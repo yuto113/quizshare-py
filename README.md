@@ -1,178 +1,194 @@
-# クイズシェア 🎯 (Flask / Python版)
+# クイズシェア 🎯 - PythonAnywhere 無料デプロイ版
 
-グループ内でクイズを出し合い、**タイム計測・採点・難易度評価・感想投稿・統計表示** ができる
-Webアプリです。Python + Flask + HTML + 最小限のJavaScript で作られています。
-
----
-
-## ✨ 主な機能
-
-- グループを作って合言葉(ID)で仲間を招待
-- クイズ投稿(記述式 / 選択式 / タグ付き)
-- タイム計測つきの採点
-- 感想(★1〜5 + コメント)と統計表示
-- 管理者モード `/<ID>/setting/` で閲覧のみ切替・グループ削除
-- 利用規約・プライバシーポリシー・ヘルプページ内蔵
-- 違法投稿・名誉毀損などに対する<strong>同意チェックボックス</strong>を各所に配置し、
-  管理者が責任を負わない設計
+**完全無料・期限なし・クレカ不要**で使える
+Python (Flask) + SQLite のWebアプリです。
 
 ---
 
-## 📁 ファイル構成
+## 🌐 なぜPythonAnywhere?
+
+| 比較 | PythonAnywhere | Render | Railway |
+|-----|--------------|--------|---------|
+| 料金 | **ずっと無料** | 無料(DB30日で消える) | クレカ必要 |
+| DB | SQLite永久保存 | PostgreSQL30日のみ | PostgreSQL |
+| 寝る | ❌なし | 😴15分で寝る | - |
+| 難しさ | ★☆☆ かんたん | ★★☆ | ★★★ |
+
+**→ PythonAnywhereが一番かんたんで、ずっと無料で使える！**
+
+---
+
+## 🚀 デプロイ手順 (全部で約15分)
+
+### ステップ1: アカウント作成
+
+1. [https://www.pythonanywhere.com](https://www.pythonanywhere.com) にアクセス
+2. 「Start running Python Online」→「Create a Beginner account」
+3. ユーザー名・パスワード・メールを設定(クレカ不要!)
+
+---
+
+### ステップ2: ファイルをアップロード
+
+**ダッシュボード → Files タブ** を開く
+
+ホーム(`/home/あなたのユーザー名/`)に `quizshare-py` フォルダを作って、
+以下のファイルをすべてアップロード:
 
 ```
 quizshare-py/
-├── app.py                # Flask本体。ルーティング・API・DB・認証
-├── requirements.txt      # Python依存ライブラリ
-├── Procfile              # Railway用の起動コマンド
-├── runtime.txt           # Pythonのバージョン
-├── railway.json          # Railway設定
-├── .env.example          # 環境変数のサンプル
-├── .gitignore
-├── README.md
+├── app.py
+├── requirements.txt
 ├── static/
-│   ├── style.css         # 共通スタイル
-│   └── app.js            # 共通の通信・トースト・モーダル処理
+│   ├── style.css
+│   └── app.js
 └── templates/
-    ├── base.html         # 全ページ共通のひな形(ヘッダー=左チーム名、右ナビ+ログアウト)
-    ├── entry.html        # トップ(グループログイン)
-    ├── create_group.html # 新しいグループ作成
-    ├── group.html        # グループ画面(クイズ一覧+追加)
-    ├── answer.html       # クイズ回答(タイマー+結果+感想+統計)
-    ├── admin.html        # 管理者画面(/<ID>/setting/)
-    ├── terms.html        # 利用規約
-    ├── privacy.html      # プライバシーポリシー
-    ├── help.html         # ヘルプ
+    ├── base.html
+    ├── entry.html
+    ├── create_group.html
+    ├── group.html
+    ├── answer.html
+    ├── admin.html
+    ├── terms.html
+    ├── privacy.html
+    ├── help.html
     ├── 404.html
     └── 500.html
 ```
 
----
-
-## 💻 ローカル開発
-
-### 1. 依存ライブラリをインストール
-
-```bash
-cd quizshare-py
-python -m venv .venv
-source .venv/bin/activate        # Windows は .venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-### 2. 環境変数を設定
-
-```bash
-cp .env.example .env
-# .env をエディタで開いて PEPPER と FLASK_SECRET_KEY を書き換える
-python -c "import secrets; print(secrets.token_hex(32))"  # でランダム文字列が作れる
-```
-
-### 3. 起動
-
-```bash
-python app.py
-```
-
-→ `http://localhost:5000` にアクセス。
-
-データベースは `DATABASE_URL` が空なら自動で **SQLite**(ファイルベース、設定不要)になります。
+> **ヒント**: zipファイルをアップロードして、Bash Consoleで展開することもできるよ↓
+> ```bash
+> cd ~
+> unzip quizshare-flask.zip
+> mv quizshare-py quizshare-py  # すでにこの名前
+> ```
 
 ---
 
-## 🚀 Railwayへのデプロイ
+### ステップ3: ライブラリをインストール
 
-### 1. GitHubにpush
+**ダッシュボード → Consoles → Bash** を開いて入力:
 
 ```bash
-git init
-git add .
-git commit -m "initial commit (Flask版)"
-git branch -M main
-git remote add origin https://github.com/<your-name>/quizshare-py.git
-git push -u origin main
+pip3 install flask python-dotenv --user
 ```
 
-### 2. Railwayでプロジェクト作成
+---
 
-1. [Railway](https://railway.app) → **New Project** → **Deploy from GitHub repo**
-2. リポジトリを選択 → 自動で Python/Flask プロジェクトとしてビルド開始
-3. ビルドに `requirements.txt`、起動に `Procfile` が使われます
+### ステップ4: Webアプリを設定
 
-### 3. PostgreSQLを追加
+1. **ダッシュボード → Web タブ** を開く
+2. 「Add a new web app」をクリック
+3. 「Next」→「Flask」→「Python 3.10」→「Next」
+4. Pathの入力欄に以下を入力:
+   ```
+   /home/あなたのユーザー名/quizshare-py/app.py
+   ```
+5. 「Next」で完了
 
-同じプロジェクトで **+ New** → **Database** → **Add PostgreSQL**
-→ `DATABASE_URL` が自動で注入されるので設定不要です。
+---
 
-### 4. 環境変数を設定
+### ステップ5: WSGIファイルを書き換える
 
-Webサービスの **Variables** タブで以下を追加:
+1. **Web タブ** の「WSGI configuration file」リンクをクリック
+2. ファイルの中身を**全部消して**、以下を貼り付ける:
 
-| 変数名              | 値                                | 説明 |
-|---------------------|----------------------------------|------|
-| `PEPPER`            | 32文字以上のランダム文字列        | グループIDやパスワードの暗号化に使用 |
-| `FLASK_SECRET_KEY`  | 別の32文字以上ランダム文字列      | セッションクッキー暗号化用 |
-| `FLASK_DEBUG`       | `0`                              | 本番モード |
+```python
+import sys
+import os
 
-ランダム文字列の生成:
+# プロジェクトのフォルダ(「myusername」を自分のユーザー名に変えてね!)
+project_home = '/home/myusername/quizshare-py'
+if project_home not in sys.path:
+    sys.path.insert(0, project_home)
+
+# ひみつの鍵を設定(下の文字列は変えてね!)
+os.environ['PEPPER'] = 'ここに32文字以上のランダムな文字列'
+os.environ['FLASK_SECRET_KEY'] = 'ここに別の32文字以上のランダムな文字列'
+os.environ['SQLITE_PATH'] = '/home/myusername/quizshare.db'
+os.environ['FLASK_DEBUG'] = '0'
+
+from app import app as application
+```
+
+3. ランダムな文字列の作り方(BashConsoleで):
+   ```bash
+   python3 -c "import secrets; print(secrets.token_hex(32))"
+   ```
+   2回実行して、1つ目をPEPPER、2つ目をFLASK_SECRET_KEYに使ってね
+
+4. **「Save」ボタン**を押す
+
+---
+
+### ステップ6: 起動!
+
+1. **Web タブ**に戻る
+2. 緑の「**Reload**」ボタンを押す
+3. `https://あなたのユーザー名.pythonanywhere.com` にアクセス!
+
+---
+
+## ✅ うまくいったか確認
+
+- `https://あなたのユーザー名.pythonanywhere.com` にアクセス
+- ログイン画面が出ればOK!
+- 最初にグループを作成してみよう
+
+---
+
+## ⚠️ よくあるエラーと対処法
+
+### エラーログの見方
+Web タブ → 「Error log」リンクをクリック
+
+### `ModuleNotFoundError: No module named 'flask'`
 ```bash
-python -c "import secrets; print(secrets.token_hex(32))"
+pip3 install flask --user
 ```
+を実行して、Webタブで「Reload」
 
-⚠️ **PEPPER は一度決めたら絶対に変更しないこと**
-(変更すると既存のグループにアクセスできなくなります)
+### `OperationalError: unable to open database file`
+WSGIファイルの `SQLITE_PATH` のパスに「myusername」→自分のユーザー名に変えたか確認!
 
-### 5. ドメインを発行
-
-**Settings** → **Networking** → **Generate Domain** で公開URLが取得できます。
-
-以降、`main` ブランチへの push で自動再デプロイされます。
-
----
-
-## 🔐 セキュリティ設計
-
-| 脅威 | 対策 |
-|------|------|
-| DBダンプからグループID漏洩 | `HMAC-SHA256(PEPPER, id)` でハッシュ化して保存 |
-| 管理者パスワード漏洩 | `scrypt` + ランダムsalt(N=16384)でハッシュ化 |
-| 答えのクライアント漏洩 | 答え合わせはサーバー側。ブラウザには答えが渡らない |
-| 他グループへの侵入 | すべてのAPIでセッションのグループIDを検証 |
-| SQLインジェクション | プレースホルダ(`%s` / `?`)のみ使用、文字列連結禁止 |
-| 総当たり攻撃 | IP別に1分単位のレート制限(作成10/分、管理者ログイン10/分) |
-| セッション乗っ取り | HttpOnly・SameSite=Lax・本番はSecureフラグ付き |
-| 管理者の誤削除 | グループIDの再入力 + 責任確認チェックの2段階確認 |
+### ページが真っ白になる
+- Error logを確認
+- WSGIファイルの `project_home` のパスを確認
 
 ---
 
-## 📝 設計のポイント
+## 🔄 ファイルを更新したいとき
 
-### コーディングルール(ユーザー指定)に従った設計
-
-1. ✅ **基本Python** — ロジック・認証・DB操作・採点はすべて `app.py` 内
-2. ✅ **デザインはHTML** — レイアウトは Jinja2 テンプレート、見た目は CSS
-3. ✅ **JSは必要な時だけ** — すべてのJSブロックの先頭に `#` で理由をコメント
-4. ✅ **新中1にもわかる日本語コメント** — 専門用語はひらがな + たとえ話で説明
-5. ✅ **一部リロードで動く** — すべてのフォーム送信を `fetch` で行い、ページ全体はリロードしない
-6. ✅ **法令遵守の同意チェック** — グループ作成・クイズ投稿・感想投稿・グループ削除の
-    4箇所に「違法ではないこと」「責任の所在」のチェックボックスを配置
-
-### ヘッダーデザイン
-
-- **左端**: チーム名(ログイン前は「クイズシェア」、ログイン後はグループ名)
-- **右端**: クイズ一覧 / ヘルプ / 利用規約 / プライバシー / ログアウト
-
-### データベースの自動選択
-
-- `DATABASE_URL` が設定されていれば → **PostgreSQL**(本番)
-- 空なら → **SQLite**(ローカル)
-- 両方で動くよう SQL は `%s` プレースホルダで書き、実行時に `?` へ変換
+1. FilesタブでファイルをアップロードしてHire
+2. Webタブで「Reload」ボタンを押すだけ!
 
 ---
 
-## 📜 ライセンス
+## 💡 無料プランの制限
 
-MIT
+| 制限 | 内容 |
+|-----|-----|
+| CPU | 1日100秒まで(クイズアプリなら十分) |
+| ディスク | 512MB |
+| 外部アクセス | 一部サイトへのHTTPのみ(このアプリは関係なし) |
+| アプリ数 | 1個まで |
+
+---
+
+## 🗄️ データはどこに保存される?
+
+`/home/あなたのユーザー名/quizshare.db` というファイルに保存されるよ。
+SQLiteというファイル型のデータベースで、サーバーを再起動しても消えない。
+
+バックアップしたいときは、FilesタブからこのDBファイルをダウンロードできるよ!
+
+---
+
+## 🔒 セキュリティメモ
+
+- PEPPERとFLASK_SECRET_KEYは必ず変えること(デフォルト値では危ない!)
+- WSGIファイルはWebからは見えないので、ここに書いても安全
+- PythonAnywhereは自動でHTTPS(鍵マーク)になるよ
 
 ---
 

@@ -1,4 +1,8 @@
+# PythonAnywhere は psycopg2 不要(SQLiteを使うから)
+# もしRailwayなど PostgreSQL環境にデプロイするときだけ psycopg2-binary を追加してね
+
 Flask==3.0.3
-psycopg2-binary==2.9.9
-gunicorn==22.0.0
 python-dotenv==1.0.1
+
+# 本番(PostgreSQL)で使うときだけ必要(PythonAnywhereは不要)
+# psycopg2-binary==2.9.9
