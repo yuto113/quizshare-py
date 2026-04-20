@@ -886,21 +886,21 @@ def api_admin_login(group_id):
     if not password:
         return err('パスワードを入力してね')
 
+    admin_password = os.environ.get('ADMIN_PASSWORD', '')
+    if not admin_password:
+        return err('管理者パスワードが設定されていないよ', 403)
+    if not hmac.compare_digest(password, admin_password):
+        return err('パスワードが違うよ', 401)
+
     with get_db() as conn:
         cur = make_cursor(conn)
-        cur.execute(q('SELECT id, admin_password_hash FROM groups WHERE group_id_hash = %s'),
+        cur.execute(q('SELECT id FROM groups WHERE group_id_hash = %s'),
                     (hash_group_id(group_id),))
         row = cur.fetchone()
 
     if not row:
         return err('グループが見つからないよ', 404)
-    stored = row['admin_password_hash']
-    if not stored:
-        return err('このグループには管理者パスワードが設定されていないよ', 403)
-    if not verify_password(password, stored):
-        return err('パスワードが違うよ', 401)
 
-    # 管理者ログイン情報をセッションに保存(1時間で自動的に切れる)
     session['admin'] = {
         'group_uuid': str(row['id']),
         'expires_at': time.time() + 3600,
