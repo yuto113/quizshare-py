@@ -1,0 +1,429 @@
+{# ============================================================
+   group.html : グループに入ったあとのメイン画面
+   クイズ一覧・追加・タグ絞り込みをリロードなしで行う
+   ============================================================ #}
+{% extends "base.html" %}
+{% block title %}{{ group.name }} - クイズシェア{% endblock %}
+
+{% block content %}
+<div class="container">
+  {% if group.view_only %}
+  <div class="info-bar">
+    👁️ <strong>閲覧のみモード</strong>が有効です。クイズの追加・削除はできませんが、回答と感想の投稿は可能です。
+  </div>
+  {% endif %}
+
+  <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:20px;">
+    <div>
+      <h1 class="page-title">🎯 クイズ一覧</h1>
+      <p class="page-subtitle" id="count-label">読み込み中...</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
+      <span style="font-size:11px; color:#9CA3AF; font-weight:900;">グループID</span>
+      <button class="btn btn-secondary" id="copy-id-btn" style="font-family:monospace; font-size:12px; padding:6px 12px;">
+        📋 {{ current_group_id }}
+      </button>
+    </div>
+  </div>
+
+  {# ===== タグ絞り込み(JSで動的に出す) ===== #}
+  <div class="filter-bar" id="tag-filter" style="display:none;">
+    <span class="filter-label">🏷️ タグ</span>
+    {# 中身はJSで入れる #}
+  </div>
+
+  {# ===== クイズ一覧が入る場所 ===== #}
+  <div id="quiz-list" class="quiz-grid">
+    <p style="grid-column:1/-1; text-align:center; color:#9CA3AF; padding:40px 0;">
+      読み込み中...
+    </p>
+  </div>
+</div>
+
+{# ===== クイズ追加ボタン(閲覧モードだと出さない) ===== #}
+{% if not group.view_only %}
+<button class="fab" id="btn-add-quiz" aria-label="クイズを追加">+</button>
+{% endif %}
+
+{# ==========================================================
+   クイズ追加モーダル
+   ========================================================== #}
+<div class="modal-overlay" id="modal-add" style="display:none;">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span>➕ クイズを追加</span>
+      <button type="button" class="modal-close" onclick="closeModal('modal-add')">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="add-form">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">名前 *</label>
+            <input type="text" id="q-name" class="form-control" placeholder="山田太郎" maxlength="30" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">クラス</label>
+            <input type="text" id="q-class" class="form-control" placeholder="3年A組" maxlength="20">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">クイズ(問題) *</label>
+          <textarea id="q-question" class="form-control" placeholder="問題文を入力..." maxlength="500" rows="3" required></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">回答形式</label>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <button type="button" class="mode-btn btn-secondary" data-mode="text"
+                    style="padding:10px; border-radius:10px; border:2px solid var(--c-main); background:var(--c-main); color:#fff; font-weight:900; cursor:pointer;">
+              📝 記述
+            </button>
+            <button type="button" class="mode-btn btn-secondary" data-mode="options"
+                    style="padding:10px; border-radius:10px; border:2px solid transparent; background:var(--c-soft); color:var(--c-main); font-weight:900; cursor:pointer;">
+              📋 選択
+            </button>
+          </div>
+        </div>
+
+        <div id="text-mode" class="form-group">
+          <label class="form-label">答え *</label>
+          <textarea id="q-answer" class="form-control" placeholder="答えを入力..." maxlength="500" rows="2"></textarea>
+          <p class="form-help">※大文字/小文字・空白・一部の句読点のちがいは無視して採点されるよ</p>
+        </div>
+
+        <div id="options-mode" class="form-group" style="display:none;">
+          <label class="form-label">選択肢と正解 *</label>
+          <div id="opt-list">
+            <div class="opt-row" style="display:flex; gap:8px; margin-bottom:6px; align-items:center;">
+              <button type="button" class="opt-correct" data-idx="0"
+                      style="width:32px; height:32px; border-radius:50%; border:none; background:#10B981; color:#fff; font-weight:900; cursor:pointer;">✓</button>
+              <input type="text" class="form-control opt-input" placeholder="選択肢 A" maxlength="100">
+            </div>
+            <div class="opt-row" style="display:flex; gap:8px; margin-bottom:6px; align-items:center;">
+              <button type="button" class="opt-correct" data-idx="1"
+                      style="width:32px; height:32px; border-radius:50%; border:none; background:var(--c-soft); color:var(--c-main); font-weight:900; cursor:pointer;">B</button>
+              <input type="text" class="form-control opt-input" placeholder="選択肢 B" maxlength="100">
+            </div>
+          </div>
+          <button type="button" id="btn-add-opt" class="btn btn-secondary" style="margin-top:6px; font-size:12px; padding:6px 12px;">
+            ➕ 選択肢を追加
+          </button>
+          <p class="form-help">緑の✓ボタンで正解を選んでね</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">🏷️ タグ</label>
+          <input type="text" id="q-tag-input" class="form-control" placeholder="タグを入力してEnter(カンマ区切りOK)" maxlength="20">
+          <div id="q-tags" style="display:flex; flex-wrap:wrap; gap:4px; margin-top:8px;"></div>
+        </div>
+
+        {# ===== 違法チェック ===== #}
+        <label class="form-check">
+          <input type="checkbox" id="q-confirm-legal" required>
+          <span>
+            このクイズは、他人の著作物のそのままの引用や、特定の人を傷つける内容、個人情報、
+            公序良俗に反する内容を<strong>含んでいません</strong>。
+          </span>
+        </label>
+
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top:12px;">
+          ✅ 保存する
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ============================================================
+// グループ画面のスクリプト
+// # クイズ一覧を取得→表示、タグ絞り込み、追加をすべてJS+fetchで処理する(リロードしない)。
+// ============================================================
+
+const state = {
+  quizzes: [],
+  filterTags: new Set(),
+  viewOnly: {{ 'true' if group.view_only else 'false' }},
+};
+
+// ---- クイズ一覧を読み込む ----
+async function loadQuizzes() {
+  try {
+    const r = await window.api.get('/api/quizzes');
+    state.quizzes = r.quizzes;
+    state.viewOnly = r.view_only;
+    renderTagFilter();
+    renderQuizzes();
+  } catch (err) {
+    window.toast(err.message, 'error');
+  }
+}
+
+// ---- タグ絞り込みバーを表示 ----
+function renderTagFilter() {
+  const all = new Set();
+  state.quizzes.forEach(q => (q.tags || []).forEach(t => all.add(t)));
+  const tags = Array.from(all).sort();
+  const bar = document.getElementById('tag-filter');
+  if (tags.length === 0) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  let html = '<span class="filter-label">🏷️ タグ</span>';
+  tags.forEach(t => {
+    const active = state.filterTags.has(t);
+    html += `<button class="q-tag button ${active?'active':''}" data-tag="${escapeHtml(t)}">#${escapeHtml(t)}</button>`;
+  });
+  if (state.filterTags.size > 0) {
+    html += '<button id="clear-filter" style="font-size:11px; font-weight:700; color:#6B7280; background:none; border:none; cursor:pointer; text-decoration:underline;">クリア</button>';
+  }
+  bar.innerHTML = html;
+}
+
+// タグのクリック(絞り込み)
+document.getElementById('tag-filter').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-tag]');
+  if (btn) {
+    const t = btn.dataset.tag;
+    if (state.filterTags.has(t)) state.filterTags.delete(t);
+    else state.filterTags.add(t);
+    renderTagFilter();
+    renderQuizzes();
+    return;
+  }
+  if (e.target.id === 'clear-filter') {
+    state.filterTags.clear();
+    renderTagFilter();
+    renderQuizzes();
+  }
+});
+
+// ---- クイズカード一覧を表示 ----
+function renderQuizzes() {
+  const list = document.getElementById('quiz-list');
+  const filters = Array.from(state.filterTags);
+  const filtered = filters.length === 0
+    ? state.quizzes
+    : state.quizzes.filter(q => filters.every(t => (q.tags||[]).includes(t)));
+
+  document.getElementById('count-label').textContent =
+    filters.length === 0
+      ? `全 ${state.quizzes.length} 問`
+      : `${filtered.length} 問 / 全 ${state.quizzes.length} 問中`;
+
+  if (filtered.length === 0) {
+    list.innerHTML = `
+      <div style="grid-column:1/-1; text-align:center; padding:60px 20px;">
+        <div style="font-size:64px; margin-bottom:12px;">${state.quizzes.length === 0 ? '📝' : '🔍'}</div>
+        <p style="font-family:'Zen Maru Gothic',sans-serif; font-weight:900; font-size:18px; margin:0 0 4px;">
+          ${state.quizzes.length === 0 ? 'まだクイズがないよ' : '該当するクイズがないよ'}
+        </p>
+        <p style="color:#9CA3AF; font-size:13px; margin:0;">
+          ${state.quizzes.length === 0
+              ? (state.viewOnly ? 'クイズが追加されるのを待ちましょう' : '右下の+ボタンから追加しよう')
+              : 'タグ絞り込みをクリアしてみてね'}
+        </p>
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(q => cardHtml(q)).join('');
+}
+
+function cardHtml(q) {
+  const acc = q.attempts > 0 ? Math.round((q.corrects / q.attempts) * 100) : null;
+  const accClass = acc === null ? '' : acc >= 70 ? 'good' : acc >= 40 ? 'mid' : 'bad';
+  return `
+    <a href="/answer/${encodeURIComponent(q.id)}" class="quiz-card" style="text-decoration:none; color:inherit; display:flex; flex-direction:column;">
+      <div class="q-tags">
+        ${(q.tags||[]).slice(0,3).map(t => `<span class="q-tag">#${escapeHtml(t)}</span>`).join('')}
+        ${q.has_options ? '<span class="q-tag" style="background:#F3F4F6; color:#6B7280;">📋 選択</span>' : ''}
+      </div>
+      <div class="q-question">${escapeHtml(q.question)}</div>
+      ${q.attempts > 0 || q.feedback_count > 0 ? `
+        <div class="q-stats">
+          ${q.attempts > 0 ? `<span class="stat-item">👥 <span>${q.attempts}</span>人挑戦</span>` : ''}
+          ${acc !== null ? `<span class="stat-item ${accClass}">🏆 <span>${acc}%</span>正解</span>` : ''}
+          ${q.feedback_count > 0 && q.avg_difficulty > 0
+            ? `<span class="stat-item">${starsHtml(q.avg_difficulty)} ${q.avg_difficulty.toFixed(1)}</span>`
+            : ''}
+        </div>` : ''}
+      <div class="q-author">
+        <div class="q-author-avatar">${escapeHtml(q.name[0] || '?')}</div>
+        <div style="flex:1; min-width:0;">
+          <div class="q-author-name">${escapeHtml(q.name)}</div>
+          ${q.class_name ? `<div class="q-author-class">${escapeHtml(q.class_name)}</div>` : ''}
+        </div>
+        <span style="color:var(--c-main); font-weight:900;">→</span>
+      </div>
+    </a>`;
+}
+
+// ---- ID コピー ----
+document.getElementById('copy-id-btn').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText('{{ current_group_id }}');
+    window.toast('IDをコピーしたよ', 'success');
+  } catch {
+    window.toast('コピーに失敗したよ', 'error');
+  }
+});
+
+// ---- クイズ追加モーダル ----
+{% if not group.view_only %}
+const addBtn = document.getElementById('btn-add-quiz');
+if (addBtn) addBtn.addEventListener('click', () => window.openModal('modal-add'));
+
+// 記述/選択モードの切り替え
+let currentMode = 'text';
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentMode = btn.dataset.mode;
+    document.querySelectorAll('.mode-btn').forEach(b => {
+      if (b.dataset.mode === currentMode) {
+        b.style.background = 'var(--c-main)';
+        b.style.color = '#fff';
+        b.style.borderColor = 'var(--c-main)';
+      } else {
+        b.style.background = 'var(--c-soft)';
+        b.style.color = 'var(--c-main)';
+        b.style.borderColor = 'transparent';
+      }
+    });
+    document.getElementById('text-mode').style.display = currentMode === 'text' ? 'block' : 'none';
+    document.getElementById('options-mode').style.display = currentMode === 'options' ? 'block' : 'none';
+  });
+});
+
+// 選択肢の正解指定
+let correctIdx = 0;
+document.getElementById('opt-list').addEventListener('click', (e) => {
+  const btn = e.target.closest('.opt-correct');
+  if (!btn) return;
+  correctIdx = parseInt(btn.dataset.idx, 10);
+  document.querySelectorAll('.opt-correct').forEach(b => {
+    const idx = parseInt(b.dataset.idx, 10);
+    if (idx === correctIdx) {
+      b.style.background = '#10B981';
+      b.style.color = '#fff';
+      b.textContent = '✓';
+    } else {
+      b.style.background = 'var(--c-soft)';
+      b.style.color = 'var(--c-main)';
+      b.textContent = String.fromCharCode(65 + idx);
+    }
+  });
+});
+
+// 選択肢を追加
+document.getElementById('btn-add-opt').addEventListener('click', () => {
+  const list = document.getElementById('opt-list');
+  const count = list.children.length;
+  if (count >= 6) { window.toast('選択肢は6個までだよ', 'error'); return; }
+  const row = document.createElement('div');
+  row.className = 'opt-row';
+  row.style.cssText = 'display:flex; gap:8px; margin-bottom:6px; align-items:center;';
+  row.innerHTML = `
+    <button type="button" class="opt-correct" data-idx="${count}"
+            style="width:32px; height:32px; border-radius:50%; border:none; background:var(--c-soft); color:var(--c-main); font-weight:900; cursor:pointer;">${String.fromCharCode(65 + count)}</button>
+    <input type="text" class="form-control opt-input" placeholder="選択肢 ${String.fromCharCode(65 + count)}" maxlength="100">
+    <button type="button" class="btn-remove-opt" style="width:28px; height:28px; border:none; background:#FEE2E2; color:#DC2626; border-radius:50%; cursor:pointer;">✕</button>`;
+  list.appendChild(row);
+});
+
+// 選択肢削除
+document.getElementById('opt-list').addEventListener('click', (e) => {
+  const btn = e.target.closest('.btn-remove-opt');
+  if (!btn) return;
+  const list = document.getElementById('opt-list');
+  if (list.children.length <= 2) { window.toast('選択肢は2個以上必要だよ', 'error'); return; }
+  btn.closest('.opt-row').remove();
+  // インデックスを振り直す
+  list.querySelectorAll('.opt-correct').forEach((b, i) => {
+    b.dataset.idx = i;
+    const isCorrect = (i === correctIdx);
+    b.textContent = isCorrect ? '✓' : String.fromCharCode(65 + i);
+  });
+  // 正解がなくなった場合は最初に
+  if (correctIdx >= list.children.length) {
+    correctIdx = 0;
+    const first = list.querySelector('.opt-correct');
+    if (first) first.click();
+  }
+});
+
+// タグ入力
+const tagSet = new Set();
+function renderQTags() {
+  const box = document.getElementById('q-tags');
+  box.innerHTML = Array.from(tagSet).map(t =>
+    `<span class="q-tag" style="cursor:pointer;">#${escapeHtml(t)} <span data-remove="${escapeHtml(t)}" style="margin-left:4px;">✕</span></span>`
+  ).join('');
+}
+document.getElementById('q-tag-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    const v = e.target.value.trim().replace(/,/g, '');
+    if (v && v.length <= 20) tagSet.add(v);
+    e.target.value = '';
+    renderQTags();
+  }
+});
+document.getElementById('q-tags').addEventListener('click', (e) => {
+  const rm = e.target.closest('[data-remove]');
+  if (rm) { tagSet.delete(rm.dataset.remove); renderQTags(); }
+});
+
+// クイズ送信
+document.getElementById('add-form').addEventListener('submit', async (e) => {
+  e.preventDefault();  // リロード止める
+  const name = document.getElementById('q-name').value.trim();
+  const klass = document.getElementById('q-class').value.trim();
+  const question = document.getElementById('q-question').value.trim();
+  const confirmLegal = document.getElementById('q-confirm-legal').checked;
+
+  const payload = {
+    name, class_name: klass, question,
+    tags: Array.from(tagSet),
+    confirm_not_illegal: confirmLegal,
+  };
+
+  if (currentMode === 'text') {
+    const answer = document.getElementById('q-answer').value.trim();
+    if (!answer) { window.toast('答えを入力してね', 'error'); return; }
+    payload.answer = answer;
+  } else {
+    const opts = Array.from(document.querySelectorAll('.opt-input')).map(i => i.value.trim()).filter(v => v);
+    if (opts.length < 2) { window.toast('選択肢は2個以上入力してね', 'error'); return; }
+    if (correctIdx >= opts.length) { window.toast('正解が選択肢からはみ出てるよ', 'error'); return; }
+    payload.answer = opts[correctIdx];
+    payload.answer_options = opts;
+  }
+
+  const btn = e.target.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  btn.textContent = '保存中...';
+  try {
+    const r = await window.api.post('/api/quizzes', payload);
+    state.quizzes.unshift(r.quiz);
+    renderTagFilter();
+    renderQuizzes();
+    window.toast('追加したよ!', 'success');
+    window.closeModal('modal-add');
+    // フォーム初期化
+    e.target.reset();
+    tagSet.clear();
+    renderQTags();
+  } catch (err) {
+    window.toast(err.message, 'error');
+  }
+  btn.disabled = false;
+  btn.textContent = '✅ 保存する';
+});
+{% endif %}
+
+// 起動
+loadQuizzes();
+</script>
+{% endblock %}

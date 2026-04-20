@@ -1,0 +1,18 @@
+{# ============================================================
+   404.html : ページが見つからなかった時にでる画面
+   ============================================================ #}
+{% extends "base.html" %}
+{% block title %}ページが見つからないよ - クイズシェア{% endblock %}
+
+{% block content %}
+<div class="container-narrow">
+  <div class="card" style="text-align:center; padding:48px 24px;">
+    <div style="font-size:80px;">🔍</div>
+    <h1 class="page-title" style="margin-top:16px;">ページが見つからないよ</h1>
+    <p class="page-subtitle">
+      URLが間違っているか、ページが削除された可能性があるよ。
+    </p>
+    <a href="{{ url_for('page_home') }}" class="btn btn-primary" style="margin-top:16px;">🏠 トップに戻る</a>
+  </div>
+</div>
+{% endblock %}

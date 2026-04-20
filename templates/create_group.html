@@ -1,0 +1,185 @@
+{# ============================================================
+   create_group.html : 新しいグループを作るページ
+   利用規約や違法行為の確認チェックも入れる
+   ============================================================ #}
+{% extends "base.html" %}
+{% block title %}グループを作る - クイズシェア{% endblock %}
+
+{% block content %}
+<div class="container-narrow">
+  <a href="{{ url_for('page_home') }}" style="color:#6B7280; font-weight:700; font-size:13px; display:inline-flex; align-items:center; gap:4px; margin-bottom:20px;">
+    ← 戻る
+  </a>
+
+  <div class="card anim-slideUp">
+    <h2>✨ 新しいグループ</h2>
+    <p class="form-help" style="margin-bottom:16px;">作成後、IDを仲間に共有して招待しよう</p>
+
+    <form id="create-form">
+      <div class="form-group">
+        <label class="form-label">グループ名</label>
+        <input type="text" id="grp-name" class="form-control"
+               placeholder="例: 高3A組 化学クイズ部" maxlength="50" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">
+          🔑 グループID (合言葉)
+          <button type="button" id="btn-random-id"
+                  style="float:right; background:var(--c-soft); color:var(--c-main); border:none; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:900; cursor:pointer;">
+            🎲 ランダム生成
+          </button>
+        </label>
+        <input type="text" id="grp-id" class="form-control mono"
+               placeholder="半角英数字・ハイフン・6文字以上"
+               pattern="[a-zA-Z0-9_-]{6,32}" required autocomplete="off">
+        <p class="form-help">🔒 このIDがグループへの合言葉になるよ。推測されにくいものにしてね。</p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">🎨 グループのテーマカラー</label>
+        <div class="color-grid" id="color-grid">
+          {% set colors = [
+            ('#E85A8A', 'さくら'), ('#4A7FD9', '瑠璃'),
+            ('#4DB07A', '若葉'),   ('#E88555', '夕焼け'),
+            ('#8874D4', '藤'),     ('#3BA0A0', '緑青'),
+            ('#E67562', '珊瑚'),   ('#D4A33B', '山吹')
+          ] %}
+          {% for hex, name in colors %}
+          <button type="button" class="color-swatch {% if loop.first %}active{% endif %}"
+                  data-color="{{ hex }}"
+                  style="background:{{ hex }}; color:{{ hex }};"
+                  title="{{ name }}">
+            <span class="check" style="display:{% if loop.first %}flex{% else %}none{% endif %}">✓</span>
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# ===== 管理者パスワード(任意) ===== #}
+      <div style="margin:20px 0; padding:14px; border:2px dashed #E5E7EB; border-radius:14px; background:#FAFAFA;">
+        <label style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+          <span style="font-weight:900; font-size:13px;">
+            🛡️ 管理者を設定する
+            <span style="font-weight:400; font-size:11px; color:#9CA3AF; margin-left:6px;">(任意)</span>
+          </span>
+          <input type="checkbox" id="set-admin" style="width:18px; height:18px; accent-color:var(--c-main);">
+        </label>
+        <p class="form-help" style="margin-top:6px;">
+          パスワードを設定すると <code style="background:#fff; padding:1px 4px; border-radius:4px;">/&lt;ID&gt;/setting/</code> から管理画面に入れるよ。
+          閲覧モードや削除ができるようになるよ。
+        </p>
+        <div id="admin-fields" style="display:none; margin-top:12px;">
+          <div class="form-group">
+            <label class="form-label">管理者パスワード</label>
+            <input type="password" id="admin-pw" class="form-control" placeholder="6文字以上" maxlength="100">
+          </div>
+          <div class="form-group">
+            <label class="form-label">もう一度入力</label>
+            <input type="password" id="admin-pw2" class="form-control" placeholder="確認" maxlength="100">
+          </div>
+          <p style="font-size:10px; color:#B45309; background:#FEF3C7; padding:8px 10px; border-radius:8px; margin:0;">
+            ⚠️ パスワードを忘れると管理画面に入れなくなるよ。忘れないようにメモしてね。
+          </p>
+        </div>
+      </div>
+
+      {# ===== 利用規約と違法行為の確認チェック ===== #}
+      {# # ここで同意してもらうことで、管理者が責任を負わない範囲をはっきりさせる #}
+      <label class="form-check">
+        <input type="checkbox" id="agree-terms" required>
+        <span>
+          <a href="{{ url_for('page_terms') }}" target="_blank" style="color:var(--c-main); font-weight:900;">利用規約</a>
+          と
+          <a href="{{ url_for('page_privacy') }}" target="_blank" style="color:var(--c-main); font-weight:900;">プライバシーポリシー</a>
+          に同意します
+        </span>
+      </label>
+      <label class="form-check">
+        <input type="checkbox" id="confirm-legal" required>
+        <span>
+          このグループで作成・共有する内容は、日本国の法律や
+          他人の権利(著作権・プライバシーなど)に
+          <strong>違反しないこと</strong>を約束します
+        </span>
+      </label>
+
+      <button type="submit" class="btn btn-primary btn-block" style="margin-top:16px;">
+        ✨ 作成する
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ============================================================
+// グループ作成ページのスクリプト
+// # 色の選択、管理者チェックボックス、送信すべてJSで扱う。
+// #   送信はfetchなのでページはリロードされない=書きかけの内容が消えない。
+// ============================================================
+
+let selectedColor = '#E85A8A';
+
+// 色パレットのクリックで選択
+document.getElementById('color-grid').addEventListener('click', (e) => {
+  const btn = e.target.closest('.color-swatch');
+  if (!btn) return;
+  document.querySelectorAll('.color-swatch').forEach(b => {
+    b.classList.remove('active');
+    b.querySelector('.check').style.display = 'none';
+  });
+  btn.classList.add('active');
+  btn.querySelector('.check').style.display = 'flex';
+  selectedColor = btn.dataset.color;
+});
+
+// ランダムID生成
+document.getElementById('btn-random-id').addEventListener('click', () => {
+  const chars = 'abcdefghijkmnpqrstuvwxyz23456789';
+  let s = '';
+  for (let i = 0; i < 10; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  document.getElementById('grp-id').value = s;
+});
+
+// 管理者チェックで欄を見せる/かくす
+document.getElementById('set-admin').addEventListener('change', (e) => {
+  document.getElementById('admin-fields').style.display = e.target.checked ? 'block' : 'none';
+});
+
+// 送信
+document.getElementById('create-form').addEventListener('submit', async (e) => {
+  e.preventDefault();  // リロード防止
+
+  const name = document.getElementById('grp-name').value.trim();
+  const groupId = document.getElementById('grp-id').value.trim();
+  const setAdmin = document.getElementById('set-admin').checked;
+  const pw = document.getElementById('admin-pw').value;
+  const pw2 = document.getElementById('admin-pw2').value;
+
+  if (setAdmin) {
+    if (pw.length < 6) { window.toast('管理者パスワードは6文字以上にしてね', 'error'); return; }
+    if (pw !== pw2) { window.toast('管理者パスワードが一致しないよ', 'error'); return; }
+  }
+
+  const btn = e.target.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  btn.textContent = '作成中...';
+  try {
+    const r = await window.api.post('/api/groups', {
+      name, group_id: groupId, color: selectedColor,
+      admin_password: setAdmin ? pw : '',
+      agreed_terms: document.getElementById('agree-terms').checked,
+      confirm_not_illegal: document.getElementById('confirm-legal').checked,
+    });
+    window.toast('グループを作成したよ!', 'success');
+    setTimeout(() => { window.location.href = r.redirect || '/group'; }, 500);
+  } catch (err) {
+    window.toast(err.message, 'error');
+    btn.disabled = false;
+    btn.textContent = '✨ 作成する';
+  }
+});
+</script>
+{% endblock %}

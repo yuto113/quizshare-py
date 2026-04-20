@@ -1,0 +1,84 @@
+{# ============================================================
+   entry.html : さいしょのページ(ログインか、新しいグループを作る)
+   ============================================================ #}
+{% extends "base.html" %}
+{% block title %}クイズシェア 🎯 - はじめる{% endblock %}
+
+{% block content %}
+<div class="container-narrow" style="padding-top:48px;">
+  <div style="text-align:center; margin-bottom:32px;">
+    <div class="anim-float" style="font-size:56px; margin-bottom:8px;">🎯</div>
+    <h1 class="page-title" style="font-size:36px;">
+      クイズ<span style="color:var(--c-main);">シェア</span>
+    </h1>
+    <p class="page-subtitle">グループでクイズを出し合おう</p>
+  </div>
+
+  <div class="card anim-slideUp">
+    <h2>🔑 グループに入る</h2>
+    <p class="form-help" style="margin-bottom:16px;">
+      招待されたグループID(合言葉)を入力してね
+    </p>
+
+    {# ===== ログインフォーム ===== #}
+    {# # formのonsubmitでページリロードを止めて、fetchでサーバーに送る(=一部リロード) #}
+    <form id="login-form">
+      <div class="form-group">
+        <label class="form-label">グループID</label>
+        <input type="password" id="login-group-id" class="form-control mono"
+               placeholder="例: my-group-123"
+               required minlength="6" maxlength="32"
+               autocomplete="off">
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">
+        ➡ 入る
+      </button>
+    </form>
+
+    <div style="display:flex; align-items:center; gap:12px; margin:24px 0;">
+      <div style="flex:1; height:1px; background:#E5E7EB;"></div>
+      <span style="font-size:11px; color:#9CA3AF; font-weight:900;">または</span>
+      <div style="flex:1; height:1px; background:#E5E7EB;"></div>
+    </div>
+
+    <a href="{{ url_for('page_create') }}" class="btn btn-secondary btn-block">
+      ✨ 新しいグループを作る
+    </a>
+  </div>
+
+  <div style="margin-top:20px; padding:12px 16px; background:rgba(255,255,255,0.6);
+              backdrop-filter:blur(8px); border-radius:16px; border:1px solid #fff;
+              font-size:12px; color:#374151; display:flex; gap:8px; align-items:flex-start;">
+    <span>🛡️</span>
+    <span>
+      グループIDは <strong>暗号化されて</strong>保存されるよ。
+      管理者機能は <code style="background:#F3F4F6; padding:1px 4px; border-radius:4px;">/&lt;ID&gt;/setting/</code> からアクセスできるよ。
+    </span>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ============================================================
+// ログインフォームの処理
+// # form標準のsubmitはリロードを起こすのでJSでpreventDefaultして止める。
+// #   そしてfetchでサーバーにだけ送って、成功したらページ遷移する。
+// ============================================================
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();  // リロードを止める
+  const groupId = document.getElementById('login-group-id').value.trim();
+  const btn = e.target.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  btn.textContent = 'チェック中...';
+  try {
+    const r = await window.api.post('/api/login', { group_id: groupId });
+    window.location.href = r.redirect || '/group';
+  } catch (err) {
+    window.toast(err.message, 'error');
+    btn.disabled = false;
+    btn.textContent = '➡ 入る';
+  }
+});
+</script>
+{% endblock %}

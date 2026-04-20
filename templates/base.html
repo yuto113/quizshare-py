@@ -1,0 +1,71 @@
+{# ============================================================
+   base.html:ぜんぶのページの土台
+   左上にチーム名(ロゴ)、右上にページ移動ボタンとログアウトを置くよ。
+   ============================================================ #}
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>{% block title %}クイズシェア 🎯{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  {# 各ページが色のテーマを決めるための変数 #}
+  {% if current_group %}
+  <style>
+    :root {
+      --c-main: {{ current_group.color }};
+      --c-soft: {{ current_group.color }}1A;
+      --c-shadow: {{ current_group.color }}40;
+    }
+  </style>
+  {% endif %}
+  {% block head_extra %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+
+<header class="site-header">
+  <div class="site-header-inner">
+    {# ===== 左はじ: チーム名(ロゴ) ===== #}
+    <a href="{{ url_for('page_home') }}" class="site-header-left" style="text-decoration:none;color:inherit;">
+      {% if current_group %}
+        <span class="site-header-logo" aria-hidden="true">{{ current_group.name[0] }}</span>
+        <span class="site-header-title">
+          {{ current_group.name }}
+          {% if current_group.view_only %}
+            <span class="view-only-badge">👁️ 閲覧</span>
+          {% endif %}
+        </span>
+      {% else %}
+        <span class="site-header-logo" aria-hidden="true">🎯</span>
+        <span class="site-header-title">クイズシェア</span>
+      {% endif %}
+    </a>
+
+    {# ===== 右はじ: ページ移動ボタンとログアウト ===== #}
+    <nav class="site-header-nav">
+      {% block nav_items %}
+        {% if current_group %}
+          <a class="header-link" href="{{ url_for('page_group') }}">🏠 クイズ</a>
+        {% endif %}
+        <a class="header-link" href="{{ url_for('page_help') }}">❓ ヘルプ</a>
+        <a class="header-link" href="{{ url_for('page_terms') }}">📜 利用規約</a>
+        <a class="header-link" href="{{ url_for('page_privacy') }}">🔒 プライバシー</a>
+        {% if current_group %}
+          <a class="header-link danger" href="#" data-action="logout">↪ ログアウト</a>
+        {% endif %}
+      {% endblock %}
+    </nav>
+  </div>
+</header>
+
+<main>
+  {% block content %}{% endblock %}
+</main>
+
+{# ===== 共通JSを読みこむ ===== #}
+{# # リロードなしでサーバーとやり取りするため、fetch APIを使う共通スクリプト #}
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

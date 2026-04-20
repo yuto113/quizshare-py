@@ -1,0 +1,18 @@
+{# ============================================================
+   500.html : サーバーエラーのときに出る画面
+   ============================================================ #}
+{% extends "base.html" %}
+{% block title %}サーバーエラー - クイズシェア{% endblock %}
+
+{% block content %}
+<div class="container-narrow">
+  <div class="card" style="text-align:center; padding:48px 24px;">
+    <div style="font-size:80px;">⚠️</div>
+    <h1 class="page-title" style="margin-top:16px;">サーバーでエラーが起きたよ</h1>
+    <p class="page-subtitle">
+      少し時間をおいてから、もう一度試してね。
+    </p>
+    <a href="{{ url_for('page_home') }}" class="btn btn-primary" style="margin-top:16px;">🏠 トップに戻る</a>
+  </div>
+</div>
+{% endblock %}

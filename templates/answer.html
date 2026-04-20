@@ -1,0 +1,486 @@
+{# ============================================================
+   answer.html : クイズに答えるページ
+   タイム計測・◎✖採点・感想投稿・統計表示をリロードなしで行う
+   ============================================================ #}
+{% extends "base.html" %}
+{% block title %}{{ quiz.question[:20] }}... - クイズシェア{% endblock %}
+
+{% block nav_items %}
+  <a class="header-link" href="{{ url_for('page_group') }}">← 一覧へ</a>
+  <a class="header-link" href="{{ url_for('page_help') }}">❓ ヘルプ</a>
+  <a class="header-link" href="{{ url_for('page_terms') }}">📜 利用規約</a>
+  <a class="header-link" href="{{ url_for('page_privacy') }}">🔒 プライバシー</a>
+  <a class="header-link danger" href="#" data-action="logout">↪ ログアウト</a>
+{% endblock %}
+
+{% block content %}
+<div class="container-narrow">
+
+  {# ===== 出題者情報とタイマー ===== #}
+  <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
+    <div class="q-author-avatar" style="width:40px; height:40px; font-size:16px;">
+      {{ quiz.author_name[0] }}
+    </div>
+    <div style="flex:1; min-width:0;">
+      <div style="font-size:11px; color:#9CA3AF; font-weight:900;">出題者</div>
+      <div class="display-font" style="font-weight:900; font-size:16px;">
+        {{ quiz.author_name }}
+        {% if quiz.class_name %}
+          <span style="color:#9CA3AF; font-weight:500; font-size:13px; margin-left:6px;">/ {{ quiz.class_name }}</span>
+        {% endif %}
+      </div>
+    </div>
+    {# ===== タイマー表示(回答前のみ) ===== #}
+    <span class="timer-badge" id="timer-badge">⏱️ <span id="timer-text">0.0</span>秒</span>
+  </div>
+
+  {% if quiz.tags %}
+  <div class="q-tags" style="margin-bottom:12px;">
+    {% for t in quiz.tags %}<span class="q-tag">#{{ t }}</span>{% endfor %}
+  </div>
+  {% endif %}
+
+  {# ===== 問題本文 ===== #}
+  <div style="background:linear-gradient(135deg, var(--c-soft), rgba(255,255,255,0.1));
+              border: 2px solid var(--c-soft);
+              border-radius: var(--radius-lg);
+              padding: 28px; margin-bottom:24px;"
+       class="anim-slideUp">
+    <div style="font-size:11px; font-weight:900; letter-spacing:0.1em; color:var(--c-main); margin-bottom:12px;">
+      ━━━ QUESTION
+    </div>
+    <h2 class="display-font" style="font-weight:900; font-size:24px; line-height:1.5; margin:0; white-space:pre-wrap;">{{ quiz.question }}</h2>
+  </div>
+
+  {# ===== 回答フォーム ===== #}
+  <div id="answer-section">
+    {% if quiz.has_options %}
+      {# 選択式 #}
+      <div id="options-list">
+        {% for opt in quiz.answer_options %}
+        <button type="button" class="option-btn" data-option="{{ opt }}">
+          <span class="option-badge">{{ 'ABCDEF'[loop.index0] }}</span>
+          <span class="display-font">{{ opt }}</span>
+        </button>
+        {% endfor %}
+      </div>
+    {% else %}
+      {# 記述式 #}
+      <div class="form-group">
+        <label class="form-label">📝 あなたの答え</label>
+        <input type="text" id="answer-input" class="form-control display-font"
+               style="font-size:18px; font-weight:700; padding:14px;"
+               placeholder="答えを入力..." maxlength="500" autocomplete="off">
+      </div>
+    {% endif %}
+
+    <button id="submit-answer" class="btn btn-primary btn-block" style="margin-top:16px; font-size:16px; padding:14px;">
+      ➡ 答える
+    </button>
+  </div>
+
+  {# ===== 採点結果の表示エリア(最初はかくす) ===== #}
+  <div id="result-section" style="display:none;">
+    <div class="result-mark" id="result-mark"></div>
+    <h2 class="result-title" id="result-title"></h2>
+
+    <div style="text-align:center; margin:12px 0;">
+      <span class="time-pill">⏱️ <span id="result-time"></span></span>
+    </div>
+
+    <div style="max-width:400px; margin:24px auto 0;
+                padding:20px; border-radius:20px;
+                background:linear-gradient(135deg, #ECFDF5, #D1FAE5);
+                border:2px solid #10B981;"
+         id="result-box">
+      <div style="font-size:10px; font-weight:900; color:#059669; letter-spacing:0.1em; margin-bottom:6px;">
+        CORRECT ANSWER ✨
+      </div>
+      <p class="display-font" style="font-size:20px; font-weight:900; margin:0; word-break:break-all;" id="result-answer"></p>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; max-width:400px; margin:24px auto 0;">
+      <button id="retry-btn" class="btn btn-secondary">🔄 もう一度</button>
+      <a href="{{ url_for('page_group') }}" class="btn btn-primary">→ 一覧へ</a>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:400px; margin:32px auto 0;">
+      <button id="btn-feedback" class="btn btn-secondary" style="border-color:#FCD34D; background:#FFFBEB; color:#92400E; padding:12px; flex-direction:column; height:auto;">
+        <span style="font-size:18px;">💬</span>
+        <span style="font-size:12px;">感想を書く</span>
+      </button>
+      <button id="btn-stats" class="btn btn-secondary" style="border-color:#93C5FD; background:#EFF6FF; color:#1E40AF; padding:12px; flex-direction:column; height:auto;">
+        <span style="font-size:18px;">📊</span>
+        <span style="font-size:12px;">統計を見る</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+{# ===========================
+   フィードバックモーダル
+   =========================== #}
+<div class="modal-overlay" id="modal-feedback" style="display:none;">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span>💬 感想と難易度</span>
+      <button class="modal-close" onclick="closeModal('modal-feedback')">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="fb-form">
+        <div class="form-group">
+          <label class="form-label">難易度はどうだった?</label>
+          <div class="stars big" id="fb-stars" style="justify-content:center; padding:8px 0;">
+            <button type="button" class="star-btn" data-val="1">★</button>
+            <button type="button" class="star-btn" data-val="2">★</button>
+            <button type="button" class="star-btn" data-val="3">★</button>
+            <button type="button" class="star-btn" data-val="4">★</button>
+            <button type="button" class="star-btn" data-val="5">★</button>
+          </div>
+          <div style="text-align:center; font-size:13px; font-weight:700; color:#6B7280; height:20px;" id="fb-label">
+            星を選んでね
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">感想(任意)</label>
+          <textarea id="fb-comment" class="form-control" placeholder="例: 面白かった! / ヒントがほしい"
+                    rows="3" maxlength="500"></textarea>
+          <div style="text-align:right; font-size:10px; color:#9CA3AF;"><span id="fb-count">0</span>/500</div>
+        </div>
+
+        {# ===== 感想の確認チェック ===== #}
+        <label class="form-check">
+          <input type="checkbox" id="fb-confirm-legal" required>
+          <span>特定の人を傷つけたり、不適切な表現を<strong>含んでいません</strong></span>
+        </label>
+
+        <button type="submit" id="fb-submit" class="btn btn-primary btn-block" style="margin-top:10px;" disabled>
+          ✉ 送信する
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# ===========================
+   統計モーダル
+   =========================== #}
+<div class="modal-overlay" id="modal-stats" style="display:none;">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span>📊 みんなの統計</span>
+      <button class="modal-close" onclick="closeModal('modal-stats')">✕</button>
+    </div>
+    <div class="modal-body" id="stats-body">
+      <p style="text-align:center; padding:40px 0; color:#9CA3AF;">読み込み中...</p>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ============================================================
+// 回答ページのスクリプト
+// # タイマーを100ms毎に更新、送信、結果表示、感想送信、統計取得、
+// #   これらすべてfetchでリロードなしに処理する。
+// ============================================================
+
+const QUIZ_ID = {{ quiz.id | tojson }};
+const HAS_OPTIONS = {{ 'true' if quiz.has_options else 'false' }};
+
+// ---- タイマー(100ミリ秒ごとに更新) ----
+// # setIntervalで定期的に「今の時間 - 始めた時間」を計算して表示する
+let startTime = Date.now();
+let finalTimeMs = 0;
+const timerText = document.getElementById('timer-text');
+const timerInterval = setInterval(() => {
+  const elapsed = (Date.now() - startTime) / 1000;
+  timerText.textContent = elapsed.toFixed(1);
+}, 100);
+
+// ---- 選択肢クリック ----
+let selectedOption = null;
+if (HAS_OPTIONS) {
+  document.querySelectorAll('.option-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedOption = btn.dataset.option;
+    });
+  });
+}
+
+// ---- 答えを送信 ----
+document.getElementById('submit-answer').addEventListener('click', async () => {
+  let userAnswer;
+  if (HAS_OPTIONS) {
+    if (!selectedOption) { window.toast('選んでね', 'error'); return; }
+    userAnswer = selectedOption;
+  } else {
+    userAnswer = document.getElementById('answer-input').value.trim();
+    if (!userAnswer) { window.toast('答えを入力してね', 'error'); return; }
+  }
+  finalTimeMs = Date.now() - startTime;
+  clearInterval(timerInterval);  // タイマーストップ
+
+  const btn = document.getElementById('submit-answer');
+  btn.disabled = true;
+  btn.textContent = '採点中...';
+
+  try {
+    const r = await window.api.post(`/api/quizzes/${encodeURIComponent(QUIZ_ID)}/answer`, {
+      user_answer: userAnswer,
+      time_ms: finalTimeMs,
+    });
+    showResult(r.correct, r.correct_answer, r.time_ms);
+  } catch (err) {
+    window.toast(err.message, 'error');
+    btn.disabled = false;
+    btn.textContent = '➡ 答える';
+    // タイマー再開
+    startTime = Date.now() - finalTimeMs;
+    const iv = setInterval(() => {
+      timerText.textContent = ((Date.now() - startTime) / 1000).toFixed(1);
+    }, 100);
+  }
+});
+
+// Enterキーで送信(記述式)
+const answerInput = document.getElementById('answer-input');
+if (answerInput) {
+  answerInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('submit-answer').click();
+  });
+}
+
+// ---- 結果画面を表示 ----
+function showResult(correct, correctAnswer, timeMs) {
+  document.getElementById('answer-section').style.display = 'none';
+  const rs = document.getElementById('result-section');
+  rs.style.display = 'block';
+  rs.classList.add('anim-slideUp');
+
+  const mark = document.getElementById('result-mark');
+  mark.textContent = correct ? '◎' : '✖';
+  mark.className = 'result-mark ' + (correct ? 'correct' : 'wrong');
+
+  const title = document.getElementById('result-title');
+  title.textContent = correct ? '正解!' : '残念!';
+  title.className = 'result-title ' + (correct ? 'correct' : 'wrong');
+
+  document.getElementById('result-time').textContent = formatTime(timeMs);
+  document.getElementById('result-answer').textContent = correctAnswer;
+
+  const box = document.getElementById('result-box');
+  if (correct) {
+    box.style.background = 'linear-gradient(135deg, #ECFDF5, #D1FAE5)';
+    box.style.borderColor = '#10B981';
+  } else {
+    box.style.background = 'linear-gradient(135deg, #FFFBEB, #FEF3C7)';
+    box.style.borderColor = '#FCD34D';
+    box.querySelector('div').style.color = '#B45309';
+    box.querySelector('div').textContent = 'ANSWER';
+  }
+
+  // 紙吹雪(正解時のみ、簡単バージョン)
+  if (correct) confetti();
+}
+
+// ---- もう一度 ----
+document.getElementById('retry-btn').addEventListener('click', () => {
+  document.getElementById('answer-section').style.display = 'block';
+  document.getElementById('result-section').style.display = 'none';
+  const btn = document.getElementById('submit-answer');
+  btn.disabled = false;
+  btn.textContent = '➡ 答える';
+  if (answerInput) answerInput.value = '';
+  selectedOption = null;
+  document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+  startTime = Date.now();
+  finalTimeMs = 0;
+  const iv = setInterval(() => {
+    timerText.textContent = ((Date.now() - startTime) / 1000).toFixed(1);
+  }, 100);
+  window._timer = iv;
+});
+
+// ---- 紙吹雪 ----
+// # DOMに一時的な要素を追加するアニメーションなのでJS必須
+function confetti() {
+  const colors = ['#E85A8A','#4A7FD9','#4DB07A','#E88555','#8874D4','#D4A33B'];
+  const host = document.createElement('div');
+  host.style.cssText = 'position:fixed; inset:0; pointer-events:none; z-index:60; overflow:hidden;';
+  document.body.appendChild(host);
+  for (let i = 0; i < 50; i++) {
+    const p = document.createElement('div');
+    p.style.cssText = `
+      position:absolute; top:-20px; left:${Math.random()*100}%;
+      width:10px; height:14px;
+      background:${colors[Math.floor(Math.random()*colors.length)]};
+      transform:rotate(${Math.random()*360}deg);
+      animation: confetti-fall ${2+Math.random()*1.5}s ${Math.random()*0.5}s ease-out forwards;
+    `;
+    host.appendChild(p);
+  }
+  if (!document.getElementById('cf-style')) {
+    const s = document.createElement('style');
+    s.id = 'cf-style';
+    s.textContent = '@keyframes confetti-fall { to { transform: translateY(110vh) rotate(720deg); opacity:0; } }';
+    document.head.appendChild(s);
+  }
+  setTimeout(() => host.remove(), 4000);
+}
+
+// ============================================================
+// 感想(フィードバック)
+// ============================================================
+document.getElementById('btn-feedback').addEventListener('click', () => {
+  window.openModal('modal-feedback');
+});
+
+let fbDifficulty = 0;
+const FB_LABELS = ['', 'とても簡単', '簡単', '普通', '難しい', 'とても難しい'];
+document.querySelectorAll('#fb-stars .star-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    fbDifficulty = parseInt(b.dataset.val, 10);
+    updateStars();
+  });
+  b.addEventListener('mouseover', () => highlightStars(parseInt(b.dataset.val, 10)));
+});
+document.getElementById('fb-stars').addEventListener('mouseleave', () => highlightStars(fbDifficulty));
+
+function highlightStars(n) {
+  document.querySelectorAll('#fb-stars .star-btn').forEach(b => {
+    b.classList.toggle('filled', parseInt(b.dataset.val, 10) <= n);
+  });
+  const lbl = document.getElementById('fb-label');
+  lbl.textContent = n > 0 ? `★${n} - ${FB_LABELS[n]}` : '星を選んでね';
+}
+function updateStars() {
+  highlightStars(fbDifficulty);
+  checkFbSubmit();
+}
+
+document.getElementById('fb-comment').addEventListener('input', (e) => {
+  document.getElementById('fb-count').textContent = e.target.value.length;
+});
+document.getElementById('fb-confirm-legal').addEventListener('change', checkFbSubmit);
+
+function checkFbSubmit() {
+  const ok = fbDifficulty >= 1 && document.getElementById('fb-confirm-legal').checked;
+  document.getElementById('fb-submit').disabled = !ok;
+}
+
+document.getElementById('fb-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (fbDifficulty < 1) { window.toast('難易度を選んでね', 'error'); return; }
+  const btn = document.getElementById('fb-submit');
+  btn.disabled = true;
+  btn.textContent = '送信中...';
+  try {
+    await window.api.post(`/api/quizzes/${encodeURIComponent(QUIZ_ID)}/feedback`, {
+      difficulty: fbDifficulty,
+      comment: document.getElementById('fb-comment').value,
+      confirm_not_illegal: document.getElementById('fb-confirm-legal').checked,
+    });
+    window.toast('ありがとう!感想を送ったよ', 'success');
+    window.closeModal('modal-feedback');
+    document.getElementById('btn-feedback').innerHTML = '<span style="font-size:18px;">✓</span><span style="font-size:12px;">送信済み</span>';
+    document.getElementById('btn-feedback').disabled = true;
+  } catch (err) {
+    window.toast(err.message, 'error');
+    btn.disabled = false;
+    btn.textContent = '✉ 送信する';
+  }
+});
+
+// ============================================================
+// 統計
+// ============================================================
+document.getElementById('btn-stats').addEventListener('click', async () => {
+  window.openModal('modal-stats');
+  const body = document.getElementById('stats-body');
+  body.innerHTML = '<p style="text-align:center; padding:40px 0; color:#9CA3AF;">読み込み中...</p>';
+  try {
+    const r = await window.api.get(`/api/quizzes/${encodeURIComponent(QUIZ_ID)}/stats`);
+    body.innerHTML = renderStats(r.stats, r.recent_feedbacks);
+  } catch (err) {
+    body.innerHTML = `<p style="text-align:center; color:#EF4444;">${escapeHtml(err.message)}</p>`;
+  }
+});
+
+function renderStats(s, fbs) {
+  if (s.attempts === 0) {
+    return `
+      <div style="text-align:center; padding:40px 0;">
+        <div style="font-size:48px;">📊</div>
+        <p style="font-weight:900; margin:8px 0 4px;">まだ挑戦者がいないよ</p>
+        <p style="color:#9CA3AF; font-size:12px;">あなたが最初の挑戦者!</p>
+      </div>`;
+  }
+  const acc = Math.round((s.corrects / s.attempts) * 100);
+  const accColor = acc >= 70 ? '#059669' : acc >= 40 ? '#D97706' : '#DC2626';
+  const accBg = acc >= 70 ? 'rgba(16,185,129,0.1)' : acc >= 40 ? 'rgba(217,119,6,0.1)' : 'rgba(220,38,38,0.1)';
+
+  let html = `
+    <div class="stats-grid">
+      <div class="stat-box" style="background:var(--c-soft);">
+        <span style="font-size:18px;">👥</span>
+        <div class="big" style="color:var(--c-main);">${s.attempts}</div>
+        <div class="label">挑戦者</div>
+      </div>
+      <div class="stat-box" style="background:${accBg};">
+        <span style="font-size:18px;">🏆</span>
+        <div class="big" style="color:${accColor};">${acc}%</div>
+        <div class="label">正解率 (${s.corrects}/${s.attempts})</div>
+      </div>
+    </div>
+    <div class="stats-grid" style="margin-top:10px;">
+      <div class="stat-box" style="background:#F9FAFB;">
+        <span style="font-size:18px;">⏱️</span>
+        <div class="big" style="color:#374151; font-size:20px;">${formatTime(s.avg_time_ms)}</div>
+        <div class="label">平均タイム</div>
+      </div>
+      <div class="stat-box" style="background:rgba(59,130,246,0.08);">
+        <span style="font-size:18px;">⚡</span>
+        <div class="big" style="color:#1E40AF; font-size:20px;">${s.fastest_ms > 0 ? formatTime(s.fastest_ms) : '-'}</div>
+        <div class="label">最速(正解)</div>
+      </div>
+    </div>`;
+  if (s.feedback_count > 0 && s.avg_difficulty > 0) {
+    html += `
+      <div style="margin-top:14px; padding:16px; background:#FFFBEB; border:1px solid #FDE68A; border-radius:14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <span style="font-size:11px; font-weight:900; color:#92400E; letter-spacing:0.05em;">平均難易度</span>
+          <span style="font-size:11px; color:#B45309; font-weight:700;">${s.feedback_count}人が評価</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px;">
+          ${starsHtml(s.avg_difficulty)}
+          <span class="display-font" style="font-size:22px; font-weight:900; color:#B45309;">${s.avg_difficulty.toFixed(1)}</span>
+        </div>
+      </div>`;
+  }
+  if (fbs && fbs.length > 0) {
+    html += `
+      <div style="margin-top:14px;">
+        <div style="font-size:11px; font-weight:900; color:#6B7280; letter-spacing:0.05em; margin-bottom:6px;">💬 最近の感想</div>`;
+    fbs.forEach(fb => {
+      const date = new Date(fb.created_at).toLocaleDateString('ja-JP');
+      html += `
+        <div class="fb-item">
+          <div class="fb-item-head">
+            ${starsHtml(fb.difficulty)}
+            <span style="font-size:10px; color:#9CA3AF;">${date}</span>
+          </div>
+          <p style="margin:0; color:#374151;">${escapeHtml(fb.comment)}</p>
+        </div>`;
+    });
+    html += '</div>';
+  }
+  return html;
+}
+</script>
+{% endblock %}

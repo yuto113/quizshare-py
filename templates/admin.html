@@ -1,0 +1,252 @@
+{# ============================================================
+   admin.html : 管理者画面 (/<groupID>/setting/)
+   閲覧モードの切替・グループ削除ができる
+   ============================================================ #}
+{% extends "base.html" %}
+{% block title %}管理者 - クイズシェア{% endblock %}
+{% block body_class %}admin-body{% endblock %}
+
+{% block nav_items %}
+  <a class="header-link" href="{{ url_for('page_home') }}">← メインへ</a>
+  <a class="header-link" href="{{ url_for('page_help') }}">❓ ヘルプ</a>
+  <a class="header-link" href="{{ url_for('page_terms') }}">📜 規約</a>
+  <a class="header-link" href="{{ url_for('page_privacy') }}">🔒 プライバシー</a>
+{% endblock %}
+
+{% block content %}
+<div class="container-narrow">
+  {% if not group_info %}
+    {# ===== グループが存在しない場合 ===== #}
+    <div class="admin-card" style="text-align:center; padding:40px 24px;">
+      <div style="font-size:56px;">❓</div>
+      <h2 style="color:#fff; font-family:'Zen Maru Gothic',sans-serif; font-weight:900; font-size:22px; margin:8px 0;">
+        グループが見つからないよ
+      </h2>
+      <p style="color:#9CA3AF; font-size:13px;">
+        URLのグループID「<code style="background:rgba(255,255,255,0.1); padding:2px 6px; border-radius:4px;">{{ group_id }}</code>」が正しいか確認してね
+      </p>
+    </div>
+
+  {% elif not group_info.has_admin %}
+    {# ===== 管理者パスワード未設定 ===== #}
+    <div class="admin-card" style="text-align:center; padding:40px 24px; background:rgba(251,191,36,0.08); border-color:rgba(251,191,36,0.2);">
+      <div style="font-size:56px;">⚠️</div>
+      <h2 style="color:#fff; font-family:'Zen Maru Gothic',sans-serif; font-weight:900; font-size:22px; margin:8px 0;">
+        管理者が未設定だよ
+      </h2>
+      <p style="color:#9CA3AF; font-size:13px; line-height:1.7;">
+        このグループには管理者パスワードが設定されていないよ。<br>
+        グループ作成時に管理者パスワードを設定してね。
+      </p>
+    </div>
+
+  {% elif not logged_in %}
+    {# ===== ログイン画面 ===== #}
+    <div style="text-align:center; margin-bottom:32px;">
+      <div style="display:inline-flex; align-items:center; justify-content:center; width:64px; height:64px; border-radius:22px; background:linear-gradient(135deg, #EF4444, #DC2626); font-size:28px;">
+        🔒
+      </div>
+      <h1 class="display-font" style="color:#fff; font-weight:900; font-size:28px; margin:16px 0 6px;">管理者ログイン</h1>
+      <p style="color:#9CA3AF; font-size:13px; margin:0;">管理者パスワードを入力してね</p>
+    </div>
+
+    <div class="admin-card">
+      <form id="login-form">
+        <div class="form-group">
+          <label class="form-label">グループID</label>
+          <div style="padding:10px 14px; background:rgba(0,0,0,0.3); border-radius:10px; font-family:monospace; font-size:13px; color:#9CA3AF; border:1px solid rgba(255,255,255,0.05);">
+            {{ group_id }}
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">パスワード</label>
+          <input type="password" id="admin-pw" class="form-control" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn btn-block" style="background:linear-gradient(135deg, #EF4444, #DC2626); color:#fff; margin-top:4px;">
+          🔓 ログイン
+        </button>
+      </form>
+    </div>
+    <p style="text-align:center; font-size:11px; color:#6B7280; margin-top:20px;">
+      🛡️ セッションは1時間で期限切れになるよ
+    </p>
+
+  {% else %}
+    {# ===== ログイン後の管理画面 ===== #}
+    <div style="text-align:center; margin-bottom:24px;">
+      <div style="font-size:40px;">⚙️</div>
+      <h1 class="display-font" style="color:#fff; font-weight:900; font-size:24px; margin:8px 0 0;">
+        {{ group_info.name }} の管理画面
+      </h1>
+    </div>
+
+    {# ---- 閲覧のみモード切替 ---- #}
+    <div class="admin-card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:12px;">
+        <div style="flex:1;">
+          <h3>👁️ 閲覧のみモード</h3>
+          <p>
+            ONにするとメンバーはクイズの追加・編集・削除ができなくなるよ。<br>
+            挑戦や感想の投稿は引き続きできるよ。
+          </p>
+        </div>
+        <button type="button" id="toggle-view" class="toggle {% if group_info.view_only %}on{% endif %}" aria-label="閲覧モード切替"></button>
+      </div>
+      <div id="mode-status" style="display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:700; padding:4px 12px; border-radius:999px;
+                                    background: {{ 'rgba(59,130,246,0.2)' if group_info.view_only else 'rgba(52,211,153,0.2)' }};
+                                    color: {{ '#60A5FA' if group_info.view_only else '#34D399' }};">
+        <span style="width:6px; height:6px; border-radius:50%; background:currentColor;"></span>
+        現在: {% if group_info.view_only %}閲覧のみモード{% else %}通常モード(編集可){% endif %}
+      </div>
+    </div>
+
+    {# ---- グループ削除 ---- #}
+    <div class="admin-card danger">
+      <h3>🚫 グループを削除</h3>
+      <p>
+        グループ本体、全クイズ、全挑戦記録、全感想が永久に削除されるよ。<br>
+        <strong style="color:#FCA5A5;">この操作は取り消せない!</strong>
+      </p>
+
+      <div id="delete-step1">
+        <button type="button" id="btn-show-delete" class="btn" style="background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#FCA5A5;">
+          🗑️ 削除する
+        </button>
+      </div>
+
+      <div id="delete-step2" style="display:none;">
+        <p style="font-size:12px; color:#9CA3AF;">
+          確認のため、グループID <code style="background:rgba(0,0,0,0.3); padding:2px 6px; border-radius:4px; color:#FCA5A5;">{{ group_id }}</code> を入力してね:
+        </p>
+        <input type="text" id="delete-confirm" class="form-control" placeholder="グループID" style="margin-bottom:10px;">
+        {# ---- 削除前の最終確認 ---- #}
+        <label class="form-check" style="background:rgba(239,68,68,0.1); border-color:rgba(239,68,68,0.3);">
+          <input type="checkbox" id="delete-confirm-chk">
+          <span style="color:#fff;">この削除の結果について、すべての責任は管理者である私が負うことを確認しました。</span>
+        </label>
+        <div style="display:flex; gap:8px; margin-top:10px;">
+          <button type="button" id="btn-do-delete" class="btn btn-danger" disabled style="flex:1;">
+            🔥 完全に削除する
+          </button>
+          <button type="button" id="btn-cancel-delete" class="btn" style="background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.15);">
+            キャンセル
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <button type="button" id="btn-logout-admin" class="btn btn-block" style="background:rgba(255,255,255,0.05); color:#9CA3AF; border:1px solid rgba(255,255,255,0.1); margin-top:16px;">
+      ← ログアウト
+    </button>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if group_info and group_info.has_admin and not logged_in %}
+<script>
+// ============================================================
+// 管理者ログイン
+// # submitをfetchに変えてリロードなしでログインさせる
+// ============================================================
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const pw = document.getElementById('admin-pw').value;
+  const btn = e.target.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  btn.textContent = 'チェック中...';
+  try {
+    await window.api.post('/api/admin/login/{{ group_id }}', { password: pw });
+    window.location.reload();  // 成功したら同じURLをリロード(=管理画面が表示される)
+  } catch (err) {
+    window.toast(err.message, 'error');
+    btn.disabled = false;
+    btn.textContent = '🔓 ログイン';
+  }
+});
+</script>
+{% endif %}
+
+{% if group_info and logged_in %}
+<script>
+// ============================================================
+// 管理画面 (ログイン後)
+// ============================================================
+const groupIdRaw = '{{ group_id }}';
+
+// ---- 閲覧モードの切替 ----
+document.getElementById('toggle-view').addEventListener('click', async () => {
+  const tgl = document.getElementById('toggle-view');
+  const next = !tgl.classList.contains('on');
+  const msg = next
+    ? '閲覧のみモードに変更するよ?\nクイズの追加・編集・削除ができなくなるよ(挑戦は可能)。'
+    : '通常モードに戻すよ?\nクイズの追加・編集・削除が再びできるようになるよ。';
+  if (!confirm(msg)) return;
+  try {
+    const r = await window.api.post(`/api/admin/view-only/${encodeURIComponent(groupIdRaw)}`, {
+      view_only: next,
+    });
+    tgl.classList.toggle('on', r.view_only);
+    const status = document.getElementById('mode-status');
+    status.style.background = r.view_only ? 'rgba(59,130,246,0.2)' : 'rgba(52,211,153,0.2)';
+    status.style.color = r.view_only ? '#60A5FA' : '#34D399';
+    status.innerHTML = `<span style="width:6px;height:6px;border-radius:50%;background:currentColor;"></span>現在: ${r.view_only ? '閲覧のみモード' : '通常モード(編集可)'}`;
+    window.toast(r.view_only ? '閲覧のみにしたよ' : '通常モードに戻したよ', 'success');
+  } catch (err) {
+    window.toast(err.message, 'error');
+  }
+});
+
+// ---- グループ削除 ----
+document.getElementById('btn-show-delete').addEventListener('click', () => {
+  document.getElementById('delete-step1').style.display = 'none';
+  document.getElementById('delete-step2').style.display = 'block';
+});
+
+document.getElementById('btn-cancel-delete').addEventListener('click', () => {
+  document.getElementById('delete-step1').style.display = 'block';
+  document.getElementById('delete-step2').style.display = 'none';
+  document.getElementById('delete-confirm').value = '';
+  document.getElementById('delete-confirm-chk').checked = false;
+  document.getElementById('btn-do-delete').disabled = true;
+});
+
+// IDが一致し、かつ責任チェックがONなら削除ボタンを有効化
+function checkCanDelete() {
+  const idMatch = document.getElementById('delete-confirm').value.trim() === groupIdRaw;
+  const chk = document.getElementById('delete-confirm-chk').checked;
+  document.getElementById('btn-do-delete').disabled = !(idMatch && chk);
+}
+document.getElementById('delete-confirm').addEventListener('input', checkCanDelete);
+document.getElementById('delete-confirm-chk').addEventListener('change', checkCanDelete);
+
+document.getElementById('btn-do-delete').addEventListener('click', async () => {
+  if (!confirm('本当に完全に削除するよ?\nこの操作は取り消せないよ。')) return;
+  const btn = document.getElementById('btn-do-delete');
+  btn.disabled = true;
+  btn.textContent = '削除中...';
+  try {
+    await window.api.post(`/api/admin/delete-group/${encodeURIComponent(groupIdRaw)}`, {
+      confirm_group_id: document.getElementById('delete-confirm').value.trim(),
+    });
+    window.toast('グループを削除したよ', 'success');
+    setTimeout(() => { window.location.href = '/'; }, 1200);
+  } catch (err) {
+    window.toast(err.message, 'error');
+    btn.disabled = false;
+    btn.textContent = '🔥 完全に削除する';
+  }
+});
+
+// ---- ログアウト ----
+document.getElementById('btn-logout-admin').addEventListener('click', async () => {
+  try {
+    await window.api.post(`/api/admin/logout/${encodeURIComponent(groupIdRaw)}`);
+    window.location.reload();
+  } catch (err) {
+    window.toast(err.message, 'error');
+  }
+});
+</script>
+{% endif %}
+{% endblock %}

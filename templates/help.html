@@ -1,0 +1,117 @@
+{# ============================================================
+   help.html : つかいかたページ
+   ============================================================ #}
+{% extends "base.html" %}
+{% block title %}ヘルプ - クイズシェア{% endblock %}
+
+{% block content %}
+<div class="container-narrow">
+  <div class="doc-content anim-slideUp">
+    <h1>❓ ヘルプ & 使い方</h1>
+    <p style="color:#9CA3AF; font-size:12px; margin:0 0 24px;">
+      わからないことがあったら、ここを見てね!
+    </p>
+
+    <h2>🎯 クイズシェアってなに?</h2>
+    <p>
+      グループ(クラス・部活・友達など)の中で、おたがいにクイズを出し合って遊んだり勉強したりするアプリだよ。
+      クイズに答えるときのタイムも測れるし、感想や難易度の評価も投稿できるよ。
+    </p>
+
+    <h2>🚀 かんたんな使い方</h2>
+    <ol>
+      <li>トップページで「新しいグループを作る」を押す</li>
+      <li>グループ名・ID(合言葉)・好きな色を決める</li>
+      <li>作ったグループIDを友達に教える</li>
+      <li>友達はトップページでそのIDを入力してグループに入れる</li>
+      <li>右下の「+」ボタンでクイズを追加しよう</li>
+      <li>他の人のクイズに挑戦して、感想を送ろう!</li>
+    </ol>
+
+    <h2>🔑 グループID(合言葉)について</h2>
+    <ul>
+      <li>6〜32文字で、半角英数字・ハイフン(-)・アンダースコア(_)が使えるよ</li>
+      <li>ランダム生成ボタンを使うと安全なIDが作れるよ</li>
+      <li>IDは合言葉だから、信頼できる人だけに教えてね</li>
+      <li>サーバーには<strong>ぐちゃぐちゃに暗号化</strong>されて保存されるから、もしDBが盗まれてもバレないよ</li>
+    </ul>
+
+    <h2>📝 クイズを作るときのコツ</h2>
+    <ul>
+      <li><strong>記述式</strong>: 自由に答えを入力する形式。大文字/小文字・空白・句読点のちがいは自動で無視されるよ</li>
+      <li><strong>選択式</strong>: 2〜6個の選択肢から選ぶ形式。正解を一つ選んでね</li>
+      <li>タグをつけると、あとで絞り込みができて便利</li>
+    </ul>
+
+    <h2>⏱️ タイム計測と統計について</h2>
+    <ul>
+      <li>クイズページを開いた瞬間から時間を測りはじめるよ</li>
+      <li>「答える」ボタンを押した時点で測定終了</li>
+      <li>結果画面では、何人が挑戦して何%正解したか、平均タイム、最速タイムなどが見られるよ</li>
+      <li>★1〜5の難易度評価と感想も送れる(任意だよ)</li>
+    </ul>
+
+    <h2>🛡️ 管理者機能について</h2>
+    <p>
+      グループ作成時に管理者パスワードを設定すると、URL
+      <code style="background:#F3F4F6; padding:2px 6px; border-radius:4px;">/&lt;グループID&gt;/setting/</code>
+      から管理画面に入れるよ。
+    </p>
+    <ul>
+      <li><strong>閲覧のみモード</strong>: ONにするとメンバーはクイズの追加・編集・削除ができなくなる(挑戦と感想はOK)</li>
+      <li><strong>グループ削除</strong>: グループと全てのデータを永久に消す。取り消せないから注意!</li>
+      <li>管理者ログインは1時間で期限切れになるよ</li>
+    </ul>
+
+    <h2>❓ よくある質問</h2>
+
+    <div style="margin-top:12px;">
+      <p style="font-weight:900; margin-bottom:4px;">Q. パスワードを忘れちゃった!</p>
+      <p style="margin:0 0 16px; padding-left:12px; border-left:3px solid var(--c-main);">
+        ごめんね、パスワードは安全のためぐちゃぐちゃに変換して保存しているから、
+        運営でも元に戻せないんだ。新しいグループを作り直してね。
+      </p>
+
+      <p style="font-weight:900; margin-bottom:4px;">Q. グループIDを忘れちゃった!</p>
+      <p style="margin:0 0 16px; padding-left:12px; border-left:3px solid var(--c-main);">
+        同じく、グループIDもぐちゃぐちゃに変換して保存しているので、運営でも復元できないよ。
+        グループの仲間で知っている人がいないか聞いてみてね。
+      </p>
+
+      <p style="font-weight:900; margin-bottom:4px;">Q. 他のグループのクイズは見られる?</p>
+      <p style="margin:0 0 16px; padding-left:12px; border-left:3px solid var(--c-main);">
+        見られないよ。グループIDを知っている人だけが、そのグループのクイズに入れる仕組みだよ。
+      </p>
+
+      <p style="font-weight:900; margin-bottom:4px;">Q. 答えはブラウザから見えちゃうの?</p>
+      <p style="margin:0 0 16px; padding-left:12px; border-left:3px solid var(--c-main);">
+        見えないよ。答え合わせはサーバー側でやってるから、
+        ブラウザの開発者ツールを使っても答えを先に見ることはできないよ。
+      </p>
+
+      <p style="font-weight:900; margin-bottom:4px;">Q. クイズを間違えて投稿しちゃった!</p>
+      <p style="margin:0 0 16px; padding-left:12px; border-left:3px solid var(--c-main);">
+        クイズページの右上の削除ボタンから消せるよ(閲覧のみモードじゃないとき)。
+      </p>
+
+      <p style="font-weight:900; margin-bottom:4px;">Q. 違反の投稿を見つけたら?</p>
+      <p style="margin:0 0 16px; padding-left:12px; border-left:3px solid var(--c-main);">
+        グループの管理者にすぐ伝えてね。管理者はそのクイズを削除したり、
+        グループ全体を閲覧のみモードにしたりできるよ。
+      </p>
+    </div>
+
+    <h2>⚠️ 注意してほしいこと</h2>
+    <ul>
+      <li>教科書や問題集の問題を<strong>そのまま写さない</strong>でね(著作権)</li>
+      <li>特定の人が傷つくような内容は書かないでね</li>
+      <li>住所・電話番号・実名など、個人情報を書かないでね</li>
+      <li>くわしくは<a href="{{ url_for('page_terms') }}" style="color:var(--c-main); font-weight:900;">利用規約</a>を読んでね</li>
+    </ul>
+  </div>
+
+  <div style="text-align:center; margin-top:20px;">
+    <a href="{{ url_for('page_home') }}" class="btn btn-secondary">← 戻る</a>
+  </div>
+</div>
+{% endblock %}
