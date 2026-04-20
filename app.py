@@ -407,8 +407,7 @@ def page_admin_entry(group_id):
     with get_db() as conn:
         cur = make_cursor(conn)
         cur.execute(q('''
-            SELECT id, name, view_only,
-                   CASE WHEN admin_password_hash IS NULL THEN 0 ELSE 1 END AS has_admin
+            SELECT id, name, view_only
             FROM groups WHERE group_id_hash = %s
         '''), (hash_group_id(group_id),))
         row = cur.fetchone()

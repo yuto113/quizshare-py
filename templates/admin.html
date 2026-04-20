@@ -27,18 +27,6 @@
       </p>
     </div>
 
-  {% elif not group_info.has_admin %}
-    {# ===== 管理者パスワード未設定 ===== #}
-    <div class="admin-card" style="text-align:center; padding:40px 24px; background:rgba(251,191,36,0.08); border-color:rgba(251,191,36,0.2);">
-      <div style="font-size:56px;">⚠️</div>
-      <h2 style="color:#fff; font-family:'Zen Maru Gothic',sans-serif; font-weight:900; font-size:22px; margin:8px 0;">
-        管理者が未設定だよ
-      </h2>
-      <p style="color:#9CA3AF; font-size:13px; line-height:1.7;">
-        このグループには管理者パスワードが設定されていないよ。<br>
-        グループ作成時に管理者パスワードを設定してね。
-      </p>
-    </div>
 
   {% elif not logged_in %}
     {# ===== ログイン画面 ===== #}
