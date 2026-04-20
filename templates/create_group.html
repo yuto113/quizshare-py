@@ -18,8 +18,7 @@
     <form id="create-form">
       <div class="form-group">
         <label class="form-label">グループ名</label>
-        <input type="text" id="grp-name" class="form-control"
-               placeholder="例: 高3A組 化学クイズ部" maxlength="50" required>
+        <input type="text" id="grp-name" class="form-control">
       </div>
 
       <div class="form-group">
@@ -114,12 +113,6 @@
 
 {% block scripts %}
 <script>
-// ============================================================
-// グループ作成ページのスクリプト
-// # 色の選択、管理者チェックボックス、送信すべてJSで扱う。
-// #   送信はfetchなのでページはリロードされない=書きかけの内容が消えない。
-// ============================================================
-
 let selectedColor = '#E85A8A';
 
 // 色パレットのクリックで選択
@@ -143,29 +136,18 @@ document.getElementById('btn-random-id').addEventListener('click', () => {
   document.getElementById('grp-id').value = s;
 });
 
-
 // 送信
 document.getElementById('create-form').addEventListener('submit', async (e) => {
-  e.preventDefault();  // リロード防止
-
+  e.preventDefault();
   const name = document.getElementById('grp-name').value.trim();
   const groupId = document.getElementById('grp-id').value.trim();
-  const setAdmin = document.getElementById('set-admin').checked;
-  const pw = document.getElementById('admin-pw').value;
-  const pw2 = document.getElementById('admin-pw2').value;
-
-  if (setAdmin) {
-    if (pw.length < 6) { window.toast('管理者パスワードは6文字以上にしてね', 'error'); return; }
-    if (pw !== pw2) { window.toast('管理者パスワードが一致しないよ', 'error'); return; }
-  }
-
   const btn = e.target.querySelector('button[type="submit"]');
   btn.disabled = true;
   btn.textContent = '作成中...';
   try {
     const r = await window.api.post('/api/groups', {
       name, group_id: groupId, color: selectedColor,
-      admin_password: setAdmin ? pw : '',
+      admin_password: '',
       agreed_terms: document.getElementById('agree-terms').checked,
       confirm_not_illegal: document.getElementById('confirm-legal').checked,
     });
