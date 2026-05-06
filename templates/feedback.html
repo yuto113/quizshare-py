@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}フィードバック - QuizShare{% endblock %}
+
+{% block content %}
+<div style="max-width:600px; margin:40px auto; padding:0 16px;">
+  <h1 style="font-size:1.6rem; margin-bottom:8px;">📝 フィードバック</h1>
+  <p style="color:#555; margin-bottom:24px;">
+    QuizShareをもっとよくするためのご意見・ご要望をお待ちしています！
+  </p>
+
+  {% if msg == "ok" %}
+    <div style="background:#e8f5e9; border:1px solid #a5d6a7; border-radius:8px; padding:16px; margin-bottom:24px; color:#2e7d32;">
+      ✅ フィードバックを送りました！ありがとうございます。
+    </div>
+  {% elif msg == "error" %}
+    <div style="background:#ffebee; border:1px solid #ef9a9a; border-radius:8px; padding:16px; margin-bottom:24px; color:#c62828;">
+      ⚠️ メッセージを入力してください。
+    </div>
+  {% endif %}
+
+  <form method="POST" action="/feedback">
+
+    <!-- 星評価 -->
+    <div style="margin-bottom:24px;">
+      <label style="font-weight:bold; display:block; margin-bottom:8px;">★ 評価</label>
+      <div id="star-area" style="font-size:2rem; cursor:pointer; letter-spacing:4px;">
+        <span class="star" data-v="1">☆</span>
+        <span class="star" data-v="2">☆</span>
+        <span class="star" data-v="3">☆</span>
+        <span class="star" data-v="4">☆</span>
+        <span class="star" data-v="5">☆</span>
+      </div>
+      <!-- 選んだ星の数を送るかくしフィールド -->
+      <input type="hidden" name="star_rating" id="star_rating" value="3">
+    </div>
+
+    <!-- カテゴリ -->
+    <div style="margin-bottom:24px;">
+      <label style="font-weight:bold; display:block; margin-bottom:8px;">📂 カテゴリ</label>
+      <select name="category" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:8px; font-size:1rem;">
+        <option value="感想">💬 感想</option>
+        <option value="機能リクエスト">✨ 機能リクエスト</option>
+      </select>
+    </div>
+
+    <!-- 自由記述 -->
+    <div style="margin-bottom:24px;">
+      <label style="font-weight:bold; display:block; margin-bottom:8px;">📝 メッセージ</label>
+      <textarea name="message" rows="5" placeholder="ご意見・ご要望を書いてください"
+        style="width:100%; padding:10px; border:1px solid #ccc; border-radius:8px; font-size:1rem; box-sizing:border-box;"></textarea>
+    </div>
+
+    <button type="submit"
+      style="width:100%; padding:14px; background:#4caf50; color:white; border:none; border-radius:8px; font-size:1.1rem; cursor:pointer; font-weight:bold;">
+      送信する 🚀
+    </button>
+  </form>
+</div>
+
+{% block scripts %}
+<script>
+// ===== 星評価のインタラクション =====
+
+// 今選ばれている星の数（最初は3）
+var currentStar = 3;
+
+// ページを開いたとき星を3つ塗る
+updateStars(currentStar);
+
+// 星をクリックしたとき
+document.querySelectorAll(".star").forEach(function(star) {
+
+  // クリックで星を選ぶ
+  star.addEventListener("click", function() {
+    currentStar = parseInt(this.getAttribute("data-v"));
+    document.getElementById("star_rating").value = currentStar;
+    updateStars(currentStar);
+  });
+
+  // マウスを乗せたとき一時的に星を光らせる
+  star.addEventListener("mouseover", function() {
+    updateStars(parseInt(this.getAttribute("data-v")));
+  });
+
+  // マウスが離れたら元に戻す
+  star.addEventListener("mouseleave", function() {
+    updateStars(currentStar);
+  });
+});
+
+// 星を指定の数だけ塗る関数
+function updateStars(n) {
+  document.querySelectorAll(".star").forEach(function(s) {
+    var v = parseInt(s.getAttribute("data-v"));
+    // v が n 以下なら塗りつぶし星、そうでなければ空の星
+    s.textContent = (v <= n) ? "★" : "☆";
+    s.style.color  = (v <= n) ? "#f5a623" : "#ccc";
+  });
+}
+</script>
+{% endblock %}
+{% endblock %}

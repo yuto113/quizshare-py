@@ -1,5 +1,37 @@
 # -*- coding: utf-8 -*-
 # ====================================================================
+# 暗号化ヘルパー(問題文・答え・グループ名・作者名・タグなどを暗号化)
+# ====================================================================
+from cryptography.fernet import Fernet, InvalidToken
+
+_fernet_instance = None
+def get_fernet():
+    global _fernet_instance
+    if _fernet_instance is None:
+        key = os.environ.get('ENCRYPTION_KEY', '')
+        if not key:
+            raise RuntimeError('ENCRYPTION_KEY が設定されていないよ(WSGIファイルを確認)')
+        _fernet_instance = Fernet(key.encode() if isinstance(key, str) else key)
+    return _fernet_instance
+
+def encrypt_text(text):
+    if not text:
+        return text
+    if isinstance(text, str):
+        text = text.encode('utf-8')
+    return get_fernet().encrypt(text).decode('ascii')
+
+def decrypt_text(text):
+    if not text:
+        return text
+    if isinstance(text, bytes):
+        text = text.decode('ascii')
+    try:
+        return get_fernet().decrypt(text.encode('ascii')).decode('utf-8')
+    except (InvalidToken, ValueError):
+        return text
+
+# ====================================================================
 # クイズシェア (Flask版)
 # ぜんぶのサーバーのしごとがこのファイルにまとまっているよ。
 # ====================================================================
@@ -27,6 +59,39 @@ try:
 except Exception:
     pass
 
+
+# ====================================================================
+# 暗号化ヘルパー
+# ====================================================================
+from cryptography.fernet import Fernet, InvalidToken
+
+_fernet = None
+def get_fernet():
+    global _fernet
+    if _fernet is None:
+        key = os.environ.get('ENCRYPTION_KEY', '')
+        if not key:
+            raise RuntimeError('ENCRYPTION_KEY が設定されていないよ')
+        _fernet = Fernet(key.encode() if isinstance(key, str) else key)
+    return _fernet
+
+def enc(text):
+    # テキストを暗号化して返す
+    if not text:
+        return text
+    try:
+        return get_fernet().encrypt(str(text).encode('utf-8')).decode('ascii')
+    except Exception:
+        return text
+
+def dec(text):
+    # 暗号化テキストを復号して返す
+    if not text:
+        return text
+    try:
+        return get_fernet().decrypt(str(text).encode('ascii')).decode('utf-8')
+    except Exception:
+        return text
 
 # ====================================================================
 # 1. Flaskアプリを作る
@@ -240,7 +305,75 @@ def init_db():
         # 速く検索するための「しおり(インデックス)」
         cur.execute('CREATE INDEX IF NOT EXISTS idx_quizzes_group ON quizzes(group_id)')
         cur.execute('CREATE INDEX IF NOT EXISTS idx_attempts_quiz ON attempts(quiz_id)')
+
+        # クイズ編集パスワード・複数正解・画像テーブル追加
+        if USE_POSTGRES:
+            cur.execute("ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS edit_password_hash TEXT")
+            cur.execute("ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS answers TEXT")
+        else:
+            try:
+                cur.execute("ALTER TABLE quizzes ADD COLUMN edit_password_hash TEXT")
+            except Exception:
+                pass
+            try:
+                cur.execute("ALTER TABLE quizzes ADD COLUMN answers TEXT")
+            except Exception:
+                pass
+
+        # 画像テーブル
+        cur.execute(f'''
+            CREATE TABLE IF NOT EXISTS quiz_images (
+                id {id_default},
+                quiz_id TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                created_at {time_default}
+            )
+        ''')
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_images_quiz ON quiz_images(quiz_id)')
         cur.execute('CREATE INDEX IF NOT EXISTS idx_feedbacks_quiz ON feedbacks(quiz_id)')
+
+        # グループパスワード列を追加
+        if USE_POSTGRES:
+            cur.execute("ALTER TABLE groups ADD COLUMN IF NOT EXISTS group_password_hash TEXT")
+        else:
+            try:
+                cur.execute("ALTER TABLE groups ADD COLUMN group_password_hash TEXT")
+            except Exception:
+                pass
+
+        # ランキングの表
+        cur.execute(f'''
+            CREATE TABLE IF NOT EXISTS rankings (
+                id {id_default},
+                quiz_id TEXT NOT NULL,
+                display_name TEXT NOT NULL,
+                time_ms INTEGER NOT NULL,
+                created_at {time_default}
+            )
+        ''')
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_rankings_quiz ON rankings(quiz_id)')
+        if USE_POSTGRES:
+            cur.execute("ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS explanation TEXT DEFAULT ''")
+        else:
+            try:
+                cur.execute("ALTER TABLE quizzes ADD COLUMN explanation TEXT DEFAULT ''")
+            except Exception:
+                pass
+        cur.execute(f'''CREATE TABLE IF NOT EXISTS quiz_sets (
+                id {id_default},
+                group_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                quiz_ids TEXT NOT NULL,
+                created_at {time_default}
+            )''')
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_sets_group ON quiz_sets(group_id)')
+        if USE_POSTGRES:
+            cur.execute("ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS hint TEXT DEFAULT ''")
+        else:
+            try:
+                cur.execute("ALTER TABLE quizzes ADD COLUMN hint TEXT DEFAULT ''")
+            except Exception:
+                pass
 
     print('✓ データベースの準備ができたよ')
 
@@ -332,6 +465,21 @@ def normalize_answer(s: str) -> str:
     return s
 
 
+def check_answer(user_answer, quiz_row):
+    # quiz_rowの答えは復号済みのものを期待する
+    # 複数正解に対応した答え合わせ
+    # answersカラムがあればそちらを優先、なければanswerを使う
+    answers_json = quiz_row.get('answers')
+    if answers_json:
+        try:
+            answers = json.loads(answers_json)
+        except Exception:
+            answers = [quiz_row['answer']]
+    else:
+        answers = [quiz_row['answer']]
+    ua = normalize_answer(user_answer)
+    return any(normalize_answer(a) == ua for a in answers)
+
 # ====================================================================
 # 7. JSONで結果を返すヘルパー
 # ====================================================================
@@ -407,8 +555,7 @@ def page_admin_entry(group_id):
     with get_db() as conn:
         cur = make_cursor(conn)
         cur.execute(q('''
-            SELECT id, name, view_only,
-                   CASE WHEN admin_password_hash IS NULL THEN 0 ELSE 1 END AS has_admin
+            SELECT id, name, view_only
             FROM groups WHERE group_id_hash = %s
         '''), (hash_group_id(group_id),))
         row = cur.fetchone()
@@ -506,17 +653,28 @@ def api_create_group():
             return err('このグループIDはもう使われているよ。違うIDにしてね。', 409)
 
         if USE_POSTGRES:
+            gp_hash = None
+            group_password = data.get('group_password') or ''
+            if group_password:
+                if len(group_password) < 4:
+                    pass
+                else:
+                    gp_hash = hash_password(group_password)
             cur.execute(q('''
-                INSERT INTO groups (group_id_hash, name, color, admin_password_hash)
-                VALUES (%s, %s, %s, %s) RETURNING id
-            '''), (gid_hash, name, color, pw_hash))
+                INSERT INTO groups (group_id_hash, name, color, admin_password_hash, group_password_hash)
+                VALUES (%s, %s, %s, %s, %s) RETURNING id
+            '''), (gid_hash, name, color, pw_hash, gp_hash))
             new_group_id = cur.fetchone()['id']
         else:
+            gp_hash = None
+            group_password = data.get('group_password') or ''
+            if group_password and len(group_password) >= 4:
+                gp_hash = hash_password(group_password)
             new_group_id = new_id()
             cur.execute(q('''
-                INSERT INTO groups (id, group_id_hash, name, color, admin_password_hash)
-                VALUES (%s, %s, %s, %s, %s)
-            '''), (new_group_id, gid_hash, name, color, pw_hash))
+                INSERT INTO groups (id, group_id_hash, name, color, admin_password_hash, group_password_hash)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            '''), (new_group_id, gid_hash, name, color, pw_hash, gp_hash))
 
     # ログイン状態にする
     session.clear()
@@ -526,26 +684,47 @@ def api_create_group():
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
-    # グループにログインする
     if not rate_limit(f'login:{client_ip()}', 20):
         return err('ログインが多すぎるよ。少し待ってね。', 429)
+    data = request.get_json(silent=True) or {}
+    group_id = (data.get('group_id') or '').strip()
+    group_password = data.get('group_password') or ''
+    if not group_id:
+        return err('グループIDを入力してね')
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q('SELECT id, group_password_hash FROM groups WHERE group_id_hash = %s'),
+                    (hash_group_id(group_id),))
+        row = cur.fetchone()
+    if not row:
+        return err('グループIDが正しくないよ', 403)
+    row = dict(row)
+    stored_gp = row.get('group_password_hash')
+    if stored_gp:
+        if not group_password:
+            return err('パスワードが必要だよ', 401)
+        if not verify_password(group_password, stored_gp):
+            return err('パスワードが違うよ', 401)
+    session.clear()
+    session['group_id'] = group_id
+    return ok(redirect='/group')
 
+
+@app.route('/api/groups/check', methods=['POST'])
+def api_check_group():
     data = request.get_json(silent=True) or {}
     group_id = (data.get('group_id') or '').strip()
     if not group_id:
         return err('グループIDを入力してね')
-
     with get_db() as conn:
         cur = make_cursor(conn)
-        cur.execute(q('SELECT id FROM groups WHERE group_id_hash = %s'), (hash_group_id(group_id),))
+        cur.execute(q('SELECT id, group_password_hash FROM groups WHERE group_id_hash = %s'),
+                    (hash_group_id(group_id),))
         row = cur.fetchone()
-
     if not row:
         return err('グループIDが正しくないよ', 403)
-
-    session.clear()
-    session['group_id'] = group_id
-    return ok(redirect='/group')
+    row = dict(row)
+    return ok(has_password=bool(row.get('group_password_hash')))
 
 
 @app.route('/api/logout', methods=['POST'])
@@ -608,6 +787,7 @@ def api_list_quizzes():
         cur.execute(q('''
             SELECT q.id, q.author_name AS name, q.class_name, q.question,
                    q.answer_options, q.has_options, q.tags, q.created_at,
+                   CASE WHEN q.edit_password_hash IS NOT NULL THEN 1 ELSE 0 END AS has_edit_pw,
                    (SELECT COUNT(*) FROM attempts WHERE quiz_id = q.id) AS attempts,
                    (SELECT COUNT(*) FROM attempts WHERE quiz_id = q.id AND correct = 1) AS corrects,
                    (SELECT COALESCE(AVG(difficulty), 0) FROM feedbacks WHERE quiz_id = q.id) AS avg_difficulty,
@@ -635,6 +815,7 @@ def api_list_quizzes():
         row['avg_difficulty'] = float(row.get('avg_difficulty') or 0)
         row['feedback_count'] = int(row.get('feedback_count') or 0)
         row['has_options'] = bool(row.get('has_options'))
+        row['has_edit_pw'] = bool(row.get('has_edit_pw'))
         row['created_at'] = str(row['created_at'])
         quizzes.append(row)
 
@@ -694,15 +875,32 @@ def api_create_quiz():
     clean_tags = clean_tags[:10]
     tags_str = ','.join(clean_tags)
 
+    # 複数正解の処理
+    data_answers = data.get('answers') or []
+    if isinstance(data_answers, list) and len(data_answers) > 0:
+        clean_answers = [str(a).strip() for a in data_answers if str(a).strip()]
+        if answer not in clean_answers:
+            clean_answers.insert(0, answer)
+        answers_json_str = json.dumps(clean_answers, ensure_ascii=False)
+    else:
+        answers_json_str = json.dumps([answer], ensure_ascii=False)
+
+    # 編集パスワード
+    edit_pw = data.get('edit_password') or ''
+    edit_pw_hash = hash_password(edit_pw) if edit_pw else None
+    explanation = (data.get('explanation') or '').strip()[:1000]
+    hint = (data.get('hint') or '').strip()[:300]
+
     with get_db() as conn:
         cur = make_cursor(conn)
         if USE_POSTGRES:
             cur.execute(q('''
                 INSERT INTO quizzes (group_id, author_name, class_name, question, answer,
-                                     answer_options, has_options, tags)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id, created_at
+                                     answer_options, has_options, tags, answers, edit_password_hash, explanation, hint)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id, created_at
             '''), (grp['id'], name, class_name, question, answer,
-                   options_json, 1 if has_options else 0, tags_str))
+                   options_json, 1 if has_options else 0, tags_str,
+                   answers_json_str, edit_pw_hash, explanation, hint))
             row = cur.fetchone()
             new_quiz_id = str(row['id'])
             created_at = str(row['created_at'])
@@ -710,10 +908,11 @@ def api_create_quiz():
             new_quiz_id = new_id()
             cur.execute(q('''
                 INSERT INTO quizzes (id, group_id, author_name, class_name, question, answer,
-                                     answer_options, has_options, tags)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                     answer_options, has_options, tags, answers, edit_password_hash, explanation, hint)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             '''), (new_quiz_id, grp['id'], name, class_name, question, answer,
-                   options_json, 1 if has_options else 0, tags_str))
+                   options_json, 1 if has_options else 0, tags_str,
+                   answers_json_str, edit_pw_hash, explanation, hint))
             created_at = datetime.now(timezone.utc).isoformat()
 
     return ok(quiz={
@@ -723,6 +922,7 @@ def api_create_quiz():
         'question': question,
         'answer_options': json.loads(options_json) if options_json else None,
         'has_options': has_options,
+        'has_edit_pw': bool(edit_pw_hash),
         'tags': clean_tags,
         'created_at': created_at,
         'attempts': 0, 'corrects': 0,
@@ -767,13 +967,22 @@ def api_answer_quiz(quiz_id):
 
     with get_db() as conn:
         cur = make_cursor(conn)
-        cur.execute(q('SELECT answer FROM quizzes WHERE id = %s AND group_id = %s'),
+        cur.execute(q('SELECT answer, answers, explanation, hint FROM quizzes WHERE id = %s AND group_id = %s'),
                     (quiz_id, grp['id']))
         row = cur.fetchone()
         if not row:
             return err('クイズが見つからないよ', 404)
-        correct_answer = row['answer']
-        is_correct = normalize_answer(user_answer) == normalize_answer(correct_answer)
+        row_dict = dict(row)
+        correct_answer = dec(row_dict.get('answer') or '')
+        answers_raw = row_dict.get('answers')
+        if answers_raw:
+            try:
+                ans_list = json.loads(answers_raw)
+                row_dict['answers'] = json.dumps([dec(a) for a in ans_list], ensure_ascii=False)
+            except Exception:
+                pass
+        row_dict['answer'] = correct_answer
+        is_correct = check_answer(user_answer, row_dict)
 
         if USE_POSTGRES:
             cur.execute(q('INSERT INTO attempts (quiz_id, correct, time_ms) VALUES (%s, %s, %s)'),
@@ -782,7 +991,7 @@ def api_answer_quiz(quiz_id):
             cur.execute(q('INSERT INTO attempts (id, quiz_id, correct, time_ms) VALUES (%s, %s, %s, %s)'),
                         (new_id(), quiz_id, 1 if is_correct else 0, time_ms))
 
-    return ok(correct=is_correct, correct_answer=correct_answer, time_ms=time_ms)
+    return ok(correct=is_correct, correct_answer=correct_answer, time_ms=time_ms, explanation=dec(row_dict.get('explanation') or ''), hint=dec(row_dict.get('hint') or ''))
 
 
 @app.route('/api/quizzes/<quiz_id>/feedback', methods=['POST'])
@@ -967,6 +1176,410 @@ def api_admin_delete_group(group_id):
     return ok()
 
 
+
+@app.route("/api/admin/quizzes/<group_id>", methods=["GET"])
+def api_admin_quizzes(group_id):
+    # 管理者がクイズ一覧を取得する
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q("SELECT id FROM groups WHERE group_id_hash = %s"), (hash_group_id(group_id),))
+        row = cur.fetchone()
+    if not row:
+        return err("グループが見つからないよ", 404)
+    if not admin_logged_in_for(row["id"]):
+        return err("管理者としてログインしてね", 401)
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q("SELECT id, author_name, question, created_at FROM quizzes WHERE group_id = %s ORDER BY created_at DESC"), (row["id"],))
+        quizzes = [dict(r) for r in cur.fetchall()]
+    for q2 in quizzes:
+        q2["id"] = str(q2["id"])
+        q2["created_at"] = str(q2["created_at"])
+    return ok(quizzes=quizzes)
+
+@app.route("/api/admin/quizzes/<group_id>/<quiz_id>", methods=["DELETE"])
+def api_admin_delete_quiz(group_id, quiz_id):
+    # 管理者がクイズを削除する
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q("SELECT id FROM groups WHERE group_id_hash = %s"), (hash_group_id(group_id),))
+        row = cur.fetchone()
+    if not row:
+        return err("グループが見つからないよ", 404)
+    if not admin_logged_in_for(row["id"]):
+        return err("管理者としてログインしてね", 401)
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q("DELETE FROM attempts WHERE quiz_id = %s"), (quiz_id,))
+        cur.execute(q("DELETE FROM feedbacks WHERE quiz_id = %s"), (quiz_id,))
+        cur.execute(q("DELETE FROM quizzes WHERE id = %s AND group_id = %s"), (quiz_id, row["id"]))
+    return ok()
+
+@app.route('/api/quizzes/<quiz_id>/ranking', methods=['POST'])
+def api_register_ranking(quiz_id):
+    grp = current_group()
+    if not grp:
+        return err('ログインしてね', 401)
+    data = request.get_json(silent=True) or {}
+    display_name = (data.get('display_name') or '').strip()
+    time_ms = int(data.get('time_ms') or 0)
+    if not display_name or len(display_name) > 20:
+        return err('表示名は1〜20文字で入力してね')
+    if time_ms <= 0:
+        return err('タイムが正しくないよ')
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q('SELECT 1 FROM quizzes WHERE id = %s AND group_id = %s'),
+                    (quiz_id, grp['id']))
+        if not cur.fetchone():
+            return err('クイズが見つからないよ', 404)
+        if USE_POSTGRES:
+            cur.execute(q('INSERT INTO rankings (quiz_id, display_name, time_ms) VALUES (%s, %s, %s)'),
+                        (quiz_id, display_name, time_ms))
+        else:
+            cur.execute(q('INSERT INTO rankings (id, quiz_id, display_name, time_ms) VALUES (%s, %s, %s, %s)'),
+                        (new_id(), quiz_id, display_name, time_ms))
+    return ok()
+
+
+@app.route('/api/group/rankings', methods=['GET'])
+def api_group_rankings():
+    grp = current_group()
+    if not grp:
+        return err('ログインしてね', 401)
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q('''
+            SELECT q.id, q.question, q.author_name,
+                   (SELECT COUNT(*) FROM rankings WHERE quiz_id = q.id) AS ranking_count
+            FROM quizzes q WHERE q.group_id = %s
+            ORDER BY q.created_at DESC
+        '''), (grp['id'],))
+        quizzes = [dict(r) for r in cur.fetchall()]
+    for q2 in quizzes:
+        q2['id'] = str(q2['id'])
+        q2['ranking_count'] = int(q2.get('ranking_count') or 0)
+    return ok(quizzes=quizzes)
+
+
+@app.route('/api/quizzes/<quiz_id>/rankings', methods=['GET'])
+def api_quiz_rankings(quiz_id):
+    grp = current_group()
+    if not grp:
+        return err('ログインしてね', 401)
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q('SELECT 1 FROM quizzes WHERE id = %s AND group_id = %s'),
+                    (quiz_id, grp['id']))
+        if not cur.fetchone():
+            return err('クイズが見つからないよ', 404)
+        cur.execute(q('''
+            SELECT display_name, time_ms, created_at
+            FROM rankings WHERE quiz_id = %s
+            ORDER BY time_ms ASC LIMIT 20
+        '''), (quiz_id,))
+        rankings = [dict(r) for r in cur.fetchall()]
+    for r in rankings:
+        r['created_at'] = str(r['created_at'])
+    return ok(rankings=rankings)
+
+
+@app.route('/ranking')
+def page_ranking():
+    grp = current_group()
+    if not grp:
+        return redirect(url_for('page_home'))
+    return render_template('ranking.html', group=grp, group_id=session.get('group_id'))
+
+
+@app.route('/api/admin/enter/<group_id>', methods=['POST'])
+def api_admin_enter(group_id):
+    # 管理者がグループに入る(パスワードなしで入れる)
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q('SELECT id FROM groups WHERE group_id_hash = %s'), (hash_group_id(group_id),))
+        row = cur.fetchone()
+    if not row:
+        return err('グループが見つからないよ', 404)
+    if not admin_logged_in_for(row['id']):
+        return err('管理者としてログインしてね', 401)
+    session['group_id'] = group_id
+    return ok(redirect='/group')
+
+
+@app.route('/api/quizzes/<quiz_id>', methods=['GET'])
+def api_get_quiz(quiz_id):
+    # クイズ1件の詳細を取得(編集用)
+    grp = current_group()
+    if not grp:
+        return err('ログインしてね', 401)
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q('''SELECT id, author_name, class_name, question, answer,
+                          answer_options, has_options, tags, answers,
+                          CASE WHEN edit_password_hash IS NOT NULL THEN 1 ELSE 0 END AS has_edit_pw
+                   FROM quizzes WHERE id = %s AND group_id = %s'''),
+                    (quiz_id, grp['id']))
+        row = cur.fetchone()
+    if not row:
+        return err('クイズが見つからないよ', 404)
+    quiz = dict(row)
+    opts = quiz.get('answer_options')
+    if isinstance(opts, str) and opts:
+        try:
+            quiz['answer_options'] = json.loads(opts)
+        except Exception:
+            quiz['answer_options'] = None
+    quiz['tags'] = [t for t in (quiz.get('tags') or '').split(',') if t]
+    ans = quiz.get('answers')
+    if isinstance(ans, str) and ans:
+        try:
+            quiz['answers'] = json.loads(ans)
+        except Exception:
+            quiz['answers'] = [quiz['answer']]
+    else:
+        quiz['answers'] = [quiz['answer']]
+    quiz['id'] = str(quiz['id'])
+    quiz['has_options'] = bool(quiz.get('has_options'))
+    quiz['has_edit_pw'] = bool(quiz.get('has_edit_pw'))
+    return ok(quiz=quiz)
+
+
+@app.route('/api/quizzes/<quiz_id>/edit', methods=['POST'])
+def api_edit_quiz(quiz_id):
+    # クイズ編集: パスワードが設定されてないクイズは編集できない
+    grp = current_group()
+    if not grp:
+        return err('ログインしてね', 401)
+    if grp['view_only']:
+        return err('このグループは閲覧のみモードだよ', 403)
+
+    data = request.get_json(silent=True) or {}
+
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q('SELECT edit_password_hash FROM quizzes WHERE id = %s AND group_id = %s'),
+                    (quiz_id, grp['id']))
+        row = cur.fetchone()
+    if not row:
+        return err('クイズが見つからないよ', 404)
+    row = dict(row)
+    stored = row.get('edit_password_hash')
+    if not stored:
+        return err('このクイズは編集できないよ', 403)
+
+    pw = data.get('edit_password') or ''
+    if not verify_password(pw, stored):
+        return err('編集パスワードが違うよ', 401)
+
+    question = (data.get('question') or '').strip()
+    answer = (data.get('answer') or '').strip()
+    if not question or len(question) > 500:
+        return err('問題は1〜500文字で入力してね')
+    if not answer:
+        return err('答えを入力してね')
+
+    data_answers = data.get('answers') or []
+    if isinstance(data_answers, list) and data_answers:
+        clean_answers = [str(a).strip() for a in data_answers if str(a).strip()]
+        answers_json_str = json.dumps(clean_answers, ensure_ascii=False)
+    else:
+        answers_json_str = json.dumps([answer], ensure_ascii=False)
+
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q('UPDATE quizzes SET question=%s, answer=%s, answers=%s WHERE id=%s AND group_id=%s'),
+                    (question, answer, answers_json_str, quiz_id, grp['id']))
+    return ok()
+
+
+@app.route('/api/quizzes/<quiz_id>/upload', methods=['POST'])
+def api_upload_image(quiz_id):
+    # 画像をアップロードする(3枚まで)
+    grp = current_group()
+    if not grp:
+        return err('ログインしてね', 401)
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q('SELECT 1 FROM quizzes WHERE id = %s AND group_id = %s'),
+                    (quiz_id, grp['id']))
+        if not cur.fetchone():
+            return err('クイズが見つからないよ', 404)
+        cur.execute(q('SELECT COUNT(*) as cnt FROM quiz_images WHERE quiz_id = %s'), (quiz_id,))
+        cnt = dict(cur.fetchone())['cnt']
+        if int(cnt) >= 3:
+            return err('画像は3枚までだよ', 400)
+
+    if 'file' not in request.files:
+        return err('ファイルがないよ', 400)
+    f = request.files['file']
+    if not f.filename:
+        return err('ファイル名がないよ', 400)
+    ext = f.filename.rsplit('.', 1)[-1].lower()
+    if ext not in {'png', 'jpg', 'jpeg', 'gif', 'webp'}:
+        return err('png/jpg/gif/webpのみアップロードできるよ', 400)
+    if len(f.read()) > 5 * 1024 * 1024:
+        return err('ファイルは5MB以下にしてね', 400)
+    f.seek(0)
+
+    upload_dir = os.path.join(os.path.dirname(__file__), 'static', 'uploads')
+    os.makedirs(upload_dir, exist_ok=True)
+    filename = new_id() + '.' + ext
+    f.save(os.path.join(upload_dir, filename))
+
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        if USE_POSTGRES:
+            cur.execute(q('INSERT INTO quiz_images (quiz_id, filename) VALUES (%s, %s)'),
+                        (quiz_id, filename))
+        else:
+            cur.execute(q('INSERT INTO quiz_images (id, quiz_id, filename) VALUES (%s, %s, %s)'),
+                        (new_id(), quiz_id, filename))
+    return ok(filename=filename, url='/static/uploads/' + filename)
+
+
+@app.route('/api/quizzes/<quiz_id>/images', methods=['GET'])
+def api_get_images(quiz_id):
+    # クイズの画像一覧を返す
+    grp = current_group()
+    if not grp:
+        return err('ログインしてね', 401)
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q('SELECT filename FROM quiz_images WHERE quiz_id = %s ORDER BY created_at'),
+                    (quiz_id,))
+        images = [{' filename': r['filename'] if hasattr(r, '__getitem__') else r[0],
+                   'url': '/static/uploads/' + (r['filename'] if hasattr(r, '__getitem__') else r[0])}
+                  for r in cur.fetchall()]
+    return ok(images=images)
+
+
+@app.route('/api/quizzes/random', methods=['GET'])
+def api_random_quiz():
+    grp = current_group()
+    if not grp:
+        return err('ログインしてね', 401)
+    import random
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q('SELECT id FROM quizzes WHERE group_id = %s'), (grp['id'],))
+        ids = [str(dict(r)['id']) for r in cur.fetchall()]
+    if not ids:
+        return err('クイズがないよ', 404)
+    return ok(quiz_id=random.choice(ids))
+
+
+@app.route('/api/sets', methods=['GET'])
+def api_list_sets():
+    grp = current_group()
+    if not grp:
+        return err('ログインしてね', 401)
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q('SELECT id, name, quiz_ids, created_at FROM quiz_sets WHERE group_id = %s ORDER BY created_at DESC'), (grp['id'],))
+        rows = [dict(r) for r in cur.fetchall()]
+    for r in rows:
+        r['id'] = str(r['id'])
+        r['quiz_ids'] = (r.get('quiz_ids') or '').split(',') if r.get('quiz_ids') else []
+        r['count'] = len(r['quiz_ids'])
+        r['created_at'] = str(r['created_at'])
+    return ok(sets=rows)
+
+
+@app.route('/api/sets', methods=['POST'])
+def api_create_set():
+    grp = current_group()
+    if not grp:
+        return err('ログインしてね', 401)
+    if grp['view_only']:
+        return err('閲覧モードでは作れないよ', 403)
+    data = request.get_json(silent=True) or {}
+    name = (data.get('name') or '').strip()
+    quiz_ids = data.get('quiz_ids') or []
+    if not name or len(name) > 50:
+        return err('セット名を1〜50文字で入力してね')
+    if not isinstance(quiz_ids, list) or len(quiz_ids) < 1:
+        return err('クイズを1つ以上選んでね')
+    quiz_ids_str = ','.join([str(x) for x in quiz_ids])
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        if USE_POSTGRES:
+            cur.execute(q('INSERT INTO quiz_sets (group_id, name, quiz_ids) VALUES (%s, %s, %s)'),
+                        (grp['id'], name, quiz_ids_str))
+        else:
+            cur.execute(q('INSERT INTO quiz_sets (id, group_id, name, quiz_ids) VALUES (%s, %s, %s, %s)'),
+                        (new_id(), grp['id'], name, quiz_ids_str))
+    return ok()
+
+
+@app.route('/api/sets/<set_id>', methods=['DELETE'])
+def api_delete_set(set_id):
+    grp = current_group()
+    if not grp:
+        return err('ログインしてね', 401)
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q('DELETE FROM quiz_sets WHERE id = %s AND group_id = %s'), (set_id, grp['id']))
+    return ok()
+
+
+@app.route('/sets')
+def page_sets():
+    grp = current_group()
+    if not grp:
+        return redirect(url_for('page_home'))
+    return render_template('sets.html', group=grp, group_id=session.get('group_id'))
+
+
+@app.route('/api/quizzes/<quiz_id>/hint', methods=['GET'])
+def api_get_hint(quiz_id):
+    grp = current_group()
+    if not grp:
+        return err('ログインしてね', 401)
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q('SELECT hint FROM quizzes WHERE id = %s AND group_id = %s'),
+                    (quiz_id, grp['id']))
+        row = cur.fetchone()
+    if not row:
+        return err('クイズが見つからないよ', 404)
+    return ok(hint=dec(dict(row).get('hint') or ''))
+
+
+@app.route('/api/group/stats', methods=['GET'])
+def api_group_stats():
+    grp = current_group()
+    if not grp:
+        return err('ログインしてね', 401)
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q('SELECT COUNT(*) AS c FROM quizzes WHERE group_id = %s'), (grp['id'],))
+        total_quizzes = int(dict(cur.fetchone())['c'])
+        cur.execute(q('''SELECT COUNT(*) AS c FROM attempts WHERE quiz_id IN
+                        (SELECT id FROM quizzes WHERE group_id = %s)'''), (grp['id'],))
+        total_attempts = int(dict(cur.fetchone())['c'])
+        cur.execute(q('''SELECT COUNT(*) AS c FROM attempts WHERE correct = 1 AND quiz_id IN
+                        (SELECT id FROM quizzes WHERE group_id = %s)'''), (grp['id'],))
+        total_corrects = int(dict(cur.fetchone())['c'])
+        cur.execute(q('''SELECT q.id, q.question, q.author_name AS name,
+                        (SELECT COUNT(*) FROM attempts WHERE quiz_id = q.id) AS attempts
+                        FROM quizzes q WHERE q.group_id = %s
+                        ORDER BY attempts DESC LIMIT 5'''), (grp['id'],))
+        popular = [dict(r) for r in cur.fetchall()]
+    for p in popular:
+        p['id'] = str(p['id'])
+        p['attempts'] = int(p['attempts'])
+    return ok(total_quizzes=total_quizzes, total_attempts=total_attempts,
+              total_corrects=total_corrects, popular=popular)
+
+
+@app.route('/groupstats')
+def page_group_stats():
+    grp = current_group()
+    if not grp:
+        return redirect(url_for('page_home'))
+    return render_template('group_stats.html', group=grp, group_id=session.get('group_id'))
+
 # ====================================================================
 # 11. ヘルスチェック(Railwayが「サーバー動いてる?」って確認するため)
 # ====================================================================
@@ -1010,6 +1623,50 @@ def inject_globals():
 # ====================================================================
 # Flaskのデフォルト開発サーバーの起動(本番は gunicorn が呼び出す)
 init_db()
+
+
+# ===== フィードバック機能 =====
+
+@app.route("/feedback", methods=["GET", "POST"])
+def feedback():
+    # フィードバックを送信するページ
+    import datetime, pytz
+    msg = None
+    if request.method == "POST":
+        star    = request.form.get("star_rating", "3")
+        category = request.form.get("category", "感想")
+        message  = request.form.get("message", "").strip()
+        # メッセージが空なら送信しない
+        if not message:
+            msg = "error"
+        else:
+            # 日本時間で今の時刻を取得
+            jst = pytz.timezone("Asia/Tokyo")
+            now = datetime.datetime.now(jst).strftime("%Y-%m-%d %H:%M:%S")
+            conn = get_db()
+            conn.execute(
+                "INSERT INTO feedback (created_at, star_rating, category, message) VALUES (?, ?, ?, ?)",
+                (now, int(star), category, message)
+            )
+            conn.commit()
+            conn.close()
+            msg = "ok"
+    return render_template("feedback.html", msg=msg)
+
+@app.route("/feedback/list")
+def feedback_list():
+    # 管理者だけが見られるフィードバック一覧ページ
+    admin_pw = request.args.get("pw", "")
+    correct_pw = os.environ.get("ADMIN_PASSWORD", "")
+    if admin_pw != correct_pw:
+        # パスワードが違ったら403エラー
+        return "管理者パスワードが違います", 403
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT id, created_at, star_rating, category, message FROM feedback ORDER BY id DESC"
+    ).fetchall()
+    conn.close()
+    return render_template("feedback_list.html", feedbacks=rows)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

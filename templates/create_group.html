@@ -56,33 +56,7 @@
         </div>
       </div>
 
-      <!-- {# ===== 管理者パスワード(任意) ===== #}
-      <div style="margin:20px 0; padding:14px; border:2px dashed #E5E7EB; border-radius:14px; background:#FAFAFA;">
-        <label style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
-          <span style="font-weight:900; font-size:13px;">
-            🛡️ 管理者を設定する
-            <span style="font-weight:400; font-size:11px; color:#9CA3AF; margin-left:6px;">(任意)</span>
-          </span>
-          <input type="checkbox" id="set-admin" style="width:18px; height:18px; accent-color:var(--c-main);">
-        </label>
-        <p class="form-help" style="margin-top:6px;">
-          パスワードを設定すると <code style="background:#fff; padding:1px 4px; border-radius:4px;">/&lt;ID&gt;/setting/</code> から管理画面に入れるよ。
-          閲覧モードや削除ができるようになるよ。
-        </p>
-        <div id="admin-fields" style="display:none; margin-top:12px;">
-          <div class="form-group">
-            <label class="form-label">管理者パスワード</label>
-            <input type="password" id="admin-pw" class="form-control" placeholder="6文字以上" maxlength="100">
-          </div>
-          <div class="form-group">
-            <label class="form-label">もう一度入力</label>
-            <input type="password" id="admin-pw2" class="form-control" placeholder="確認" maxlength="100">
-          </div>
-          <p style="font-size:10px; color:#B45309; background:#FEF3C7; padding:8px 10px; border-radius:8px; margin:0;">
-            ⚠️ パスワードを忘れると管理画面に入れなくなるよ。忘れないようにメモしてね。
-          </p>
-        </div>
-      </div> -->
+      
 
       {# ===== 利用規約と違法行為の確認チェック ===== #}
       {# # ここで同意してもらうことで、管理者が責任を負わない範囲をはっきりさせる #}
@@ -143,33 +117,18 @@ document.getElementById('btn-random-id').addEventListener('click', () => {
   document.getElementById('grp-id').value = s;
 });
 
-// 管理者チェックで欄を見せる/かくす
-document.getElementById('set-admin').addEventListener('change', (e) => {
-  document.getElementById('admin-fields').style.display = e.target.checked ? 'block' : 'none';
-});
-
 // 送信
 document.getElementById('create-form').addEventListener('submit', async (e) => {
-  e.preventDefault();  // リロード防止
-
+  e.preventDefault();
   const name = document.getElementById('grp-name').value.trim();
   const groupId = document.getElementById('grp-id').value.trim();
-  const setAdmin = document.getElementById('set-admin').checked;
-  const pw = document.getElementById('admin-pw').value;
-  const pw2 = document.getElementById('admin-pw2').value;
-
-  if (setAdmin) {
-    if (pw.length < 6) { window.toast('管理者パスワードは6文字以上にしてね', 'error'); return; }
-    if (pw !== pw2) { window.toast('管理者パスワードが一致しないよ', 'error'); return; }
-  }
-
   const btn = e.target.querySelector('button[type="submit"]');
   btn.disabled = true;
   btn.textContent = '作成中...';
   try {
     const r = await window.api.post('/api/groups', {
       name, group_id: groupId, color: selectedColor,
-      admin_password: setAdmin ? pw : '',
+      admin_password: '',
       agreed_terms: document.getElementById('agree-terms').checked,
       confirm_not_illegal: document.getElementById('confirm-legal').checked,
     });

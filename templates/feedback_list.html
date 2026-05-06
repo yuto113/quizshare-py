@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}フィードバック一覧 - QuizShare{% endblock %}
+
+{% block content %}
+<div style="max-width:800px; margin:40px auto; padding:0 16px;">
+  <h1 style="font-size:1.6rem; margin-bottom:4px;">📋 フィードバック一覧</h1>
+  <p style="color:#888; margin-bottom:24px;">管理者専用ページ</p>
+
+  {% if feedbacks %}
+    <!-- 件数の表示 -->
+    <p style="margin-bottom:16px; color:#555;">全 <strong>{{ feedbacks|length }}</strong> 件</p>
+
+    {% for fb in feedbacks %}
+    <div style="background:#fff; border:1px solid #e0e0e0; border-radius:10px; padding:16px; margin-bottom:16px; box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+
+      <!-- 上の行：星・カテゴリ・日時 -->
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+        <div>
+          <!-- 星を塗る：fb[2]が星の数 -->
+          <span style="color:#f5a623; font-size:1.2rem;">
+            {% for i in range(fb[2]) %}★{% endfor %}{% for i in range(5 - fb[2]) %}☆{% endfor %}
+          </span>
+          <span style="margin-left:10px; background:#e3f2fd; color:#1565c0; padding:2px 10px; border-radius:20px; font-size:0.85rem;">
+            {{ fb[3] }}
+          </span>
+        </div>
+        <span style="color:#aaa; font-size:0.85rem;">🕐 {{ fb[1] }}</span>
+      </div>
+
+      <!-- メッセージ本文 -->
+      <p style="margin:0; color:#333; line-height:1.7; white-space:pre-wrap;">{{ fb[4] }}</p>
+    </div>
+    {% endfor %}
+
+  {% else %}
+    <div style="text-align:center; color:#aaa; padding:60px 0;">
+      <div style="font-size:3rem;">📭</div>
+      <p>まだフィードバックはありません</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
