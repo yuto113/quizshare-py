@@ -1448,7 +1448,7 @@ def api_get_images(quiz_id):
         cur = make_cursor(conn)
         cur.execute(q('SELECT filename FROM quiz_images WHERE quiz_id = %s ORDER BY created_at'),
                     (quiz_id,))
-        images = [{' filename': r['filename'] if hasattr(r, '__getitem__') else r[0],
+        images = [{'filename': r['filename'] if hasattr(r, '__getitem__') else r[0],
                    'url': '/static/uploads/' + (r['filename'] if hasattr(r, '__getitem__') else r[0])}
                   for r in cur.fetchall()]
     return ok(images=images)
