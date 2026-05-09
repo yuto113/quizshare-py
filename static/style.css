@@ -827,3 +827,72 @@ textarea.form-control {
   .result-mark { font-size: 120px; }
   .color-grid { grid-template-columns: repeat(4, 1fr); }
 }
+
+/* ===== 管理者画面ダークテーマ ===== */
+.admin-body {
+    background: #0f1117 !important;
+    color: #e0e0e0 !important;
+}
+.admin-body .navbar {
+    background: #1a1a2e !important;
+    border-bottom: 1px solid #2d2d44;
+}
+.admin-body .navbar a,
+.admin-body .navbar span {
+    color: #c0c0d0 !important;
+}
+.admin-body .card,
+.admin-body [class*="card"] {
+    background: #1e1e2e !important;
+    border: 1px solid #2d2d44 !important;
+    color: #e0e0e0 !important;
+}
+.admin-body h1,
+.admin-body h2,
+.admin-body h3,
+.admin-body h4 {
+    color: #ffffff !important;
+}
+.admin-body p,
+.admin-body span,
+.admin-body td,
+.admin-body th,
+.admin-body li {
+    color: #c0c0d0 !important;
+}
+.admin-body table {
+    background: #1e1e2e !important;
+    border-color: #2d2d44 !important;
+}
+.admin-body th {
+    background: #2d2d44 !important;
+}
+.admin-body tr:hover {
+    background: #2a2a3e !important;
+}
+.admin-body input,
+.admin-body select,
+.admin-body textarea {
+    background: #2d2d44 !important;
+    color: #e0e0e0 !important;
+    border: 1px solid #3d3d54 !important;
+}
+.admin-body input::placeholder,
+.admin-body textarea::placeholder {
+    color: #888 !important;
+}
+.admin-body .btn-danger {
+    background: #c0392b !important;
+}
+.admin-body .btn-secondary {
+    background: #3d3d54 !important;
+    color: #e0e0e0 !important;
+}
+/* コードっぽいテキストを見やすく */
+.admin-body code,
+.admin-body .mono {
+    background: #2d2d44 !important;
+    color: #7dd3fc !important;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
