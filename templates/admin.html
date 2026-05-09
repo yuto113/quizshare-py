@@ -137,25 +137,21 @@
 // 管理者ログイン
 // # submitをfetchに変えてリロードなしでログインさせる
 // ============================================================
-// # DOMContentLoadedで確実にフォームが存在してからイベントを登録する
-document.addEventListener('DOMContentLoaded', function() {
-  var loginForm = document.getElementById('login-form');
-  if (!loginForm) return;  // ログインフォームがないページでは何もしない
-  loginForm.addEventListener('submit', async function(e) {
-    e.preventDefault();
-    var pw  = document.getElementById('admin-pw').value;
-    var btn = e.target.querySelector('button[type="submit"]');
-    btn.disabled = true;
-    btn.textContent = 'チェック中...';
-    try {
-      await window.api.post('/api/admin/login/{{ group_id }}', { password: pw });
-      window.location.reload();  // 成功したらリロードして管理画面を表示
-    } catch (err) {
-      window.toast(err.message, 'error');
-      btn.disabled = false;
-      btn.textContent = '🔓 ログイン';
-    }
-  });
+// # このスクリプトはフォームの後に読み込まれるので直接登録できる
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const pw  = document.getElementById('admin-pw').value;
+  const btn = e.target.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  btn.textContent = 'チェック中...';
+  try {
+    await window.api.post('/api/admin/login/{{ group_id }}', { password: pw });
+    window.location.reload();  // 成功したらリロードして管理画面を表示
+  } catch (err) {
+    window.toast(err.message, 'error');
+    btn.disabled = false;
+    btn.textContent = '🔓 ログイン';
+  }
 });
 </script>
 {% endif %}
