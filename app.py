@@ -1,3 +1,6 @@
+import site as _site
+import sys
+sys.path.insert(0, _site.getusersitepackages())
 # -*- coding: utf-8 -*-
 # ====================================================================
 # 暗号化ヘルパー(問題文・答え・グループ名・作者名・タグなどを暗号化)
@@ -454,6 +457,13 @@ def client_ip() -> str:
 # 6. 文字列を比べる関数(答え合わせで使う)
 # 大文字/小文字・空白・句読点のちがいは許してあげる
 # ====================================================================
+# 漢字→ひらがな変換（pykakasiを一度だけ初期化して使い回す）
+try:
+    import pykakasi as _pykakasi
+    _kakasi = _pykakasi.kakasi()
+except Exception:
+    _kakasi = None  # インストールされていない場合はスキップ
+
 def normalize_answer(s: str) -> str:
     import unicodedata
     s = (s or '').strip()
@@ -476,7 +486,19 @@ def normalize_answer(s: str) -> str:
             result.append(chr(ord(c) - 0x60))  # ひらがなに変換
         else:
             result.append(c)
-    return ''.join(result)
+    s = ''.join(result)
+    # 漢字→ひらがなに変換（pykakasi使用）
+    # # 「海」→「うみ」のように変換することで漢字・ひらがな両方正解にできる
+    if _kakasi:
+        try:
+            converted = _kakasi.convert(s)
+            s = ''.join(
+                item['hira'] if item['hira'] else item['orig']
+                for item in converted
+            )
+        except Exception:
+            pass  # 変換失敗時はそのまま
+    return s
 
 
 def check_answer(user_answer, quiz_row):
