@@ -67,20 +67,30 @@ entry.html : さいしょのページ(ログインか、新しいグループを
   // ============================================================
   // ログインフォームの処理(2段階: グループID → パスワード)
   // ============================================================
-  // # ブラウザのオートコンプリートで不正な値（URLパスなど）が入ったらクリアする
-  window.addEventListener('load', function() {
+  // # ブラウザのautofillはload後に入るので少し待ってからチェックする
+  function clearInvalidGroupId() {
     var inp = document.getElementById('login-group-id');
     if (inp && inp.value.indexOf('/') !== -1) {
       inp.value = '';
     }
-  });
+  }
+  // # 100ms・500ms・1000msで3回チェック（ブラウザによってタイミングが違う）
+  setTimeout(clearInvalidGroupId, 100);
+  setTimeout(clearInvalidGroupId, 500);
+  setTimeout(clearInvalidGroupId, 1000);
+
+  // # submitのときも「/」が入ってたらグループIDだけ取り出す
+  // # 例: "quiz-2/setting/" → "quiz-2"
+  function sanitizeGroupId(val) {
+    return val.split('/')[0].trim();
+  }
 
   // パスワードが必要かどうかのフラグ
   let needsPassword = false;
 
   document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const groupId = document.getElementById('login-group-id').value.trim();
+    const groupId = sanitizeGroupId(document.getElementById('login-group-id').value);
     // # パスワード欄はあとから表示されるのでnullチェックが必要
     const groupPwEl = document.getElementById('login-group-pw');
     const groupPw = groupPwEl ? groupPwEl.value : '';

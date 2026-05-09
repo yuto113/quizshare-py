@@ -131,7 +131,7 @@
 {% endblock %}
 
 {% block scripts %}
-{% if group_info and group_info.has_admin and not logged_in %}
+{% if group_info and not logged_in %}
 <script>
 // ============================================================
 // 管理者ログイン
