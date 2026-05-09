@@ -71,7 +71,9 @@ entry.html : さいしょのページ(ログインか、新しいグループを
   document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();  // リロードを止める
     const groupId = document.getElementById('login-group-id').value.trim();
-    const groupPw = document.getElementById('login-group-pw').value;
+    // # パスワード欄がまだ表示されてないときはnullになるので安全に取得する
+    const groupPwEl = document.getElementById('login-group-pw');
+    const groupPw = groupPwEl ? groupPwEl.value : '';
     const btn = e.target.querySelector('button[type="submit"]');
     btn.disabled = true;
     btn.textContent = 'チェック中...';
