@@ -1630,10 +1630,10 @@ init_db()
 @app.route("/feedback", methods=["GET", "POST"])
 def feedback():
     # フィードバックを送信するページ
-    import datetime, pytz
+    import datetime, pytz, sqlite3 as _sq
     msg = None
     if request.method == "POST":
-        star    = request.form.get("star_rating", "3")
+        star     = request.form.get("star_rating", "3")
         category = request.form.get("category", "感想")
         message  = request.form.get("message", "").strip()
         # メッセージが空なら送信しない
@@ -1643,7 +1643,9 @@ def feedback():
             # 日本時間で今の時刻を取得
             jst = pytz.timezone("Asia/Tokyo")
             now = datetime.datetime.now(jst).strftime("%Y-%m-%d %H:%M:%S")
-            conn = get_db()
+            # DBに直接つないで保存する
+            db_path = os.environ.get("SQLITE_PATH", "/home/yuto113/quizshare.db")
+            conn = _sq.connect(db_path)
             conn.execute(
                 "INSERT INTO feedback (created_at, star_rating, category, message) VALUES (?, ?, ?, ?)",
                 (now, int(star), category, message)
@@ -1656,12 +1658,15 @@ def feedback():
 @app.route("/feedback/list")
 def feedback_list():
     # 管理者だけが見られるフィードバック一覧ページ
-    admin_pw = request.args.get("pw", "")
+    import sqlite3 as _sq
+    admin_pw  = request.args.get("pw", "")
     correct_pw = os.environ.get("ADMIN_PASSWORD", "")
     if admin_pw != correct_pw:
         # パスワードが違ったら403エラー
         return "管理者パスワードが違います", 403
-    conn = get_db()
+    # DBに直接つないで一覧を取得する
+    db_path = os.environ.get("SQLITE_PATH", "/home/yuto113/quizshare.db")
+    conn = _sq.connect(db_path)
     rows = conn.execute(
         "SELECT id, created_at, star_rating, category, message FROM feedback ORDER BY id DESC"
     ).fetchall()
