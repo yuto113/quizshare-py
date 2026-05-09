@@ -52,6 +52,9 @@
     <h2 class="display-font" style="font-weight:900; font-size:24px; line-height:1.5; margin:0; white-space:pre-wrap;">{{ quiz.question }}</h2>
   </div>
 
+  {# ===== 問題の画像 ===== #}
+  <div id="quiz-images" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;"></div>
+
   {# ===== 回答フォーム ===== #}
   <div id="answer-section">
     {% if quiz.has_options %}
@@ -73,6 +76,14 @@
                placeholder="答えを入力..." maxlength="500" autocomplete="off">
       </div>
     {% endif %}
+
+    <button id="btn-show-hint" class="btn btn-secondary btn-block" style="margin-top:8px; font-size:13px; padding:10px; display:none;">
+      🔍 ヒントを見る
+    </button>
+    <div id="hint-box" style="display:none; margin-top:8px; padding:12px; background:#FEF3C7; border:1.5px solid #FCD34D; border-radius:12px;">
+      <div style="font-size:11px; font-weight:900; color:#92400E; margin-bottom:4px;">🔍 ヒント</div>
+      <p id="hint-text" style="margin:0; color:#78350F;"></p>
+    </div>
 
     <button id="submit-answer" class="btn btn-primary btn-block" style="margin-top:16px; font-size:16px; padding:14px;">
       ➡ 答える
@@ -99,7 +110,18 @@
       <p class="display-font" style="font-size:20px; font-weight:900; margin:0; word-break:break-all;" id="result-answer"></p>
     </div>
 
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; max-width:400px; margin:24px auto 0;">
+    <div id="explanation-box" style="display:none; max-width:400px; margin:20px auto 0; padding:16px; background:#EFF6FF; border:2px solid #93C5FD; border-radius:16px;">
+      <div style="font-size:11px; font-weight:900; color:#1E40AF; letter-spacing:0.1em; margin-bottom:6px;">💡 解説</div>
+      <p id="explanation-text" style="margin:0; color:#1E3A8A; line-height:1.7; white-space:pre-wrap;"></p>
+    </div>
+
+    <div id="random-next-area" style="display:none; max-width:400px; margin:24px auto 0;">
+      <button id="btn-random-next" class="btn btn-primary btn-block" style="font-size:16px; padding:14px;">
+        ➡ 次の問題へ(<span id="random-progress"></span>)
+      </button>
+    </div>
+
+    <div id="normal-buttons" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; max-width:400px; margin:24px auto 0;">
       <button id="retry-btn" class="btn btn-secondary">🔄 もう一度</button>
       <a href="{{ url_for('page_group') }}" class="btn btn-primary">→ 一覧へ</a>
     </div>
@@ -109,6 +131,15 @@
         <span style="font-size:18px;">💬</span>
         <span style="font-size:12px;">感想を書く</span>
       </button>
+      <div id="ranking-section" style="display:none;">
+        <div style="background:#FFFBEB; border:1.5px solid #FCD34D; border-radius:16px; padding:16px; margin-top:0;">
+          <div style="font-weight:900; margin-bottom:8px;">ランキングに登録する</div>
+          <input type="text" id="ranking-name" class="form-control" placeholder="表示名(20文字以内)" maxlength="20" style="margin-bottom:8px;">
+          <button id="btn-ranking-submit" class="btn btn-primary btn-block" style="background:#F59E0B;">
+            登録する
+          </button>
+        </div>
+      </div>
       <button id="btn-stats" class="btn btn-secondary" style="border-color:#93C5FD; background:#EFF6FF; color:#1E40AF; padding:12px; flex-direction:column; height:auto;">
         <span style="font-size:18px;">📊</span>
         <span style="font-size:12px;">統計を見る</span>
@@ -189,6 +220,42 @@
 // ============================================================
 
 const QUIZ_ID = {{ quiz.id | tojson }};
+
+// ランダムモード(URLに?random=1...5があれば)
+const urlParams = new URLSearchParams(window.location.search);
+const randomMode = urlParams.get('random');
+const randomTotal = 5;
+let randomCurrent = randomMode ? parseInt(randomMode, 10) : 0;
+
+// 問題の画像を読み込む
+(async () => {
+  try {
+    const r = await window.api.get('/api/quizzes/' + encodeURIComponent(QUIZ_ID) + '/images');
+    const box = document.getElementById('quiz-images');
+    if (r.images && r.images.length > 0) {
+      box.innerHTML = r.images.map(img =>
+        '<img src="' + img.url + '" style="max-width:200px; max-height:200px; border-radius:12px; border:2px solid #E5E7EB; object-fit:cover;">'
+      ).join('');
+    }
+  } catch(e) {}
+})();
+
+// ヒントを取得
+(async () => {
+  try {
+    const r = await window.api.get('/api/quizzes/' + encodeURIComponent(QUIZ_ID) + '/hint');
+    if (r.hint) {
+      document.getElementById('btn-show-hint').style.display = 'block';
+      document.getElementById('hint-text').textContent = r.hint;
+    }
+  } catch(e) {}
+})();
+
+document.getElementById('btn-show-hint').addEventListener('click', () => {
+  document.getElementById('hint-box').style.display = 'block';
+  document.getElementById('btn-show-hint').style.display = 'none';
+});
+
 const HAS_OPTIONS = {{ 'true' if quiz.has_options else 'false' }};
 
 // ---- タイマー(100ミリ秒ごとに更新) ----
@@ -235,7 +302,24 @@ document.getElementById('submit-answer').addEventListener('click', async () => {
       user_answer: userAnswer,
       time_ms: finalTimeMs,
     });
+    if (r.explanation) {
+      document.getElementById('explanation-text').textContent = r.explanation;
+      document.getElementById('explanation-box').style.display = 'block';
+    } else {
+      document.getElementById('explanation-box').style.display = 'none';
+    }
     showResult(r.correct, r.correct_answer, r.time_ms);
+    // ランダムモードならボタンを切替
+    if (randomMode) {
+      document.getElementById('normal-buttons').style.display = 'none';
+      document.getElementById('random-next-area').style.display = 'block';
+      if (randomCurrent >= randomTotal) {
+        document.getElementById('btn-random-next').innerHTML = '🎉 完了!一覧へ戻る';
+        document.getElementById('random-progress').textContent = randomCurrent + '/' + randomTotal;
+      } else {
+        document.getElementById('random-progress').textContent = randomCurrent + '/' + randomTotal;
+      }
+    }
   } catch (err) {
     window.toast(err.message, 'error');
     btn.disabled = false;
@@ -286,7 +370,7 @@ function showResult(correct, correctAnswer, timeMs) {
   }
 
   // 紙吹雪(正解時のみ、簡単バージョン)
-  if (correct) confetti();
+  if (correct) { confetti(); document.getElementById('ranking-section').style.display = 'block'; }
 }
 
 // ---- もう一度 ----
@@ -397,11 +481,46 @@ document.getElementById('fb-form').addEventListener('submit', async (e) => {
   }
 });
 
+// ---- ランキング登録 ----
+document.getElementById('btn-ranking-submit').addEventListener('click', async () => {
+  const name = document.getElementById('ranking-name').value.trim();
+  if (!name) { window.toast('表示名を入力してね', 'error'); return; }
+  const btn = document.getElementById('btn-ranking-submit');
+  btn.disabled = true;
+  btn.textContent = '登録中...';
+  try {
+    await window.api.post('/api/quizzes/' + encodeURIComponent(QUIZ_ID) + '/ranking', {
+      display_name: name,
+      time_ms: finalTimeMs,
+    });
+    window.toast('ランキングに登録したよ!', 'success');
+    document.getElementById('ranking-section').innerHTML = '<p style="text-align:center; color:#059669; font-weight:900; padding:12px;">✓ 登録済み</p>';
+  } catch (err) {
+    window.toast(err.message, 'error');
+    btn.disabled = false;
+    btn.textContent = '登録する';
+  }
+});
+
 // ============================================================
-// 統計
+// 統計(リアルタイム更新付き)
 // ============================================================
+let statsInterval = null;
+function startStatsAutoUpdate() {
+  if (statsInterval) return;
+  statsInterval = setInterval(async () => {
+    if (document.getElementById('modal-stats').style.display !== 'none') {
+      try {
+        const r = await window.api.get('/api/quizzes/' + encodeURIComponent(QUIZ_ID) + '/stats');
+        document.getElementById('stats-body').innerHTML = renderStats(r.stats, r.recent_feedbacks);
+      } catch(e) {}
+    }
+  }, 10000);
+}
+
 document.getElementById('btn-stats').addEventListener('click', async () => {
   window.openModal('modal-stats');
+  startStatsAutoUpdate();
   const body = document.getElementById('stats-body');
   body.innerHTML = '<p style="text-align:center; padding:40px 0; color:#9CA3AF;">読み込み中...</p>';
   try {
@@ -481,6 +600,48 @@ function renderStats(s, fbs) {
     html += '</div>';
   }
   return html;
+}
+
+// ランダム次へボタン
+const btnRandomNext = document.getElementById('btn-random-next');
+if (btnRandomNext) btnRandomNext.addEventListener('click', async () => {
+  if (randomCurrent >= randomTotal) {
+    window.location.href = '/group';
+    return;
+  }
+  try {
+    const r = await window.api.get('/api/quizzes/random');
+    window.location.href = '/answer/' + encodeURIComponent(r.quiz_id) + '?random=' + (randomCurrent + 1);
+  } catch(err) { window.toast(err.message, 'error'); }
+});
+
+// セットモード
+const setIds = urlParams.get('set') ? urlParams.get('set').split(',').filter(x => x) : [];
+const setIdx = parseInt(urlParams.get('idx') || '0', 10);
+if (setIds.length > 0) {
+  // 次へボタンを表示
+  const nextArea = document.getElementById('random-next-area');
+  if (nextArea) {
+    nextArea.style.display = 'block';
+    const prog = document.getElementById('random-progress');
+    if (prog) prog.textContent = (setIdx + 1) + '/' + setIds.length;
+    const nextBtn = document.getElementById('btn-random-next');
+    if (nextBtn) {
+      if (setIdx + 1 >= setIds.length) {
+        nextBtn.innerHTML = '完了! 一覧へ戻る';
+        nextBtn.onclick = () => { window.location.href = '/group'; };
+      } else {
+        nextBtn.innerHTML = '次の問題へ(' + (setIdx+1) + '/' + setIds.length + ')';
+        nextBtn.onclick = () => {
+          const nextId = setIds[setIdx + 1];
+          window.location.href = '/answer/' + encodeURIComponent(nextId) + '?set=' + encodeURIComponent(setIds.join(',')) + '&idx=' + (setIdx + 1);
+        };
+      }
+    }
+    // 通常ボタンを隠す
+    const normalBtns = document.getElementById('normal-buttons');
+    if (normalBtns) normalBtns.style.display = 'none';
+  }
 }
 </script>
 {% endblock %}

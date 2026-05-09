@@ -47,6 +47,8 @@
       {% block nav_items %}
         {% if current_group %}
           <a class="header-link" href="{{ url_for('page_group') }}">🏠 クイズ</a>
+          <a class="header-link" href="{{ url_for('page_ranking') }}">🏆 ランキング</a>
+          <a class="header-link" href="/sets">📚 セット</a>
         {% endif %}
         <a class="header-link" href="{{ url_for('page_help') }}">❓ ヘルプ</a>
         <a class="header-link" href="{{ url_for('page_terms') }}">📜 利用規約</a>

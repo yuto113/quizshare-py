@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}グループ全体統計 - クイズシェア{% endblock %}
+
+{% block content %}
+<div class="container">
+  <h1 class="page-title">📊 グループ全体統計</h1>
+  <p class="page-subtitle">{{ group.name }} のみんなの活動</p>
+
+  <div id="stats-container">
+    <p style="color:#9CA3AF;">読み込み中...</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function load() {
+  try {
+    const r = await window.api.get('/api/group/stats');
+    const acc = r.total_attempts > 0 ? Math.round((r.total_corrects / r.total_attempts) * 100) : 0;
+    let popularHtml = '';
+    if (r.popular.length === 0) {
+      popularHtml = '<p style="color:#9CA3AF; text-align:center; padding:20px;">まだ挑戦されてないよ</p>';
+    } else {
+      popularHtml = r.popular.map((p, i) => {
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i+1) + '位';
+        return '<a href="/answer/' + encodeURIComponent(p.id) + '" style="display:flex; gap:12px; align-items:center; padding:12px; background:#fff; border:1px solid #E5E7EB; border-radius:12px; margin-bottom:8px; text-decoration:none; color:inherit;">' +
+          '<span style="font-size:20px; font-weight:900; min-width:40px;">' + medal + '</span>' +
+          '<div style="flex:1;"><div style="font-weight:900;">' + escapeHtml(p.question.slice(0, 50)) + '</div>' +
+          '<div style="font-size:12px; color:#9CA3AF;">' + escapeHtml(p.name) + '・' + p.attempts + '人挑戦</div></div></a>';
+      }).join('');
+    }
+
+    document.getElementById('stats-container').innerHTML =
+      '<div class="stats-grid">' +
+      '<div class="stat-box" style="background:var(--c-soft);">' +
+      '<div style="font-size:28px;">📝</div>' +
+      '<div class="big" style="color:var(--c-main);">' + r.total_quizzes + '</div>' +
+      '<div class="label">クイズ数</div></div>' +
+      '<div class="stat-box" style="background:rgba(59,130,246,0.08);">' +
+      '<div style="font-size:28px;">👥</div>' +
+      '<div class="big" style="color:#1E40AF;">' + r.total_attempts + '</div>' +
+      '<div class="label">総挑戦数</div></div></div>' +
+      '<div class="stats-grid" style="margin-top:10px;">' +
+      '<div class="stat-box" style="background:rgba(16,185,129,0.08);">' +
+      '<div style="font-size:28px;">🏆</div>' +
+      '<div class="big" style="color:#059669;">' + acc + '%</div>' +
+      '<div class="label">全体正解率 (' + r.total_corrects + '/' + r.total_attempts + ')</div></div>' +
+      '<div class="stat-box" style="background:#F9FAFB;">' +
+      '<div style="font-size:28px;">⭐</div>' +
+      '<div class="big" style="color:#374151; font-size:20px;">' + r.total_corrects + '</div>' +
+      '<div class="label">総正解数</div></div></div>' +
+      '<h2 style="margin-top:32px; font-family:\'Zen Maru Gothic\',sans-serif; font-weight:900;">🔥 人気クイズトップ5</h2>' +
+      popularHtml;
+  } catch(err) {
+    document.getElementById('stats-container').innerHTML = '<p style="color:#EF4444; text-align:center;">' + escapeHtml(err.message) + '</p>';
+  }
+}
+load();
+setInterval(load, 10000);
+</script>
+{% endblock %}
