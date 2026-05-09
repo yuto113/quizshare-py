@@ -1,6 +1,6 @@
-import site as _site
 import sys
-sys.path.insert(0, _site.getusersitepackages())
+# # pykakasiはPython3.10用のuserパスに入っている
+sys.path.insert(0, '/home/yuto113/.local/lib/python3.10/site-packages')
 # -*- coding: utf-8 -*-
 # ====================================================================
 # 暗号化ヘルパー(問題文・答え・グループ名・作者名・タグなどを暗号化)
