@@ -79,9 +79,14 @@ entry.html : さいしょのページ(ログインか、新しいグループを
   setTimeout(clearInvalidGroupId, 500);
   setTimeout(clearInvalidGroupId, 1000);
 
-  // # submitのときも「/」が入ってたらグループIDだけ取り出す
-  // # 例: "quiz-2/setting/" → "quiz-2"
+  // # /setting/ が含まれていたら管理者ページへリダイレクトする
   function sanitizeGroupId(val) {
+    val = (val || '').trim();
+    if (val.indexOf('/setting') !== -1) {
+      var gid = val.split('/')[0].trim();
+      if (gid) window.location.href = '/' + gid + '/setting/';
+      return null;
+    }
     return val.split('/')[0].trim();
   }
 
@@ -91,6 +96,7 @@ entry.html : さいしょのページ(ログインか、新しいグループを
   document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const groupId = sanitizeGroupId(document.getElementById('login-group-id').value);
+    if (groupId === null) return;
     // # パスワード欄はあとから表示されるのでnullチェックが必要
     const groupPwEl = document.getElementById('login-group-pw');
     const groupPw = groupPwEl ? groupPwEl.value : '';
