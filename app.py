@@ -1673,6 +1673,97 @@ def feedback_list():
     conn.close()
     return render_template("feedback_list.html", feedbacks=rows)
 
+
+# ===== 引用ライブラリ =====
+
+@app.route('/library')
+def page_library():
+    # 引用ライブラリページ（ログイン不要で閲覧可）
+    grp = current_group()
+    return render_template('library.html', logged_in=(grp is not None))
+
+@app.route('/api/library/data')
+def api_library_data():
+    # 学年・教科・問題一覧を返すAPI
+    import sqlite3 as _sq
+    db_path = os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db')
+    conn = _sq.connect(db_path)
+    grade   = request.args.get('grade', '')
+    subject = request.args.get('subject', '')
+
+    if grade and subject:
+        # 問題一覧を返す
+        rows = conn.execute(
+            "SELECT id, question, answer, explanation FROM library_quizzes WHERE grade=? AND subject=? ORDER BY id",
+            (grade, subject)
+        ).fetchall()
+        quizzes = [{'id': r[0], 'question': r[1], 'answer': r[2], 'explanation': r[3] or ''} for r in rows]
+        conn.close()
+        return ok(quizzes=quizzes)
+
+    # 学年一覧
+    grades = [r[0] for r in conn.execute(
+        "SELECT DISTINCT grade FROM library_quizzes ORDER BY grade"
+    ).fetchall()]
+
+    # 教科一覧（学年指定時）
+    subjects = []
+    if grade:
+        subjects = [r[0] for r in conn.execute(
+            "SELECT DISTINCT subject FROM library_quizzes WHERE grade=? ORDER BY subject",
+            (grade,)
+        ).fetchall()]
+
+    conn.close()
+    return ok(grades=grades, subjects=subjects)
+
+@app.route('/api/library/import', methods=['POST'])
+def api_library_import():
+    # ライブラリの問題をグループに引用するAPI
+    import sqlite3 as _sq, datetime, pytz
+    grp = current_group()
+    if not grp:
+        return err('ログインしてね', 401)
+
+    data   = request.get_json(silent=True) or {}
+    lib_id = data.get('quiz_id')
+    if not lib_id:
+        return err('quiz_idが必要です')
+
+    # ライブラリから問題を取得（別のDB接続を使う）
+    db_path = os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db')
+    lib_conn = _sq.connect(db_path)
+    row = lib_conn.execute(
+        "SELECT grade, subject, question, answer, explanation FROM library_quizzes WHERE id=?",
+        (lib_id,)
+    ).fetchone()
+    lib_conn.close()
+
+    if not row:
+        return err('問題が見つかりません')
+
+    grade, subject, question, answer, explanation = row
+    jst = pytz.timezone('Asia/Tokyo')
+    now = datetime.datetime.now(jst).strftime('%Y-%m-%d %H:%M:%S')
+
+    # グループのクイズとして追加（暗号化して保存）
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        quiz_id      = new_id()
+        group_db_id  = grp.get('id', '')
+        tag          = enc(f'{grade} {subject}')
+        try:
+            cur.execute(
+                q('INSERT INTO quizzes (id,group_id,author_name,class_name,question,answer,explanation,tags,has_options,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'),
+                (quiz_id, group_db_id, enc('引用ライブラリ'), enc(''),
+                 enc(question), enc(answer), enc(explanation or ''), tag, 0, now)
+            )
+            conn.commit()
+        except Exception as e:
+            return err(f'追加失敗: {str(e)}')
+
+    return ok(message='引用しました')
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_DEBUG', '0') == '1'
