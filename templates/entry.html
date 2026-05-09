@@ -65,19 +65,37 @@ entry.html : さいしょのページ(ログインか、新しいグループを
   // # form標準のsubmitはリロードを起こすのでJSでpreventDefaultして止める。
   // #   そしてfetchでサーバーにだけ送って、成功したらページ遷移する。
   // ============================================================
+  // パスワードが必要かどうかのフラグ
+  let needsPassword = false;
+
   document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();  // リロードを止める
     const groupId = document.getElementById('login-group-id').value.trim();
+    const groupPw = document.getElementById('login-group-pw').value;
     const btn = e.target.querySelector('button[type="submit"]');
     btn.disabled = true;
     btn.textContent = 'チェック中...';
+
+    // # パスワードが必要なときはgroup_passwordも一緒に送る
+    const body = { group_id: groupId };
+    if (needsPassword) body.group_password = groupPw;
+
     try {
-      const r = await window.api.post('/api/login', { group_id: groupId });
+      const r = await window.api.post('/api/login', body);
       window.location.href = r.redirect || '/group';
     } catch (err) {
-      window.toast(err.message, 'error');
-      btn.disabled = false;
-      btn.textContent = '➡ 入る';
+      if (err.message === 'パスワードが必要だよ') {
+        // # サーバーがパスワード必要と言ったら入力欄を表示する
+        needsPassword = true;
+        document.getElementById('pw-section').style.display = 'block';
+        document.getElementById('login-group-id').disabled = true;
+        btn.disabled = false;
+        btn.textContent = '➡ 入る';
+      } else {
+        window.toast(err.message, 'error');
+        btn.disabled = false;
+        btn.textContent = '➡ 入る';
+      }
     }
   });
 </script>
