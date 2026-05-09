@@ -27,7 +27,7 @@ entry.html : さいしょのページ(ログインか、新しいグループを
         <label class="form-label">グループID</label>
 
         <div class="relative" style="position:relative;">
-          <input type="text" id="login-group-id" class="form-control mono" placeholder="例: my-group-123" required autocomplete="off">
+          <input type="text" id="login-group-id" class="form-control mono" placeholder="例: my-group-123" required autocomplete="new-password">
         </div>
       </div>
       <div id="pw-section" style="display:none; margin-top:12px;">
@@ -67,6 +67,14 @@ entry.html : さいしょのページ(ログインか、新しいグループを
   // ============================================================
   // ログインフォームの処理(2段階: グループID → パスワード)
   // ============================================================
+  // # ブラウザのオートコンプリートで不正な値（URLパスなど）が入ったらクリアする
+  window.addEventListener('load', function() {
+    var inp = document.getElementById('login-group-id');
+    if (inp && inp.value.indexOf('/') !== -1) {
+      inp.value = '';
+    }
+  });
+
   // パスワードが必要かどうかのフラグ
   let needsPassword = false;
 
