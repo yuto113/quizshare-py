@@ -1719,7 +1719,7 @@ def api_library_data():
 
 @app.route('/api/library/import', methods=['POST'])
 def api_library_import():
-    # ライブラリの問題をグループに引用するAPI
+    # ライブラリの問題をグループに引用するAPI（平文で保存→decのフォールバックで表示OK）
     import sqlite3 as _sq, datetime, pytz
     grp = current_group()
     if not grp:
@@ -1730,9 +1730,9 @@ def api_library_import():
     if not lib_id:
         return err('quiz_idが必要です')
 
-    # ライブラリから問題を取得（別のDB接続を使う）
-    db_path = os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db')
-    lib_conn = _sq.connect(db_path)
+    # ライブラリから問題を取得
+    _db_path = os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db')
+    lib_conn = _sq.connect(_db_path)
     row = lib_conn.execute(
         "SELECT grade, subject, question, answer, explanation FROM library_quizzes WHERE id=?",
         (lib_id,)
@@ -1746,17 +1746,18 @@ def api_library_import():
     jst = pytz.timezone('Asia/Tokyo')
     now = datetime.datetime.now(jst).strftime('%Y-%m-%d %H:%M:%S')
 
-    # グループのクイズとして追加（暗号化して保存）
+    # グループのクイズとして追加
+    # # ライブラリの問題は教育公開データなので平文で保存する（decのフォールバックで正常表示される）
     with get_db() as conn:
         cur = make_cursor(conn)
-        quiz_id      = new_id()
-        group_db_id  = grp.get('id', '')
-        tag          = enc(f'{grade} {subject}')
+        quiz_id     = new_id()
+        group_db_id = grp.get('id', '')
+        tag_str     = f'{grade} {subject}'
         try:
             cur.execute(
                 q('INSERT INTO quizzes (id,group_id,author_name,class_name,question,answer,explanation,tags,has_options,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'),
-                (quiz_id, group_db_id, enc('引用ライブラリ'), enc(''),
-                 enc(question), enc(answer), enc(explanation or ''), tag, 0, now)
+                (quiz_id, group_db_id, '引用ライブラリ', '',
+                 question, answer, explanation or '', tag_str, 0, now)
             )
             conn.commit()
         except Exception as e:
