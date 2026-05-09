@@ -123,6 +123,28 @@
       </div>
     </div>
 
+    {# ---- グループに入る ---- #}
+    <div class="admin-card" style="margin-top:16px;">
+      <h3>🚪 グループに入る</h3>
+      <p>管理者としてパスワードなしでグループに入れるよ。</p>
+      <button type="button" id="btn-enter-group" class="btn btn-block" style="background:rgba(99,102,241,0.2); color:#a5b4fc; border:1px solid rgba(99,102,241,0.3);">
+        → グループのクイズ一覧へ
+      </button>
+    </div>
+
+    {# ---- クイズ管理 ---- #}
+    <div class="admin-card" style="margin-top:16px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 style="margin:0;">📝 クイズ管理</h3>
+        <button type="button" id="btn-load-quizzes" style="padding:6px 14px; background:rgba(255,255,255,0.08); color:#9CA3AF; border:1px solid rgba(255,255,255,0.1); border-radius:8px; cursor:pointer; font-size:0.85rem;">
+          🔄 一覧を読み込む
+        </button>
+      </div>
+      <div id="quiz-admin-list" style="color:#6B7280; font-size:0.85rem;">
+        「一覧を読み込む」を押してね
+      </div>
+    </div>
+
     <button type="button" id="btn-logout-admin" class="btn btn-block" style="background:rgba(255,255,255,0.05); color:#9CA3AF; border:1px solid rgba(255,255,255,0.1); margin-top:16px;">
       ← ログアウト
     </button>
@@ -226,6 +248,66 @@ document.getElementById('btn-do-delete').addEventListener('click', async () => {
     btn.textContent = '🔥 完全に削除する';
   }
 });
+
+// ---- グループに入る ----
+document.getElementById('btn-enter-group').addEventListener('click', async () => {
+  try {
+    const r = await window.api.post(`/api/admin/enter/${encodeURIComponent(groupIdRaw)}`);
+    window.location.href = r.redirect || '/group';
+  } catch (err) {
+    window.toast(err.message, 'error');
+  }
+});
+
+// ---- クイズ一覧を読み込む ----
+document.getElementById('btn-load-quizzes').addEventListener('click', async () => {
+  const list = document.getElementById('quiz-admin-list');
+  list.innerHTML = '読み込み中...';
+  try {
+    const r = await window.api.get(`/api/admin/quizzes/${encodeURIComponent(groupIdRaw)}`);
+    if (!r.quizzes || r.quizzes.length === 0) {
+      list.innerHTML = '<p style="color:#9CA3AF; margin:8px 0;">クイズがないよ</p>';
+      return;
+    }
+    list.innerHTML = r.quizzes.map((q, i) => `
+      <div style="display:flex; justify-content:space-between; align-items:center;
+                  padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+        <div style="flex:1; min-width:0; margin-right:8px;">
+          <div style="color:#e2e8f0; font-size:0.85rem;
+                      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+            ${i+1}. ${window.escapeHtml(q.question || '（問題）')}
+          </div>
+          <div style="color:#6B7280; font-size:0.75rem; margin-top:2px;">
+            ${window.escapeHtml(q.author_name || '')}
+            ${q.created_at ? ' · ' + q.created_at.substring(0,10) : ''}
+          </div>
+        </div>
+        <button onclick="deleteQuizAdmin('${q.id}')"
+          style="padding:4px 10px; background:rgba(239,68,68,0.15);
+                 color:#FCA5A5; border:1px solid rgba(239,68,68,0.3);
+                 border-radius:6px; cursor:pointer; font-size:0.8rem; flex-shrink:0;">
+          🗑️ 削除
+        </button>
+      </div>
+    `).join('');
+  } catch (err) {
+    window.toast(err.message, 'error');
+    list.innerHTML = '<p style="color:#EF4444;">読み込み失敗</p>';
+  }
+});
+
+// ---- クイズを削除する ----
+async function deleteQuizAdmin(quizId) {
+  if (!confirm('このクイズを削除するよ？\n挑戦記録・感想も全部消えるよ。')) return;
+  try {
+    await window.api.del(`/api/admin/quizzes/${encodeURIComponent(groupIdRaw)}/${quizId}`);
+    window.toast('削除したよ', 'success');
+    // 削除後に一覧を再読み込みする
+    document.getElementById('btn-load-quizzes').click();
+  } catch (err) {
+    window.toast(err.message, 'error');
+  }
+}
 
 // ---- ログアウト ----
 document.getElementById('btn-logout-admin').addEventListener('click', async () => {
