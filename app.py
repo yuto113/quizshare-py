@@ -1207,8 +1207,11 @@ def api_admin_quizzes(group_id):
         cur.execute(q("SELECT id, author_name, question, created_at FROM quizzes WHERE group_id = %s ORDER BY created_at DESC"), (row["id"],))
         quizzes = [dict(r) for r in cur.fetchall()]
     for q2 in quizzes:
-        q2["id"] = str(q2["id"])
-        q2["created_at"] = str(q2["created_at"])
+        q2["id"]          = str(q2["id"])
+        q2["created_at"]  = str(q2["created_at"])
+        # # 暗号化されたフィールドを復号して返す
+        q2["author_name"] = dec(q2.get("author_name") or "")
+        q2["question"]    = dec(q2.get("question") or "")
     return ok(quizzes=quizzes)
 
 @app.route("/api/admin/quizzes/<group_id>/<quiz_id>", methods=["DELETE"])
