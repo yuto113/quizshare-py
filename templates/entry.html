@@ -1,6 +1,6 @@
 {# ============================================================
-   entry.html : さいしょのページ(ログインか、新しいグループを作る)
-   ============================================================ #}
+entry.html : さいしょのページ(ログインか、新しいグループを作る)
+============================================================ #}
 {% extends "base.html" %}
 {% block title %}クイズシェア 🎯 - はじめる{% endblock %}
 
@@ -25,10 +25,12 @@
     <form id="login-form">
       <div class="form-group">
         <label class="form-label">グループID</label>
-        <input type="password" id="login-group-id" class="form-control mono"
-               placeholder="例: my-group-123"
-               required minlength="6" maxlength="32"
-               autocomplete="off">
+        <input type="password" id="login-group-id" class="form-control mono" placeholder="例: my-group-123" required
+          minlength="6" maxlength="32" autocomplete="off">
+        <div class="relative" style="position:relative;">
+          <input type="text" id="login-group-id" class="form-control mono" placeholder="例: my-group-123" required
+            minlength="6" maxlength="32" autocomplete="off">
+        </div>
       </div>
       <button type="submit" class="btn btn-primary btn-block">
         ➡ 入る
@@ -60,25 +62,25 @@
 
 {% block scripts %}
 <script>
-// ============================================================
-// ログインフォームの処理
-// # form標準のsubmitはリロードを起こすのでJSでpreventDefaultして止める。
-// #   そしてfetchでサーバーにだけ送って、成功したらページ遷移する。
-// ============================================================
-document.getElementById('login-form').addEventListener('submit', async (e) => {
-  e.preventDefault();  // リロードを止める
-  const groupId = document.getElementById('login-group-id').value.trim();
-  const btn = e.target.querySelector('button[type="submit"]');
-  btn.disabled = true;
-  btn.textContent = 'チェック中...';
-  try {
-    const r = await window.api.post('/api/login', { group_id: groupId });
-    window.location.href = r.redirect || '/group';
-  } catch (err) {
-    window.toast(err.message, 'error');
-    btn.disabled = false;
-    btn.textContent = '➡ 入る';
-  }
-});
+  // ============================================================
+  // ログインフォームの処理
+  // # form標準のsubmitはリロードを起こすのでJSでpreventDefaultして止める。
+  // #   そしてfetchでサーバーにだけ送って、成功したらページ遷移する。
+  // ============================================================
+  document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();  // リロードを止める
+    const groupId = document.getElementById('login-group-id').value.trim();
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    btn.textContent = 'チェック中...';
+    try {
+      const r = await window.api.post('/api/login', { group_id: groupId });
+      window.location.href = r.redirect || '/group';
+    } catch (err) {
+      window.toast(err.message, 'error');
+      btn.disabled = false;
+      btn.textContent = '➡ 入る';
+    }
+  });
 </script>
 {% endblock %}
