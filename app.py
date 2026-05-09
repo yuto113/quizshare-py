@@ -455,14 +455,28 @@ def client_ip() -> str:
 # 大文字/小文字・空白・句読点のちがいは許してあげる
 # ====================================================================
 def normalize_answer(s: str) -> str:
-    s = (s or '').strip().lower()
+    import unicodedata
+    s = (s or '').strip()
+    # NFKC正規化（全角数字・英字→半角、ローマ字統一など）
+    s = unicodedata.normalize('NFKC', s)
+    # 小文字に統一（英語の大文字小文字を区別しない）
+    s = s.lower()
     # 空白を全部消す
-    for ws in [' ', '\u3000', '\t', '\n']:
+    for ws in [' ', '\u3000', '\t', '\n', '\u00a0']:
         s = s.replace(ws, '')
-    # 句読点を消す
-    for p in ['、', '。', ',', '.', '!', '?', '!', '?']:
+    # 句読点・記号を消す
+    for p in ['、','。',',','.','!','?','！','？','・','〜','～','…',
+              '「','」','『','』','（','）','(',')',
+              '【','】','〈','〉','《','》','／','\\','-','ー','―']:
         s = s.replace(p, '')
-    return s
+    # カタカナ→ひらがなに統一（ウ→う など）
+    result = []
+    for c in s:
+        if '\u30a1' <= c <= '\u30f6':  # カタカナ範囲
+            result.append(chr(ord(c) - 0x60))  # ひらがなに変換
+        else:
+            result.append(c)
+    return ''.join(result)
 
 
 def check_answer(user_answer, quiz_row):
