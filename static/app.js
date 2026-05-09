@@ -25,6 +25,8 @@ window.api = {
     let data = null;
     try { data = await res.json(); } catch {}
     if (!res.ok || !data || data.ok === false) {
+      // # 401(ログイン必要)のとき、エントリーページにいたらトーストを出さない
+      if (res.status === 401 && window.location.pathname === '/') return {};
       throw new Error((data && data.error) || `エラーが起きたよ (${res.status})`);
     }
     return data;
