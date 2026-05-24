@@ -82,6 +82,10 @@ entry.html : さいしょのページ(ログインか、新しいグループを
   // # /setting/ が含まれていたら管理者ページへリダイレクトする
   function sanitizeGroupId(val) {
     val = (val || '').trim();
+    if (val === '/setting/' || val === 'setting' || val === '/setting') {
+      window.location.href = '/setting/';
+      return null;
+    }
     if (val.indexOf('/setting') !== -1) {
       var gid = val.split('/')[0].trim();
       if (gid) window.location.href = '/' + gid + '/setting/';
@@ -127,5 +131,23 @@ entry.html : さいしょのページ(ログインか、新しいグループを
       }
     }
   });
+
+  // お知らせ・イベントをトップに表示
+  (async () => {
+    try {
+      const r = await fetch('/api/custom_pages/home');
+      const data = await r.json();
+      if (!data.ok || data.pages.length === 0) return;
+      const box = document.getElementById('home-notices');
+      box.innerHTML = data.pages.map(p => {
+        const icon = {announce:'📢',event:'🎉',group_intro:'👥',blank:'✨'}[p.type]||'📄';
+        const color = {announce:'#f97316',event:'#7c3aed',group_intro:'#10b981',blank:'#667eea'}[p.type]||'#667eea';
+        return `<a href="${p.url}" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:white;border:2px solid ${color};border-radius:14px;text-decoration:none;color:#333;margin-bottom:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);transition:transform 0.15s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+          <span style="font-size:28px;">${icon}</span>
+          <div><div style="font-weight:900;font-size:15px;">${p.name}</div><div style="font-size:12px;color:#9CA3AF;margin-top:2px;">タップして見る →</div></div>
+        </a>`;
+      }).join('');
+    } catch(e) {}
+  })();
 </script>
 {% endblock %}

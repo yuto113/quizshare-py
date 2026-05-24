@@ -1,117 +1,248 @@
-{# ============================================================
-   help.html : つかいかたページ
-   ============================================================ #}
 {% extends "base.html" %}
-{% block title %}ヘルプ - クイズシェア{% endblock %}
+{% block title %}ヘルプ・使い方 - QuizShare{% endblock %}
+{% block robots %}<meta name="robots" content="index,follow">{% endblock %}
+{% block seo %}
+<meta name="description" content="QuizShareの使い方。グループの作り方・クイズの作り方・挑戦方法をスクリーンショット付きでわかりやすく説明します。">
+{% endblock %}
 
 {% block content %}
-<div class="container-narrow">
-  <div class="doc-content anim-slideUp">
-    <h1>❓ ヘルプ & 使い方</h1>
-    <p style="color:#9CA3AF; font-size:12px; margin:0 0 24px;">
-      わからないことがあったら、ここを見てね!
-    </p>
+<style>
+.help-section { margin-bottom: 48px; }
+.help-section h2 { font-size: 1.4rem; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 3px solid; display: flex; align-items: center; gap: 10px; }
+.help-img { width: 100%; max-width: 700px; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.12); margin: 16px 0; display: block; border: 1px solid #f0f0f0; cursor: zoom-in; transition: transform 0.2s; }
+.help-img:hover { transform: scale(1.01); }
+.help-step { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 16px; }
+.step-num { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1rem; flex-shrink: 0; color: white; }
+.step-body { flex: 1; }
+.step-title { font-weight: bold; font-size: 1rem; margin-bottom: 4px; }
+.step-desc { color: #555; font-size: 0.92rem; line-height: 1.7; }
+.tip-box { background: #fff8e1; border: 1px solid #ffe082; border-radius: 12px; padding: 14px 16px; margin: 12px 0; font-size: 0.9rem; color: #795548; }
+.tip-box strong { color: #e65100; }
+.faq-item { background: #f9f9f9; border-radius: 12px; padding: 16px; margin-bottom: 12px; border-left: 4px solid #4caf50; }
+.faq-q { font-weight: bold; color: #333; margin-bottom: 6px; }
+.faq-a { color: #555; font-size: 0.9rem; line-height: 1.7; }
+.toc-link { display: inline-block; background: white; border: 1px solid #e0e0e0; border-radius: 20px; padding: 6px 14px; font-size: 0.85rem; color: #555; text-decoration: none; transition: all 0.2s; }
+.toc-link:hover { border-color: #e91e63; color: #e91e63; transform: translateY(-1px); }
+.feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 16px 0; }
+.feature-card { background: #f9f9f9; border-radius: 12px; padding: 14px; text-align: center; font-size: 0.88rem; color: #555; }
+.feature-icon { font-size: 2rem; display: block; margin-bottom: 6px; }
+</style>
 
-    <h2>🎯 クイズシェアってなに?</h2>
-    <p>
-      グループ(クラス・部活・友達など)の中で、おたがいにクイズを出し合って遊んだり勉強したりするアプリだよ。
-      クイズに答えるときのタイムも測れるし、感想や難易度の評価も投稿できるよ。
-    </p>
+<div style="max-width: 800px; margin: 0 auto; padding: 32px 16px;">
+  <h1 style="font-size: 2rem; margin-bottom: 6px;">❓ ヘルプ・使い方</h1>
+  <p style="color: #888; margin-bottom: 28px;">QuizShareの使い方をスクリーンショット付きでわかりやすく説明します</p>
 
-    <h2>🚀 かんたんな使い方</h2>
-    <ol>
-      <li>トップページで「新しいグループを作る」を押す</li>
-      <li>グループ名・ID(合言葉)・好きな色を決める</li>
-      <li>作ったグループIDを友達に教える</li>
-      <li>友達はトップページでそのIDを入力してグループに入れる</li>
-      <li>右下の「+」ボタンでクイズを追加しよう</li>
-      <li>他の人のクイズに挑戦して、感想を送ろう!</li>
-    </ol>
-
-    <h2>🔑 グループID(合言葉)について</h2>
-    <ul>
-      <li>6〜32文字で、半角英数字・ハイフン(-)・アンダースコア(_)が使えるよ</li>
-      <li>ランダム生成ボタンを使うと安全なIDが作れるよ</li>
-      <li>IDは合言葉だから、信頼できる人だけに教えてね</li>
-      <li>サーバーには<strong>ぐちゃぐちゃに暗号化</strong>されて保存されるから、もしDBが盗まれてもバレないよ</li>
-    </ul>
-
-    <h2>📝 クイズを作るときのコツ</h2>
-    <ul>
-      <li><strong>記述式</strong>: 自由に答えを入力する形式。大文字/小文字・空白・句読点のちがいは自動で無視されるよ</li>
-      <li><strong>選択式</strong>: 2〜6個の選択肢から選ぶ形式。正解を一つ選んでね</li>
-      <li>タグをつけると、あとで絞り込みができて便利</li>
-    </ul>
-
-    <h2>⏱️ タイム計測と統計について</h2>
-    <ul>
-      <li>クイズページを開いた瞬間から時間を測りはじめるよ</li>
-      <li>「答える」ボタンを押した時点で測定終了</li>
-      <li>結果画面では、何人が挑戦して何%正解したか、平均タイム、最速タイムなどが見られるよ</li>
-      <li>★1〜5の難易度評価と感想も送れる(任意だよ)</li>
-    </ul>
-
-    <h2>🛡️ 管理者機能について</h2>
-    <p>
-      グループ作成時に管理者パスワードを設定すると、URL
-      <code style="background:#F3F4F6; padding:2px 6px; border-radius:4px;">/&lt;グループID&gt;/setting/</code>
-      から管理画面に入れるよ。
-    </p>
-    <ul>
-      <li><strong>閲覧のみモード</strong>: ONにするとメンバーはクイズの追加・編集・削除ができなくなる(挑戦と感想はOK)</li>
-      <li><strong>グループ削除</strong>: グループと全てのデータを永久に消す。取り消せないから注意!</li>
-      <li>管理者ログインは1時間で期限切れになるよ</li>
-    </ul>
-
-    <h2>❓ よくある質問</h2>
-
-    <div style="margin-top:12px;">
-      <p style="font-weight:900; margin-bottom:4px;">Q. パスワードを忘れちゃった!</p>
-      <p style="margin:0 0 16px; padding-left:12px; border-left:3px solid var(--c-main);">
-        ごめんね、パスワードは安全のためぐちゃぐちゃに変換して保存しているから、
-        運営でも元に戻せないんだ。新しいグループを作り直してね。
-      </p>
-
-      <p style="font-weight:900; margin-bottom:4px;">Q. グループIDを忘れちゃった!</p>
-      <p style="margin:0 0 16px; padding-left:12px; border-left:3px solid var(--c-main);">
-        同じく、グループIDもぐちゃぐちゃに変換して保存しているので、運営でも復元できないよ。
-        グループの仲間で知っている人がいないか聞いてみてね。
-      </p>
-
-      <p style="font-weight:900; margin-bottom:4px;">Q. 他のグループのクイズは見られる?</p>
-      <p style="margin:0 0 16px; padding-left:12px; border-left:3px solid var(--c-main);">
-        見られないよ。グループIDを知っている人だけが、そのグループのクイズに入れる仕組みだよ。
-      </p>
-
-      <p style="font-weight:900; margin-bottom:4px;">Q. 答えはブラウザから見えちゃうの?</p>
-      <p style="margin:0 0 16px; padding-left:12px; border-left:3px solid var(--c-main);">
-        見えないよ。答え合わせはサーバー側でやってるから、
-        ブラウザの開発者ツールを使っても答えを先に見ることはできないよ。
-      </p>
-
-      <p style="font-weight:900; margin-bottom:4px;">Q. クイズを間違えて投稿しちゃった!</p>
-      <p style="margin:0 0 16px; padding-left:12px; border-left:3px solid var(--c-main);">
-        クイズページの右上の削除ボタンから消せるよ(閲覧のみモードじゃないとき)。
-      </p>
-
-      <p style="font-weight:900; margin-bottom:4px;">Q. 違反の投稿を見つけたら?</p>
-      <p style="margin:0 0 16px; padding-left:12px; border-left:3px solid var(--c-main);">
-        グループの管理者にすぐ伝えてね。管理者はそのクイズを削除したり、
-        グループ全体を閲覧のみモードにしたりできるよ。
-      </p>
+  <!-- 目次 -->
+  <div style="background: #f5f5f5; border-radius: 16px; padding: 20px; margin-bottom: 40px;">
+    <div style="font-weight: bold; margin-bottom: 12px; color: #333;">📋 目次</div>
+    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+      <a href="#what" class="toc-link">🎯 QuizShareとは</a>
+      <a href="#start" class="toc-link">🚀 はじめ方</a>
+      <a href="#group" class="toc-link">👥 グループについて</a>
+      <a href="#quiz-add" class="toc-link">✏️ クイズを作る</a>
+      <a href="#quiz-play" class="toc-link">⏱️ クイズに挑戦</a>
+      <a href="#library" class="toc-link">📚 引用ライブラリ</a>
+      <a href="#ai" class="toc-link">🤖 AI採点</a>
+      <a href="#theme" class="toc-link">🎨 テーマ</a>
+      <a href="#faq" class="toc-link">💬 よくある質問</a>
     </div>
-
-    <h2>⚠️ 注意してほしいこと</h2>
-    <ul>
-      <li>教科書や問題集の問題を<strong>そのまま写さない</strong>でね(著作権)</li>
-      <li>特定の人が傷つくような内容は書かないでね</li>
-      <li>住所・電話番号・実名など、個人情報を書かないでね</li>
-      <li>くわしくは<a href="{{ url_for('page_terms') }}" style="color:var(--c-main); font-weight:900;">利用規約</a>を読んでね</li>
-    </ul>
   </div>
 
-  <div style="text-align:center; margin-top:20px;">
-    <a href="{{ url_for('page_home') }}" class="btn btn-secondary">← 戻る</a>
+  <!-- QuizShareとは -->
+  <div id="what" class="help-section">
+    <h2 style="border-color: #e91e63; color: #333;">🎯 QuizShareとは</h2>
+    <p style="color: #555; line-height: 1.8; margin-bottom: 16px;">
+      QuizShareは、クイズを作って友達・クラス・部活などのグループで共有できる<strong>無料</strong>のサービスです。
+      学校の勉強・趣味・ゲーム知識など、どんなクイズでも作れます！
+    </p>
+    <img onclick="window.openImgModal(this.src)" src="{{ url_for('static', filename='help_top.png') }}" alt="QuizShareトップページ" class="help-img">
+    <div class="feature-grid" style="margin-top: 20px;">
+      <div class="feature-card"><span class="feature-icon">✏️</span>クイズをかんたんに作れる</div>
+      <div class="feature-card"><span class="feature-icon">👥</span>グループで共有できる</div>
+      <div class="feature-card"><span class="feature-icon">📊</span>正解率・タイムを記録</div>
+      <div class="feature-card"><span class="feature-icon">📚</span>引用ライブラリで問題追加</div>
+      <div class="feature-card"><span class="feature-icon">🤖</span>AI採点補助（β）</div>
+      <div class="feature-card"><span class="feature-icon">🎨</span>テーマを自由に変更</div>
+    </div>
+  </div>
+
+  <!-- はじめ方 -->
+  <div id="start" class="help-section">
+    <h2 style="border-color: #4caf50; color: #333;">🚀 はじめ方（4ステップ）</h2>
+
+    <div class="help-step">
+      <div class="step-num" style="background: #e91e63;">1</div>
+      <div class="step-body">
+        <div class="step-title">グループを作る</div>
+        <div class="step-desc">トップページで「✨ 新しいグループを作る」をクリック。グループID（合言葉）・グループ名・カラーを設定します。</div>
+      </div>
+    </div>
+
+    <div class="help-step">
+      <div class="step-num" style="background: #ff9800;">2</div>
+      <div class="step-body">
+        <div class="step-title">グループIDを友達に教える</div>
+        <div class="step-desc">グループIDを友達に伝えます。友達はトップページでグループIDを入力してログインできます。</div>
+      </div>
+    </div>
+
+    <div class="help-step">
+      <div class="step-num" style="background: #4caf50;">3</div>
+      <div class="step-body">
+        <div class="step-title">クイズを作る</div>
+        <div class="step-desc">グループページの右下の「＋」ボタンからクイズを追加できます。</div>
+      </div>
+    </div>
+
+    <div class="help-step">
+      <div class="step-num" style="background: #667eea;">4</div>
+      <div class="step-body">
+        <div class="step-title">クイズに挑戦！</div>
+        <div class="step-desc">クイズ一覧からカードをクリックして挑戦！タイムと正誤が自動で記録されます。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- グループについて -->
+  <div id="group" class="help-section">
+    <h2 style="border-color: #667eea; color: #333;">👥 グループについて</h2>
+    <p style="color: #555; line-height: 1.8; margin-bottom: 12px;">グループIDは「合言葉」のようなものです。IDを知っている人だけがグループに参加できます。</p>
+    <img onclick="window.openImgModal(this.src)" src="{{ url_for('static', filename='help_list.png') }}" alt="クイズ一覧画面" class="help-img">
+    <div class="tip-box" style="margin-top: 16px;">
+      <strong>💡 グループIDのコツ</strong><br>
+      「class3a-2026」「soccer-trivia」など、推測されにくくて覚えやすいIDにしましょう。<br>
+      半角英数字・ハイフン・アンダースコアで6〜32文字が使えます。
+    </div>
+    <div style="margin-top: 16px; color: #555; font-size: 0.92rem; line-height: 1.8;">
+      <strong>グループ画面の機能：</strong>
+      <ul style="padding-left: 20px; margin-top: 8px;">
+        <li>🎲 <strong>ランダム出題</strong> — グループ内のクイズをランダムに出題</li>
+        <li>📋 <strong>セット</strong> — クイズをまとめてセット問題として出題</li>
+        <li>📊 <strong>全体統計</strong> — グループ全体の挑戦記録を確認</li>
+        <li>📚 <strong>引用</strong> — ライブラリから問題を追加</li>
+        <li>🏆 <strong>ランキング</strong> — タイムランキングを確認</li>
+        <li>#タグ — タグでクイズを絞り込み</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- クイズを作る -->
+  <div id="quiz-add" class="help-section">
+    <h2 style="border-color: #ff9800; color: #333;">✏️ クイズを作る</h2>
+    <p style="color: #555; line-height: 1.8; margin-bottom: 12px;">右下の「＋」ボタンを押すと追加フォームが開きます。</p>
+    <img onclick="window.openImgModal(this.src)" src="{{ url_for('static', filename='help_add.png') }}" alt="クイズ追加画面" class="help-img">
+    <div style="margin-top: 16px; color: #555; font-size: 0.92rem; line-height: 1.8;">
+      <strong>入力できる項目：</strong>
+      <ul style="padding-left: 20px; margin-top: 8px;">
+        <li>📝 <strong>名前・クラス</strong> — 誰が作ったか表示されます（任意）</li>
+        <li>❓ <strong>クイズ（問題文）</strong> — 最大500文字</li>
+        <li>✅ <strong>答え（正解）</strong> — 複数の正解を登録可能（「＋ 正解を追加」）</li>
+        <li>📋 <strong>回答形式</strong> — 「記述」か「選択肢」を選べます</li>
+        <li>#️⃣ <strong>タグ</strong> — カテゴリを入力してEnterで追加</li>
+        <li>💡 <strong>解説</strong> — 答え合わせ後に表示される説明</li>
+        <li>🔒 <strong>編集パスワード</strong> — 後から編集・削除するためのパスワード</li>
+        <li>🖼️ <strong>画像</strong> — 問題に画像を添付できます（最大3枚）</li>
+      </ul>
+    </div>
+    <div class="tip-box">
+      <strong>💡 採点のしくみ</strong><br>
+      漢字↔ひらがな変換・カタカナ変換・類義語・タイポ許容・部分一致など、賢く採点します。
+      「さくら」と入力しても「桜」と一致するよ！
+    </div>
+  </div>
+
+  <!-- クイズに挑戦 -->
+  <div id="quiz-play" class="help-section">
+    <h2 style="border-color: #e91e63; color: #333;">⏱️ クイズに挑戦する</h2>
+    <p style="color: #555; line-height: 1.8; margin-bottom: 12px;">クイズカードをクリックすると挑戦画面が開きます。</p>
+    <img onclick="window.openImgModal(this.src)" src="{{ url_for('static', filename='help_answer.png') }}" alt="クイズ挑戦画面" class="help-img">
+    <div style="margin-top: 16px; color: #555; font-size: 0.92rem; line-height: 1.8;">
+      <ul style="padding-left: 20px; margin-top: 8px;">
+        <li>⏱️ 解答にかかった時間が自動で計測・記録されます</li>
+        <li>💡 「ヒント」ボタンでヒントを表示できます（タイムに加算）</li>
+        <li>✅ 正解・不正解と解説が表示されます</li>
+        <li>🏆 ランキングに名前を登録してタイムを競えます</li>
+        <li>🤖 AI採点が有効なグループでは記述式の不正解時にAIに採点してもらえます（β）</li>
+        <li>😊 挑戦後に感想を残せます</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 引用ライブラリ -->
+  <div id="library" class="help-section">
+    <h2 style="border-color: #9c27b0; color: #333;">📚 引用ライブラリ</h2>
+    <p style="color: #555; line-height: 1.8;">AIが作成した問題をグループに追加できる機能です。ナビの「引用」からアクセスできます。</p>
+    <div style="margin-top: 12px; color: #555; font-size: 0.92rem; line-height: 1.8;">
+      <ul style="padding-left: 20px; margin-top: 8px;">
+        <li>学習・ゲーム・大学・世界・料理・動物など多数のカテゴリ</li>
+        <li>問題を選んで「引用する」でグループに追加</li>
+        <li>「まとめて追加」で複数問題を一度に追加可能</li>
+        <li>タグフィルターでカテゴリを絞り込めます</li>
+      </ul>
+    </div>
+    <div class="tip-box">
+      ⚠️ 引用ライブラリの問題はAIが生成したものです。内容に誤りが含まれる場合があります。
+    </div>
+  </div>
+
+  <!-- AI採点 -->
+  <div id="ai" class="help-section">
+    <h2 style="border-color: #f97316; color: #333;">🤖 AI採点機能（β）</h2>
+    <p style="color: #555; line-height: 1.8;">Cloudflare Workers AIを使った採点補助機能です。</p>
+    <div style="background: #fff3e0; border: 1px solid #ffcc02; border-radius: 12px; padding: 16px; margin: 12px 0; font-size: 0.9rem; color: #e65100;">
+      📌 グループの設定でAI採点をONにすると使えます（設定できるのはグループ管理者のみ）
+    </div>
+    <div style="color: #555; font-size: 0.92rem; line-height: 1.8;">
+      <ul style="padding-left: 20px; margin-top: 8px;">
+        <li>記述式問題で不正解になったとき「🤖 AIに採点してもらう β」ボタンが表示されます</li>
+        <li>AIが「正解に近い」「惜しい」「不正解」を判定して理由も教えてくれます</li>
+        <li>1日の使用上限があります（グループ別に設定可能）</li>
+        <li>β機能のため判定精度を保証するものではありません</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- テーマ -->
+  <div id="theme" class="help-section">
+    <h2 style="border-color: #667eea; color: #333;">🎨 テーマ設定</h2>
+    <p style="color: #555; line-height: 1.8;"><a href="/theme" style="color: #667eea;">テーマ設定ページ</a>から背景テーマを変更できます。</p>
+    <div style="color: #555; font-size: 0.92rem; line-height: 1.8;">
+      <ul style="padding-left: 20px; margin-top: 8px;">
+        <li>基本・季節・カラフル・ポップ・和風など20種類以上のテーマ</li>
+        <li>🔄 季節自動変更モードで春夏秋冬に合わせて自動変更</li>
+        <li>特別な日（お正月・ひな祭り・ハロウィンなど）は専用テーマが適用されます</li>
+        <li>設定はお使いのデバイスに保存されます</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- よくある質問 -->
+  <div id="faq" class="help-section">
+    <h2 style="border-color: #4caf50; color: #333;">💬 よくある質問</h2>
+
+    {% for q, a in [
+      ('グループIDを忘れました', 'グループIDは復旧できません。次回からはメモしておきましょう。新しいグループを作成して引用ライブラリから問題を再追加することをおすすめします。'),
+      ('答えが合っているのに不正解になります', '漢字・ひらがな・カタカナ変換や類義語に対応していますが、完全には対応できない場合があります。「＋ 正解を追加」で別の表現を正解として登録することをおすすめします。'),
+      ('クイズを削除・編集できません', '編集パスワードが設定されているクイズは、正しいパスワードが必要です。パスワードを忘れた場合はグループ管理者機能から削除できます。'),
+      ('画像がアップロードできません', 'png・jpg・gif・webp形式で5MB以下のファイルが使えます。ファイルサイズを小さくしてみてください。'),
+      ('スマホでも使えますか', 'はい、スマートフォン・タブレットにも対応しています。画面の向きによって表示が変わることがあります。'),
+      ('引用ライブラリの問題が間違っています', 'AIが生成した問題のため誤りが含まれることがあります。フィードバックページからお知らせください。'),
+      ('AI採点の結果が正確でありません', 'AI採点（β）はあくまで参考です。Llama 3モデルを使用しており改善中です。'),
+      ('グループのパスワードを変更したい', '現在パスワードの変更機能はありません。セキュリティが心配な場合は新しいグループを作成することをおすすめします。'),
+      ('複数の正解を設定したい', 'クイズ追加・編集画面の「＋ 正解を追加」ボタンで複数の正解を設定できます。'),
+      ('タグでクイズを絞り込みたい', 'クイズ一覧画面上部のタグをクリックすると、そのタグが付いたクイズだけ表示されます。'),
+    ] %}
+    <div class="faq-item">
+      <div class="faq-q">Q: {{ q }}</div>
+      <div class="faq-a">A: {{ a }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- お問い合わせ -->
+  <div style="background: #f5f5f5; border-radius: 16px; padding: 20px; text-align: center;">
+    <p style="color: #666; margin: 0 0 12px;">解決しない場合はフィードバックページからお問い合わせください</p>
+    <a href="/feedback" style="display: inline-block; padding: 10px 28px; background: #e91e63; color: white; border-radius: 20px; text-decoration: none; font-weight: bold;">💬 フィードバックを送る</a>
   </div>
 </div>
 {% endblock %}

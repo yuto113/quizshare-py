@@ -20,13 +20,19 @@
     <div class="modal-body">
       <div class="form-group">
         <label class="form-label">セット名</label>
-        <input type="text" id="set-name" class="form-control" placeholder="例: 数学の小テスト" maxlength="50">
+        <input type="text" id="set-name" class="form-control" placeholder="例: 今週の復習" maxlength="50">
       </div>
-      <div class="form-group">
-        <label class="form-label">クイズを選ぶ(チェック)</label>
-        <div id="quiz-checklist" style="max-height:300px; overflow-y:auto; border:1px solid #E5E7EB; border-radius:12px; padding:8px;"></div>
+      <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+        <input type="text" id="set-search" class="form-control" placeholder="🔍 問題を検索..." oninput="renderSetQuizList(this.value, document.getElementById('set-tag-filter').value)" style="flex:1;min-width:150px;font-size:0.9rem;padding:8px 12px;">
+        <select id="set-tag-filter" class="form-control" onchange="renderSetQuizList(document.getElementById('set-search').value,this.value)" style="width:auto;font-size:0.9rem;padding:8px 12px;"><option value="all">🏷️ すべてのタグ</option></select>
       </div>
-      <button id="btn-save-set" class="btn btn-primary btn-block">保存</button>
+      <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
+        <button type="button" onclick="selectAllQuizzes()" class="btn btn-secondary" style="font-size:0.8rem;padding:4px 12px;">✅ 全選択</button>
+        <button type="button" onclick="clearAllQuizzes()" class="btn btn-secondary" style="font-size:0.8rem;padding:4px 12px;">❌ 全解除</button>
+        <span id="selected-count" style="font-size:0.82rem;color:#aaa;font-weight:bold;margin-left:auto;">0問選択中</span>
+      </div>
+      <div id="quiz-checklist" style="max-height:320px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:12px;padding:4px;"></div>
+      <button id="btn-save-set" class="btn btn-primary btn-block" style="margin-top:12px;">💾 保存する</button>
     </div>
   </div>
 </div>
@@ -41,6 +47,7 @@ function loadAll() {
     window.api.get('/api/quizzes').then(function(qz) {
       allQuizzes = qz.quizzes;
       renderSets(s.sets);
+      updateSetTagFilter();
     });
   }).catch(function(err) {
     window.toast(err.message, 'error');
@@ -89,16 +96,95 @@ var btnCreate = document.getElementById('btn-create-set');
 if (btnCreate) {
   btnCreate.addEventListener('click', function() {
     document.getElementById('set-name').value = '';
-    var html = '';
-    for (var i = 0; i < allQuizzes.length; i++) {
-      var q = allQuizzes[i];
-      html += '<label style="display:flex; align-items:center; gap:8px; padding:6px; cursor:pointer; border-bottom:1px solid #F3F4F6;">';
-      html += '<input type="checkbox" class="qcb" value="' + q.id + '" style="width:16px; height:16px;">';
-      html += '<span style="font-size:13px;">' + escapeHtml(q.question.slice(0, 40)) + '</span></label>';
-    }
-    document.getElementById('quiz-checklist').innerHTML = html;
+    renderSetQuizList('', 'all');
     window.openModal('modal-create-set');
   });
+}
+
+// タグフィルターを更新
+function updateSetTagFilter() {
+  const allTags = new Set();
+  allQuizzes.forEach(q => (q.tags||[]).forEach(t => allTags.add(t)));
+  const sel = document.getElementById('set-tag-filter');
+  sel.innerHTML = '<option value="all">🏷️ すべてのタグ</option>' +
+    Array.from(allTags).sort().map(t =>
+      `<option value="${escapeHtml(t)}">#${escapeHtml(t)}</option>`
+    ).join('');
+}
+
+// クイズ一覧を描画
+function renderSetQuizList(search, tagFilter) {
+  search = (search || '').toLowerCase();
+  tagFilter = tagFilter || 'all';
+
+  let quizzes = allQuizzes.slice();
+
+  // タグフィルター
+  if (tagFilter !== 'all') {
+    quizzes = quizzes.filter(q => (q.tags||[]).includes(tagFilter));
+  }
+
+  // 検索フィルター
+  if (search) {
+    quizzes = quizzes.filter(q =>
+      q.question.toLowerCase().includes(search) ||
+      (q.name||'').toLowerCase().includes(search) ||
+      (q.tags||[]).some(t => t.toLowerCase().includes(search))
+    );
+  }
+
+  const checklist = document.getElementById('quiz-checklist');
+  if (quizzes.length === 0) {
+    checklist.innerHTML = '<div style="text-align:center;color:#aaa;padding:24px;">該当するクイズがありません</div>';
+    return;
+  }
+
+  const selectedIds = new Set(
+    Array.from(document.querySelectorAll('.qcb:checked')).map(c => c.value)
+  );
+
+  checklist.innerHTML = quizzes.map(q => {
+    const acc = q.attempts > 0 ? Math.round(q.corrects/q.attempts*100) : null;
+    const accColor = acc === null ? '#aaa' : acc >= 70 ? '#10b981' : acc >= 40 ? '#f59e0b' : '#ef4444';
+    const accText = acc === null ? '未挑戦' : acc + '%正解';
+    const tags = (q.tags||[]).slice(0,3).map(t => `<span style="background:#f0f0ff;color:#667eea;border-radius:4px;padding:1px 6px;font-size:0.72rem;">#${escapeHtml(t)}</span>`).join('');
+    const checked = selectedIds.has(q.id) ? 'checked' : '';
+    return `
+      <label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;cursor:pointer;border-radius:8px;transition:background 0.15s;" onmouseover="this.style.background='#f5f5ff'" onmouseout="this.style.background=''">
+        <input type="checkbox" class="qcb" value="${q.id}" ${checked}
+          onchange="updateSelectedCount()"
+          style="width:18px;height:18px;margin-top:3px;flex-shrink:0;accent-color:#667eea;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:0.9rem;font-weight:bold;color:#333;margin-bottom:3px;line-height:1.4;">${escapeHtml(q.question.slice(0,60))}${q.question.length>60?'…':''}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+            ${tags}
+            <span style="font-size:0.75rem;color:${accColor};font-weight:bold;">${accText}</span>
+            ${q.attempts > 0 ? `<span style="font-size:0.72rem;color:#aaa;">${q.attempts}人挑戦</span>` : ''}
+          </div>
+        </div>
+      </label>`;
+  }).join('');
+
+  updateSelectedCount();
+}
+
+function updateSelectedCount() {
+  const cnt = document.querySelectorAll('.qcb:checked').length;
+  const el = document.getElementById('selected-count');
+  if (el) {
+    el.textContent = cnt + '問選択中';
+    el.style.color = cnt > 0 ? '#667eea' : '#aaa';
+  }
+}
+
+function selectAllQuizzes() {
+  document.querySelectorAll('.qcb').forEach(c => c.checked = true);
+  updateSelectedCount();
+}
+
+function clearAllQuizzes() {
+  document.querySelectorAll('.qcb').forEach(c => c.checked = false);
+  updateSelectedCount();
 }
 
 document.getElementById('btn-save-set').addEventListener('click', function() {

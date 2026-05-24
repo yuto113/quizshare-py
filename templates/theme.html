@@ -1,0 +1,596 @@
+{% extends "base.html" %}
+{% block title %}テーマ設定 - クイズシェア{% endblock %}
+{% block head_extra %}
+<script>
+window.openThemePanel = function(){};
+window.closeThemePanel = function(){};
+window.pickTheme = function(key) {
+  if (localStorage.getItem('quiz_auto_theme') === '1') {
+    window.toast('自動モードをオフにしてから選んでね', 'error');
+    return;
+  }
+  localStorage.setItem('quiz_auto_theme','0');
+  const extras = {
+    sunset:{bg:'linear-gradient(135deg,#ffe8e0,#fff5f0)',style:''},
+    ocean:{bg:'linear-gradient(135deg,#e0f4ff,#f0faff)',style:''},
+    forest:{bg:'linear-gradient(135deg,#e8f5e9,#f1f8f1)',style:''},
+    lavender:{bg:'linear-gradient(135deg,#f3e8ff,#f9f3ff)',style:''},
+    sakura:{bg:'linear-gradient(135deg,#ffe8f0,#fff5f8)',style:''},
+    aurora:{bg:'#0a1628',style:'dark'},
+    candy:{bg:'linear-gradient(135deg,#fff0f8,#ffe8f5)',style:''},
+    mint:{bg:'linear-gradient(135deg,#e8fff0,#f0fff5)',style:''},
+    galaxy:{bg:'#0a0015',style:'dark'},
+    neon:{bg:'#050505',style:'dark'},
+    retro:{bg:'linear-gradient(135deg,#fff8e8,#fffdf0)',style:''},
+    pastel:{bg:'linear-gradient(135deg,#fff0f5,#f0fff8)',style:''},
+    washi:{bg:'linear-gradient(135deg,#f8f4e8,#f5f0e0)',style:'sepia'},
+    matcha:{bg:'linear-gradient(135deg,#e8f5e0,#f0f8e8)',style:''},
+    indigo:{bg:'linear-gradient(135deg,#e8eaff,#f0f2ff)',style:''},
+  };
+  if (typeof THEMES !== 'undefined') Object.assign(THEMES, extras);
+  if (typeof applyTheme === 'function') applyTheme(key);
+  document.querySelectorAll('.theme-card').forEach(c => {
+    c.classList.toggle('active', c.dataset.theme === key);
+  });
+  document.getElementById('current-theme-name').textContent = key;
+};
+window.toggleAutoTheme2 = function() {
+  const isAuto = localStorage.getItem('quiz_auto_theme') === '1';
+  const newAuto = !isAuto;
+  localStorage.setItem('quiz_auto_theme', newAuto ? '1' : '0');
+  if (newAuto && typeof getCurrentSeason === 'function' && typeof applyTheme === 'function') {
+    applyTheme(getCurrentSeason());
+  }
+  updateAutoToggle();
+  updateCardLock();
+};
+function updateAutoToggle() {
+  const isAuto = localStorage.getItem('quiz_auto_theme') === '1';
+  const tog = document.getElementById('auto-toggle2');
+  const knob = document.getElementById('auto-knob2');
+  if (tog) tog.style.background = isAuto ? '#4caf50' : '#e0e0e0';
+  if (knob) knob.style.left = isAuto ? '25px' : '3px';
+  updateCardLock();
+}
+
+function updateCardLock() {
+  const isAuto = localStorage.getItem('quiz_auto_theme') === '1';
+  document.querySelectorAll('.theme-card').forEach(card => {
+    if (isAuto) {
+      card.style.opacity = '0.4';
+      card.style.cursor = 'not-allowed';
+      card.style.filter = 'grayscale(60%)';
+    } else {
+      card.style.opacity = '1';
+      card.style.cursor = 'pointer';
+      card.style.filter = '';
+    }
+  });
+  // ロックメッセージ表示
+  const msg = document.getElementById('auto-mode-msg');
+  if (msg) msg.style.display = isAuto ? 'block' : 'none';
+}
+document.addEventListener('DOMContentLoaded', function() {
+  updateAutoToggle();
+  const cur = localStorage.getItem('quiz_theme') || 'default';
+  document.querySelectorAll('.theme-card').forEach(c => {
+    c.classList.toggle('active', c.dataset.theme === cur);
+  });
+  document.getElementById('current-theme-name').textContent = cur;
+  // 追加テーマをTHEMESに登録
+  const extras = {
+    sunset:{bg:'linear-gradient(135deg,#ffe8e0,#fff5f0)',style:''},
+    ocean:{bg:'linear-gradient(135deg,#e0f4ff,#f0faff)',style:''},
+    forest:{bg:'linear-gradient(135deg,#e8f5e9,#f1f8f1)',style:''},
+    lavender:{bg:'linear-gradient(135deg,#f3e8ff,#f9f3ff)',style:''},
+    sakura:{bg:'linear-gradient(135deg,#ffe8f0,#fff5f8)',style:''},
+    aurora:{bg:'#0a1628',style:'dark'},
+    candy:{bg:'linear-gradient(135deg,#fff0f8,#ffe8f5)',style:''},
+    mint:{bg:'linear-gradient(135deg,#e8fff0,#f0fff5)',style:''},
+    galaxy:{bg:'#0a0015',style:'dark'},
+    neon:{bg:'#050505',style:'dark'},
+    retro:{bg:'linear-gradient(135deg,#fff8e8,#fffdf0)',style:''},
+    pastel:{bg:'linear-gradient(135deg,#fff0f5,#f0fff8)',style:''},
+    washi:{bg:'linear-gradient(135deg,#f8f4e8,#f5f0e0)',style:'sepia'},
+    matcha:{bg:'linear-gradient(135deg,#e8f5e0,#f0f8e8)',style:''},
+    indigo:{bg:'linear-gradient(135deg,#e8eaff,#f0f2ff)',style:''},
+  };
+  if (typeof THEMES !== 'undefined') Object.assign(THEMES, extras);
+});
+</script>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:600px; margin:0 auto; padding:24px 16px;">
+  <div style="margin-bottom:12px;">
+    <a href="/setting/" style="color:#888; text-decoration:none; font-size:0.9rem;">← 管理者ページへ戻る</a>
+  </div>
+  <h1 style="font-size:1.6rem; margin-bottom:4px;">🎨 テーマ設定</h1>
+  <p style="color:#888; margin-bottom:8px;">現在のテーマ: <strong id="current-theme-name">default</strong></p>
+
+  <!-- 自動変更トグル -->
+  <div style="background:#f5f5f5; border-radius:12px; padding:14px 16px; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between;">
+    <div>
+      <div style="font-weight:bold; margin-bottom:2px;">🔄 季節自動変更モード</div>
+      <div style="color:#888; font-size:0.85rem;">春夏秋冬に合わせて自動でテーマが変わります</div>
+    </div>
+    <div id="auto-toggle2" onclick="toggleAutoTheme2()"
+      style="width:48px; height:26px; border-radius:13px; background:#e0e0e0; position:relative; cursor:pointer; transition:background 0.2s; flex-shrink:0;">
+      <div id="auto-knob2" style="position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:white; box-shadow:0 1px 4px rgba(0,0,0,0.2); transition:left 0.2s;"></div>
+    </div>
+  </div>
+
+  <!-- 自動モード時のロックメッセージ -->
+  <div id="auto-mode-msg" style="display:none; background:#fff3e0; border:1px solid #ffcc02; border-radius:10px; padding:10px 14px; margin-bottom:12px; color:#e65100; font-size:0.88rem; text-align:center;">
+    🔒 自動モードがオンです。テーマを手動で選ぶには自動モードをオフにしてください。
+  </div>
+
+  <!-- 自動モード時のロックメッセージ -->
+  <div id="auto-mode-msg" style="display:none; background:#fff3e0; border:1px solid #ffcc02; border-radius:10px; padding:10px 14px; margin-bottom:12px; color:#e65100; font-size:0.88rem; text-align:center;">
+    🔒 自動モードがオンです。テーマを手動で選ぶには自動モードをオフにしてください。
+  </div>
+
+  {% for section, themes in [
+    ('🎯 基本テーマ', [('default','デフォルト','#fdf6f0',''),('modern','🌙 近代化','#0f0f1a',''),('classic','📜 クラシック','#f5f0e8','border:1px solid #c8a87a')]),
+    ('🌿 季節テーマ', [('spring','🌸 春','linear-gradient(135deg,#ffe0f0,#fff0f5)',''),('summer','☀️ 夏','linear-gradient(135deg,#e0f0ff,#f0f8ff)',''),('autumn','🍁 秋','linear-gradient(135deg,#fff3e0,#ffe8d0)',''),('winter','❄️ 冬','linear-gradient(135deg,#e8f4ff,#e0ecff)','')]),
+    ('🌈 カラフルテーマ', [('sunset','🌅 サンセット','linear-gradient(135deg,#ff6b6b,#ffd700)',''),('ocean','🌊 オーシャン','linear-gradient(135deg,#006994,#00ccff)',''),('forest','🌲 フォレスト','linear-gradient(135deg,#1a4a2e,#52c278)',''),('lavender','💜 ラベンダー','linear-gradient(135deg,#e8d5f5,#dcc8f0)',''),('sakura','🌸 サクラ','linear-gradient(135deg,#ffb7c5,#ffe4ec)',''),('aurora','🌌 オーロラ','linear-gradient(135deg,#0a1628,#0d4f3c)','')]),
+    ('🎉 ポップテーマ', [('candy','🍬 キャンディ','linear-gradient(135deg,#ff69b4,#c71585)',''),('mint','🌿 ミント','linear-gradient(135deg,#98ff98,#d0ffd0)',''),('galaxy','🔮 ギャラクシー','linear-gradient(135deg,#0a0015,#2d0050)',''),('neon','💚 ネオン','#000','box-shadow:inset 0 0 10px #00ff00'),('retro','📺 レトロ','linear-gradient(135deg,#ff6600,#ffcc00)',''),('pastel','🎀 パステル','linear-gradient(135deg,#ffd1dc,#c7ceea)','')]),
+    ('🎎 和風テーマ', [('washi','📄 和紙','linear-gradient(135deg,#f5f0e0,#e0d8b0)',''),('matcha','🍵 抹茶','linear-gradient(135deg,#2d5a27,#6b9e5e)',''),('indigo','🟦 藍染め','linear-gradient(135deg,#1a237e,#3949ab)','')])
+  ] %}
+  <div style="color:#666; font-size:0.82rem; font-weight:bold; margin-bottom:8px;">{{ section }}</div>
+  <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:20px;">
+    {% for key, label, bg, extra in themes %}
+    <div class="theme-card" data-theme="{{ key }}" onclick="pickTheme('{{ key }}')">
+      <div style="height:44px; background:{{ bg }}; border-radius:8px; margin-bottom:6px; {{ extra }}"></div>
+      <div style="font-size:0.82rem;">{{ label }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+
+  <div style="display:flex; gap:10px; margin-top:8px;">
+    <a href="/setting/" style="flex:1; display:block; text-align:center; padding:12px; background:#667eea; color:white; border-radius:10px; text-decoration:none; font-weight:bold;">
+      ✅ 設定完了・管理者ページへ
+    </a>
+    <a href="/" style="flex:1; display:block; text-align:center; padding:12px; background:#4caf50; color:white; border-radius:10px; text-decoration:none; font-weight:bold;">
+      🏠 トップへ
+    </a>
+  </div>
+
+  <!-- ===== カスタムテーマ作成 ===== -->
+  <div id="custom-theme-section" style="display:none; margin-top:32px; border-top:2px solid #f0f0f0; padding-top:24px;">
+    <h2 style="font-size:1.2rem; margin-bottom:4px;">🎨 カスタムテーマ作成</h2>
+    <p style="color:#888; font-size:0.85rem; margin-bottom:16px;">オリジナルの背景テーマを作れます（管理者のみ）</p>
+
+    <div id="custom-themes-list" style="margin-bottom:16px;"></div>
+
+    <!-- カスタムテーマ用パスワード欄 -->
+    <div id="custom-login" style="background:#f5f5f5; border-radius:12px; padding:16px; margin-bottom:12px;">
+      <div style="font-size:0.9rem; color:#666; margin-bottom:8px;">🔐 テーマ作成には管理者パスワードが必要です</div>
+      <div style="display:flex; gap:8px;">
+        <input type="password" id="custom-pw" placeholder="管理者パスワード"
+          style="flex:1; padding:10px; border:2px solid #e0e0e0; border-radius:8px; font-size:0.95rem;">
+        <button onclick="unlockCustomTheme()"
+          style="padding:10px 16px; background:#9c27b0; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">
+          解除
+        </button>
+      </div>
+    </div>
+
+    <div id="custom-theme-form" style="display:none; background:#f5f0ff; border:1px solid #d0b3ff; border-radius:12px; padding:16px;">
+      <div style="font-weight:bold; margin-bottom:12px; color:#6a1b9a;">✨ 新しいテーマを作る</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+        <div>
+          <label style="font-size:0.82rem; color:#666; display:block; margin-bottom:4px;">テーマID（英数字）</label>
+          <input type="text" id="ct-key" placeholder="my_theme"
+            style="width:100%; padding:8px; border:2px solid #e0e0e0; border-radius:8px; box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:0.82rem; color:#666; display:block; margin-bottom:4px;">テーマ名</label>
+          <input type="text" id="ct-name" placeholder="マイテーマ"
+            style="width:100%; padding:8px; border:2px solid #e0e0e0; border-radius:8px; box-sizing:border-box;">
+        </div>
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="font-size:0.82rem; color:#666; display:block; margin-bottom:4px;">背景スタイル</label>
+        <select id="ct-bg-type" onchange="updateBgPreview()"
+          style="width:100%; padding:8px; border:2px solid #e0e0e0; border-radius:8px; margin-bottom:8px;">
+          <option value="solid">単色</option>
+          <option value="gradient2">グラデーション（2色）</option>
+          <option value="gradient3">グラデーション（3色）</option>
+        </select>
+        <div id="ct-colors" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+          <div>
+            <label style="font-size:0.78rem; color:#888;">色1</label>
+            <input type="color" id="ct-color1" value="#fdf6f0" onchange="updateBgPreview()"
+              style="display:block; width:60px; height:36px; border:none; border-radius:6px; cursor:pointer;">
+          </div>
+          <div id="ct-color2-wrap">
+            <label style="font-size:0.78rem; color:#888;">色2</label>
+            <input type="color" id="ct-color2" value="#ffe8f0" onchange="updateBgPreview()"
+              style="display:block; width:60px; height:36px; border:none; border-radius:6px; cursor:pointer;">
+          </div>
+          <div id="ct-color3-wrap" style="display:none;">
+            <label style="font-size:0.78rem; color:#888;">色3</label>
+            <input type="color" id="ct-color3" value="#e8f0ff" onchange="updateBgPreview()"
+              style="display:block; width:60px; height:36px; border:none; border-radius:6px; cursor:pointer;">
+          </div>
+          <div>
+            <label style="font-size:0.78rem; color:#888;">方向</label>
+            <select id="ct-direction" onchange="updateBgPreview()"
+              style="display:block; height:36px; padding:0 8px; border:2px solid #e0e0e0; border-radius:6px;">
+              <option value="135deg">斜め↘</option>
+              <option value="90deg">縦↓</option>
+              <option value="180deg">横→</option>
+              <option value="45deg">斜め↗</option>
+            </select>
+          </div>
+        </div>
+        <div style="height:60px; border-radius:10px; border:1px solid #e0e0e0; margin-bottom:8px; transition:background 0.3s;" id="ct-preview"></div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+        <div>
+          <label style="font-size:0.82rem; color:#666; display:block; margin-bottom:4px;">スタイル</label>
+          <select id="ct-style" style="width:100%; padding:8px; border:2px solid #e0e0e0; border-radius:8px;">
+            <option value="">通常</option>
+            <option value="dark">ダーク</option>
+            <option value="sepia">セピア</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:0.82rem; color:#666; display:block; margin-bottom:4px;">絵文字アイコン</label>
+          <input type="text" id="ct-emoji" value="🎨" placeholder="🎨"
+            style="width:100%; padding:8px; border:2px solid #e0e0e0; border-radius:8px; box-sizing:border-box; font-size:1.2rem;">
+        </div>
+      </div>
+      <button onclick="addCustomTheme()"
+        style="width:100%; padding:11px; background:#9c27b0; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">
+        ✨ このテーマを作成する
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== 特別な日カレンダー管理 ===== -->
+  <div style="margin-top:32px; border-top:2px solid #f0f0f0; padding-top:24px;">
+    <h2 style="font-size:1.2rem; margin-bottom:4px;">📅 特別な日の設定</h2>
+    <p style="color:#888; font-size:0.85rem; margin-bottom:16px;">自動モード時に特定の日付で専用テーマを表示できます</p>
+
+    <!-- 管理者パスワード入力 -->
+    <div id="special-login" style="background:#f5f5f5; border-radius:12px; padding:16px; margin-bottom:16px;">
+      <div style="font-size:0.9rem; color:#666; margin-bottom:8px;">🔐 編集には管理者パスワードが必要です</div>
+      <div style="display:flex; gap:8px;">
+        <input type="password" id="special-pw" placeholder="管理者パスワード"
+          style="flex:1; padding:10px; border:2px solid #e0e0e0; border-radius:8px; font-size:0.95rem;">
+        <button onclick="loadSpecialDays()"
+          style="padding:10px 16px; background:#667eea; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">
+          読み込む
+        </button>
+      </div>
+    </div>
+
+    <!-- 特別な日一覧 -->
+    <div id="special-days-list" style="display:none;">
+      <!-- カレンダービュー -->
+      <div style="margin-bottom:16px;">
+        <div style="display:grid; grid-template-columns:repeat(12,1fr); gap:4px; margin-bottom:12px;" id="month-grid"></div>
+      </div>
+
+      <!-- 一覧テーブル -->
+      <div id="days-table" style="margin-bottom:16px;"></div>
+
+      <!-- 追加フォーム -->
+      <div style="background:#f0f8ff; border:1px solid #b3d9ff; border-radius:12px; padding:16px;">
+        <div style="font-weight:bold; margin-bottom:12px; color:#1565c0;">➕ 特別な日を追加</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+          <div>
+            <label style="font-size:0.82rem; color:#666; display:block; margin-bottom:4px;">月</label>
+            <select id="new-month" style="width:100%; padding:8px; border:2px solid #e0e0e0; border-radius:8px;">
+              <option value="">月を選択</option>
+              {% for m in range(1,13) %}
+              <option value="{{ m }}">{{ m }}月</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label style="font-size:0.82rem; color:#666; display:block; margin-bottom:4px;">日</label>
+            <select id="new-day" style="width:100%; padding:8px; border:2px solid #e0e0e0; border-radius:8px;">
+              <option value="">日を選択</option>
+              {% for d in range(1,32) %}
+              <option value="{{ d }}">{{ d }}日</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div style="margin-bottom:10px;">
+          <label style="font-size:0.82rem; color:#666; display:block; margin-bottom:4px;">名前（例：こどもの日）</label>
+          <input type="text" id="new-name" placeholder="イベント名"
+            style="width:100%; padding:8px; border:2px solid #e0e0e0; border-radius:8px; box-sizing:border-box;">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+          <div>
+            <label style="font-size:0.82rem; color:#666; display:block; margin-bottom:4px;">テーマ</label>
+            <select id="new-theme" style="width:100%; padding:8px; border:2px solid #e0e0e0; border-radius:8px;">
+              <option value="spring">🌸 春</option>
+              <option value="summer">☀️ 夏</option>
+              <option value="autumn">🍁 秋</option>
+              <option value="winter">❄️ 冬</option>
+              <option value="newyear">🎍 お正月</option>
+              <option value="hinamatsuri">🎎 ひな祭り</option>
+              <option value="childrensday">🎏 こどもの日</option>
+              <option value="tanabata">⭐ 七夕</option>
+              <option value="halloween">🎃 ハロウィン</option>
+              <option value="christmas">🎄 クリスマス</option>
+              <option value="modern">🌙 近代化</option>
+              <option value="lavender">💜 ラベンダー</option>
+              <option value="sakura">🌸 サクラ</option>
+              <option value="galaxy">🔮 ギャラクシー</option>
+              <option value="pastel">🎀 パステル</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:0.82rem; color:#666; display:block; margin-bottom:4px;">絵文字</label>
+            <input type="text" id="new-emoji" placeholder="🎉" value="🎉"
+              style="width:100%; padding:8px; border:2px solid #e0e0e0; border-radius:8px; box-sizing:border-box; font-size:1.2rem;">
+          </div>
+        </div>
+        <button onclick="addSpecialDay()"
+          style="width:100%; padding:11px; background:#4caf50; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold; font-size:0.95rem;">
+          ➕ 追加する
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.theme-card {
+  border: 2px solid #e0e0e0; border-radius: 10px; padding: 10px 8px;
+  cursor: pointer; text-align: center; transition: all 0.2s; background: white;
+}
+.theme-card:hover { border-color: #667eea; transform: translateY(-2px); }
+.theme-card.active { border-color: #667eea; background: #f0f0ff; }
+</style>
+{% endblock %}
+{% block scripts %}
+<script>
+let specialPw = '';
+let specialDays = [];
+let customPw = '';
+
+async function loadSpecialDays() {
+  specialPw = document.getElementById('special-pw').value;
+  if (!specialPw) { window.toast('パスワードを入力してね', 'error'); return; }
+  try {
+    const r = await window.api.get('/api/special_days');
+    specialDays = r.days || [];
+    document.getElementById('special-days-list').style.display = 'block';
+    document.getElementById('custom-theme-section').style.display = 'block';
+    renderDaysTable();
+    renderMonthGrid();
+    loadCustomThemes();
+    window.toast('読み込みました', 'success');
+  } catch(e) { window.toast('エラーが起きたよ', 'error'); }
+}
+
+function renderMonthGrid() {
+  const grid = document.getElementById('month-grid');
+  const months = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  grid.innerHTML = months.map((m, i) => {
+    const count = specialDays.filter(d => d.month === i+1).length;
+    return `<div style="background:${count>0?'#667eea':'#f0f0f0'};color:${count>0?'white':'#666'};
+      border-radius:8px;padding:6px 4px;text-align:center;font-size:0.72rem;font-weight:bold;">
+      ${m}${count>0?'<br><span style="font-size:0.65rem;">'+count+'件</span>':''}
+    </div>`;
+  }).join('');
+}
+
+function renderDaysTable() {
+  const table = document.getElementById('days-table');
+  if (specialDays.length === 0) {
+    table.innerHTML = '<div style="text-align:center;color:#aaa;padding:20px;">特別な日が設定されていません</div>';
+    return;
+  }
+  table.innerHTML = specialDays.map(d => `
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:white;border:1px solid #e0e0e0;border-radius:10px;margin-bottom:6px;">
+      <span style="font-size:1.4rem;">${d.emoji}</span>
+      <div style="flex:1;">
+        <div style="font-weight:bold;font-size:0.9rem;">${d.month}月${d.day}日 - ${window.escapeHtml(d.name)}</div>
+        <div style="font-size:0.78rem;color:#888;">テーマ: ${d.theme}</div>
+      </div>
+      <button onclick="testSpecialDay('${d.theme}','${d.emoji}','${d.name}')"
+        style="padding:4px 10px;background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;border-radius:6px;cursor:pointer;font-size:0.8rem;margin-right:4px;">
+        👁️ テスト
+      </button>
+      <button onclick="deleteSpecialDay(${d.id})"
+        style="padding:4px 10px;background:#ffebee;color:#e53935;border:1px solid #ffcdd2;border-radius:6px;cursor:pointer;font-size:0.8rem;">
+        🗑️ 削除
+      </button>
+    </div>
+  `).join('');
+}
+
+async function unlockCustomTheme() {
+  const pw = document.getElementById('custom-pw').value;
+  if (!pw) { window.toast('パスワードを入力してね', 'error'); return; }
+  try {
+    const r = await fetch('/api/admin/check_password', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({password: pw})
+    });
+    const data = await r.json();
+    if (!data.ok) {
+      window.toast('パスワードが違うよ', 'error');
+      return;
+    }
+    customPw = pw;
+    document.getElementById('custom-login').style.display = 'none';
+    document.getElementById('custom-theme-form').style.display = 'block';
+    loadCustomThemes();
+    window.toast('認証しました！', 'success');
+  } catch(e) { window.toast('エラーが起きたよ', 'error'); }
+}
+
+function testSpecialDay(theme, emoji, name) {
+  // 追加テーマをTHEMESに登録
+  const extras = {
+    newyear:{bg:'linear-gradient(135deg,#fff5e0,#ffe8d0)',style:''},
+    setsubun:{bg:'linear-gradient(135deg,#fff0e8,#ffe8d8)',style:''},
+    hinamatsuri:{bg:'linear-gradient(135deg,#ffe0f0,#fff0f8)',style:''},
+    childrensday:{bg:'linear-gradient(135deg,#e0ffe8,#f0fff5)',style:''},
+    tanabata:{bg:'linear-gradient(135deg,#0a0020,#1a0040)',style:'dark'},
+    halloween:{bg:'linear-gradient(135deg,#1a0a00,#2d1500)',style:'dark'},
+    christmas:{bg:'linear-gradient(135deg,#e8fff0,#f0fff5)',style:''},
+    shichigosan:{bg:'linear-gradient(135deg,#fff0f8,#ffe8f5)',style:''},
+    candy:{bg:'linear-gradient(135deg,#fff0f8,#ffe8f5)',style:''},
+    sakura:{bg:'linear-gradient(135deg,#ffe8f0,#fff5f8)',style:''},
+    ocean:{bg:'linear-gradient(135deg,#e0f4ff,#f0faff)',style:''},
+    forest:{bg:'linear-gradient(135deg,#e8f5e9,#f1f8f1)',style:''},
+    lavender:{bg:'linear-gradient(135deg,#f3e8ff,#f9f3ff)',style:''},
+    pastel:{bg:'linear-gradient(135deg,#fff0f5,#f0fff8)',style:''},
+    galaxy:{bg:'#0a0015',style:'dark'},
+  };
+  if (typeof THEMES !== 'undefined') Object.assign(THEMES, extras);
+
+  // 現在のテーマを保存
+  const prevTheme = localStorage.getItem('quiz_theme') || 'default';
+  const prevAuto = localStorage.getItem('quiz_auto_theme') || '0';
+
+  // テストテーマを適用
+  if (typeof applyTheme === 'function') applyTheme(theme);
+
+  // バナー表示
+  const banner = document.createElement('div');
+  banner.style.cssText = 'position:fixed;top:70px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);color:white;border-radius:20px;padding:12px 24px;font-size:0.95rem;font-weight:bold;z-index:99999;animation:fadeIn 0.3s ease;';
+  let remaining = 60;
+  banner.innerHTML = `${emoji} ${name}のテーマ - <span id="test-countdown">${remaining}</span>秒後に戻ります`;
+  document.body.appendChild(banner);
+
+  // カウントダウン
+  const timer = setInterval(() => {
+    remaining--;
+    const cd = document.getElementById('test-countdown');
+    if (cd) cd.textContent = remaining;
+    if (remaining <= 0) {
+      clearInterval(timer);
+      banner.remove();
+      // 元のテーマに戻す
+      localStorage.setItem('quiz_auto_theme', prevAuto);
+      if (typeof applyTheme === 'function') applyTheme(prevTheme);
+      window.toast('テスト終了・元のテーマに戻りました', 'success');
+    }
+  }, 1000);
+
+  // ×ボタン追加
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = ' ✕';
+  closeBtn.style.cssText = 'background:none;border:none;color:white;cursor:pointer;font-size:1rem;margin-left:8px;';
+  closeBtn.onclick = () => {
+    clearInterval(timer);
+    banner.remove();
+    localStorage.setItem('quiz_auto_theme', prevAuto);
+    if (typeof applyTheme === 'function') applyTheme(prevTheme);
+  };
+  banner.appendChild(closeBtn);
+}
+
+async function addSpecialDay() {
+  const month = parseInt(document.getElementById('new-month').value);
+  const day = parseInt(document.getElementById('new-day').value);
+  const name = document.getElementById('new-name').value.trim();
+  const theme = document.getElementById('new-theme').value;
+  const emoji = document.getElementById('new-emoji').value.trim() || '🎉';
+  if (!month || !day || !name) { window.toast('月・日・名前を入力してね', 'error'); return; }
+  try {
+    await window.api.post('/api/special_days', {password: specialPw, month, day, name, theme, emoji});
+    window.toast('追加しました！', 'success');
+    document.getElementById('new-name').value = '';
+    await loadSpecialDays();
+  } catch(e) { window.toast(e.message || 'エラー', 'error'); }
+}
+
+async function deleteSpecialDay(id) {
+  if (!confirm('削除しますか？')) return;
+  try {
+    await window.api.post('/api/special_days/' + id, {password: specialPw});
+    window.toast('削除しました', 'success');
+    await loadSpecialDays();
+  } catch(e) { window.toast('エラー', 'error'); }
+}
+</script>
+{% endblock %}
+<script>
+// カスタムテーマのプレビュー更新
+function updateBgPreview() {
+  const type = document.getElementById('ct-bg-type').value;
+  const c1 = document.getElementById('ct-color1').value;
+  const c2 = document.getElementById('ct-color2').value;
+  const c3 = document.getElementById('ct-color3').value;
+  const dir = document.getElementById('ct-direction').value;
+  document.getElementById('ct-color2-wrap').style.display = type === 'solid' ? 'none' : '';
+  document.getElementById('ct-color3-wrap').style.display = type === 'gradient3' ? '' : 'none';
+  let bg = c1;
+  if (type === 'gradient2') bg = `linear-gradient(${dir},${c1},${c2})`;
+  if (type === 'gradient3') bg = `linear-gradient(${dir},${c1},${c2},${c3})`;
+  document.getElementById('ct-preview').style.background = bg;
+  return bg;
+}
+
+async function addCustomTheme() {
+  const key = document.getElementById('ct-key').value.trim().replace(/\s+/g,'_');
+  const name = document.getElementById('ct-name').value.trim();
+  const bg = updateBgPreview();
+  const style = document.getElementById('ct-style').value;
+  const emoji = document.getElementById('ct-emoji').value.trim() || '🎨';
+  if (!key || !name) { window.toast('IDと名前を入力してね', 'error'); return; }
+  if (!customPw) { window.toast('先にパスワードを入力して解除してね', 'error'); return; }
+  try {
+    const r = await window.api.post('/api/custom_themes', {password: customPw, key, name, bg, style, emoji});
+    window.toast('テーマを作成しました！', 'success');
+    // テーマに登録して即適用
+    if (typeof THEMES !== 'undefined') THEMES[key] = {name, bg, style};
+    loadCustomThemes();
+  } catch(e) { window.toast(e.message || 'エラー', 'error'); }
+}
+
+async function loadCustomThemes() {
+  try {
+    const r = await window.api.get('/api/custom_themes');
+    const list = document.getElementById('custom-themes-list');
+    if (!r.themes || r.themes.length === 0) {
+      list.innerHTML = '<div style="color:#aaa;font-size:0.85rem;margin-bottom:8px;">カスタムテーマはまだありません</div>';
+      return;
+    }
+    // THEMESに登録
+    r.themes.forEach(t => {
+      if (typeof THEMES !== 'undefined') THEMES[t.key] = {name: t.name, bg: t.bg, style: t.style};
+    });
+    list.innerHTML = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">' +
+      r.themes.map(t => `
+        <div class="theme-card" data-theme="${t.key}" onclick="pickTheme('${t.key}')">
+          <div style="height:40px;background:${t.bg};border-radius:8px;margin-bottom:4px;"></div>
+          <div style="font-size:0.75rem;">${t.emoji} ${window.escapeHtml(t.name)}</div>
+          <button onclick="event.stopPropagation();deleteCustomTheme(${t.id})"
+            style="margin-top:4px;padding:2px 8px;background:#ffebee;color:#e53935;border:1px solid #ffcdd2;border-radius:4px;cursor:pointer;font-size:0.7rem;">
+            削除
+          </button>
+        </div>`).join('') + '</div>';
+  } catch(e) {}
+}
+
+async function deleteCustomTheme(id) {
+  if (!confirm('削除しますか？')) return;
+  try {
+    await window.api.post('/api/custom_themes/' + id, {password: customPw});
+    window.toast('削除しました', 'success');
+    loadCustomThemes();
+  } catch(e) { window.toast('エラー', 'error'); }
+}
+
+// ページ読み込み時にカスタムテーマも読み込む
+document.addEventListener('DOMContentLoaded', function() {
+  updateBgPreview();
+  updateCardLock();
+  updateCardLock();
+});
+</script>

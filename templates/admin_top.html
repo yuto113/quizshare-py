@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+{% block title %}管理者トップ - クイズシェア{% endblock %}
+{% block head_extra %}
+<script>
+window.openThemePanel = function() {
+  const m = document.getElementById('theme-modal');
+  if (!m) return;
+  m.style.display = 'flex';
+  const cur = localStorage.getItem('quiz_theme') || 'default';
+  const isAuto = localStorage.getItem('quiz_auto_theme') === '1';
+  document.querySelectorAll('.theme-card').forEach(c => {
+    c.classList.toggle('active', c.dataset.theme === cur && !isAuto);
+  });
+  const tog = document.getElementById('auto-toggle2');
+  const knob = document.getElementById('auto-knob2');
+  if (tog) tog.style.background = isAuto ? '#4caf50' : '#444';
+  if (knob) knob.style.left = isAuto ? '25px' : '3px';
+};
+window.closeThemePanel = function() {
+  const m = document.getElementById('theme-modal');
+  if (m) m.style.display = 'none';
+};
+window.pickTheme = function(key) {
+  localStorage.setItem('quiz_auto_theme','0');
+  const extras = {
+    sunset:{bg:'linear-gradient(135deg,#ffe8e0,#fff5f0)',style:''},
+    ocean:{bg:'linear-gradient(135deg,#e0f4ff,#f0faff)',style:''},
+    forest:{bg:'linear-gradient(135deg,#e8f5e9,#f1f8f1)',style:''},
+    lavender:{bg:'linear-gradient(135deg,#f3e8ff,#f9f3ff)',style:''},
+    sakura:{bg:'linear-gradient(135deg,#ffe8f0,#fff5f8)',style:''},
+    aurora:{bg:'#0a1628',style:'dark'},
+    candy:{bg:'linear-gradient(135deg,#fff0f8,#ffe8f5)',style:''},
+    mint:{bg:'linear-gradient(135deg,#e8fff0,#f0fff5)',style:''},
+    galaxy:{bg:'#0a0015',style:'dark'},
+    neon:{bg:'#050505',style:'dark'},
+    retro:{bg:'linear-gradient(135deg,#fff8e8,#fffdf0)',style:''},
+    pastel:{bg:'linear-gradient(135deg,#fff0f5,#f0fff8)',style:''},
+    washi:{bg:'linear-gradient(135deg,#f8f4e8,#f5f0e0)',style:'sepia'},
+    matcha:{bg:'linear-gradient(135deg,#e8f5e0,#f0f8e8)',style:''},
+    indigo:{bg:'linear-gradient(135deg,#e8eaff,#f0f2ff)',style:''},
+  };
+  if (typeof THEMES !== 'undefined') Object.assign(THEMES, extras);
+  if (typeof applyTheme === 'function') applyTheme(key);
+  document.querySelectorAll('.theme-card').forEach(c => {
+    c.classList.toggle('active', c.dataset.theme === key);
+  });
+};
+window.toggleAutoTheme2 = function() {
+  const isAuto = localStorage.getItem('quiz_auto_theme') === '1';
+  localStorage.setItem('quiz_auto_theme', isAuto ? '0' : '1');
+  if (!isAuto && typeof getCurrentSeason === 'function' && typeof applyTheme === 'function') {
+    applyTheme(getCurrentSeason());
+  }
+  const tog = document.getElementById('auto-toggle2');
+  const knob = document.getElementById('auto-knob2');
+  const nowAuto = !isAuto;
+  if (tog) tog.style.background = nowAuto ? '#4caf50' : '#444';
+  if (knob) knob.style.left = nowAuto ? '25px' : '3px';
+};
+</script>
+{% endblock %}
+{% block body_class %}admin-body{% endblock %}
+
+{% block nav_items %}
+  <a class="header-link" href="{{ url_for('page_home') }}">← メインへ</a>
+  <a class="header-link" href="{{ url_for('page_help') }}">❓ ヘルプ</a>
+{% endblock %}
+
+{% block content %}
+<div class="container-narrow">
+  <!-- ログイン前 -->
+  <div id="login-section">
+    <div style="text-align:center; margin-bottom:32px;">
+      <div style="font-size:48px;">🛡️</div>
+      <h1 style="color:#fff; font-size:24px; margin:8px 0 4px;">管理者トップ</h1>
+      <p style="color:#9CA3AF; font-size:13px;">管理者パスワードを入力してグループ一覧を表示します</p>
+    </div>
+    <div class="admin-card">
+      <div class="form-group">
+        <label class="form-label">管理者パスワード</label>
+        <input type="password" id="admin-pw" class="form-control" placeholder="パスワードを入力">
+      </div>
+      <button onclick="loadGroups()" class="btn btn-block"
+        style="background:linear-gradient(135deg,#EF4444,#DC2626); color:#fff;">
+        🔓 グループ一覧を表示
+      </button>
+    </div>
+  </div>
+
+  <!-- ログイン後 -->
+  <div id="groups-section" style="display:none;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <h1 style="color:#fff; font-size:22px; margin:0;">📋 グループ一覧</h1>
+      <div style="display:flex; gap:8px;">
+        <a href="/theme" class="btn"
+          style="background:rgba(102,126,234,0.2); color:#a5b4fc; border:1px solid rgba(102,126,234,0.3); font-size:0.85rem; text-decoration:none; display:inline-flex; align-items:center;">
+          🎨 テーマ設定
+        </a>
+        <a href="/setting_ai/" class="btn"
+          style="background:rgba(249,115,22,0.2); color:#fb923c; border:1px solid rgba(249,115,22,0.3); font-size:0.85rem; text-decoration:none; display:inline-flex; align-items:center;">
+          🤖 AI採点管理
+        </a>
+        <a href="/setting_schedule/" class="btn"
+          style="background:rgba(52,211,153,0.2); color:#34d399; border:1px solid rgba(52,211,153,0.3); font-size:0.85rem; text-decoration:none; display:inline-flex; align-items:center;">
+          📅 ページ公開設定
+        </a>
+        <button onclick="openFeedback()" class="btn"
+          style="background:rgba(251,191,36,0.2); color:#FCD34D; border:1px solid rgba(251,191,36,0.3); font-size:0.85rem;">
+          💬 フィードバック
+        </button>
+        <button onclick="logout()" class="btn"
+          style="background:rgba(255,255,255,0.05); color:#9CA3AF; border:1px solid rgba(255,255,255,0.1); font-size:0.85rem;">
+          ← ログアウト
+        </button>
+      </div>
+    </div>
+
+    <div id="group-stats" style="color:#9CA3AF; font-size:0.85rem; margin-bottom:12px;"></div>
+    <div id="group-list"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let adminPw = '';
+
+async function loadGroups() {
+  const pw = document.getElementById('admin-pw').value;
+  if (!pw) { window.toast('パスワードを入力してね', 'error'); return; }
+  try {
+    const r = await fetch('/api/admin/groups?pw=' + encodeURIComponent(pw));
+    const data = await r.json();
+    if (!data.ok) { window.toast(data.error || 'パスワードが違うよ', 'error'); return; }
+    adminPw = pw;
+    document.getElementById('login-section').style.display = 'none';
+    document.getElementById('groups-section').style.display = 'block';
+    renderGroups(data.groups);
+  } catch(e) { window.toast('読み込みエラー', 'error'); }
+}
+
+function renderGroups(groups) {
+  document.getElementById('group-stats').textContent = '合計 ' + groups.length + ' グループ';
+  const list = document.getElementById('group-list');
+  if (groups.length === 0) {
+    list.innerHTML = '<div class="admin-card" style="text-align:center;color:#9CA3AF;">グループがないよ</div>';
+    return;
+  }
+  list.innerHTML = groups.map(g => `
+    <div class="admin-card" style="margin-bottom:12px; padding:14px 16px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="width:40px; height:40px; border-radius:12px; background:${g.color}; display:flex; align-items:center; justify-content:center; font-size:1.2rem; font-weight:900; color:#fff; flex-shrink:0;">
+          ${window.escapeHtml(g.name[0])}
+        </div>
+        <div style="flex:1; min-width:0;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="color:#e2e8f0; font-weight:700; font-size:0.95rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+              ${window.escapeHtml(g.name)}
+            </span>
+            ${g.is_official ? '<span style="background:linear-gradient(135deg,#f59e0b,#d97706);color:white;border-radius:6px;padding:1px 8px;font-size:0.7rem;font-weight:bold;flex-shrink:0;">⭐ 公式</span>' : ''}
+            ${g.school_mode ? '<span style="background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:white;border-radius:6px;padding:1px 8px;font-size:0.7rem;font-weight:bold;flex-shrink:0;">🏫 学校</span>' : ''}
+          </div>
+          <div style="color:#6B7280; font-size:0.75rem; margin-top:2px;">
+            クイズ ${g.quiz_count}問
+            ${g.view_only ? ' · <span style="color:#60A5FA;">👁️ 閲覧のみ</span>' : ''}
+            · ${g.created_at ? g.created_at.substring(0,10) : ''}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0;">
+          <button onclick="toggleOfficial('${g.id}', ${g.is_official})"
+            style="padding:6px 10px; background:${g.is_official ? 'rgba(245,158,11,0.2)' : 'rgba(100,100,100,0.2)'}; color:${g.is_official ? '#f59e0b' : '#9CA3AF'}; border:1px solid ${g.is_official ? 'rgba(245,158,11,0.4)' : 'rgba(100,100,100,0.3)'}; border-radius:8px; font-size:0.75rem; cursor:pointer;">
+            ${g.is_official ? '⭐ 公式解除' : '☆ 公式化'}
+          </button>
+          <button onclick="toggleSchoolMode('${g.id}', ${g.school_mode || false})"
+            style="padding:6px 10px; background:${g.school_mode ? 'rgba(59,130,246,0.2)' : 'rgba(100,100,100,0.2)'}; color:${g.school_mode ? '#60a5fa' : '#9CA3AF'}; border:1px solid ${g.school_mode ? 'rgba(59,130,246,0.4)' : 'rgba(100,100,100,0.3)'}; border-radius:8px; font-size:0.75rem; cursor:pointer;">
+            ${g.school_mode ? '🏫 学校解除' : '🏫 学校化'}
+          </button>
+          <button onclick="goSetting(this.dataset.name)" data-name="${g.name.replace(/'/g, '&apos;')}"
+            style="padding:6px 14px; background:rgba(99,102,241,0.2); color:#a5b4fc; border:1px solid rgba(99,102,241,0.3); border-radius:8px; font-size:0.8rem; cursor:pointer;">
+            ⚙️ 設定
+          </button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function toggleSchoolMode(groupId, currentMode) {
+  const next = !currentMode;
+  if (!confirm(next ? 'このグループを学校グループにしますか？' : '学校グループを解除しますか？')) return;
+  try {
+    const r = await fetch('/api/admin/school-mode', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({password: adminPw, group_id: groupId, enabled: next})
+    });
+    const data = await r.json();
+    if (data.ok) {
+      window.toast(next ? '🏫 学校グループに設定しました' : '学校グループを解除しました', 'success');
+      loadGroups();
+    } else {
+      window.toast(data.error || 'エラー', 'error');
+    }
+  } catch(e) {
+    window.toast('通信エラー', 'error');
+  }
+}
+
+async function toggleOfficial(groupId, currentIsOfficial) {
+  const next = !currentIsOfficial;
+  if (!confirm(next ? 'このグループを公式グループにしますか？' : '公式グループを解除しますか？')) return;
+  try {
+    const r = await fetch('/api/admin/set_official', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({password: adminPw, group_id: groupId, is_official: next})
+    });
+    const data = await r.json();
+    if (data.ok) {
+      window.toast(next ? '⭐ 公式グループに設定しました' : '公式を解除しました', 'success');
+      loadGroups();
+    } else {
+      window.toast(data.error || 'エラー', 'error');
+    }
+  } catch(e) {
+    window.toast('通信エラー', 'error');
+  }
+}
+
+function goSetting(groupName) {
+  const groupId = prompt('「' + groupName + '」のグループIDを入力してね\n（グループIDはログイン時に使うIDだよ）');
+  if (groupId && groupId.trim()) {
+    window.location.href = '/' + groupId.trim() + '/setting/';
+  }
+}
+
+function openFeedback() {
+  window.open('/feedback/list?pw=' + encodeURIComponent(adminPw), '_blank');
+}
+
+function logout() {
+  adminPw = '';
+  document.getElementById('admin-pw').value = '';
+  document.getElementById('login-section').style.display = 'block';
+  document.getElementById('groups-section').style.display = 'none';
+}
+</script>
+{% endblock %}
+
+<!-- ===== テーマ設定モーダル ===== -->
+<div id="theme-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center; padding:16px;">
+  <div style="background:#1e1e2e; border-radius:20px; padding:24px; max-width:520px; width:100%; max-height:90vh; overflow-y:auto; border:1px solid #3d3d5c;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+      <h2 style="color:#e0e0ff; margin:0; font-size:1.2rem;">🎨 テーマ設定</h2>
+      <button onclick="closeThemePanel()" style="background:none; border:none; color:#aaa; font-size:1.5rem; cursor:pointer;">✕</button>
+    </div>
+    <div style="background:rgba(255,255,255,0.05); border-radius:12px; padding:14px; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between;">
+      <div>
+        <div style="color:#e0e0ff; font-weight:bold; margin-bottom:2px;">🔄 季節自動変更モード</div>
+        <div style="color:#aaa; font-size:0.82rem;">春夏秋冬に合わせて自動でテーマが変わります</div>
+      </div>
+      <div id="auto-toggle2" onclick="toggleAutoTheme2()"
+        style="width:48px; height:26px; border-radius:13px; background:#444; position:relative; cursor:pointer; transition:background 0.2s; flex-shrink:0;">
+        <div id="auto-knob2" style="position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:white; box-shadow:0 1px 4px rgba(0,0,0,0.3); transition:left 0.2s;"></div>
+      </div>
+    </div>
+    <div style="color:#aaa; font-size:0.82rem; margin-bottom:10px;">テーマを選んでください</div>
+    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px;">
+      <div style="grid-column:span 3; color:#a5b4fc; font-size:0.8rem; font-weight:bold;">🎯 基本テーマ</div>
+      <div class="theme-card" data-theme="default" onclick="pickTheme('default')"><div style="height:40px;background:#fdf6f0;border-radius:8px;margin-bottom:6px;border:1px solid #eee;"></div>デフォルト</div>
+      <div class="theme-card" data-theme="modern" onclick="pickTheme('modern')"><div style="height:40px;background:#0f0f1a;border-radius:8px;margin-bottom:6px;"></div>🌙 近代化</div>
+      <div class="theme-card" data-theme="classic" onclick="pickTheme('classic')"><div style="height:40px;background:#f5f0e8;border-radius:8px;margin-bottom:6px;border:1px solid #c8a87a;"></div>📜 クラシック</div>
+      <div style="grid-column:span 3; color:#a5b4fc; font-size:0.8rem; font-weight:bold;">🌿 季節テーマ</div>
+      <div class="theme-card" data-theme="spring" onclick="pickTheme('spring')"><div style="height:40px;background:linear-gradient(135deg,#ffe0f0,#fff0f5);border-radius:8px;margin-bottom:6px;"></div>🌸 春</div>
+      <div class="theme-card" data-theme="summer" onclick="pickTheme('summer')"><div style="height:40px;background:linear-gradient(135deg,#e0f0ff,#f0f8ff);border-radius:8px;margin-bottom:6px;"></div>☀️ 夏</div>
+      <div class="theme-card" data-theme="autumn" onclick="pickTheme('autumn')"><div style="height:40px;background:linear-gradient(135deg,#fff3e0,#ffe8d0);border-radius:8px;margin-bottom:6px;"></div>🍁 秋</div>
+      <div class="theme-card" data-theme="winter" onclick="pickTheme('winter')"><div style="height:40px;background:linear-gradient(135deg,#e8f4ff,#e0ecff);border-radius:8px;margin-bottom:6px;"></div>❄️ 冬</div>
+      <div style="grid-column:span 3; color:#a5b4fc; font-size:0.8rem; font-weight:bold;">🌈 カラフルテーマ</div>
+      <div class="theme-card" data-theme="sunset" onclick="pickTheme('sunset')"><div style="height:40px;background:linear-gradient(135deg,#ff6b6b,#ffd700);border-radius:8px;margin-bottom:6px;"></div>🌅 サンセット</div>
+      <div class="theme-card" data-theme="ocean" onclick="pickTheme('ocean')"><div style="height:40px;background:linear-gradient(135deg,#006994,#00ccff);border-radius:8px;margin-bottom:6px;"></div>🌊 オーシャン</div>
+      <div class="theme-card" data-theme="forest" onclick="pickTheme('forest')"><div style="height:40px;background:linear-gradient(135deg,#1a4a2e,#52c278);border-radius:8px;margin-bottom:6px;"></div>🌲 フォレスト</div>
+      <div class="theme-card" data-theme="lavender" onclick="pickTheme('lavender')"><div style="height:40px;background:linear-gradient(135deg,#e8d5f5,#dcc8f0);border-radius:8px;margin-bottom:6px;"></div>💜 ラベンダー</div>
+      <div class="theme-card" data-theme="sakura" onclick="pickTheme('sakura')"><div style="height:40px;background:linear-gradient(135deg,#ffb7c5,#ffe4ec);border-radius:8px;margin-bottom:6px;"></div>🌸 サクラ</div>
+      <div class="theme-card" data-theme="aurora" onclick="pickTheme('aurora')"><div style="height:40px;background:linear-gradient(135deg,#0a1628,#0d4f3c);border-radius:8px;margin-bottom:6px;"></div>🌌 オーロラ</div>
+      <div style="grid-column:span 3; color:#a5b4fc; font-size:0.8rem; font-weight:bold;">🎉 ポップテーマ</div>
+      <div class="theme-card" data-theme="candy" onclick="pickTheme('candy')"><div style="height:40px;background:linear-gradient(135deg,#ff69b4,#c71585);border-radius:8px;margin-bottom:6px;"></div>🍬 キャンディ</div>
+      <div class="theme-card" data-theme="mint" onclick="pickTheme('mint')"><div style="height:40px;background:linear-gradient(135deg,#98ff98,#d0ffd0);border-radius:8px;margin-bottom:6px;"></div>🌿 ミント</div>
+      <div class="theme-card" data-theme="galaxy" onclick="pickTheme('galaxy')"><div style="height:40px;background:linear-gradient(135deg,#0a0015,#2d0050);border-radius:8px;margin-bottom:6px;"></div>🔮 ギャラクシー</div>
+      <div class="theme-card" data-theme="neon" onclick="pickTheme('neon')"><div style="height:40px;background:#000;border-radius:8px;margin-bottom:6px;box-shadow:inset 0 0 10px #00ff00;"></div>💚 ネオン</div>
+      <div class="theme-card" data-theme="retro" onclick="pickTheme('retro')"><div style="height:40px;background:linear-gradient(135deg,#ff6600,#ffcc00);border-radius:8px;margin-bottom:6px;"></div>📺 レトロ</div>
+      <div class="theme-card" data-theme="pastel" onclick="pickTheme('pastel')"><div style="height:40px;background:linear-gradient(135deg,#ffd1dc,#c7ceea);border-radius:8px;margin-bottom:6px;"></div>🎀 パステル</div>
+      <div style="grid-column:span 3; color:#a5b4fc; font-size:0.8rem; font-weight:bold;">🎎 和風テーマ</div>
+      <div class="theme-card" data-theme="washi" onclick="pickTheme('washi')"><div style="height:40px;background:linear-gradient(135deg,#f5f0e0,#e0d8b0);border-radius:8px;margin-bottom:6px;"></div>📄 和紙</div>
+      <div class="theme-card" data-theme="matcha" onclick="pickTheme('matcha')"><div style="height:40px;background:linear-gradient(135deg,#2d5a27,#6b9e5e);border-radius:8px;margin-bottom:6px;"></div>🍵 抹茶</div>
+      <div class="theme-card" data-theme="indigo" onclick="pickTheme('indigo')"><div style="height:40px;background:linear-gradient(135deg,#1a237e,#3949ab);border-radius:8px;margin-bottom:6px;"></div>🟦 藍染め</div>
+    </div>
+    <button onclick="closeThemePanel()" style="width:100%;padding:12px;background:#667eea;color:white;border:none;border-radius:10px;cursor:pointer;font-weight:bold;font-size:1rem;">✅ 閉じる</button>
+  </div>
+</div>
+
+<style>
+.theme-card{background:rgba(255,255,255,0.05);border:2px solid rgba(255,255,255,0.1);border-radius:10px;padding:10px 8px;cursor:pointer;text-align:center;font-size:0.78rem;color:#ccc;transition:all 0.2s;}
+.theme-card:hover{border-color:#667eea;transform:translateY(-2px);color:white;}
+.theme-card.active{border-color:#667eea;background:rgba(102,126,234,0.2);color:white;}
+</style>
+
+<script>
+const EXTRA_THEMES = {
+  sunset:{bg:'linear-gradient(135deg,#ffe8e0,#fff5f0)',style:''},
+  ocean:{bg:'linear-gradient(135deg,#e0f4ff,#f0faff)',style:''},
+  forest:{bg:'linear-gradient(135deg,#e8f5e9,#f1f8f1)',style:''},
+  lavender:{bg:'linear-gradient(135deg,#f3e8ff,#f9f3ff)',style:''},
+  sakura:{bg:'linear-gradient(135deg,#ffe8f0,#fff5f8)',style:''},
+  aurora:{bg:'#0a1628',style:'dark'},
+  candy:{bg:'linear-gradient(135deg,#fff0f8,#ffe8f5)',style:''},
+  mint:{bg:'linear-gradient(135deg,#e8fff0,#f0fff5)',style:''},
+  galaxy:{bg:'#0a0015',style:'dark'},
+  neon:{bg:'#050505',style:'dark'},
+  retro:{bg:'linear-gradient(135deg,#fff8e8,#fffdf0)',style:''},
+  pastel:{bg:'linear-gradient(135deg,#fff0f5,#f0fff8)',style:''},
+  washi:{bg:'linear-gradient(135deg,#f8f4e8,#f5f0e0)',style:'sepia'},
+  matcha:{bg:'linear-gradient(135deg,#e8f5e0,#f0f8e8)',style:''},
+  indigo:{bg:'linear-gradient(135deg,#e8eaff,#f0f2ff)',style:''},
+};
+
+function openThemePanel() {
+  const m = document.getElementById('theme-modal');
+  if (!m) return;
+  m.style.display = 'flex';
+  updateThemeCards();
+  updateAutoToggle2();
+}
+function closeThemePanel() {
+  const m = document.getElementById('theme-modal');
+  if (m) m.style.display = 'none';
+}
+function pickTheme(key) {
+  localStorage.setItem('quiz_auto_theme','0');
+  if (typeof THEMES !== 'undefined') Object.assign(THEMES, EXTRA_THEMES);
+  if (typeof applyTheme === 'function') applyTheme(key);
+  updateThemeCards();
+  updateAutoToggle2();
+}
+function toggleAutoTheme2() {
+  const isAuto = localStorage.getItem('quiz_auto_theme') === '1';
+  localStorage.setItem('quiz_auto_theme', isAuto ? '0' : '1');
+  if (!isAuto) {
+    if (typeof THEMES !== 'undefined') Object.assign(THEMES, EXTRA_THEMES);
+    if (typeof getCurrentSeason === 'function' && typeof applyTheme === 'function') applyTheme(getCurrentSeason());
+  }
+  updateAutoToggle2();
+  updateThemeCards();
+}
+function updateThemeCards() {
+  const current = localStorage.getItem('quiz_theme') || 'default';
+  const isAuto = localStorage.getItem('quiz_auto_theme') === '1';
+  document.querySelectorAll('.theme-card').forEach(c => {
+    c.classList.toggle('active', c.dataset.theme === current && !isAuto);
+  });
+}
+function updateAutoToggle2() {
+  const isAuto = localStorage.getItem('quiz_auto_theme') === '1';
+  const tog = document.getElementById('auto-toggle2');
+  const knob = document.getElementById('auto-knob2');
+  if (tog) tog.style.background = isAuto ? '#4caf50' : '#444';
+  if (knob) knob.style.left = isAuto ? '25px' : '3px';
+}
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof THEMES !== 'undefined') Object.assign(THEMES, EXTRA_THEMES);
+  const btn = document.getElementById('theme-open-btn');
+  if (btn) btn.addEventListener('click', openThemePanel);
+  document.getElementById('theme-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeThemePanel();
+  });
+});
+</script>

@@ -14,8 +14,12 @@
       <h1 class="page-title">🎯 クイズ一覧</h1>
       <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
         <button id="btn-random" class="btn btn-secondary" style="font-size:12px; padding:6px 12px;">🎲 ランダム出題</button>
-        <a href="/sets" class="btn btn-secondary" style="font-size:12px; padding:6px 12px;">📚 セット</a>
-        <a href="/groupstats" class="btn btn-secondary" style="font-size:12px; padding:6px 12px;">📊 全体統計</a>
+        <button onclick="openAiConfigModal()" class="btn btn-secondary" style="font-size:12px; padding:6px 12px;">🤖 AI設定</button>
+        {% if group.school_mode %}
+        <button onclick="openAccessLogModal()" class="btn btn-secondary" style="font-size:12px; padding:6px 12px; background:#4a90d9; color:white;">📋 入室ログ</button>
+        {% endif %}
+        <a href="/sets" id="btn-sets" class="btn btn-secondary" style="font-size:12px; padding:6px 12px;">📚 セット</a>
+        <a href="/groupstats" id="btn-stats" class="btn btn-secondary" style="font-size:12px; padding:6px 12px;">📊 全体統計</a>
         <select id="sort-select" class="form-control" style="font-size:12px; padding:6px 12px; width:auto; display:inline-block;">
           <option value="new">新しい順</option>
           <option value="old">古い順</option>
@@ -35,6 +39,9 @@
       </button>
     </div>
   </div>
+
+  <!-- AIトークン使用量バー -->
+  <div id="ai-token-bars" style="display:none; margin-bottom:16px;"></div>
 
   <div class="filter-bar" id="tag-filter" style="display:none;"></div>
   <div id="quiz-list" class="quiz-grid">
@@ -175,37 +182,470 @@
       <button class="modal-close" onclick="closeModal('modal-edit')">✕</button>
     </div>
     <div class="modal-body">
-      <form id="edit-form">
-        <input type="hidden" id="edit-quiz-id">
+      <!-- ステップ1: パスワード入力 -->
+      <div id="edit-step-pw">
+        <p style="color:#666; margin-bottom:16px; font-size:0.95rem;">編集するにはパスワードを入力してください。</p>
         <div class="form-group">
-          <label class="form-label">クイズ(問題) *</label>
-          <textarea id="edit-question" class="form-control" rows="3" maxlength="500" required></textarea>
-        </div>
-        <div class="form-group">
-          <label class="form-label">答え(正解) *</label>
-          <div id="edit-answers-box"></div>
-          <button type="button" id="edit-btn-add-answer" class="btn btn-secondary" style="font-size:12px; padding:6px 12px; margin-top:4px;">
-            ➕ 正解を追加
-          </button>
-        </div>
-        <div id="edit-pw-section" style="display:none; margin-bottom:12px;">
           <label class="form-label">🔒 編集パスワード</label>
           <input type="password" id="edit-password" class="form-control" placeholder="パスワードを入力してね">
         </div>
-        <button type="submit" class="btn btn-primary btn-block">💾 保存する</button>
-      </form>
+        <button type="button" onclick="checkEditPassword()" class="btn btn-primary btn-block">🔓 確認する</button>
+      </div>
+      <!-- ステップ2: 編集フォーム -->
+      <div id="edit-step-form" style="display:none;">
+        <form id="edit-form">
+          <input type="hidden" id="edit-quiz-id">
+          <div class="form-group">
+            <label class="form-label">クイズ(問題) *</label>
+            <textarea id="edit-question" class="form-control" rows="3" maxlength="500" required></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">答え(正解) *</label>
+            <div id="edit-answers-box"></div>
+            <button type="button" id="edit-btn-add-answer" class="btn btn-secondary" style="font-size:12px; padding:6px 12px; margin-top:4px;">
+              ➕ 正解を追加
+            </button>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">💾 保存する</button>
+        </form>
+        <div style="margin-top:12px; padding-top:12px; border-top:1px solid #eee;">
+          <button type="button" id="edit-delete-btn" onclick="deleteFromEdit()"
+            style="width:100%; padding:10px; background:#ffebee; color:#e53935; border:1px solid #ffcdd2; border-radius:8px; cursor:pointer; font-size:0.9rem; font-weight:bold;">
+            🗑️ このクイズを削除する
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
+<!-- AI API設定モーダル -->
+<div class="modal-overlay" id="modal-ai-config" style="display:none;">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">
+    <div class="modal-header">
+      <span>🤖 AI採点APIの設定</span>
+      <button class="modal-close" onclick="closeModal('modal-ai-config')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:#9CA3AF;font-size:0.88rem;margin-bottom:16px;">
+        AIサービスのAPIキーを登録すると、このグループでAI採点が使えるようになります。
+      </p>
+
+      <!-- AIサービス選択 -->
+      <div class="form-group">
+        <label class="form-label">🤖 AIサービス</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;" id="ai-provider-btns">
+          <button type="button" class="ai-pvd-btn" data-provider="gemini"
+            style="padding:10px;border-radius:10px;border:2px solid #e5e7eb;background:white;cursor:pointer;font-weight:bold;display:flex;align-items:center;gap:6px;justify-content:center;">
+            <img src="https://www.gstatic.com/lamda/images/gemini_sparkle_v002_d4735304ff6292a690345.svg" style="width:18px;height:18px;" onerror="this.style.display='none'">
+            Google Gemini
+          </button>
+          <button type="button" class="ai-pvd-btn" data-provider="openai"
+            style="padding:10px;border-radius:10px;border:2px solid #e5e7eb;background:white;cursor:pointer;font-weight:bold;display:flex;align-items:center;gap:6px;justify-content:center;">
+            🧠 OpenAI
+          </button>
+          <button type="button" class="ai-pvd-btn" data-provider="anthropic"
+            style="padding:10px;border-radius:10px;border:2px solid #e5e7eb;background:white;cursor:pointer;font-weight:bold;display:flex;align-items:center;gap:6px;justify-content:center;">
+            🔮 Anthropic
+          </button>
+          <button type="button" class="ai-pvd-btn" data-provider="cloudflare"
+            style="padding:10px;border-radius:10px;border:2px solid #e5e7eb;background:white;cursor:pointer;font-weight:bold;display:flex;align-items:center;gap:6px;justify-content:center;">
+            ☁️ Cloudflare
+          </button>
+        </div>
+      </div>
+
+      <!-- APIキー入力 -->
+      <div class="form-group" id="ai-key-section">
+        <label class="form-label" id="ai-key-label">APIキー</label>
+        <div style="position:relative;">
+          <input type="password" id="ai-key-input" class="form-control"
+            placeholder="APIキーを入力..."
+            style="padding-right:48px;font-family:monospace;font-size:0.85rem;">
+          <button type="button" onclick="toggleAiKeyView()" id="ai-key-eye"
+            style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1rem;">👁️</button>
+        </div>
+        <p class="form-help" id="ai-key-help">APIキーはサーバーに暗号化して保存されます</p>
+      </div>
+
+      <!-- Cloudflare専用: Account ID -->
+      <div class="form-group" id="ai-cf-section" style="display:none;">
+        <label class="form-label">Account ID（Cloudflareのみ）</label>
+        <input type="text" id="ai-cf-account" class="form-control"
+          placeholder="Cloudflare Account ID"
+          style="font-family:monospace;font-size:0.85rem;">
+      </div>
+
+      <!-- モデル使用説明 -->
+      <div id="ai-model-info" style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:12px;font-size:0.82rem;color:#0369a1;margin-bottom:12px;">
+        サービスを選択してください
+      </div>
+
+      <!-- 1日の上限設定 -->
+      <div class="form-group">
+        <label class="form-label">📊 1日のAI採点上限（トークン数）</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button type="button" class="ai-limit-btn btn btn-secondary" data-limit="500" style="padding:6px 14px;font-size:0.85rem;">500</button>
+          <button type="button" class="ai-limit-btn btn btn-secondary" data-limit="1000" style="padding:6px 14px;font-size:0.85rem;">1000</button>
+          <button type="button" class="ai-limit-btn btn btn-secondary" data-limit="3000" style="padding:6px 14px;font-size:0.85rem;">3000</button>
+          <button type="button" class="ai-limit-btn btn btn-secondary" data-limit="10000" style="padding:6px 14px;font-size:0.85rem;">10000</button>
+          <button type="button" class="ai-limit-btn btn btn-secondary" data-limit="0" style="padding:6px 14px;font-size:0.85rem;">無制限</button>
+        </div>
+        <input type="number" id="ai-limit-input" class="form-control" value="1000" min="0" style="margin-top:8px;font-size:0.85rem;">
+        <p class="form-help">0=無制限。無料枠に合わせて設定してね。</p>
+      </div>
+
+      <button type="button" onclick="saveGroupAiConfig()" class="btn btn-primary btn-block">
+        💾 保存する
+      </button>
+      <div id="ai-save-status" style="margin-top:8px;font-size:0.82rem;display:none;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ランダム出題モーダル -->
+<div class="modal-overlay" id="modal-random" style="display:none;">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">
+    <div class="modal-header">
+      <span>🎲 ランダム出題</span>
+      <button class="modal-close" onclick="closeModal('modal-random')">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- 問題数 -->
+      <div class="form-group">
+        <label class="form-label">📊 問題数</label>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          {% for n in [5, 10, 15, 20, 30] %}
+          <button type="button" class="random-count-btn btn btn-secondary"
+            data-count="{{ n }}"
+            style="padding:8px 20px; font-weight:bold;">
+            {{ n }}問
+          </button>
+          {% endfor %}
+          <button type="button" class="random-count-btn btn btn-secondary"
+            data-count="all" style="padding:8px 20px; font-weight:bold;">
+            全問
+          </button>
+        </div>
+      </div>
+
+      <!-- 正解率フィルター -->
+      <div class="form-group">
+        <label class="form-label">🎯 正解率フィルター</label>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button type="button" class="random-acc-btn btn btn-secondary active"
+            data-acc="all" style="padding:8px 16px; font-weight:bold;">
+            すべて
+          </button>
+          <button type="button" class="random-acc-btn btn btn-secondary"
+            data-acc="low" style="padding:8px 16px; font-weight:bold;">
+            😓 30%以下
+          </button>
+          <button type="button" class="random-acc-btn btn btn-secondary"
+            data-acc="mid" style="padding:8px 16px; font-weight:bold;">
+            😐 31〜60%
+          </button>
+          <button type="button" class="random-acc-btn btn btn-secondary"
+            data-acc="high" style="padding:8px 16px; font-weight:bold;">
+            😊 61%以上
+          </button>
+        </div>
+      </div>
+
+      <!-- タグフィルター -->
+      <div class="form-group">
+        <label class="form-label">🏷️ タグで絞り込み（複数選択可）</label>
+        <div id="random-tag-list" style="display:flex; flex-wrap:wrap; gap:6px; max-height:150px; overflow-y:auto; padding:4px;"></div>
+        <p class="form-help" style="margin-top:6px;">選択なし＝すべてのタグ</p>
+      </div>
+
+      <!-- 対象問題数表示 -->
+      <div id="random-preview" style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:10px; padding:12px; margin-bottom:16px; text-align:center; font-weight:bold; color:#0369a1;">
+        対象: 計算中...
+      </div>
+
+      <button onclick="startRandom()" class="btn btn-primary btn-block" style="font-size:1rem; padding:14px;">
+        🎲 スタート！
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- 入室ログモーダル -->
+<div id="access-log-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;">
+  <div style="background:white; margin:40px auto; padding:24px; border-radius:16px; max-width:600px; width:90%;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <h2 style="margin:0; font-size:18px;">📋 入室ログ</h2>
+      <button onclick="closeAccessLogModal()" style="background:none; border:none; font-size:20px; cursor:pointer;">✕</button>
+    </div>
+    <p style="font-size:12px; color:#888; margin-bottom:16px;">グループへのログイン履歴です。不審なアクセスがないか確認できます。</p>
+    <div id="access-log-list" style="font-size:13px;">読み込み中...</div>
+  </div>
+</div>
+
+<script>
+async function openAccessLogModal() {
+  document.getElementById('access-log-modal').style.display = 'block';
+  const list = document.getElementById('access-log-list');
+  list.innerHTML = '読み込み中...';
+  try {
+    const res = await fetch('/api/group/access-logs');
+    const data = await res.json();
+    if (!data.ok || data.logs.length === 0) {
+      list.innerHTML = '<p style="color:#888;">まだログがありません</p>';
+      return;
+    }
+    list.innerHTML = data.logs.map(log => {
+      const dt = log.created_at || '';
+      const dev = log.device || '不明';
+      const ip = log.ip_hash || '';
+      return `<div style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px;">
+        <div>
+          <span style="font-size:16px;">${deviceIcon(dev)}</span>
+          <strong>${dev}</strong>
+        </div>
+        <div style="color:#666; font-size:12px;">${dt}</div>
+        <details style="width:100%; margin-top:4px;">
+          <summary style="cursor:pointer; font-size:11px; color:#aaa;">詳しく</summary>
+          <div style="font-size:11px; color:#888; margin-top:4px; font-family:monospace;">
+            🕐 ${dt}<br>
+            📱 ${dev}<br>
+            🔑 ID: ${ip}
+          </div>
+        </details>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    list.innerHTML = '<p style="color:red;">読み込みエラー</p>';
+  }
+}
+
+function deviceIcon(dev) {
+  if (dev.includes('iPhone')) return '📱';
+  if (dev.includes('Android')) return '📱';
+  if (dev.includes('iPad')) return '📟';
+  if (dev.includes('Mac')) return '💻';
+  if (dev.includes('Windows')) return '🖥️';
+  return '❓';
+}
+
+function closeAccessLogModal() {
+  document.getElementById('access-log-modal').style.display = 'none';
+}
+</script>
 {% endblock %}
 
 {% block scripts %}
+<script>
+// クイズ部ガイド起動チェック
+(function() {
+  const shouldGuide = {{ 'true' if show_guide else 'false' }};
+  if (!shouldGuide) return;
+
+  // DOM読み込み後にガイド開始
+  if (document.readyState === 'complete') {
+    setTimeout(showGroupGuide, 800);
+  } else {
+    window.addEventListener('load', function() {
+      setTimeout(showGroupGuide, 800);
+    });
+  }
+
+  const GUIDE_STEPS = [
+    {title:'📣 沢中のクイズ研究部の皆さん', desc:'このページはクイズ研究部専用の使い方ガイドです！一緒に使い方を見ていきましょう！', targetId:null},
+    {title:'🎯 ようこそ！QuizShareへ', desc:'QuizShareはクイズを作って・答えて・みんなで楽しめるサービスです！順番に使い方を説明します。', targetId:null},
+    {title:'📋 クイズ一覧', desc:'グループのクイズがここに一覧で表示されます。カードをクリックするとクイズに挑戦できます！まだクイズがない場合は下の「＋」ボタンから作れます！', targetId:'quiz-list'},
+    {title:'🔢 並び替え', desc:'「新しい順」「正解率低い順」など並び替えができます。苦手な問題を優先して練習するのがオススメです！', targetId:'sort-select'},
+    {title:'🏷️ タグで絞り込み', desc:'クイズにタグをつけるとここに表示されます。タグをクリックするとそのカテゴリのクイズだけ表示できます！（クイズを追加するとタグが表示されます）', targetId:'tag-filter'},
+    {title:'🎲 ランダム出題', desc:'「ランダム出題」ボタンでランダムにクイズが出題されます。何問出すか選べます！', targetId:'btn-random'},
+    {title:'📊 全体統計', desc:'「全体統計」ボタンでグループ全体の挑戦記録・正解率・ランキングを確認できます！', targetId:'btn-stats'},
+    {title:'📚 セット', desc:'「セット」ボタンでクイズをまとめてセット問題として出題できます！', targetId:'btn-sets'},
+    {title:'📖 引用ライブラリ', desc:'「引用」ボタンからAIが作ったクイズを追加できます！ゲーム・歴史・科学など多数！', targetId:'nav-library'},
+    {title:'➕ クイズを作ろう！', desc:'右下の緑の「＋」ボタンから自分でクイズを作れます。問題・答え・解説・ヒントを入力できます！', targetId:null},
+    {title:'📋 グループIDをコピー', desc:'グループIDをコピーして友達に共有できます！', targetId:'copy-id-btn'},
+    {title:'🏆 準備完了！', desc:'使い方はバッチリです！さっそくクイズに挑戦してみてください！楽しんでね！🎉', targetId:null},
+  ];
+  let gStep = 0;
+
+  function showGroupGuide() {
+    gStep = 0;
+    document.body.classList.add('guide-active');
+    renderGStep();
+  }
+
+  function renderGStep() {
+    // 既存要素を全削除
+    ['g-overlay','g-modal','g-highlight','g-label'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.remove();
+    });
+    // 前のステップのハイライトをリセット
+    document.querySelectorAll('[data-guide-highlighted]').forEach(el => {
+      el.style.position = '';
+      el.style.zIndex = '';
+      el.style.pointerEvents = '';
+      delete el.dataset.guideHighlighted;
+    });
+    // +ボタンもブロック
+    const addBtn = document.getElementById('btn-add-quiz');
+    if (addBtn) { addBtn.style.pointerEvents = 'none'; addBtn.style.zIndex = '1'; }
+    const step = GUIDE_STEPS[gStep];
+    const isLast = gStep === GUIDE_STEPS.length - 1;
+
+    // オーバーレイ（クリック不可にして操作をブロック）
+    const ov = document.createElement('div');
+    ov.id = 'g-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:99990;pointer-events:all;';
+    document.body.appendChild(ov);
+
+    // ハイライト
+    if (step.targetId) {
+      const tgt = document.getElementById(step.targetId);
+      if (tgt) {
+        tgt.scrollIntoView({behavior:'smooth', block:'center'});
+        setTimeout(() => {
+          // 既存ハイライトを削除（連打対策）
+          ['g-highlight','g-label'].forEach(id => {
+            const el = document.getElementById(id); if (el) el.remove();
+          });
+          const rect = tgt.getBoundingClientRect();
+          const pad = 12;
+
+          // ハイライト枠
+          const hl = document.createElement('div');
+          hl.id = 'g-highlight';
+          hl.style.cssText = [
+            'position:fixed',
+            `top:${rect.top - pad}px`,
+            `left:${rect.left - pad}px`,
+            `width:${rect.width + pad*2}px`,
+            `height:${rect.height + pad*2}px`,
+            'border-radius:14px',
+            'z-index:99992',
+            'pointer-events:none',
+            'border:3px solid #4caf50',
+            'background:rgba(255,255,255,0.15)',
+            'box-shadow:0 0 0 4px rgba(76,175,80,0.5),0 0 0 9999px rgba(0,0,0,0.75),0 0 32px rgba(76,175,80,0.8)',
+            'animation:gpulse 1.5s infinite',
+          ].join(';');
+          document.body.appendChild(hl);
+          // ターゲット要素をハイライト枠の上に出す
+          tgt.style.position = 'relative';
+          tgt.style.zIndex = '99993';
+          tgt.style.pointerEvents = 'none';
+          tgt.dataset.guideHighlighted = '1';
+
+          // ラベル
+          const label = document.createElement('div');
+          label.id = 'g-label';
+          const labelTop = rect.top - pad - 44;
+          label.style.cssText = [
+            'position:fixed',
+            `top:${labelTop > 10 ? labelTop : rect.bottom + pad + 8}px`,
+            `left:${rect.left - pad}px`,
+            'background:#4caf50',
+            'color:white',
+            'border-radius:8px',
+            'padding:6px 14px',
+            'font-size:0.85rem',
+            'font-weight:bold',
+            'z-index:99993',
+            'pointer-events:none',
+            'box-shadow:0 2px 8px rgba(0,0,0,0.3)',
+            'white-space:nowrap',
+          ].join(';');
+          label.textContent = '👆 ここです！';
+          document.body.appendChild(label);
+          // オーバーレイはそのまま維持
+        }, 300);
+      } else {
+        // ターゲットが見つからない場合はオーバーレイのみ
+        ov.style.background = 'rgba(0,0,0,0.75)';
+      }
+    }
+
+    // モーダル（吹き出し式：ターゲットがあればその近く、なければ中央下）
+    const m = document.createElement('div');
+    m.id = 'g-modal';
+    let modalStyle = 'position:fixed;background:white;border-radius:20px;padding:24px 28px;max-width:420px;width:90%;z-index:99999;box-shadow:0 8px 48px rgba(0,0,0,0.5);animation:gslideUp 0.3s ease;';
+    if (step.targetId) {
+      const tgt2 = document.getElementById(step.targetId);
+      if (tgt2) {
+        const r2 = tgt2.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - r2.bottom;
+        const spaceAbove = r2.top;
+        if (spaceBelow > 220) {
+          modalStyle += `top:${r2.bottom + 20}px;left:50%;transform:translateX(-50%);`;
+        } else if (spaceAbove > 220) {
+          modalStyle += `bottom:${window.innerHeight - r2.top + 20}px;left:50%;transform:translateX(-50%);`;
+        } else {
+          modalStyle += 'bottom:32px;left:50%;transform:translateX(-50%);';
+        }
+      } else {
+        modalStyle += 'bottom:32px;left:50%;transform:translateX(-50%);';
+      }
+    } else {
+      modalStyle += 'bottom:32px;left:50%;transform:translateX(-50%);';
+    }
+    m.style.cssText = modalStyle;
+    m.innerHTML = `
+      <style>
+        @keyframes gslideUp{from{transform:translateX(-50%) translateY(20px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1}}
+        @keyframes gpulse{0%,100%{box-shadow:0 0 0 4px #4caf50,0 0 0 9999px rgba(0,0,0,0.7)}50%{box-shadow:0 0 0 10px #81c784,0 0 0 9999px rgba(0,0,0,0.7)}}
+      </style>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <span style="background:#1565c0;color:white;border-radius:20px;padding:3px 14px;font-size:0.78rem;font-weight:bold;">${gStep+1} / ${GUIDE_STEPS.length}</span>
+        <button onclick="endGGuide()" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:1.3rem;">✕</button>
+      </div>
+      <h3 style="font-size:1.1rem;font-weight:900;color:#1565c0;margin-bottom:8px;">${step.title}</h3>
+      <p style="color:#444;font-size:0.92rem;line-height:1.75;margin-bottom:20px;">${step.desc}</p>
+      <div style="display:flex;gap:10px;">
+        ${gStep > 0 ? `<button onclick="prevGStep()" style="flex:1;padding:10px;border:2px solid #1565c0;background:white;color:#1565c0;border-radius:10px;cursor:pointer;font-weight:bold;">← 前へ</button>` : '<div style="flex:1;"></div>'}
+        <button onclick="${isLast ? 'endGGuide()' : 'nextGStep()'}"
+          style="flex:2;padding:10px;background:linear-gradient(135deg,#1565c0,#1976d2);color:white;border:none;border-radius:10px;cursor:pointer;font-weight:bold;">
+          ${isLast ? '✅ 完了！' : '次へ →'}
+        </button>
+      </div>
+      <div style="display:flex;justify-content:center;gap:6px;margin-top:14px;">
+        ${GUIDE_STEPS.map((_,i) => `<div style="width:8px;height:8px;border-radius:50%;background:${i===gStep?'#1565c0':'#ddd'};"></div>`).join('')}
+      </div>
+    `;
+    document.body.appendChild(m);
+  }
+
+  window.nextGStep = function() {
+    if (gStep < GUIDE_STEPS.length-1) {
+      gStep++;
+      renderGStep();
+    }
+  };
+  window.prevGStep = function() { if (gStep > 0) { gStep--; renderGStep(); } };
+  window.endGGuide = function() {
+    ['g-overlay','g-modal','g-highlight','g-label'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.remove();
+    });
+    // ハイライトしたスタイルをリセット
+    document.querySelectorAll('[data-guide-highlighted]').forEach(el => {
+      el.style.position = '';
+      el.style.zIndex = '';
+      el.style.pointerEvents = '';
+      delete el.dataset.guideHighlighted;
+    });
+    // +ボタンを戻す
+    const addBtn2 = document.getElementById('btn-add-quiz');
+    if (addBtn2) { addBtn2.style.pointerEvents = ''; }
+    document.body.classList.remove('guide-active');
+    sessionStorage.setItem('quizclub_guide_done', '1');
+  };
+})();
+</script>
 <script>
 const state = {
   quizzes: [],
   filterTags: new Set(),
   sortBy: 'new',
   viewOnly: {{ 'true' if group.view_only else 'false' }},
+  page: 1,
+  perPage: 50,
 };
 
 async function loadQuizzes() {
@@ -220,6 +660,32 @@ async function loadQuizzes() {
   }
 }
 
+function getTagLimit() {
+  const w = window.innerWidth;
+  if (w >= 900) return 15;
+  if (w >= 600) return 10;
+  if (w >= 400) return 6;
+  return 4;
+}
+
+function toggleTags() {
+  const hidden = document.getElementById('hidden-tags');
+  const btn = document.getElementById('toggle-tags');
+  if (!hidden || !btn) return;
+  if (hidden.style.display === 'none') {
+    hidden.style.display = 'flex';
+    btn.textContent = '▲ 閉じる';
+  } else {
+    hidden.style.display = 'none';
+    const cnt = hidden.querySelectorAll('.q-tag').length;
+    btn.textContent = '▼ もっと見る（' + cnt + '件）';
+  }
+}
+
+window.addEventListener('resize', () => {
+  renderTagFilter();
+});
+
 function renderTagFilter() {
   const all = new Set();
   state.quizzes.forEach(q => (q.tags || []).forEach(t => all.add(t)));
@@ -227,11 +693,23 @@ function renderTagFilter() {
   const bar = document.getElementById('tag-filter');
   if (tags.length === 0) { bar.style.display = 'none'; return; }
   bar.style.display = 'flex';
+  const SHOW_LIMIT = getTagLimit();
   let html = '<span class="filter-label">🏷️ タグ</span>';
-  tags.forEach(t => {
+  const visibleTags = tags.slice(0, SHOW_LIMIT);
+  const hiddenTags = tags.slice(SHOW_LIMIT);
+  visibleTags.forEach(t => {
     const active = state.filterTags.has(t);
     html += '<button class="q-tag button ' + (active ? 'active' : '') + '" data-tag="' + escapeHtml(t) + '">#' + escapeHtml(t) + '</button>';
   });
+  if (hiddenTags.length > 0) {
+    html += '<div id="hidden-tags" style="display:none; flex-wrap:wrap; gap:4px;">';
+    hiddenTags.forEach(t => {
+      const active = state.filterTags.has(t);
+      html += '<button class="q-tag button ' + (active ? 'active' : '') + '" data-tag="' + escapeHtml(t) + '">#' + escapeHtml(t) + '</button>';
+    });
+    html += '</div>';
+    html += '<button id="toggle-tags" onclick="toggleTags()" style="font-size:11px; font-weight:700; color:#6B7280; background:none; border:none; cursor:pointer; text-decoration:underline;">▼ もっと見る（' + hiddenTags.length + '件）</button>';
+  }
   if (state.filterTags.size > 0) {
     html += '<button id="clear-filter" style="font-size:11px; font-weight:700; color:#6B7280; background:none; border:none; cursor:pointer; text-decoration:underline;">クリア</button>';
   }
@@ -244,18 +722,21 @@ document.getElementById('tag-filter').addEventListener('click', (e) => {
     const t = btn.dataset.tag;
     if (state.filterTags.has(t)) state.filterTags.delete(t);
     else state.filterTags.add(t);
+    state.page = 1;
     renderTagFilter();
     renderQuizzes();
     return;
   }
   if (e.target.id === 'clear-filter') {
     state.filterTags.clear();
+    state.page = 1;
     renderTagFilter();
     renderQuizzes();
   }
 });
 
 function renderQuizzes() {
+  state.page = state.page || 1;
   const list = document.getElementById('quiz-list');
   const filters = Array.from(state.filterTags);
   let filtered = filters.length === 0 ? state.quizzes : state.quizzes.filter(q => filters.every(t => (q.tags||[]).includes(t)));
@@ -278,12 +759,17 @@ function renderQuizzes() {
     }
     return 0;
   });
+  const total = filtered.length;
+  const perPage = 50;
+  const maxPage = Math.max(1, Math.ceil(total / perPage));
+  if (state.page > maxPage) state.page = maxPage;
+  const paged = filtered.slice((state.page-1)*perPage, state.page*perPage);
   document.getElementById('count-label').textContent = filters.length === 0 ? '全 ' + state.quizzes.length + ' 問' : filtered.length + ' 問 / 全 ' + state.quizzes.length + ' 問中';
   if (filtered.length === 0) {
     list.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:60px 20px;"><div style="font-size:64px; margin-bottom:12px;">' + (state.quizzes.length === 0 ? '📝' : '🔍') + '</div><p style="font-weight:900; font-size:18px; margin:0 0 4px;">' + (state.quizzes.length === 0 ? 'まだクイズがないよ' : '該当するクイズがないよ') + '</p></div>';
     return;
   }
-  list.innerHTML = filtered.map(q => cardHtml(q)).join('');
+  list.innerHTML = paged.map(q => cardHtml(q)).join('');
   // 編集ボタンにクリックイベントを設定
   document.querySelectorAll('.edit-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -292,6 +778,40 @@ function renderQuizzes() {
       openEditModal(btn.dataset.quizId);
     });
   });
+  renderPager(maxPage, total);
+}
+
+function renderPager(maxPage, total) {
+  let pager = document.getElementById('quiz-pager');
+  if (!pager) {
+    pager = document.createElement('div');
+    pager.id = 'quiz-pager';
+    document.getElementById('quiz-list').insertAdjacentElement('afterend', pager);
+  }
+  if (maxPage <= 1) { pager.innerHTML = ''; return; }
+  const cur = state.page;
+  const perPage = 50;
+  let btns = '';
+  btns += `<button onclick="gotoPage(${cur-1})" ${cur===1?'disabled':''} style="padding:8px 14px;border:1px solid #e0e0e0;border-radius:8px;background:${cur===1?'#f5f5f5':'white'};cursor:${cur===1?'default':'pointer'};color:${cur===1?'#aaa':'#333'};">← 前へ</button>`;
+  for (let i=1; i<=maxPage; i++) {
+    if (i===1||i===maxPage||(i>=cur-1&&i<=cur+1)) {
+      btns += `<button onclick="gotoPage(${i})" style="padding:8px 14px;border:2px solid ${i===cur?'#667eea':'#e0e0e0'};border-radius:8px;background:${i===cur?'#667eea':'white'};color:${i===cur?'white':'#333'};font-weight:${i===cur?'bold':'normal'};cursor:pointer;">${i}</button>`;
+    } else if (i===cur-2||i===cur+2) {
+      btns += `<span style="padding:8px 2px;color:#aaa;">…</span>`;
+    }
+  }
+  btns += `<button onclick="gotoPage(${cur+1})" ${cur===maxPage?'disabled':''} style="padding:8px 14px;border:1px solid #e0e0e0;border-radius:8px;background:${cur===maxPage?'#f5f5f5':'white'};cursor:${cur===maxPage?'default':'pointer'};color:${cur===maxPage?'#aaa':'#333'};">次へ →</button>`;
+  pager.innerHTML = `<div style="display:flex;justify-content:center;align-items:center;gap:6px;flex-wrap:wrap;padding:20px 0;">${btns}</div><div style="text-align:center;color:#888;font-size:0.82rem;margin-bottom:16px;">${(cur-1)*perPage+1}〜${Math.min(cur*perPage,total)}問目（全${total}問）</div>`;
+}
+
+function gotoPage(page) {
+  const filters = Array.from(state.filterTags);
+  const filtered = filters.length===0 ? state.quizzes : state.quizzes.filter(q=>filters.every(t=>(q.tags||[]).includes(t)));
+  const maxPage = Math.max(1, Math.ceil(filtered.length/50));
+  if (page<1||page>maxPage) return;
+  state.page = page;
+  renderQuizzes();
+  window.scrollTo({top:0, behavior:'smooth'});
 }
 
 function cardHtml(q) {
@@ -482,27 +1002,93 @@ document.getElementById('add-form').addEventListener('submit', async (e) => {
   btn.disabled = false; btn.textContent = '✅ 保存する';
 });
 
+let _editQuizData = null;
+
+async function deleteFromEdit() {
+  const quizId = document.getElementById('edit-quiz-id').value;
+  const pw = document.getElementById('edit-password').value;
+  if (!confirm('このクイズを削除しますか？この操作は取り消せません。')) return;
+  try {
+    const r = await fetch(`/api/quizzes/${quizId}`, {
+      method: 'DELETE',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ edit_password: pw })
+    });
+    const data = await r.json();
+    if (!data.ok) throw new Error(data.error || '削除に失敗しました');
+    window.toast('削除しました', 'success');
+    closeModal('modal-edit');
+    loadQuizzes();
+  } catch(e) {
+    window.toast(e.message || '削除に失敗しました', 'error');
+  }
+}
+
 async function openEditModal(quizId) {
+  // リセット
+  _editQuizData = null;
   document.getElementById('edit-quiz-id').value = quizId;
-  document.getElementById('edit-question').value = '読み込み中...';
-  document.getElementById('edit-answers-box').innerHTML = '';
+  document.getElementById('edit-password').value = '';
+  document.getElementById('edit-step-pw').style.display = 'block';
+  document.getElementById('edit-step-form').style.display = 'none';
   window.openModal('modal-edit');
+
+  // クイズデータを事前取得
   try {
     const r = await window.api.get('/api/quizzes/' + encodeURIComponent(quizId));
-    const q = r.quiz;
-    document.getElementById('edit-question').value = q.question;
-    const box = document.getElementById('edit-answers-box');
-    box.innerHTML = '';
-    (q.answers || [q.answer]).forEach((ans, i) => {
-      const row = document.createElement('div');
-      row.style.cssText = 'display:flex; gap:8px; margin-bottom:6px; align-items:flex-start;';
-      row.innerHTML = '<span style="font-size:11px; font-weight:900; color:#10B981; padding-top:10px; flex-shrink:0;">' + (i+1) + '</span>' +
-        '<textarea class="form-control edit-ans-input" maxlength="500" rows="2" style="flex:1;">' + escapeHtml(ans) + '</textarea>' +
-        (i > 0 ? '<button type="button" style="background:#FEE2E2; color:#DC2626; border:none; border-radius:8px; padding:6px 10px; cursor:pointer; margin-top:4px; flex-shrink:0;" onclick="this.parentElement.remove()">✕</button>' : '');
-      box.appendChild(row);
-    });
-    document.getElementById('edit-pw-section').style.display = q.has_edit_pw ? 'block' : 'none';
+    _editQuizData = r.quiz;
+    // パスワードなしなら直接フォームを表示
+    if (!_editQuizData.has_edit_pw) {
+      showEditForm();
+    }
   } catch(err) { window.toast(err.message, 'error'); window.closeModal('modal-edit'); }
+}
+
+async function checkEditPassword() {
+  const pw = document.getElementById('edit-password').value;
+  if (!pw) { window.toast('パスワードを入力してね', 'error'); return; }
+  const quizId = document.getElementById('edit-quiz-id').value;
+  // パスワードをサーバーで仮検証（保存時に再検証するのでここは簡易チェック）
+  const btn = document.querySelector('#edit-step-pw .btn-primary');
+  btn.disabled = true; btn.textContent = '確認中...';
+  try {
+    // 空の内容で送信して401かどうかで判定
+    await window.api.post('/api/quizzes/' + encodeURIComponent(quizId) + '/edit', {
+      question: _editQuizData.question,
+      answer: (_editQuizData.answers||[_editQuizData.answer])[0],
+      answers: _editQuizData.answers||[_editQuizData.answer],
+      edit_password: pw,
+    });
+    // 成功したらそのまま保存完了扱い→再度フォームを開く
+    showEditForm();
+    window.toast('パスワードを確認しました', 'success');
+  } catch(err) {
+    if (err.message && (err.message.includes('パスワード') || err.message.includes('401'))) {
+      window.toast('パスワードが違うよ', 'error');
+    } else {
+      // パスワードOKでその他のエラー→フォームへ
+      showEditForm();
+    }
+  }
+  btn.disabled = false; btn.textContent = '🔓 確認する';
+}
+
+function showEditForm() {
+  if (!_editQuizData) return;
+  const q = _editQuizData;
+  document.getElementById('edit-step-pw').style.display = 'none';
+  document.getElementById('edit-step-form').style.display = 'block';
+  document.getElementById('edit-question').value = q.question;
+  const box = document.getElementById('edit-answers-box');
+  box.innerHTML = '';
+  (q.answers || [q.answer]).forEach((ans, i) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex; gap:8px; margin-bottom:6px; align-items:flex-start;';
+    row.innerHTML = '<span style="font-size:11px; font-weight:900; color:#10B981; padding-top:10px; flex-shrink:0;">' + (i+1) + '</span>' +
+      '<textarea class="form-control edit-ans-input" maxlength="500" rows="2" style="flex:1;">' + escapeHtml(ans) + '</textarea>' +
+      (i > 0 ? '<button type="button" style="background:#FEE2E2; color:#DC2626; border:none; border-radius:8px; padding:6px 10px; cursor:pointer; margin-top:4px; flex-shrink:0;" onclick="this.parentElement.remove()">✕</button>' : '');
+    box.appendChild(row);
+  });
 }
 
 document.getElementById('edit-btn-add-answer').addEventListener('click', () => {
@@ -528,7 +1114,7 @@ document.getElementById('edit-form').addEventListener('submit', async (e) => {
   try {
     await window.api.post('/api/quizzes/' + encodeURIComponent(quizId) + '/edit', {
       question, answer: answers[0], answers,
-      edit_password: document.getElementById('edit-password').value,
+      edit_password: document.getElementById('edit-password').value || '',
     });
     window.toast('保存したよ!', 'success');
     window.closeModal('modal-edit');
@@ -538,13 +1124,143 @@ document.getElementById('edit-form').addEventListener('submit', async (e) => {
 });
 {% endif %}
 
+// ===== ランダム出題 =====
+let randomSettings = { count: 10, acc: 'all', tags: new Set() };
+
 const btnRandom = document.getElementById('btn-random');
-if (btnRandom) btnRandom.addEventListener('click', async () => {
-  try {
-    const r = await window.api.get('/api/quizzes/random');
-    window.location.href = '/answer/' + encodeURIComponent(r.quiz_id) + '?random=1';
-  } catch(err) { window.toast(err.message, 'error'); }
+if (btnRandom) btnRandom.addEventListener('click', () => {
+  openRandomModal();
 });
+
+function openRandomModal() {
+  // タグ一覧を生成
+  const allTags = new Set();
+  state.quizzes.forEach(q => (q.tags||[]).forEach(t => allTags.add(t)));
+  const tagList = document.getElementById('random-tag-list');
+  if (allTags.size === 0) {
+    tagList.innerHTML = '<span style="color:#aaa;font-size:0.85rem;">タグがまだありません</span>';
+  } else {
+    tagList.innerHTML = Array.from(allTags).sort().map(t => `
+      <button type="button" class="q-tag random-tag-btn ${randomSettings.tags.has(t) ? 'active' : ''}"
+        data-tag="${escapeHtml(t)}" onclick="toggleRandomTag('${escapeHtml(t)}')"
+        style="cursor:pointer;">#${escapeHtml(t)}</button>
+    `).join('');
+  }
+
+  // 問題数ボタンの初期選択
+  document.querySelectorAll('.random-count-btn').forEach(btn => {
+    const val = btn.dataset.count === 'all' ? 'all' : parseInt(btn.dataset.count);
+    const isActive = String(randomSettings.count) === String(btn.dataset.count);
+    btn.classList.toggle('btn-primary', isActive);
+    btn.classList.toggle('btn-secondary', !isActive);
+  });
+
+  // 正解率ボタンの初期選択
+  document.querySelectorAll('.random-acc-btn').forEach(btn => {
+    const isActive = btn.dataset.acc === randomSettings.acc;
+    btn.classList.toggle('btn-primary', isActive);
+    btn.classList.toggle('btn-secondary', !isActive);
+  });
+
+  updateRandomPreview();
+  window.openModal('modal-random');
+}
+
+function toggleRandomTag(tag) {
+  if (randomSettings.tags.has(tag)) randomSettings.tags.delete(tag);
+  else randomSettings.tags.add(tag);
+  document.querySelectorAll('.random-tag-btn').forEach(btn => {
+    btn.classList.toggle('active', randomSettings.tags.has(btn.dataset.tag));
+  });
+  updateRandomPreview();
+}
+
+function updateRandomPreview() {
+  const filtered = getRandomFilteredQuizzes();
+  const count = randomSettings.count === 'all' ? filtered.length : Math.min(randomSettings.count, filtered.length);
+  const preview = document.getElementById('random-preview');
+  if (filtered.length === 0) {
+    preview.style.background = '#fff1f2';
+    preview.style.borderColor = '#fecdd3';
+    preview.style.color = '#be123c';
+    preview.textContent = '⚠️ 条件に合うクイズがありません';
+  } else {
+    preview.style.background = '#f0f9ff';
+    preview.style.borderColor = '#bae6fd';
+    preview.style.color = '#0369a1';
+    preview.textContent = `対象: ${filtered.length}問中 ${count}問出題`;
+  }
+}
+
+function getRandomFilteredQuizzes() {
+  let quizzes = state.quizzes.slice();
+
+  // タグフィルター
+  if (randomSettings.tags.size > 0) {
+    quizzes = quizzes.filter(q =>
+      Array.from(randomSettings.tags).some(t => (q.tags||[]).includes(t))
+    );
+  }
+
+  // 正解率フィルター
+  if (randomSettings.acc !== 'all') {
+    quizzes = quizzes.filter(q => {
+      if (q.attempts === 0) return randomSettings.acc === 'low';
+      const acc = q.corrects / q.attempts * 100;
+      if (randomSettings.acc === 'low') return acc <= 30;
+      if (randomSettings.acc === 'mid') return acc > 30 && acc <= 60;
+      if (randomSettings.acc === 'high') return acc > 60;
+      return true;
+    });
+  }
+
+  return quizzes;
+}
+
+// 問題数ボタン
+document.querySelectorAll('.random-count-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    randomSettings.count = btn.dataset.count === 'all' ? 'all' : parseInt(btn.dataset.count);
+    document.querySelectorAll('.random-count-btn').forEach(b => {
+      b.classList.toggle('btn-primary', b.dataset.count === btn.dataset.count);
+      b.classList.toggle('btn-secondary', b.dataset.count !== btn.dataset.count);
+    });
+    updateRandomPreview();
+  });
+});
+
+// 正解率ボタン
+document.querySelectorAll('.random-acc-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    randomSettings.acc = btn.dataset.acc;
+    document.querySelectorAll('.random-acc-btn').forEach(b => {
+      b.classList.toggle('btn-primary', b.dataset.acc === btn.dataset.acc);
+      b.classList.toggle('btn-secondary', b.dataset.acc !== btn.dataset.acc);
+    });
+    updateRandomPreview();
+  });
+});
+
+async function startRandom() {
+  const filtered = getRandomFilteredQuizzes();
+  if (filtered.length === 0) {
+    window.toast('条件に合うクイズがありません', 'error');
+    return;
+  }
+
+  // シャッフル
+  const shuffled = filtered.slice().sort(() => Math.random() - 0.5);
+  const count = randomSettings.count === 'all' ? shuffled.length : Math.min(randomSettings.count, shuffled.length);
+  const selected = shuffled.slice(0, count);
+  const ids = selected.map(q => q.id);
+
+  // セッションに保存して最初の問題へ
+  sessionStorage.setItem('random_ids', JSON.stringify(ids));
+  sessionStorage.setItem('random_idx', '0');
+  sessionStorage.setItem('random_total', String(ids.length));
+  window.closeModal('modal-random');
+  window.location.href = '/answer/' + encodeURIComponent(ids[0]) + '?random=1&total=' + ids.length;
+}
 
 const sortSel = document.getElementById('sort-select');
 if (sortSel) sortSel.addEventListener('change', () => {
@@ -552,7 +1268,275 @@ if (sortSel) sortSel.addEventListener('change', () => {
   renderQuizzes();
 });
 
+// ===== AI API設定 =====
+const AI_PROVIDERS = {
+  gemini:     { label:'Google Gemini',  model:'gemini-1.5-flash', help:'Google AI StudioでAPIキーを取得（無料枠あり）' },
+  openai:     { label:'OpenAI',         model:'gpt-4o-mini',      help:'platform.openai.comでAPIキーを取得（有料）' },
+  anthropic:  { label:'Anthropic',      model:'claude-haiku',     help:'console.anthropic.comでAPIキーを取得（有料）' },
+  cloudflare: { label:'Cloudflare',     model:'Llama 3 8B',       help:'Account IDとAPIトークンの両方が必要（無料）' },
+};
+let selectedProvider = 'gemini';
+
+document.querySelectorAll('.ai-pvd-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    selectedProvider = btn.dataset.provider;
+    document.querySelectorAll('.ai-pvd-btn').forEach(b => {
+      const active = b.dataset.provider === selectedProvider;
+      b.style.borderColor = active ? 'var(--c-main)' : '#e5e7eb';
+      b.style.background  = active ? 'var(--c-soft)' : 'white';
+      b.style.color       = active ? 'var(--c-main)' : '#333';
+    });
+    document.getElementById('ai-cf-section').style.display =
+      selectedProvider === 'cloudflare' ? 'block' : 'none';
+    const info = AI_PROVIDERS[selectedProvider];
+    document.getElementById('ai-model-info').textContent =
+      `使用モデル: ${info.model} — ${info.help}`;
+    document.getElementById('ai-key-label').textContent =
+      selectedProvider === 'cloudflare' ? 'APIトークン' : 'APIキー';
+  });
+});
+document.querySelector('.ai-pvd-btn[data-provider="gemini"]').click();
+
+function toggleAiKeyView() {
+  const input = document.getElementById('ai-key-input');
+  const btn   = document.getElementById('ai-key-eye');
+  if (input.type === 'password') { input.type = 'text';     btn.textContent = '🙈'; }
+  else                           { input.type = 'password'; btn.textContent = '👁️'; }
+}
+
+async function openAiConfigModal() {
+  const status = document.getElementById('ai-save-status');
+  status.style.display = 'block';
+  status.style.color   = '#9CA3AF';
+  status.textContent   = '現在の設定を確認中...';
+  try {
+    const r    = await fetch('/api/group/ai_config');
+    const data = await r.json();
+    if (data.ok) {
+      if (data.is_official && {{ 'true' if group.school_mode else 'false' }}) {
+        document.querySelectorAll('.ai-pvd-btn').forEach(b => b.disabled = true);
+        document.getElementById('ai-key-input').disabled = true;
+        document.getElementById('ai-cf-account').disabled = true;
+        document.querySelector('#modal-ai-config .btn-primary').disabled = true;
+        status.style.color   = '#3b82f6';
+        status.textContent   = '🏫 公式学校グループはAI設定ができません';
+      } else if (data.is_official) {
+        document.querySelectorAll('.ai-pvd-btn').forEach(b => b.disabled = true);
+        document.getElementById('ai-key-input').disabled = true;
+        document.getElementById('ai-cf-account').disabled = true;
+        document.querySelector('#modal-ai-config .btn-primary').disabled = true;
+        status.style.color   = '#f59e0b';
+        status.textContent   = '⭐ 公式グループはサイト管理者がAIを設定します';
+      } else if (data.has_admin_config) {
+        status.style.color = '#10b981';
+        status.textContent = '✅ 管理者側でAIが設定済みです（優先使用中）';
+      } else if (data.has_group_config) {
+        const btn = document.querySelector(`.ai-pvd-btn[data-provider="${data.ai_provider}"]`);
+        if (btn) btn.click();
+        status.style.color = '#10b981';
+        status.textContent = '✅ AIが設定済みです';
+      } else {
+        status.style.color = '#9CA3AF';
+        status.textContent = 'まだAIが設定されていません';
+      }
+    }
+  } catch(e) { status.textContent = ''; }
+  window.openModal('modal-ai-config');
+}
+
+// 上限ボタン
+document.querySelectorAll('.ai-limit-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.getElementById('ai-limit-input').value = btn.dataset.limit;
+    document.querySelectorAll('.ai-limit-btn').forEach(b => {
+      b.classList.toggle('btn-primary', b.dataset.limit === btn.dataset.limit);
+      b.classList.toggle('btn-secondary', b.dataset.limit !== btn.dataset.limit);
+    });
+  });
+});
+
+async function saveGroupAiConfig() {
+  const apiKey    = document.getElementById('ai-key-input').value.trim();
+  const cfAccount = document.getElementById('ai-cf-account').value.trim();
+  const status    = document.getElementById('ai-save-status');
+  if (!apiKey) { window.toast('APIキーを入力してね', 'error'); return; }
+  if (selectedProvider === 'cloudflare' && !cfAccount) {
+    window.toast('CloudflareはAccount IDも必要だよ', 'error'); return;
+  }
+  status.style.display = 'block';
+  status.style.color   = '#9CA3AF';
+  status.textContent   = '保存中...';
+  try {
+    const dailyLimit = parseInt(document.getElementById('ai-limit-input').value) || 1000;
+    const r = await fetch('/api/group/ai_config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        ai_provider:   selectedProvider,
+        ai_api_key:    apiKey,
+        cf_account_id: cfAccount,
+        cf_api_token:  selectedProvider === 'cloudflare' ? apiKey : '',
+        daily_limit:   dailyLimit,
+      })
+    });
+    const data = await r.json();
+    if (data.ok) {
+      status.style.color = '#10b981';
+      status.textContent = '✅ 保存しました！AI採点が使えるようになりました。';
+      window.toast('AI設定を保存したよ！', 'success');
+      document.getElementById('ai-key-input').value = '';
+    } else {
+      status.style.color = '#ef4444';
+      status.textContent = '❌ ' + (data.error || 'エラー');
+    }
+  } catch(e) {
+    status.style.color = '#ef4444';
+    status.textContent = '❌ 通信エラー';
+  }
+}
+
+// ===== AIトークン使用量バー =====
+async function loadAiTokenBars() {
+  try {
+    const r = await fetch('/api/group/ai_usage');
+    const data = await r.json();
+    if (!data.ok) return;
+
+    const { today_used, daily_limit, has_group_key, has_admin_key, ai_provider } = data;
+    const bars = document.getElementById('ai-token-bars');
+
+    // どちらもない場合は非表示
+    if (!has_group_key && !has_admin_key) {
+      bars.style.display = 'none';
+      return;
+    }
+
+    const pct = daily_limit > 0 ? Math.min(100, Math.round(today_used / daily_limit * 100)) : 0;
+    const barColor = pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : '#10b981';
+    const remaining = daily_limit > 0 ? Math.max(0, daily_limit - today_used) : '∞';
+
+    const providerLabel = {
+      gemini: 'Google Gemini', openai: 'OpenAI',
+      anthropic: 'Anthropic', cloudflare: 'Cloudflare'
+    }[ai_provider] || ai_provider;
+
+    let html = `
+      <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:12px 16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span style="font-size:0.82rem;font-weight:bold;color:#9CA3AF;">🤖 AI採点 本日の使用量（合計）</span>
+          <span style="font-size:0.78rem;color:#9CA3AF;">${today_used} / ${daily_limit > 0 ? daily_limit : '∞'} トークン（残り ${remaining}）</span>
+        </div>
+        <div style="background:rgba(255,255,255,0.08);border-radius:99px;height:8px;overflow:hidden;">
+          <div style="width:${pct}%;height:100%;background:${barColor};border-radius:99px;transition:width 0.5s;"></div>
+        </div>`;
+
+    // グループAPIバー
+    if (has_group_key) {
+      html += `
+        <div style="margin-top:8px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <span style="font-size:0.75rem;color:#6B7280;">自分のAPI（${providerLabel}）</span>
+            <span style="font-size:0.75rem;color:#6B7280;">${today_used} トークン使用</span>
+          </div>
+          <div style="background:rgba(255,255,255,0.06);border-radius:99px;height:5px;overflow:hidden;">
+            <div style="width:${pct}%;height:100%;background:#667eea;border-radius:99px;transition:width 0.5s;"></div>
+          </div>
+        </div>`;
+    } else {
+      html += `
+        <div style="margin-top:6px;font-size:0.75rem;color:#4B5563;">自分のAPI: 未設定（OFF）</div>`;
+    }
+
+    // 管理者APIバー
+    if (has_admin_key) {
+      html += `
+        <div style="margin-top:8px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <span style="font-size:0.75rem;color:#6B7280;">管理者API（Cloudflare）</span>
+            <span style="font-size:0.75rem;color:#6B7280;">${today_used} トークン使用</span>
+          </div>
+          <div style="background:rgba(255,255,255,0.06);border-radius:99px;height:5px;overflow:hidden;">
+            <div style="width:${pct}%;height:100%;background:#f59e0b;border-radius:99px;transition:width 0.5s;"></div>
+          </div>
+        </div>`;
+    } else {
+      html += `
+        <div style="margin-top:6px;font-size:0.75rem;color:#4B5563;">管理者API: 未設定（OFF / 0トークン）</div>`;
+    }
+
+    html += `</div>`;
+    bars.innerHTML = html;
+    bars.style.display = 'block';
+  } catch(e) {
+    // エラー時は非表示のまま
+  }
+}
+
+loadAiTokenBars();
 loadQuizzes();
 setInterval(loadQuizzes, 10000);
+setInterval(loadAiTokenBars, 30000);
+</script>
+<!-- 入室ログモーダル -->
+<div id="access-log-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;">
+  <div style="background:white; margin:40px auto; padding:24px; border-radius:16px; max-width:600px; width:90%;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <h2 style="margin:0; font-size:18px;">📋 入室ログ</h2>
+      <button onclick="closeAccessLogModal()" style="background:none; border:none; font-size:20px; cursor:pointer;">✕</button>
+    </div>
+    <p style="font-size:12px; color:#888; margin-bottom:16px;">グループへのログイン履歴です。不審なアクセスがないか確認できます。</p>
+    <div id="access-log-list" style="font-size:13px;">読み込み中...</div>
+  </div>
+</div>
+
+<script>
+async function openAccessLogModal() {
+  document.getElementById('access-log-modal').style.display = 'block';
+  const list = document.getElementById('access-log-list');
+  list.innerHTML = '読み込み中...';
+  try {
+    const res = await fetch('/api/group/access-logs');
+    const data = await res.json();
+    if (!data.ok || data.logs.length === 0) {
+      list.innerHTML = '<p style="color:#888;">まだログがありません</p>';
+      return;
+    }
+    list.innerHTML = data.logs.map(log => {
+      const dt = log.created_at || '';
+      const dev = log.device || '不明';
+      const ip = log.ip_hash || '';
+      return `<div style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px;">
+        <div>
+          <span style="font-size:16px;">${deviceIcon(dev)}</span>
+          <strong>${dev}</strong>
+        </div>
+        <div style="color:#666; font-size:12px;">${dt}</div>
+        <details style="width:100%; margin-top:4px;">
+          <summary style="cursor:pointer; font-size:11px; color:#aaa;">詳しく</summary>
+          <div style="font-size:11px; color:#888; margin-top:4px; font-family:monospace;">
+            🕐 ${dt}<br>
+            📱 ${dev}<br>
+            🔑 ID: ${ip}
+          </div>
+        </details>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    list.innerHTML = '<p style="color:red;">読み込みエラー</p>';
+  }
+}
+
+function deviceIcon(dev) {
+  if (dev.includes('iPhone')) return '📱';
+  if (dev.includes('Android')) return '📱';
+  if (dev.includes('iPad')) return '📟';
+  if (dev.includes('Mac')) return '💻';
+  if (dev.includes('Windows')) return '🖥️';
+  return '❓';
+}
+
+function closeAccessLogModal() {
+  document.getElementById('access-log-modal').style.display = 'none';
+}
 </script>
 {% endblock %}

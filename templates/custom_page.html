@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ page_name }}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    {% if template_type == 'announce' %}
+    body{background:linear-gradient(135deg,#ff6b35 0%,#f7c59f 50%,#efefd0 100%);min-height:100vh;}
+    .hero{background:linear-gradient(135deg,rgba(255,107,53,0.9),rgba(247,197,159,0.7));border-bottom:1px solid rgba(255,255,255,0.3);}
+    {% elif template_type == 'event' %}
+    body{background:linear-gradient(135deg,#667eea 0%,#764ba2 50%,#f093fb 100%);min-height:100vh;}
+    .hero{background:linear-gradient(135deg,rgba(102,126,234,0.9),rgba(118,75,162,0.7));border-bottom:1px solid rgba(255,255,255,0.3);}
+    {% elif template_type == 'group_intro' %}
+    body{background:linear-gradient(135deg,#11998e 0%,#38ef7d 100%);min-height:100vh;}
+    .hero{background:linear-gradient(135deg,rgba(17,153,142,0.9),rgba(56,239,125,0.6));border-bottom:1px solid rgba(255,255,255,0.3);}
+    {% else %}
+    body{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);min-height:100vh;}
+    .hero{background:linear-gradient(135deg,rgba(26,26,46,0.9),rgba(15,52,96,0.7));border-bottom:1px solid rgba(255,255,255,0.1);}
+    {% endif %}
+    *{box-sizing:border-box;}
+    .hero{padding:60px 20px 40px;text-align:center;color:white;}
+    .hero-icon{font-size:72px;margin-bottom:16px;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.3));}
+    .hero-title{font-family:'Zen Maru Gothic',sans-serif;font-weight:900;font-size:clamp(24px,5vw,42px);margin:0 0 12px;text-shadow:0 2px 20px rgba(0,0,0,0.4);}
+    .hero-sub{font-size:16px;opacity:0.9;margin:0;}
+    .page-wrap{max-width:720px;margin:0 auto;padding:0 16px 80px;}
+    .glass-card{background:rgba(255,255,255,0.15);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.25);border-radius:24px;padding:28px;color:white;margin-bottom:16px;box-shadow:0 8px 32px rgba(0,0,0,0.15);}
+    .info-row{display:flex;gap:16px;align-items:center;padding:14px 0;border-bottom:1px solid rgba(255,255,255,0.15);}
+    .info-row:last-child{border-bottom:none;}
+    .info-icon{font-size:32px;flex-shrink:0;}
+    .info-label{font-size:11px;opacity:0.7;font-weight:900;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;}
+    .info-value{font-size:17px;font-weight:bold;}
+    .body-text{white-space:pre-wrap;line-height:1.9;font-size:16px;opacity:0.95;}
+    .enter-btn{display:block;text-align:center;background:white;color:#333;padding:18px 32px;border-radius:18px;font-weight:900;font-size:18px;text-decoration:none;margin:20px 0;box-shadow:0 8px 32px rgba(0,0,0,0.2);transition:transform 0.15s,box-shadow 0.15s;}
+    .enter-btn:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,0.3);}
+    .back-link{display:block;text-align:center;color:rgba(255,255,255,0.6);font-size:14px;margin-top:24px;text-decoration:none;}
+    .back-link:hover{color:white;}
+    /* 空白ブロック */
+    .block{margin-bottom:16px;}
+    .block-heading{font-family:'Zen Maru Gothic',sans-serif;font-weight:900;font-size:26px;color:white;text-shadow:0 2px 10px rgba(0,0,0,0.3);margin:0 0 8px;}
+    .block-text{background:rgba(255,255,255,0.12);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.2);border-radius:16px;padding:20px;color:white;white-space:pre-wrap;line-height:1.8;font-size:15px;}
+    .block-btn-wrap{display:flex;gap:10px;flex-wrap:wrap;}
+    .block-cta{display:inline-flex;align-items:center;gap:8px;padding:14px 28px;border-radius:14px;font-weight:900;font-size:15px;text-decoration:none;transition:transform 0.15s;}
+    .block-cta.white{background:white;color:#333;}
+    .block-cta.outline{background:transparent;border:2px solid rgba(255,255,255,0.8);color:white;}
+    .block-cta:hover{transform:translateY(-2px);}
+    .block-image img{width:100%;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.2);}
+    /* 編集バー */
+    .edit-bar{position:fixed;bottom:0;left:0;right:0;background:rgba(15,15,30,0.95);backdrop-filter:blur(16px);padding:12px 20px;display:flex;gap:8px;align-items:center;z-index:1000;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,0.1);}
+    .edit-btn{padding:10px 18px;border-radius:10px;border:none;cursor:pointer;font-weight:bold;font-size:13px;}
+    /* モーダル */
+    .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:2000;overflow-y:auto;}
+    .modal-box{background:#1e1e2e;margin:40px auto;padding:28px;border-radius:20px;max-width:560px;width:90%;color:#e0e0ff;}
+    .modal-input{width:100%;background:#2a2a3e;border:2px solid #4a4a6a;color:#e0e0ff;border-radius:10px;padding:10px;font-size:14px;margin-bottom:12px;box-sizing:border-box;}
+    .modal-input:focus{outline:none;border-color:#667eea;}
+    .modal-label{font-size:12px;color:#9CA3AF;font-weight:bold;display:block;margin-bottom:4px;}
+  </style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-icon">
+    {% if template_type == 'announce' %}📢{% elif template_type == 'event' %}🎉{% elif template_type == 'group_intro' %}👥{% else %}✨{% endif %}
+  </div>
+  <h1 class="hero-title" id="main-title">{{ content.title or page_name }}</h1>
+  {% if content.subtitle %}<p class="hero-sub" id="main-sub">{{ content.subtitle }}</p>{% endif %}
+  {% if content.date and template_type == 'announce' %}<p class="hero-sub" id="main-date">📅 {{ content.date }}</p>{% endif %}
+</div>
+
+<div class="page-wrap">
+  {% if template_type == 'announce' %}
+  <div class="glass-card">
+    <p class="body-text" id="main-body">{{ content.body or '' }}</p>
+  </div>
+
+  {% elif template_type == 'event' %}
+  <div class="glass-card">
+    {% if content.date %}<div class="info-row"><div class="info-icon">📅</div><div><div class="info-label">開催日時</div><div class="info-value" id="ev-date">{{ content.date }}</div></div></div>{% endif %}
+    {% if content.place %}<div class="info-row"><div class="info-icon">📍</div><div><div class="info-label">場所</div><div class="info-value" id="ev-place">{{ content.place }}</div></div></div>{% endif %}
+    {% if content.capacity %}<div class="info-row"><div class="info-icon">👥</div><div><div class="info-label">定員</div><div class="info-value" id="ev-capacity">{{ content.capacity }}</div></div></div>{% endif %}
+  </div>
+  {% if content.body %}<div class="glass-card"><p class="body-text" id="main-body">{{ content.body }}</p></div>{% endif %}
+
+  {% elif template_type == 'group_intro' %}
+  {% if content.body %}<div class="glass-card"><p class="body-text" id="main-body">{{ content.body }}</p></div>{% endif %}
+  <a href="/" class="enter-btn">🎯 グループに入る →</a>
+
+  {% else %}
+  <div id="blocks-area">
+    {% if content.blocks %}
+      {% for block in content.blocks %}
+        {% if block.type == 'heading' %}<div class="block"><h2 class="block-heading">{{ block.text }}</h2></div>
+        {% elif block.type == 'text' %}<div class="block"><div class="block-text">{{ block.text }}</div></div>
+        {% elif block.type == 'button' %}<div class="block"><div class="block-btn-wrap"><a href="{{ block.url or '#' }}" class="block-cta white">{{ block.text }}</a></div></div>
+        {% elif block.type == 'image' %}<div class="block block-image"><img src="{{ block.url }}" alt="{{ block.text }}"></div>
+        {% endif %}
+      {% endfor %}
+    {% else %}
+      <div class="glass-card" style="text-align:center; opacity:0.6;">コンテンツを追加してください</div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <a href="/" class="back-link">← トップへ戻る</a>
+</div>
+
+{% if request.args.get('edit') == '1' %}
+<div class="edit-bar">
+  <span style="color:white;font-weight:bold;font-size:14px;">✏️ 編集モード</span>
+  <button class="edit-btn" onclick="openEditModal()" style="background:#667eea;color:white;">📝 内容を編集</button>
+  {% if template_type == 'blank' %}
+  <button class="edit-btn" onclick="openBlockEditor()" style="background:#f59e0b;color:white;">🧱 ブロック追加</button>
+  {% endif %}
+  <button class="edit-btn" onclick="saveContent()" style="background:#10b981;color:white;">💾 保存</button>
+  <button class="edit-btn" onclick="window.close()" style="background:#6b7280;color:white;">✕ 閉じる</button>
+</div>
+
+<!-- 編集モーダル -->
+<div class="modal-bg" id="edit-modal">
+  <div class="modal-box">
+    <h2 style="margin:0 0 20px;font-family:'Zen Maru Gothic',sans-serif;">✏️ 内容を編集</h2>
+    <div id="edit-fields"></div>
+    <div style="display:flex;gap:8px;margin-top:16px;">
+      <button onclick="applyEdit()" style="flex:2;padding:12px;background:#667eea;color:white;border:none;border-radius:10px;font-weight:bold;cursor:pointer;">✅ 適用</button>
+      <button onclick="document.getElementById('edit-modal').style.display='none'" style="flex:1;padding:12px;background:#374151;color:white;border:none;border-radius:10px;cursor:pointer;">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<!-- ブロック追加モーダル -->
+<div class="modal-bg" id="block-modal">
+  <div class="modal-box">
+    <h2 style="margin:0 0 16px;font-family:'Zen Maru Gothic',sans-serif;">🧱 ブロックを追加</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+      <button onclick="addBlock('heading')" style="padding:14px;border-radius:10px;border:2px solid #4a4a6a;background:rgba(255,255,255,0.05);color:#e0e0ff;cursor:pointer;font-weight:bold;">📌 見出し</button>
+      <button onclick="addBlock('text')" style="padding:14px;border-radius:10px;border:2px solid #4a4a6a;background:rgba(255,255,255,0.05);color:#e0e0ff;cursor:pointer;font-weight:bold;">📝 テキスト</button>
+      <button onclick="addBlock('button')" style="padding:14px;border-radius:10px;border:2px solid #4a4a6a;background:rgba(255,255,255,0.05);color:#e0e0ff;cursor:pointer;font-weight:bold;">🔘 ボタン</button>
+      <button onclick="addBlock('image')" style="padding:14px;border-radius:10px;border:2px solid #4a4a6a;background:rgba(255,255,255,0.05);color:#e0e0ff;cursor:pointer;font-weight:bold;">🖼️ 画像URL</button>
+    </div>
+    <div id="block-fields"></div>
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <button onclick="applyBlock()" id="apply-block-btn" style="flex:2;padding:12px;background:#667eea;color:white;border:none;border-radius:10px;font-weight:bold;cursor:pointer;">➕ 追加</button>
+      <button onclick="document.getElementById('block-modal').style.display='none'" style="flex:1;padding:12px;background:#374151;color:white;border:none;border-radius:10px;cursor:pointer;">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const pageKey = '{{ page_key }}';
+const adminPw = '{{ request.args.get("pw", "") }}';
+const tmplType = '{{ template_type }}';
+let currentContent = {{ content | tojson }};
+if (!currentContent.blocks) currentContent.blocks = [];
+let pendingBlock = null;
+
+const fieldDefs = {
+  announce: [{key:'title',label:'タイトル',type:'text'},{key:'date',label:'日付',type:'text',placeholder:'例: 2026年6月1日'},{key:'body',label:'本文',type:'textarea'}],
+  event: [{key:'title',label:'イベント名',type:'text'},{key:'date',label:'日時',type:'text',placeholder:'例: 2026年6月1日 14:00〜'},{key:'place',label:'場所',type:'text'},{key:'capacity',label:'定員',type:'text'},{key:'body',label:'詳細',type:'textarea'}],
+  group_intro: [{key:'title',label:'タイトル',type:'text'},{key:'subtitle',label:'サブタイトル',type:'text'},{key:'body',label:'紹介文',type:'textarea'}],
+  blank: [{key:'title',label:'ページタイトル',type:'text'}],
+};
+
+function openEditModal() {
+  const fields = fieldDefs[tmplType] || fieldDefs.blank;
+  document.getElementById('edit-fields').innerHTML = fields.map(f => `
+    <label class="modal-label">${f.label}</label>
+    ${f.type==='textarea'
+      ? `<textarea class="modal-input" id="ef-${f.key}" rows="5">${esc(currentContent[f.key]||'')}</textarea>`
+      : `<input type="text" class="modal-input" id="ef-${f.key}" value="${esc(currentContent[f.key]||'')}" placeholder="${f.placeholder||''}">`}
+  `).join('');
+  document.getElementById('edit-modal').style.display = 'block';
+}
+
+function applyEdit() {
+  const fields = fieldDefs[tmplType] || fieldDefs.blank;
+  fields.forEach(f => {
+    const el = document.getElementById('ef-' + f.key);
+    if (el) currentContent[f.key] = el.value;
+  });
+  if (document.getElementById('main-title')) document.getElementById('main-title').textContent = currentContent.title||'';
+  if (document.getElementById('main-body')) document.getElementById('main-body').textContent = currentContent.body||'';
+  if (document.getElementById('main-date')) document.getElementById('main-date').textContent = '📅 '+(currentContent.date||'');
+  if (document.getElementById('main-sub')) document.getElementById('main-sub').textContent = currentContent.subtitle||'';
+  if (document.getElementById('ev-date')) document.getElementById('ev-date').textContent = currentContent.date||'';
+  if (document.getElementById('ev-place')) document.getElementById('ev-place').textContent = currentContent.place||'';
+  if (document.getElementById('ev-capacity')) document.getElementById('ev-capacity').textContent = currentContent.capacity||'';
+  document.getElementById('edit-modal').style.display = 'none';
+}
+
+function openBlockEditor() {
+  document.getElementById('block-fields').innerHTML = '';
+  pendingBlock = null;
+  document.getElementById('block-modal').style.display = 'block';
+}
+
+function addBlock(type) {
+  pendingBlock = {type};
+  const blockLabels = {
+    heading: [{key:'text',label:'見出しテキスト',type:'text'}],
+    text: [{key:'text',label:'テキスト内容',type:'textarea'}],
+    button: [{key:'text',label:'ボタンのテキスト',type:'text'},{key:'url',label:'リンクURL',type:'text',placeholder:'https://...'}],
+    image: [{key:'url',label:'画像URL',type:'text',placeholder:'https://...'},{key:'text',label:'説明文（任意）',type:'text'}],
+  };
+  document.getElementById('block-fields').innerHTML = (blockLabels[type]||[]).map(f => `
+    <label class="modal-label">${f.label}</label>
+    ${f.type==='textarea'
+      ? `<textarea class="modal-input" id="bf-${f.key}" rows="4"></textarea>`
+      : `<input type="text" class="modal-input" id="bf-${f.key}" placeholder="${f.placeholder||''}">`}
+  `).join('');
+}
+
+function applyBlock() {
+  if (!pendingBlock) return;
+  const blockLabels = {
+    heading: ['text'],
+    text: ['text'],
+    button: ['text','url'],
+    image: ['url','text'],
+  };
+  const keys = blockLabels[pendingBlock.type] || [];
+  keys.forEach(k => {
+    const el = document.getElementById('bf-' + k);
+    if (el) pendingBlock[k] = el.value;
+  });
+  currentContent.blocks.push({...pendingBlock});
+  // DOM更新
+  renderBlocks();
+  document.getElementById('block-modal').style.display = 'none';
+}
+
+function renderBlocks() {
+  const area = document.getElementById('blocks-area');
+  if (!area) return;
+  area.innerHTML = currentContent.blocks.map((b, i) => {
+    let html = '';
+    if (b.type==='heading') html = `<div class="block"><h2 class="block-heading">${esc(b.text)}</h2><button onclick="removeBlock(${i})" style="background:#e53935;color:white;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;">削除</button></div>`;
+    else if (b.type==='text') html = `<div class="block"><div class="block-text">${esc(b.text)}</div><button onclick="removeBlock(${i})" style="background:#e53935;color:white;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;margin-top:4px;">削除</button></div>`;
+    else if (b.type==='button') html = `<div class="block"><div class="block-btn-wrap"><a href="${esc(b.url||'#')}" class="block-cta white">${esc(b.text)}</a></div><button onclick="removeBlock(${i})" style="background:#e53935;color:white;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;margin-top:8px;">削除</button></div>`;
+    else if (b.type==='image') html = `<div class="block block-image"><img src="${esc(b.url)}" alt="${esc(b.text||'')}"><button onclick="removeBlock(${i})" style="background:#e53935;color:white;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;margin-top:4px;">削除</button></div>`;
+    return html;
+  }).join('') || '<div class="glass-card" style="text-align:center;opacity:0.6;">ブロックを追加してください</div>';
+}
+
+function removeBlock(i) {
+  currentContent.blocks.splice(i, 1);
+  renderBlocks();
+}
+
+async function saveContent() {
+  const r = await fetch('/api/custom_pages/' + pageKey, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({password: adminPw, content: currentContent, page_name: currentContent.title || pageKey, show_on_home: true, is_published: true})
+  });
+  const data = await r.json();
+  if (data.ok) { alert('保存しました！'); location.reload(); }
+  else { alert(data.error || 'エラー'); }
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+</script>
+{% endif %}
+</body>
+</html>

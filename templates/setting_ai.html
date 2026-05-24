@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI採点管理 - QuizShare</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body { background:#0f0f1a; color:#e0e0ff; font-family:sans-serif; margin:0; padding:0; }
+    .container { max-width:800px; margin:0 auto; padding:24px 16px; }
+    .card { background:#1e1e2e; border:1px solid #3d3d5c; border-radius:16px; padding:20px; margin-bottom:16px; }
+    .btn { padding:10px 20px; border-radius:8px; border:none; cursor:pointer; font-weight:bold; font-size:0.95rem; }
+    .btn-primary { background:#667eea; color:white; }
+    input[type=password], input[type=number] {
+      background:#2a2a3e; border:2px solid #4a4a6a; color:#e0e0ff;
+      border-radius:8px; padding:10px 14px; font-size:0.95rem; width:100%; box-sizing:border-box;
+    }
+    .progress-bar { background:#2a2a3e; border-radius:20px; height:14px; overflow:hidden; margin:8px 0; }
+    .progress-fill { height:100%; border-radius:20px; transition:width 0.5s; }
+    .badge { display:inline-block; padding:3px 12px; border-radius:10px; font-size:0.82rem; font-weight:bold; }
+    .badge-on { background:rgba(52,211,153,0.2); color:#34D399; }
+    .badge-off { background:rgba(156,163,175,0.2); color:#9CA3AF; }
+    .stat-box { background:#2a2a3e; border-radius:12px; padding:16px; text-align:center; }
+    .stat-num { font-size:2rem; font-weight:900; color:#a5b4fc; }
+    .stat-label { font-size:0.8rem; color:#9CA3AF; margin-top:4px; }
+    .group-card { background:#2a2a3e; border:1px solid #3d3d5c; border-radius:12px; padding:16px; margin-bottom:10px; }
+    .toggle { width:52px; height:28px; border-radius:14px; background:#555; border:none; position:relative; cursor:pointer; transition:background 0.3s; flex-shrink:0; display:inline-block; vertical-align:middle; }
+    .toggle .knob { position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%; background:white; box-shadow:0 1px 4px rgba(0,0,0,0.4); transition:transform 0.3s; pointer-events:none; }
+    .toggle.on { background:#4caf50; }
+    .toggle.on .knob { transform:translateX(24px); }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div style="margin-bottom:16px;">
+    <a href="/setting/" style="color:#9CA3AF; text-decoration:none; font-size:0.9rem;">← 管理者ページへ</a>
+  </div>
+  <h1 style="font-size:1.6rem; margin-bottom:4px;">🤖 AI採点 管理</h1>
+  <p style="color:#9CA3AF; margin-bottom:20px;">グループごとのAI採点ON/OFF・1日の上限・使用量を確認できます</p>
+
+  <!-- ログイン -->
+  <div id="login-section" class="card">
+    <h3 style="margin:0 0 12px;">🔐 管理者ログイン</h3>
+    <div style="display:flex; gap:8px;">
+      <input type="password" id="admin-pw" placeholder="管理者パスワード">
+      <button class="btn btn-primary" onclick="loadData()" style="white-space:nowrap;">確認する</button>
+    </div>
+  </div>
+
+  <!-- データ -->
+  <div id="data-section" style="display:none;">
+
+    <!-- 全体使用量 -->
+    <div class="card">
+      <h3 style="margin:0 0 16px; color:#a5b4fc;">📊 本日の全体使用量</h3>
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:16px;">
+        <div class="stat-box">
+          <div class="stat-num" id="stat-today">-</div>
+          <div class="stat-label">今日の使用トークン</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num" id="stat-remain">-</div>
+          <div class="stat-label">今日の残りトークン</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num" id="stat-pct">-</div>
+          <div class="stat-label">使用率</div>
+        </div>
+      </div>
+      <div style="font-size:0.82rem; color:#9CA3AF; margin-bottom:4px;">1日の上限: 100,000トークン</div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="global-bar" style="background:linear-gradient(90deg,#667eea,#764ba2); width:0%;"></div>
+      </div>
+    </div>
+
+    <!-- グループ別 -->
+    <div class="card">
+      <h3 style="margin:0 0 16px; color:#a5b4fc;">👥 グループ別設定</h3>
+      <div id="groups-list"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 制限設定モーダル -->
+<div id="limit-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center; padding:16px;">
+  <div style="background:#1e1e2e; border:1px solid #3d3d5c; border-radius:20px; padding:24px; max-width:380px; width:100%;">
+    <h3 style="margin:0 0 8px; color:#e0e0ff;">⚙️ 1日の上限設定</h3>
+    <p id="limit-group-name" style="color:#a5b4fc; margin-bottom:16px; font-size:0.9rem;"></p>
+    <div style="margin-bottom:8px;">
+      <label style="font-size:0.85rem; color:#9CA3AF; display:block; margin-bottom:6px;">1日の上限トークン数（0=無制限）</label>
+      <input type="number" id="limit-daily" value="1000" min="0" max="100000">
+    </div>
+    <div id="limit-remain-info" style="font-size:0.78rem; color:#a5b4fc; margin-bottom:8px; background:rgba(102,126,234,0.1); border-radius:8px; padding:8px 10px;"></div>
+    <div style="font-size:0.78rem; color:#9CA3AF; margin-bottom:20px;">全体の1日上限は100,000トークン・0を設定すると使用不可になります</div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn btn-primary" onclick="saveLimit()" style="flex:1;">保存</button>
+      <button class="btn" onclick="closeLimitModal()" style="background:#3d3d5c; color:#e0e0ff;">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let adminPw = '';
+let currentGroupId = '';
+let currentData = {groups: []};
+
+async function loadData() {
+  adminPw = document.getElementById('admin-pw').value;
+  if (!adminPw) { alert('パスワードを入力してね'); return; }
+  try {
+    const r = await fetch('/api/ai_usage/summary?pw=' + encodeURIComponent(adminPw));
+    const data = await r.json();
+    if (!data.ok) { alert(data.error || 'パスワードが違うよ'); return; }
+    document.getElementById('login-section').style.display = 'none';
+    document.getElementById('data-section').style.display = 'block';
+    renderData(data);
+  } catch(e) { alert('エラー: ' + e.message); }
+}
+
+function renderData(data) {
+  currentData = data;
+  // 今日の合計
+  const todayTotal = data.groups.reduce((s, g) => s + g.today_tokens, 0);
+  const limit = 100000;
+  const remain = Math.max(0, limit - todayTotal);
+  const pct = Math.min(100, Math.round(todayTotal / limit * 100));
+
+  document.getElementById('stat-today').textContent = todayTotal.toLocaleString();
+  document.getElementById('stat-remain').textContent = remain.toLocaleString();
+  document.getElementById('stat-pct').textContent = pct + '%';
+  const bar = document.getElementById('global-bar');
+  bar.style.width = pct + '%';
+  bar.style.background = pct > 80 ? '#e53935' : pct > 50 ? '#ff9800' : 'linear-gradient(90deg,#667eea,#764ba2)';
+
+  // グループ別
+  const list = document.getElementById('groups-list');
+  list.innerHTML = data.groups.map(g => {
+    const gpct = g.daily_limit > 0 ? Math.min(100, Math.round(g.today_tokens / g.daily_limit * 100)) : 0;
+    const barColor = gpct > 80 ? '#e53935' : gpct > 50 ? '#ff9800' : '#667eea';
+    return `
+    <div class="group-card">
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+        <div style="flex:1;">
+          <div style="font-weight:bold; color:#e0e0ff;">${esc(g.name)}</div>
+          <div style="font-size:0.78rem; color:#9CA3AF; margin-top:2px;">
+            今日: ${g.today_tokens.toLocaleString()}トークン / 上限: ${g.daily_limit.toLocaleString()}トークン
+          </div>
+        </div>
+        <button class="toggle ${g.ai_scoring ? 'on' : ''}" onclick="toggleAI('${g.id}', this)" title="AI採点ON/OFF"><span class="knob"></span></button>
+      </div>
+      <div style="font-size:0.75rem; color:#9CA3AF; margin-bottom:4px;">今日の使用率 ${gpct}%</div>
+      <div class="progress-bar" style="height:8px;">
+        <div class="progress-fill" style="width:${gpct}%; background:${barColor};"></div>
+      </div>
+      <div style="margin-top:10px; text-align:right;">
+        <button onclick="openLimitModal('${g.id}','${esc(g.name)}',${g.daily_limit})"
+          style="padding:4px 12px; background:rgba(102,126,234,0.2); color:#a5b4fc; border:1px solid rgba(102,126,234,0.3); border-radius:6px; cursor:pointer; font-size:0.8rem;">
+          ⚙️ 1日の上限を設定
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function toggleAI(groupId, btn) {
+  const next = !btn.classList.contains('on');
+  try {
+    const r = await fetch('/api/admin/ai-scoring/' + groupId, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({password: adminPw, ai_scoring: next})
+    });
+    const data = await r.json();
+    if (!data.ok) { alert(data.error); return; }
+    btn.classList.toggle('on', data.ai_scoring);
+  } catch(e) { alert('エラー: ' + e.message); }
+}
+
+function openLimitModal(groupId, name, daily) {
+  currentGroupId = groupId;
+  document.getElementById('limit-group-name').textContent = '📌 ' + name;
+  document.getElementById('limit-daily').value = daily;
+  // 他グループの合計を計算して残りを表示
+  const otherTotal = currentData.groups
+    .filter(g => g.id !== groupId)
+    .reduce((s, g) => s + g.daily_limit, 0);
+  const remain = Math.max(0, 100000 - otherTotal);
+  const info = document.getElementById('limit-remain-info');
+  if (info) {
+    info.textContent = '他グループの合計: ' + otherTotal.toLocaleString() + 'トークン / このグループに設定可能: 0〜' + remain.toLocaleString() + 'トークン';
+  }
+  document.getElementById('limit-modal').style.display = 'flex';
+}
+
+function closeLimitModal() {
+  document.getElementById('limit-modal').style.display = 'none';
+}
+
+async function saveLimit() {
+  const daily = parseInt(document.getElementById('limit-daily').value) || 0;
+  // 他のグループの合計上限を計算
+  const otherTotal = currentData.groups
+    .filter(g => g.id !== currentGroupId)
+    .reduce((s, g) => s + g.daily_limit, 0);
+  const newTotal = otherTotal + daily;
+  if (daily > 0 && newTotal > 100000) {
+    const remain = 100000 - otherTotal;
+    alert('1日の上限の合計が100,000トークンを超えるよ！\n他のグループの合計: ' + otherTotal.toLocaleString() + '\nこのグループに設定できる上限: ' + Math.max(0, remain).toLocaleString() + 'トークンまで');
+    return;
+  }
+  try {
+    const r = await fetch('/api/ai_limits/' + currentGroupId, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({password: adminPw, daily_limit: daily, total_limit: 100000})
+    });
+    const data = await r.json();
+    if (!data.ok) { alert(data.error); return; }
+    closeLimitModal();
+    loadData();
+  } catch(e) { alert('エラー: ' + e.message); }
+}
+
+function esc(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;');
+}
+
+document.getElementById('admin-pw').addEventListener('keydown', e => {
+  if (e.key === 'Enter') loadData();
+});
+</script>
+</body>
+</html>

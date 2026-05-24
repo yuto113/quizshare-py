@@ -110,6 +110,15 @@
       <p class="display-font" style="font-size:20px; font-weight:900; margin:0; word-break:break-all;" id="result-answer"></p>
     </div>
 
+    <!-- AI採点ボタン -->
+    <div id="ai-score-area" style="display:none; max-width:400px; margin:16px auto 0; text-align:center;">
+      <button id="ai-score-btn" onclick="requestAiScore()"
+        style="padding:10px 24px; background:linear-gradient(135deg,#f97316,#ea580c); color:white; border:none; border-radius:20px; cursor:pointer; font-size:0.9rem; font-weight:bold; box-shadow:0 2px 8px rgba(249,115,22,0.4);">
+        🤖 AIに採点してもらう <span style="font-size:0.7rem;background:rgba(255,255,255,0.3);padding:1px 6px;border-radius:8px;">β</span>
+      </button>
+      <div id="ai-result-box" style="display:none; margin-top:10px; padding:12px 16px; border-radius:12px; font-size:0.9rem;"></div>
+    </div>
+
     <div id="explanation-box" style="display:none; max-width:400px; margin:20px auto 0; padding:16px; background:#EFF6FF; border:2px solid #93C5FD; border-radius:16px;">
       <div style="font-size:11px; font-weight:900; color:#1E40AF; letter-spacing:0.1em; margin-bottom:6px;">💡 解説</div>
       <p id="explanation-text" style="margin:0; color:#1E3A8A; line-height:1.7; white-space:pre-wrap;"></p>
@@ -213,6 +222,34 @@
 
 {% block scripts %}
 <script>
+async function requestAiScore() {
+    const btn = document.getElementById('ai-score-btn');
+    const box = document.getElementById('ai-result-box');
+    btn.disabled = true;
+    btn.textContent = '🤖 AI採点中...';
+    box.style.display = 'none';
+    try {
+      const r = await window.api.post('/api/ai/score', window._aiScoreData || {});
+      const styles = {
+        correct: {bg:'#e8f5e9',border:'#a5d6a7',color:'#2e7d32',icon:'✅',label:'正解に近い'},
+        partial:  {bg:'#fff8e1',border:'#ffe082',color:'#e65100',icon:'💛',label:'惜しい！'},
+        wrong:    {bg:'#ffebee',border:'#ffcdd2',color:'#c62828',icon:'❌',label:'不正解'},
+        unknown:  {bg:'#f5f5f5',border:'#e0e0e0',color:'#555',icon:'❓',label:'判定不明'},
+      };
+      const s = styles[r.ai_result] || styles.unknown;
+      box.style.cssText = 'display:block;background:'+s.bg+';border:1px solid '+s.border+';border-radius:10px;padding:12px;color:'+s.color+';text-align:left;margin-top:10px;';
+      box.innerHTML = '<div style="font-weight:bold;margin-bottom:4px;">'+s.icon+' AI判定: '+s.label+'</div>'
+        + (r.ai_reason ? '<div style="font-size:0.85rem;">'+window.escapeHtml(r.ai_reason)+'</div>' : '');
+      btn.textContent = '🤖 もう一度AIに採点してもらう';
+      btn.disabled = false;
+    } catch(e) {
+      box.style.cssText = 'display:block;background:#ffebee;border:1px solid #ffcdd2;border-radius:10px;padding:12px;color:#c62828;';
+      box.textContent = e.message || 'AI採点エラー';
+      btn.textContent = '🤖 AIに採点してもらう';
+      btn.disabled = false;
+    }
+  }
+
 // ============================================================
 // 回答ページのスクリプト
 // # タイマーを100ms毎に更新、送信、結果表示、感想送信、統計取得、
@@ -234,7 +271,7 @@ let randomCurrent = randomMode ? parseInt(randomMode, 10) : 0;
     const box = document.getElementById('quiz-images');
     if (r.images && r.images.length > 0) {
       box.innerHTML = r.images.map(img =>
-        '<img src="' + img.url + '" style="max-width:200px; max-height:200px; border-radius:12px; border:2px solid #E5E7EB; object-fit:cover;">'
+        '<img src="' + img.url + '" onclick="window.openImgModal(this.src)" style="max-width:200px; max-height:200px; border-radius:12px; border:2px solid #E5E7EB; object-fit:cover; cursor:zoom-in;">'
       ).join('');
     }
   } catch(e) {}
@@ -257,6 +294,7 @@ document.getElementById('btn-show-hint').addEventListener('click', () => {
 });
 
 const HAS_OPTIONS = {{ 'true' if quiz.has_options else 'false' }};
+const AI_SCORING = {{ 'true' if ai_scoring else 'false' }};
 
 // ---- タイマー(100ミリ秒ごとに更新) ----
 // # setIntervalで定期的に「今の時間 - 始めた時間」を計算して表示する
@@ -282,6 +320,7 @@ if (HAS_OPTIONS) {
 
 // ---- 答えを送信 ----
 document.getElementById('submit-answer').addEventListener('click', async () => {
+
   let userAnswer;
   if (HAS_OPTIONS) {
     if (!selectedOption) { window.toast('選んでね', 'error'); return; }
@@ -308,7 +347,25 @@ document.getElementById('submit-answer').addEventListener('click', async () => {
     } else {
       document.getElementById('explanation-box').style.display = 'none';
     }
+    // 採点補助メッセージ表示
+    if (r.match_msg && r.correct) {
+      const msg = document.createElement('div');
+      msg.style.cssText = 'text-align:center;margin:8px auto;padding:6px 16px;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:20px;color:#2e7d32;font-size:0.85rem;max-width:400px;';
+      msg.textContent = '💡 ' + r.match_msg;
+      const expBox = document.getElementById('explanation-box');
+      expBox.parentNode.insertBefore(msg, expBox);
+      setTimeout(() => msg.remove(), 5000);
+    }
     showResult(r.correct, r.correct_answer, r.time_ms);
+    if (!r.correct && !HAS_OPTIONS && AI_SCORING) {
+      window._aiScoreData = {
+        question: {{ quiz.question | tojson }},
+        correct_answer: r.correct_answer,
+        user_answer: userAnswer,
+      };
+      document.getElementById('ai-score-area').style.display = 'block';
+    }
+
     // ランダムモードならボタンを切替
     if (randomMode) {
       document.getElementById('normal-buttons').style.display = 'none';

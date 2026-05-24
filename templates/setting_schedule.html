@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ページ管理 - QuizShare</title>
+  <meta name="robots" content="noindex">
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body { background:#0f0f1a; color:#e0e0ff; }
+    .container { max-width:900px; margin:0 auto; padding:24px 16px; }
+    .card { background:#1e1e2e; border:1px solid #3d3d5c; border-radius:16px; padding:20px; margin-bottom:16px; }
+    .form-input { background:#2a2a3e; border:2px solid #4a4a6a; color:#e0e0ff; border-radius:8px; padding:8px 12px; font-size:0.9rem; width:100%; box-sizing:border-box; }
+    .form-input:focus { outline:none; border-color:#667eea; }
+    .btn-primary { background:#667eea; color:white; border:none; border-radius:8px; padding:10px 20px; cursor:pointer; font-weight:bold; }
+    .btn-danger { background:#e53935; color:white; border:none; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:0.82rem; }
+    .btn-secondary { background:rgba(255,255,255,0.1); color:#e0e0ff; border:1px solid rgba(255,255,255,0.2); border-radius:8px; padding:6px 12px; cursor:pointer; font-size:0.82rem; }
+    .btn-add { background:rgba(52,211,153,0.2); color:#34d399; border:1px solid rgba(52,211,153,0.3); border-radius:8px; padding:8px 16px; cursor:pointer; font-size:0.85rem; }
+    .schedule-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }
+    .badge-on { background:rgba(52,211,153,0.2); color:#34d399; border-radius:10px; padding:2px 10px; font-size:0.78rem; }
+    .badge-off { background:rgba(156,163,175,0.2); color:#9CA3AF; border-radius:10px; padding:2px 10px; font-size:0.78rem; }
+    .toggle { width:52px; height:28px; border-radius:14px; background:#555; border:none; position:relative; cursor:pointer; transition:background 0.3s; flex-shrink:0; display:inline-block; }
+    .toggle .knob { position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%; background:white; box-shadow:0 1px 4px rgba(0,0,0,0.4); transition:transform 0.3s; pointer-events:none; }
+    .toggle.on { background:#4caf50; }
+    .toggle.on .knob { transform:translateX(24px); }
+    label { font-size:0.82rem; color:#9CA3AF; display:block; margin-bottom:4px; }
+    .tab-btn { padding:10px 24px; border-radius:10px; border:none; font-weight:bold; cursor:pointer; transition:all 0.2s; }
+    .tab-btn.active { background:#667eea; color:white; }
+    .tab-btn.inactive { background:rgba(255,255,255,0.08); color:#9CA3AF; }
+    .tmpl-btn { padding:14px; border-radius:12px; border:2px solid #4a4a6a; background:rgba(255,255,255,0.05); color:#9CA3AF; cursor:pointer; font-weight:bold; font-size:0.9rem; transition:all 0.2s; text-align:center; }
+    .tmpl-btn.active { border-color:#667eea; background:rgba(102,126,234,0.2); color:#a5b4fc; }
+    .tmpl-btn:hover { border-color:#667eea; color:#a5b4fc; }
+    .page-card { background:#1e1e2e; border:1px solid #3d3d5c; border-radius:14px; padding:16px; margin-bottom:12px; }
+    .page-card-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+    .section { display:none; }
+    .section.active { display:block; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div style="margin-bottom:16px;">
+    <a href="/setting/" style="color:#9CA3AF; text-decoration:none; font-size:0.9rem;">← 管理者ページへ</a>
+  </div>
+  <h1 style="font-size:1.6rem; margin-bottom:16px;">🗂️ ページ管理</h1>
+
+  <!-- ログイン -->
+  <div id="login-section" class="card">
+    <h3 style="margin:0 0 12px;">🔐 管理者ログイン</h3>
+    <div style="display:flex; gap:8px;">
+      <input type="password" id="admin-pw" class="form-input" placeholder="管理者パスワード" style="flex:1;">
+      <button class="btn-primary" onclick="doLogin()">確認する</button>
+    </div>
+  </div>
+
+  <div id="main-section" style="display:none;">
+    <!-- タブ -->
+    <div style="display:flex; gap:8px; margin-bottom:20px;">
+      <button class="tab-btn active" id="tab-pages" onclick="switchTab('pages')">🛠️ ページ作成・管理</button>
+      <button class="tab-btn inactive" id="tab-schedule" onclick="switchTab('schedule')">📅 公開期間設定</button>
+    </div>
+
+    <!-- ページ作成・管理タブ -->
+    <div id="section-pages" class="section active">
+      <div class="card">
+        <h3 style="margin:0 0 16px; color:#a5b4fc;">✨ 新しいページを作成</h3>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+          <div>
+            <label>ページキー（英数字のみ）</label>
+            <input type="text" id="new-page-key" class="form-input" placeholder="例: news2026">
+          </div>
+          <div>
+            <label>ページ名</label>
+            <input type="text" id="new-page-name" class="form-input" placeholder="例: 6月のお知らせ">
+          </div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="margin-bottom:8px;">テンプレートを選択</label>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <button class="tmpl-btn active" data-tmpl="announce" onclick="selectTemplate(this)">📢 お知らせ<br><span style="font-size:0.75rem; opacity:0.7;">重要連絡・通知に</span></button>
+            <button class="tmpl-btn" data-tmpl="event" onclick="selectTemplate(this)">🎉 イベント・大会<br><span style="font-size:0.75rem; opacity:0.7;">日時・場所・詳細</span></button>
+            <button class="tmpl-btn" data-tmpl="group_intro" onclick="selectTemplate(this)">👥 グループ紹介<br><span style="font-size:0.75rem; opacity:0.7;">グループのPRに</span></button>
+            <button class="tmpl-btn" data-tmpl="blank" onclick="selectTemplate(this)">📝 自由作成<br><span style="font-size:0.75rem; opacity:0.7;">自分でデザイン</span></button>
+          </div>
+        </div>
+        <div style="margin-bottom:12px; display:flex; align-items:center; gap:10px;">
+          <button class="toggle" id="new-show-home" onclick="this.classList.toggle('on')"><span class="knob"></span></button>
+          <span style="font-size:0.85rem; color:#9CA3AF;">トップページにリンクを表示する（お知らせ・イベントのみ推奨）</span>
+        </div>
+        <button class="btn-primary" onclick="createNewPage()" style="width:100%; padding:12px; font-size:1rem;">✨ ページを作成する</button>
+      </div>
+
+      <div id="pages-list"></div>
+    </div>
+
+    <!-- 公開期間設定タブ -->
+    <div id="section-schedule" class="section">
+      <div id="pages-schedule-list"></div>
+      <div class="card">
+        <h3 style="margin:0 0 12px; color:#a5b4fc;">📅 公開期間を手動追加</h3>
+        <p style="color:#9CA3AF; font-size:0.82rem; margin-bottom:12px;">※ページ作成タブで作ったページは自動でここに追加されます</p>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+          <div><label>ページキー</label><input type="text" id="manual-key" class="form-input" placeholder="例: quizclub2027"></div>
+          <div><label>ページ名</label><input type="text" id="manual-name" class="form-input" placeholder="例: クイズ研究部2027"></div>
+        </div>
+        <div style="margin-bottom:10px;"><label>URL</label><input type="text" id="manual-url" class="form-input" placeholder="例: /quizclub-2027"></div>
+        <button class="btn-add" onclick="addManualPage()">➕ 追加する</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let adminPw = '';
+let selectedTemplate = 'announce';
+let pagesData = [];
+let customPagesData = [];
+
+function doLogin() {
+  adminPw = document.getElementById('admin-pw').value;
+  if (!adminPw) { alert('パスワードを入力してね'); return; }
+  document.getElementById('login-section').style.display = 'none';
+  document.getElementById('main-section').style.display = 'block';
+  loadAll();
+}
+
+document.getElementById('admin-pw').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+function switchTab(tab) {
+  document.getElementById('section-pages').classList.toggle('active', tab === 'pages');
+  document.getElementById('section-schedule').classList.toggle('active', tab === 'schedule');
+  document.getElementById('tab-pages').className = 'tab-btn ' + (tab === 'pages' ? 'active' : 'inactive');
+  document.getElementById('tab-schedule').className = 'tab-btn ' + (tab === 'schedule' ? 'active' : 'inactive');
+  if (tab === 'schedule') loadSchedules();
+}
+
+function selectTemplate(btn) {
+  selectedTemplate = btn.dataset.tmpl;
+  document.querySelectorAll('.tmpl-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+async function loadAll() {
+  await loadCustomPages();
+}
+
+async function loadCustomPages() {
+  const r = await fetch('/api/custom_pages?pw=' + encodeURIComponent(adminPw));
+  const data = await r.json();
+  if (!data.ok) { alert(data.error || 'エラー'); return; }
+  customPagesData = data.pages;
+  renderCustomPages();
+}
+
+function renderCustomPages() {
+  const list = document.getElementById('pages-list');
+  if (customPagesData.length === 0) {
+    list.innerHTML = '<div class="card" style="text-align:center; color:#9CA3AF; padding:32px;">まだページがありません</div>';
+    return;
+  }
+  list.innerHTML = customPagesData.map(p => `
+    <div class="page-card">
+      <div class="page-card-header">
+        <div>
+          <div style="font-weight:bold; color:#e0e0ff; font-size:1rem;">${esc(p.name)}</div>
+          <div style="color:#9CA3AF; font-size:0.8rem; margin-top:2px;">
+            <a href="${esc(p.url)}" target="_blank" style="color:#667eea;">${esc(p.url)}</a>
+            · ${tmplLabel(p.template_type)}
+          </div>
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+          <span class="${p.is_published ? 'badge-on' : 'badge-off'}">${p.is_published ? '✅ 公開中' : '❌ 非公開'}</span>
+          ${p.show_on_home ? '<span style="font-size:0.78rem; padding:2px 10px; border-radius:10px; background:rgba(102,126,234,0.2); color:#a5b4fc;">🏠 ホーム</span>' : ''}
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn-primary" onclick="editPage('${esc(p.key)}')" style="padding:8px 16px; font-size:0.85rem;">✏️ 編集</button>
+        <button class="btn-secondary" onclick="togglePublish('${esc(p.key)}', ${p.is_published})" style="padding:8px 16px; font-size:0.85rem;">${p.is_published ? '🔒 非公開に' : '🌐 公開する'}</button>
+        <button class="btn-danger" onclick="deletePage('${esc(p.key)}', '${esc(p.name)}')" style="padding:8px 16px;">🗑️ 削除</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function tmplLabel(t) {
+  return {announce:'📢 お知らせ', event:'🎉 イベント', group_intro:'👥 グループ紹介', blank:'📝 自由'}[t] || t;
+}
+
+async function createNewPage() {
+  const key = document.getElementById('new-page-key').value.trim().replace(/[^a-zA-Z0-9_-]/g, '');
+  const name = document.getElementById('new-page-name').value.trim();
+  const showHome = document.getElementById('new-show-home').classList.contains('on');
+  if (!key) { alert('ページキーは英数字で入力してね'); return; }
+  if (!name) { alert('ページ名を入力してね'); return; }
+  const defaultContent = {
+    announce: {title: name, date: '', body: 'ここにお知らせ内容を入力してください。'},
+    event: {title: name, date: '', place: '', capacity: '', body: 'ここにイベント詳細を入力してください。'},
+    group_intro: {title: name, subtitle: '', body: 'ここにグループの紹介文を入力してください。', group_id: ''},
+    blank: {title: name, blocks: []},
+  }[selectedTemplate];
+  const r = await fetch('/api/custom_pages', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({password: adminPw, page_key: key, page_name: name,
+      url: '/p/' + key, template_type: selectedTemplate,
+      content: defaultContent, show_on_home: showHome})
+  });
+  const data = await r.json();
+  if (data.ok) {
+    alert('作成しました！編集ボタンから内容を編集できます。');
+    document.getElementById('new-page-key').value = '';
+    document.getElementById('new-page-name').value = '';
+    await loadCustomPages();
+    // 公開期間設定にも自動追加
+    await fetch('/api/page_schedules/' + key, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({password: adminPw, page_name: name, url: '/p/' + key, schedules: [], is_active: true})
+    });
+  } else { alert(data.error || 'エラー'); }
+}
+
+function editPage(key) {
+  window.open('/p/' + key + '?edit=1&pw=' + encodeURIComponent(adminPw), '_blank');
+}
+
+async function togglePublish(key, current) {
+  const r = await fetch('/api/custom_pages/' + key, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({password: adminPw, is_published: !current, show_on_home: true, content: {}})
+  });
+  const data = await r.json();
+  if (data.ok) { await loadCustomPages(); }
+  else { alert(data.error || 'エラー'); }
+}
+
+async function deletePage(key, name) {
+  if (!confirm(`「${name}」を削除しますか？`)) return;
+  const r = await fetch('/api/custom_pages/' + key + '/delete', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({password: adminPw})
+  });
+  const data = await r.json();
+  if (data.ok) { alert('削除しました'); await loadCustomPages(); }
+  else { alert('削除失敗: ' + (data.error || 'エラー')); }
+}
+
+// ===== 公開期間設定 =====
+async function loadSchedules() {
+  const r = await fetch('/api/page_schedules?pw=' + encodeURIComponent(adminPw));
+  const data = await r.json();
+  if (!data.ok) return;
+  pagesData = data.pages;
+  renderSchedules();
+}
+
+function renderSchedules() {
+  const list = document.getElementById('pages-schedule-list');
+  if (pagesData.length === 0) {
+    list.innerHTML = '<div class="card" style="text-align:center; color:#9CA3AF; padding:32px;">まだ設定がありません</div>';
+    return;
+  }
+  list.innerHTML = pagesData.map((p, pi) => `
+    <div class="card">
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
+        <div style="flex:1;">
+          <div style="font-weight:bold; color:#e0e0ff;">${esc(p.name)}</div>
+          <div style="color:#9CA3AF; font-size:0.82rem;"><span style="font-family:monospace;">${esc(p.url)}</span></div>
+        </div>
+        <span class="${p.is_active ? 'badge-on' : 'badge-off'}">${p.is_active ? '✅ 有効' : '❌ 無効'}</span>
+        <button class="toggle ${p.is_active ? 'on' : ''}" onclick="toggleActive(${pi})"><span class="knob"></span></button>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="color:#9CA3AF; font-size:0.82rem; margin-bottom:8px;">📅 公開期間（日本時間）</div>
+        <div id="schedules-${pi}">
+          ${p.schedules.map((s, si) => renderScheduleRow(pi, si, s)).join('')}
+        </div>
+        <button class="btn-add" onclick="addSchedule(${pi})" style="margin-top:8px;">➕ 期間を追加</button>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn-primary" onclick="saveSchedule(${pi})">💾 保存</button>
+        <button class="btn-danger" onclick="deleteSchedulePage(${pi})">🗑️ 削除</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderScheduleRow(pi, si, s) {
+  return `<div class="schedule-row">
+    <input type="text" value="${esc(s.label||'')}" placeholder="ラベル"
+      onchange="pagesData[${pi}].schedules[${si}].label=this.value"
+      style="background:#2a2a3e;border:2px solid #4a4a6a;color:#e0e0ff;border-radius:8px;padding:6px 10px;width:90px;font-size:0.85rem;">
+    <span style="color:#9CA3AF;font-size:0.82rem;">開始</span>
+    <input type="datetime-local" value="${s.start||''}"
+      onchange="pagesData[${pi}].schedules[${si}].start=this.value"
+      style="background:#2a2a3e;border:2px solid #4a4a6a;color:#e0e0ff;border-radius:8px;padding:6px 10px;font-size:0.85rem;">
+    <span style="color:#9CA3AF;font-size:0.82rem;">〜</span>
+    <input type="datetime-local" value="${s.end||''}"
+      onchange="pagesData[${pi}].schedules[${si}].end=this.value"
+      style="background:#2a2a3e;border:2px solid #4a4a6a;color:#e0e0ff;border-radius:8px;padding:6px 10px;font-size:0.85rem;">
+    <button class="btn-danger" onclick="removeSchedule(${pi},${si})">🗑️</button>
+  </div>`;
+}
+
+function addSchedule(pi) { pagesData[pi].schedules.push({label:'',start:'',end:''}); renderSchedules(); }
+function removeSchedule(pi, si) { pagesData[pi].schedules.splice(si,1); renderSchedules(); }
+function toggleActive(pi) { pagesData[pi].is_active = !pagesData[pi].is_active; renderSchedules(); }
+
+async function saveSchedule(pi) {
+  const p = pagesData[pi];
+  const r = await fetch('/api/page_schedules/' + p.key, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({password: adminPw, page_name: p.name, url: p.url, schedules: p.schedules, is_active: p.is_active})
+  });
+  const data = await r.json();
+  if (data.ok) { alert('保存しました！'); loadSchedules(); }
+  else { alert(data.error || 'エラー'); }
+}
+
+async function deleteSchedulePage(pi) {
+  const p = pagesData[pi];
+  if (!confirm(`「${p.name}」を削除しますか？`)) return;
+  const r = await fetch('/api/page_schedules/' + p.key + '/delete', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({password: adminPw})
+  });
+  const data = await r.json();
+  if (data.ok) { alert('削除しました！'); loadSchedules(); }
+  else { alert(data.error || 'エラー'); }
+}
+
+async function addManualPage() {
+  const key = document.getElementById('manual-key').value.trim();
+  const name = document.getElementById('manual-name').value.trim();
+  const url = document.getElementById('manual-url').value.trim();
+  if (!key || !name || !url) { alert('すべて入力してね'); return; }
+  const r = await fetch('/api/page_schedules/' + key, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({password: adminPw, page_name: name, url, schedules: [], is_active: true})
+  });
+  const data = await r.json();
+  if (data.ok) { alert('追加しました！'); loadSchedules(); }
+  else { alert(data.error || 'エラー'); }
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body>
+</html>

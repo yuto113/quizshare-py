@@ -3,10 +3,12 @@
 
 {% block content %}
 <div style="max-width:800px; margin:0 auto; padding:24px 16px;">
-
+  <div style="margin-bottom:8px;">
+    <a href="/library" style="color:#888; text-decoration:none; font-size:0.9rem;">← 戻る</a>
+  </div>
   <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
     <span style="font-size:2rem;">📚</span>
-    <h1 style="font-size:1.6rem; margin:0;">引用ライブラリ</h1>
+    <h1 style="font-size:1.6rem; margin:0;">学習ライブラリ</h1>
   </div>
   <p style="color:#666; margin-bottom:20px;">
     学年・教科を選んで問題を確認。ログインしているグループに「引用する」で追加できます。
@@ -19,40 +21,136 @@
   </div>
   {% endif %}
 
-  <!-- 学年・教科セレクター -->
-  <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:24px;">
+  <!-- 全問表示ボタン -->
+  <button onclick="loadAllStudy()" id="btn-all-study"
+    style="display:block; width:100%; padding:14px; margin-bottom:12px; background:linear-gradient(135deg,#667eea,#764ba2); color:white; border:none; border-radius:12px; font-size:1rem; font-weight:bold; cursor:pointer; box-shadow:0 2px 8px rgba(102,126,234,0.3);">
+    📚 学習ライブラリの全問題を表示する
+  </button>
+
+  <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
     <select id="grade-select" style="flex:1; min-width:160px; padding:10px 14px; border:2px solid #e0e0e0; border-radius:10px; font-size:1rem; background:#fff; cursor:pointer;">
       <option value="">📖 学年を選んでください</option>
     </select>
-    <select id="subject-select" disabled style="flex:1; min-width:160px; padding:10px 14px; border:2px solid #e0e0e0; border-radius:10px; font-size:1rem; background:#f5f5f5; cursor:not-allowed;">
+    <select id="subject-select" style="flex:1; min-width:160px; padding:10px 14px; border:2px solid #e0e0e0; border-radius:10px; font-size:1rem; background:#fff; cursor:pointer;">
       <option value="">📝 教科を選んでください</option>
     </select>
   </div>
 
-  <!-- 統計 -->
+  {% if logged_in %}
+  <div id="bulk-toolbar" style="display:none; background:#e8f5e9; border:1px solid #a5d6a7; border-radius:10px; padding:10px 16px; margin-bottom:16px; align-items:center; gap:10px; flex-wrap:wrap;">
+    <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:0.95rem;">
+      <input type="checkbox" id="check-all" style="width:18px; height:18px; cursor:pointer;">
+      すべて選択
+    </label>
+    <span style="color:#aaa;">|</span>
+    <span id="selected-count" style="font-size:0.9rem; color:#555;">0問 選択中</span>
+    <button onclick="importSelected()" id="bulk-import-btn"
+      style="margin-left:auto; padding:8px 18px; background:#4caf50; color:white; border:none; border-radius:8px; cursor:pointer; font-size:0.95rem; font-weight:bold;">
+      ＋ まとめて引用する
+    </button>
+  </div>
+  {% endif %}
+
   <div id="quiz-count" style="color:#aaa; font-size:0.9rem; margin-bottom:12px; text-align:right;"></div>
 
-  <!-- クイズリスト -->
   <div id="quiz-list">
     <div style="text-align:center; color:#bbb; padding:60px 0;">
       <div style="font-size:3rem;">📖</div>
-      <p>学年と教科を選ぶと問題が表示されます</p>
+      <p>学年を選ぶと問題が表示されます</p>
     </div>
   </div>
 </div>
+
+{% if logged_in %}
+<button id="bulk-toggle-btn" onclick="toggleBulkMode()"
+  style="position:fixed; bottom:24px; right:24px; padding:14px 20px; background:#e91e63; color:white; border:none; border-radius:50px; cursor:pointer; font-size:1rem; font-weight:bold; box-shadow:0 4px 16px rgba(233,30,99,0.4); z-index:1000; display:none;">
+  ☑️ まとめて追加
+</button>
+{% endif %}
+
 {% endblock %}
 
 {% block scripts %}
 <script>
-// ログイン状態（Jinja2で渡す）
+async function loadAllStudy() {
+  const btn = document.getElementById('btn-all-study');
+  btn.textContent = '読み込み中...'; btn.disabled = true;
+  try {
+    const r = await window.api.get('/api/library/data?grade=__all__&subject=');
+    if (r.quizzes) {
+      r.quizzes.forEach(q => {
+        if (!q._grade) q._grade = q.grade || '';
+        if (!q._subject) q._subject = q.subject || '';
+      });
+      renderQuizzes(r.quizzes);
+      document.getElementById('quiz-count').textContent = '全' + r.quizzes.length + '問（全学年・全教科）';
+    }
+  } catch(e) { window.toast('読み込みエラー','error'); }
+  btn.textContent = '📚 学習ライブラリの全問題を表示する'; btn.disabled = false;
+}
+</script>
+<!-- 同意モーダル -->
+<div id="consent-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center;">
+  <div style="background:#fff; border-radius:16px; padding:32px 28px; max-width:480px; width:90%; box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+    <div style="font-size:2rem; text-align:center; margin-bottom:12px;">📚</div>
+    <h2 style="font-size:1.3rem; margin:0 0 16px; text-align:center;">引用ライブラリ 利用規約</h2>
+    <div style="background:#fff8e1; border:1px solid #ffe082; border-radius:10px; padding:16px; margin-bottom:20px; font-size:0.95rem; line-height:1.7; color:#444;">
+      <p style="margin:0 0 12px;"><strong>📌 ご利用にあたって、以下の内容にご同意ください。</strong></p>
+      <ul style="margin:0; padding-left:20px;">
+        <li style="margin-bottom:8px;">このライブラリの引用内容は、<strong>QuizShare内での学習目的のみ</strong>に使用することができます。</li>
+        <li style="margin-bottom:8px;">引用した問題を<strong>他のサービス・媒体・商用目的</strong>で使用することを<strong style="color:#e53935;">禁止します</strong>。</li>
+        <li style="margin-bottom:8px;">問題の内容を<strong>無断で転載・配布・販売</strong>することを禁止します。</li>
+        <li style="margin-bottom:8px;">本ライブラリは<strong>教育目的</strong>で提供されており、引用者はこの目的の範囲内で適切に利用する責任を負います。</li>
+        <li>規約に違反した場合、<strong>利用を停止</strong>する場合があります。</li>
+      </ul>
+    </div>
+    <label style="display:flex; align-items:center; gap:10px; margin-bottom:20px; cursor:pointer; font-size:0.95rem;">
+      <input type="checkbox" id="consent-check" style="width:18px; height:18px; cursor:pointer; accent-color:#e91e63;">
+      上記の利用規約を読み、内容に同意します
+    </label>
+    <button id="consent-btn" onclick="agreeConsent()" disabled
+      style="width:100%; padding:12px; background:#ccc; color:white; border:none; border-radius:10px; font-size:1rem; font-weight:bold; cursor:not-allowed;">
+      同意してライブラリを使う
+    </button>
+    <p style="text-align:center; margin-top:12px; font-size:0.85rem; color:#aaa;">
+      同意しない場合はページを閉じてください
+    </p>
+  </div>
+</div>
+
+<script>
 const loggedIn = {{ 'true' if logged_in else 'false' }};
 
-// ===== 学年リストを読み込む =====
+// 同意チェック
+document.getElementById('consent-check').addEventListener('change', function() {
+  const btn = document.getElementById('consent-btn');
+  btn.disabled = !this.checked;
+  btn.style.background = this.checked ? '#e91e63' : '#ccc';
+  btn.style.cursor = this.checked ? 'pointer' : 'not-allowed';
+});
+
+function agreeConsent() {
+  localStorage.setItem('library_consent_agreed', '1');
+  document.getElementById('consent-modal').style.display = 'none';
+}
+
+function checkConsent() {
+  if (!localStorage.getItem('library_consent_agreed')) {
+    document.getElementById('consent-modal').style.display = 'flex';
+  }
+}
+checkConsent();
+let bulkMode = false;
+let selectedIds = new Set();
+let currentQuizzes = [];
+
 async function loadGrades() {
   try {
     const r = await window.api.get('/api/library/data');
+    if (!r || !r.grades) return;
+
+    // 学年セレクトに追加
     const sel = document.getElementById('grade-select');
-    // 学年を順番通りに並べる
     const order = ['小学1年生','小学2年生','小学3年生','小学4年生','小学5年生','小学6年生','中学1年生','中学2年生','中学3年生'];
     const sorted = r.grades.sort((a, b) => {
       const ai = order.indexOf(a), bi = order.indexOf(b);
@@ -60,115 +158,321 @@ async function loadGrades() {
     });
     sorted.forEach(g => {
       const opt = document.createElement('option');
-      opt.value = g;
-      opt.textContent = g;
+      opt.value = g; opt.textContent = g;
       sel.appendChild(opt);
     });
-  } catch(e) {
-    window.toast('読み込みエラー', 'error');
-  }
+
+    // 教科セレクトに全教科を最初から追加
+    const subjSel = document.getElementById('subject-select');
+    subjSel.innerHTML = '<option value="">📝 教科を選んでください</option>';
+    const allSubjects = r.subjects || r.all_subjects || [];
+    allSubjects.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s; opt.textContent = s;
+      subjSel.appendChild(opt);
+    });
+    subjSel.style.background = '#fff';
+    subjSel.style.cursor = 'pointer';
+  } catch(e) { window.toast('読み込みエラー', 'error'); }
 }
 
-// ===== 学年を選んだとき教科を読み込む =====
 document.getElementById('grade-select').addEventListener('change', async function() {
   const grade = this.value;
   const subjSel = document.getElementById('subject-select');
   subjSel.innerHTML = '<option value="">📝 教科を選んでください</option>';
-  subjSel.disabled = true;
-  subjSel.style.background = '#f5f5f5';
-  subjSel.style.cursor = 'not-allowed';
-  document.getElementById('quiz-list').innerHTML = '<div style="text-align:center;color:#bbb;padding:40px 0;"><div style="font-size:2rem;">📝</div><p>教科を選んでください</p></div>';
+  hideBulkBtn();
+  if (!grade) {
+    document.getElementById('quiz-list').innerHTML = '<div style="text-align:center;color:#bbb;padding:60px 0;"><div style="font-size:3rem;">📖</div><p>学年を選ぶと問題が表示されます</p></div>';
+    document.getElementById('quiz-count').textContent = '';
+    return;
+  }
+  document.getElementById('quiz-list').innerHTML = '<div style="text-align:center;padding:40px;color:#bbb;">読み込み中...</div>';
   document.getElementById('quiz-count').textContent = '';
-  if (!grade) return;
-
   try {
     const r = await window.api.get('/api/library/data?grade=' + encodeURIComponent(grade));
     r.subjects.forEach(s => {
       const opt = document.createElement('option');
-      opt.value = s;
-      opt.textContent = s;
+      opt.value = s; opt.textContent = s;
       subjSel.appendChild(opt);
     });
     subjSel.disabled = false;
     subjSel.style.background = '#fff';
     subjSel.style.cursor = 'pointer';
-  } catch(e) {
-    window.toast('読み込みエラー', 'error');
-  }
+    const allQuizzes = [];
+    await Promise.all(r.subjects.map(async s => {
+      try {
+        const qr = await window.api.get('/api/library/data?grade=' + encodeURIComponent(grade) + '&subject=' + encodeURIComponent(s));
+        if (qr.quizzes) { qr.quizzes.forEach(q => { q._subject = s; q._grade = grade; }); allQuizzes.push(...qr.quizzes); }
+      } catch(e) {}
+    }));
+    renderQuizzes(allQuizzes);
+  } catch(e) { window.toast('読み込みエラー', 'error'); }
 });
 
-// ===== 教科を選んだとき問題を表示する =====
 document.getElementById('subject-select').addEventListener('change', async function() {
-  const grade   = document.getElementById('grade-select').value;
+  const grade = document.getElementById('grade-select').value;
   const subject = this.value;
-  const list    = document.getElementById('quiz-list');
-  const counter = document.getElementById('quiz-count');
-  if (!subject) return;
-
-  list.innerHTML = '<div style="text-align:center;padding:40px;color:#bbb;">読み込み中...</div>';
-  counter.textContent = '';
-
+  if (!subject) { document.getElementById('grade-select').dispatchEvent(new Event('change')); return; }
+  document.getElementById('quiz-list').innerHTML = '<div style="text-align:center;padding:40px;color:#bbb;">読み込み中...</div>';
+  document.getElementById('quiz-count').textContent = '';
+  hideBulkBtn();
   try {
-    const r = await window.api.get(
-      '/api/library/data?grade=' + encodeURIComponent(grade) +
-      '&subject=' + encodeURIComponent(subject)
-    );
+    const r = await window.api.get('/api/library/data?grade=' + encodeURIComponent(grade) + '&subject=' + encodeURIComponent(subject));
+    if (r.quizzes) r.quizzes.forEach(q => { q._subject = subject; q._grade = grade || q.grade || ''; });
+    renderQuizzes(r.quizzes || []);
+  } catch(e) { window.toast('読み込みエラー', 'error'); }
+});
 
-    if (!r.quizzes || r.quizzes.length === 0) {
-      list.innerHTML = '<div style="text-align:center;color:#bbb;padding:40px;">問題がありません</div>';
-      return;
-    }
-
-    counter.textContent = '全' + r.quizzes.length + '問';
-
-    // 問題カードを作る
-    list.innerHTML = r.quizzes.map((q, i) => `
-      <div class="card" style="margin-bottom:12px; padding:16px; border-radius:12px; border:1px solid #e0e0e0;">
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; flex-wrap:wrap;">
-          <div style="flex:1; min-width:200px;">
-            <div style="font-weight:bold; margin-bottom:8px; font-size:1rem; line-height:1.5;">
-              Q${i+1}. ${window.escapeHtml(q.question)}
-            </div>
-            <div style="color:#2e7d32; font-size:0.95rem; margin-bottom:4px;">
-              ✅ 答え: ${window.escapeHtml(q.answer)}
-            </div>
-            ${q.explanation ? `<div style="color:#888; font-size:0.85rem; margin-top:4px;">💡 ${window.escapeHtml(q.explanation)}</div>` : ''}
+function renderQuizzes(quizzes) {
+  currentQuizzes = quizzes;
+  selectedIds.clear();
+  bulkMode = false;
+  updateBulkToolbar();
+  const list = document.getElementById('quiz-list');
+  const counter = document.getElementById('quiz-count');
+  if (!quizzes || quizzes.length === 0) {
+    list.innerHTML = '<div style="text-align:center;color:#bbb;padding:40px;">問題がありません</div>';
+    counter.textContent = '';
+    hideBulkBtn();
+    return;
+  }
+  counter.textContent = '全' + quizzes.length + '問';
+  if (loggedIn) showBulkBtn();
+  list.innerHTML = quizzes.map((q, i) => `
+    <div class="card quiz-card" data-id="${q.id}" style="margin-bottom:12px; padding:16px; border-radius:12px; border:1px solid #e0e0e0; transition:border-color 0.2s, background 0.2s; background:white;">
+      <div style="display:flex; align-items:flex-start; gap:10px;">
+        ${loggedIn ? `<div class="bulk-check" style="display:none; padding-top:2px; flex-shrink:0;"><input type="checkbox" class="quiz-checkbox" data-id="${q.id}" onchange="onCheckChange(this)" style="width:20px; height:20px; cursor:pointer; accent-color:#4caf50;"></div>` : ''}
+        <div style="flex:1; min-width:0;">
+          <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px; flex-wrap:wrap;">
+            ${q._grade ? `<span style="background:#e91e63; color:white; font-size:0.72rem; padding:2px 8px; border-radius:10px;">${window.escapeHtml(q._grade)}</span>` : ''}
+            ${q._subject ? `<span style="background:#1565c0; color:white; font-size:0.72rem; padding:2px 8px; border-radius:10px;">${window.escapeHtml(q._subject)}</span>` : ''}
           </div>
-          ${loggedIn ? `
-          <button
-            onclick="importQuiz(${q.id}, this)"
-            style="padding:8px 16px; background:#4caf50; color:white; border:none; border-radius:8px; cursor:pointer; font-size:0.9rem; white-space:nowrap; flex-shrink:0;">
-            ＋ 引用する
-          </button>` : ''}
+          <div style="font-weight:bold; margin-bottom:8px; font-size:1rem; line-height:1.5;">Q${i+1}. ${window.escapeHtml(q.question)}</div>
+          <div style="color:#2e7d32; font-size:0.95rem; margin-bottom:4px;">✅ 答え: ${window.escapeHtml(q.answer)}</div>
+          ${q.explanation ? `<div style="color:#888; font-size:0.85rem; margin-top:4px;">💡 ${window.escapeHtml(q.explanation)}</div>` : ''}
+        </div>
+        ${loggedIn ? `<button class="import-btn" data-id="${q.id}" onclick="importQuiz(${q.id}, this)"
+          style="padding:8px 16px; background:${q.imported?'#9e9e9e':'#4caf50'}; color:white; border:none; border-radius:8px; cursor:pointer; font-size:0.9rem; white-space:nowrap; flex-shrink:0;"
+          ${q.imported?'disabled':''}>
+          ${q.imported?'✅ 引用済み':'＋ 引用する'}
+        </button>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleBulkMode() {
+  bulkMode = !bulkMode;
+  selectedIds.clear();
+  updateBulkToolbar();
+  updateCardStyles();
+  if (document.getElementById('check-all')) document.getElementById('check-all').checked = false;
+  updateSelectedCount();
+}
+
+function updateBulkToolbar() {
+  const toolbar = document.getElementById('bulk-toolbar');
+  const btn = document.getElementById('bulk-toggle-btn');
+  if (!toolbar || !btn) return;
+  if (bulkMode) {
+    toolbar.style.display = 'flex';
+    btn.textContent = '✖ キャンセル';
+    btn.style.background = '#9e9e9e';
+  } else {
+    toolbar.style.display = 'none';
+    btn.textContent = '☑️ まとめて追加';
+    btn.style.background = '#e91e63';
+  }
+}
+
+function updateCardStyles() {
+  document.querySelectorAll('.quiz-card').forEach(card => {
+    const importBtn = card.querySelector('.import-btn');
+    const bulkCheck = card.querySelector('.bulk-check');
+    const checkbox  = card.querySelector('.quiz-checkbox');
+    const isImported = importBtn && importBtn.disabled;
+    if (bulkMode) {
+      // まとめてモード: 引用済みはラベル表示、未引用はチェックボックス
+      if (isImported) {
+        if (bulkCheck) bulkCheck.style.display = 'none';
+        // 引用済みバッジを表示
+        let badge = card.querySelector('.imported-badge');
+        if (!badge) {
+          badge = document.createElement('div');
+          badge.className = 'imported-badge';
+          badge.style = 'padding-top:2px; flex-shrink:0; font-size:0.85rem; color:#9e9e9e; white-space:nowrap;';
+          badge.textContent = '✅ 引用済み';
+          bulkCheck.parentNode.insertBefore(badge, bulkCheck);
+        }
+        badge.style.display = 'block';
+      } else {
+        if (bulkCheck) bulkCheck.style.display = 'block';
+        const badge = card.querySelector('.imported-badge');
+        if (badge) badge.style.display = 'none';
+      }
+      if (importBtn) importBtn.style.display = 'none';
+      if (checkbox) checkbox.checked = false;
+    } else {
+      // 通常モード
+      if (bulkCheck) bulkCheck.style.display = 'none';
+      const badge = card.querySelector('.imported-badge');
+      if (badge) badge.style.display = 'none';
+      if (importBtn) importBtn.style.display = '';
+      if (checkbox) checkbox.checked = false;
+      card.style.borderColor = '#e0e0e0';
+      card.style.background = '';
+    }
+  });
+}
+
+function onCheckChange(checkbox) {
+  const id = parseInt(checkbox.dataset.id);
+  if (checkbox.checked) selectedIds.add(id); else selectedIds.delete(id);
+  const card = checkbox.closest('.quiz-card');
+  if (card) { card.style.borderColor = checkbox.checked ? '#e91e63' : '#e0e0e0'; card.style.background = checkbox.checked ? '#fce4ec' : ''; }
+  updateSelectedCount();
+  const total = document.querySelectorAll('.quiz-checkbox').length;
+  document.getElementById('check-all').checked = (selectedIds.size === total && total > 0);
+}
+
+const checkAllEl = document.getElementById('check-all');
+if (checkAllEl) checkAllEl.addEventListener('change', function() {
+  // 引用済みでないチェックボックスのみ対象
+  const checkboxes = document.querySelectorAll('.quiz-checkbox');
+  checkboxes.forEach(cb => {
+    const card = cb.closest('.quiz-card');
+    const importBtn = card ? card.querySelector('.import-btn') : null;
+    const isImported = importBtn && importBtn.disabled;
+    if (isImported) return; // 引用済みはスキップ
+    cb.checked = this.checked;
+    const id = parseInt(cb.dataset.id);
+    if (this.checked) selectedIds.add(id); else selectedIds.delete(id);
+    if (card) { card.style.borderColor = this.checked ? '#e91e63' : '#e0e0e0'; card.style.background = this.checked ? '#fce4ec' : ''; }
+  });
+  updateSelectedCount();
+});
+
+function updateSelectedCount() {
+  const el = document.getElementById('selected-count');
+  if (el) el.textContent = selectedIds.size + '問 選択中';
+  const btn = document.getElementById('bulk-import-btn');
+  if (btn) btn.disabled = selectedIds.size === 0;
+}
+
+async function importSelected() {
+  if (selectedIds.size === 0) return;
+  const ids = [...selectedIds];
+  const btn = document.getElementById('bulk-import-btn');
+  btn.disabled = true;
+  btn.textContent = '追加中...';
+  let ok = 0, ng = 0;
+  const importedIds = [];
+  for (const id of ids) {
+    try {
+      await window.api.post('/api/library/import', {quiz_id: id});
+      ok++;
+      importedIds.push(id);
+      const card = document.querySelector(`.quiz-card[data-id="${id}"]`);
+      if (card) { card.style.opacity = '0.5'; card.style.borderColor = '#4caf50'; card.style.background = '#e8f5e9'; }
+    } catch(e) { ng++; }
+  }
+  if (ok > 0) window.toast(ok + '問を引用しました！', 'success');
+  if (ng > 0) window.toast(ng + '問は引用に失敗しました', 'error');
+  // まとめてモードを終了
+  bulkMode = false;
+  selectedIds.clear();
+  updateBulkToolbar();
+  // カードをリセット（チェック解除・ボーダー戻す）
+  document.querySelectorAll('.bulk-check').forEach(el => { el.style.display = 'none'; });
+  document.querySelectorAll('.quiz-checkbox').forEach(el => { el.checked = false; });
+  document.querySelectorAll('.quiz-card').forEach(el => { el.style.borderColor = '#e0e0e0'; el.style.background = ''; });
+  // 引用済みボタンを更新（updateCardStylesの後に実行）
+  importedIds.forEach(id => {
+    const importBtn = document.querySelector(`.import-btn[data-id="${id}"]`);
+    if (importBtn) {
+      importBtn.style.display = '';
+      importBtn.textContent = '✅ 引用済み';
+      importBtn.style.background = '#9e9e9e';
+      importBtn.disabled = true;
+    }
+  });
+  btn.textContent = '＋ まとめて引用する';
+  btn.disabled = false;
+}
+
+
+async function askEditPassword() {
+  return new Promise((resolve) => {
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+    modal.innerHTML = `
+      <div style="background:#fff;border-radius:20px;padding:24px;max-width:400px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+        <h3 style="margin:0 0 12px;font-size:1.1rem;">🔑 編集パスワードの設定</h3>
+        <p style="color:#666;font-size:0.88rem;margin-bottom:14px;">引用するクイズに編集パスワードを設定できます。<br>設定しない場合は空欄のままにしてください。</p>
+        <input type="password" id="edit-pw-input" placeholder="編集パスワード（任意）"
+          style="width:100%;padding:10px 14px;border:2px solid #e0e0e0;border-radius:10px;font-size:1rem;box-sizing:border-box;margin-bottom:16px;">
+        <div style="display:flex;gap:8px;">
+          <button onclick="window._onEditPwOk()"
+            style="flex:1;padding:11px;background:#4caf50;color:white;border:none;border-radius:10px;font-size:0.95rem;font-weight:bold;cursor:pointer;">
+            ✅ この設定で引用する
+          </button>
+          <button onclick="window._onEditPwCancel()"
+            style="padding:11px 16px;background:#f5f5f5;color:#555;border:none;border-radius:10px;font-size:0.95rem;cursor:pointer;">
+            キャンセル
+          </button>
         </div>
       </div>
-    `).join('');
+    `;
+    document.body.appendChild(modal);
+    window._onEditPwOk = function() {
+      const pw = document.getElementById('edit-pw-input').value;
+      modal.remove();
+      resolve(pw);
+    };
+    window._onEditPwCancel = function() {
+      modal.remove();
+      resolve(null);
+    };
+  });
+}
 
-  } catch(e) {
-    window.toast('読み込みエラー', 'error');
-    list.innerHTML = '<div style="text-align:center;color:#e53935;padding:40px;">読み込みに失敗しました</div>';
-  }
-});
-
-// ===== 引用する =====
 async function importQuiz(quizId, btn) {
+  const ok = await window.checkClaudeNotice();
+  if (!ok) return;
+  const editPw = await askEditPassword();
+  if (editPw === null) return;
   btn.disabled = true;
   btn.textContent = '追加中...';
   btn.style.background = '#aaa';
   try {
-    await window.api.post('/api/library/import', {quiz_id: quizId});
+    await window.api.post('/api/library/import', {quiz_id: quizId, edit_password: editPw || ''});
     window.toast('グループに引用しました', 'success');
     btn.textContent = '✅ 引用済み';
     btn.style.background = '#9e9e9e';
+    // 引用済みIDを記憶
+    const imported = JSON.parse(sessionStorage.getItem('imported_ids') || '[]');
+    imported.push(quizId);
+    sessionStorage.setItem('imported_ids', JSON.stringify(imported));
   } catch(err) {
-    window.toast(err.message, 'error');
-    btn.disabled = false;
-    btn.textContent = '＋ 引用する';
-    btn.style.background = '#4caf50';
+    if (err.message && err.message.includes('already')) {
+      btn.textContent = '✅ 引用済み';
+      btn.style.background = '#9e9e9e';
+    } else {
+      window.toast(err.message, 'error');
+      btn.disabled = false;
+      btn.textContent = '＋ 引用する';
+      btn.style.background = '#4caf50';
+    }
   }
 }
 
-// 最初に学年を読み込む
-loadGrades();
+function showBulkBtn() { const btn = document.getElementById('bulk-toggle-btn'); if (btn) btn.style.display = ''; }
+function hideBulkBtn() { const btn = document.getElementById('bulk-toggle-btn'); if (btn) { btn.style.display = 'none'; bulkMode = false; updateBulkToolbar(); } }
+
+(async function() {
+  const agreed = await window.checkLibraryConsent();
+  if (!agreed) { window.location.href = '/library'; return; }
+  loadGrades();
+})();
 </script>
 {% endblock %}

@@ -307,7 +307,7 @@ textarea.form-control {
   background: #fff;
   border: 1.5px solid var(--c-border);
   border-radius: var(--radius-lg);
-  padding: 20px;
+  padding: 12px 14px;
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
   display: flex;
@@ -650,26 +650,29 @@ textarea.form-control {
 /* -------- トグルスイッチ -------- */
 .toggle {
   position: relative;
-  width: 56px;
-  height: 32px;
+  width: 52px;
+  height: 28px;
   background: #9CA3AF;
   border-radius: 999px;
   border: none;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.25s;
   flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 .toggle.on { background: #3B82F6; }
 .toggle::after {
   content: '';
   position: absolute;
-  top: 4px;
-  left: 4px;
-  width: 24px;
-  height: 24px;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
   background: #fff;
   border-radius: 50%;
-  transition: transform 0.2s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
 }
 .toggle.on::after { transform: translateX(24px); }
 
@@ -805,6 +808,12 @@ textarea.form-control {
   text-align: right;
 }
 
+/* ガイド中の+ボタン非表示 */
+.guide-active .fab {
+  z-index: 1 !important;
+  pointer-events: none !important;
+}
+
 /* -------- アニメーション -------- */
 @keyframes fadeIn   { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp  { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
@@ -818,14 +827,83 @@ textarea.form-control {
 
 /* -------- レスポンシブ -------- */
 @media (max-width: 640px) {
-  .site-header-inner { padding: 10px 14px; }
-  .site-header-title { font-size: 14px; max-width: 140px; }
-  .header-link { padding: 6px 10px; font-size: 12px; }
-  .container { padding: 16px 14px 96px; }
-  .page-title { font-size: 22px; }
-  .card { padding: 20px; }
-  .result-mark { font-size: 120px; }
+  /* ===== ヘッダー ===== */
+  .site-header-inner {
+    padding: 8px 12px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .site-header-left { font-size: 14px; }
+  .site-header-title { font-size: 13px; max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .site-header-logo { font-size: 20px; }
+
+  /* ナビを折り返してコンパクトに */
+  .site-header-inner {
+    flex-wrap: wrap;
+  }
+  .site-header-nav {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 2px;
+    justify-content: flex-start;
+  }
+  .site-header-nav .header-link {
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 6px;
+  }
+  #hamburger-btn { display: none !important; }
+  #nav-close-btn { display: none !important; }
+
+  /* ===== コンテンツ ===== */
+  .container { padding: 12px 10px 80px; }
+  .container-narrow { padding: 16px 12px; }
+  .page-title { font-size: 20px; }
+  .page-subtitle { font-size: 14px; }
+
+  /* ===== カード ===== */
+  .card { padding: 14px 12px; border-radius: 12px; }
+
+  /* ===== フォーム ===== */
+  .form-control { font-size: 16px; } /* iOSズーム防止 */
+  .btn { font-size: 15px; padding: 11px 18px; }
+  .btn-block { font-size: 16px; }
+
+  /* ===== クイズカード ===== */
+  .result-mark { font-size: 80px; }
   .color-grid { grid-template-columns: repeat(4, 1fr); }
+
+  /* ===== モーダル ===== */
+  .modal {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    margin: 10px !important;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  /* ===== 引用ライブラリ ===== */
+  #bulk-toggle-btn {
+    bottom: 16px !important;
+    right: 16px !important;
+    padding: 12px 16px !important;
+    font-size: 0.9rem !important;
+  }
+
+  /* ===== ランキング・セット ===== */
+  table { font-size: 13px; }
+  th, td { padding: 8px 6px; }
+}
+
+/* タブレット対応 */
+@media (max-width: 768px) {
+  .site-header-nav {
+    gap: 4px;
+  }
+  .header-link {
+    padding: 5px 8px;
+    font-size: 11px;
+  }
 }
 
 /* ===== 管理者画面ダークテーマ ===== */
@@ -895,4 +973,206 @@ textarea.form-control {
     color: #7dd3fc !important;
     padding: 2px 6px;
     border-radius: 4px;
+}
+
+/* ============================================================
+   テーマスタイル
+   ============================================================ */
+@keyframes floatEmoji {
+  0% { transform: translateY(0) rotate(-5deg); }
+  100% { transform: translateY(-30px) rotate(5deg); }
+}
+
+/* 近代化モード */
+body.theme-dark {
+  color: #e0e0ff !important;
+}
+body.theme-dark .card,
+body.theme-dark [class*="card"] {
+  background: #1e1e2e !important;
+  border-color: #3d3d5c !important;
+  color: #e0e0ff !important;
+}
+body.theme-dark h1,body.theme-dark h2,body.theme-dark h3,
+body.theme-dark p,body.theme-dark label,body.theme-dark span {
+  color: #e0e0ff !important;
+}
+body.theme-dark input,body.theme-dark select,body.theme-dark textarea {
+  background: #2a2a3e !important;
+  color: #e0e0ff !important;
+  border-color: #4a4a6a !important;
+}
+body.theme-dark .header-bar {
+  background: #1a1a2e !important;
+  border-color: #3d3d5c !important;
+}
+
+/* クラシックモード */
+body.theme-sepia {
+  color: #3d2b1f !important;
+  font-family: 'Georgia', serif !important;
+}
+body.theme-sepia .card,
+body.theme-sepia [class*="card"] {
+  background: #fdf5e6 !important;
+  border-color: #c8a87a !important;
+  color: #3d2b1f !important;
+}
+body.theme-sepia h1,body.theme-sepia h2,body.theme-sepia h3 {
+  color: #5c3d1e !important;
+  font-family: 'Georgia', serif !important;
+}
+body.theme-sepia input,body.theme-sepia select {
+  background: #fdf5e6 !important;
+  border-color: #c8a87a !important;
+  color: #3d2b1f !important;
+}
+
+/* 画像拡大モーダル */
+.img-modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+  z-index: 99999; display: flex; align-items: center; justify-content: center;
+  cursor: zoom-out; animation: fadeIn 0.15s ease;
+}
+.img-modal-overlay img {
+  max-width: 92vw; max-height: 88vh; border-radius: 12px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+}
+@keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+
+/* クリック可能な画像 */
+.quiz-image-thumb {
+  cursor: zoom-in; border-radius: 8px; transition: transform 0.15s, box-shadow 0.15s;
+}
+.quiz-image-thumb:hover {
+  transform: scale(1.04); box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+
+/* ローディングスケルトン */
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.2s infinite;
+  border-radius: 8px;
+}
+@keyframes skeleton-loading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* テーマ設定パネル */
+.theme-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px;
+}
+.theme-btn {
+  border: 2px solid #e0e0e0; border-radius: 10px; padding: 8px 4px;
+  cursor: pointer; text-align: center; font-size: 0.8rem; transition: all 0.2s;
+  background: white;
+}
+.theme-btn:hover { border-color: #667eea; transform: translateY(-2px); }
+.theme-btn.active { border-color: #667eea; background: #f0f0ff; }
+.theme-preview {
+  width: 100%; height: 32px; border-radius: 6px; margin-bottom: 4px;
+}
+
+/* ネオンテーマ */
+body.theme-neon .card { background:#111 !important; border-color:#00ff00 !important; color:#00ff00 !important; box-shadow:0 0 8px #00ff0044 !important; }
+body.theme-neon h1,body.theme-neon h2,body.theme-neon h3 { color:#00ff00 !important; text-shadow:0 0 8px #00ff00; }
+
+/* ギャラクシーテーマ */
+body.theme-galaxy .card { background:#12002a !important; border-color:#7c4dff !important; color:#ce93d8 !important; }
+body.theme-galaxy h1,body.theme-galaxy h2 { color:#b388ff !important; }
+
+/* オーロラテーマ */
+body.theme-aurora .card { background:#0d1f33 !important; border-color:#00bfa5 !important; color:#7fffd4 !important; }
+body.theme-aurora h1,body.theme-aurora h2 { color:#7fffd4 !important; }
+
+/* ネオンテーマ */
+body.theme-neon .card { background:#111 !important; border-color:#00ff00 !important; color:#00ff00 !important; box-shadow:0 0 8px #00ff0044 !important; }
+body.theme-neon h1,body.theme-neon h2,body.theme-neon h3 { color:#00ff00 !important; text-shadow:0 0 8px #00ff00; }
+
+/* ギャラクシーテーマ */
+body.theme-galaxy .card { background:#12002a !important; border-color:#7c4dff !important; color:#ce93d8 !important; }
+body.theme-galaxy h1,body.theme-galaxy h2 { color:#b388ff !important; }
+
+/* オーロラテーマ */
+body.theme-aurora .card { background:#0d1f33 !important; border-color:#00bfa5 !important; color:#7fffd4 !important; }
+body.theme-aurora h1,body.theme-aurora h2 { color:#7fffd4 !important; }
+
+/* 特別な日テーマ */
+body.theme-dark.tanabata-theme .card { background:#12002a !important; border-color:#7c4dff !important; }
+body.halloween-dark .card { background:#1a0a00 !important; border-color:#ff6600 !important; color:#ff9933 !important; }
+
+/* ============================================================
+   レスポンシブ対応（スマホ・タブレット）
+   ============================================================ */
+
+/* タッチデバイス共通 */
+* { -webkit-tap-highlight-color: transparent; }
+button, a { touch-action: manipulation; }
+
+/* スマホ（480px以下） */
+@media (max-width: 480px) {
+  .site-header-inner { padding: 0 12px; }
+  .container-narrow { padding: 16px 12px; }
+  .card { padding: 14px 12px; border-radius: 12px; }
+  .btn { padding: 10px 16px; font-size: 0.9rem; }
+  .page-title { font-size: 1.4rem; }
+  .page-subtitle { font-size: 0.9rem; }
+  /* クイズカード */
+  .quiz-card { padding: 12px; }
+  /* フォーム */
+  input, select, textarea {
+    font-size: 16px !important; /* iOSズーム防止 */
+  }
+  /* テーマカード */
+  .theme-card { padding: 8px 4px; }
+  /* ライブラリ */
+  #quiz-list .card { padding: 12px; }
+}
+
+/* タブレット（768px以下） */
+@media (max-width: 768px) {
+  .hide-mobile { display: none !important; }
+  .stack-mobile { flex-direction: column !important; }
+  .full-mobile { width: 100% !important; }
+  /* グリッドを1列に */
+  .theme-grid { grid-template-columns: repeat(3, 1fr) !important; }
+  /* ナビ */
+  .header-nav { gap: 8px; }
+  .header-link { font-size: 0.82rem; padding: 6px 8px; }
+  /* ボタン群 */
+  .btn-group { flex-wrap: wrap; }
+  .btn-group .btn { flex: 1; min-width: 120px; }
+}
+
+/* iPad（768px〜1024px） */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .container-narrow { max-width: 700px; }
+  .theme-grid { grid-template-columns: repeat(4, 1fr) !important; }
+}
+
+/* iOSの入力フォームズーム防止 */
+@media screen and (-webkit-min-device-pixel-ratio: 0) {
+  select, textarea, input[type="text"],
+  input[type="password"], input[type="email"],
+  input[type="number"], input[type="search"] {
+    font-size: 16px;
+  }
+}
+
+/* スクロールバーを細く（スマホ用） */
+@media (max-width: 768px) {
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 2px; }
+}
+
+/* フローティングボタンをスマホで調整 */
+@media (max-width: 480px) {
+  #bulk-toggle-btn {
+    bottom: 16px !important;
+    right: 16px !important;
+    padding: 12px 16px !important;
+    font-size: 0.9rem !important;
+  }
 }

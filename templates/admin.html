@@ -68,6 +68,72 @@
       </h1>
     </div>
 
+    {# ---- AI採点 + APIキー設定（統合） ---- #}
+    <div class="admin-card" style="margin-bottom:16px; padding:16px;">
+      <h3 style="margin-bottom:12px;">🤖 AI採点設定</h3>
+
+      <div class="form-group">
+        <label class="form-label">AIサービスを選ぶ</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;" id="admin-ai-provider-btns">
+          <button type="button" class="admin-ai-pvd-btn" data-provider="gemini"
+            style="padding:10px;border-radius:10px;border:2px solid #444;background:#1e1e2e;color:#e0e0ff;cursor:pointer;font-weight:bold;font-size:0.85rem;">
+            🌟 Google Gemini
+          </button>
+          <button type="button" class="admin-ai-pvd-btn" data-provider="openai"
+            style="padding:10px;border-radius:10px;border:2px solid #444;background:#1e1e2e;color:#e0e0ff;cursor:pointer;font-weight:bold;font-size:0.85rem;">
+            🧠 OpenAI
+          </button>
+          <button type="button" class="admin-ai-pvd-btn" data-provider="anthropic"
+            style="padding:10px;border-radius:10px;border:2px solid #444;background:#1e1e2e;color:#e0e0ff;cursor:pointer;font-weight:bold;font-size:0.85rem;">
+            🔮 Anthropic
+          </button>
+          <button type="button" class="admin-ai-pvd-btn" data-provider="cloudflare"
+            style="padding:10px;border-radius:10px;border:2px solid #444;background:#1e1e2e;color:#e0e0ff;cursor:pointer;font-weight:bold;font-size:0.85rem;">
+            ☁️ Cloudflare
+          </button>
+        </div>
+        <div id="admin-ai-model-info" style="margin-top:8px;background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);border-radius:8px;padding:10px;font-size:0.82rem;color:#a5b4fc;">
+          サービスを選択してください
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" id="admin-ai-key-label">APIキー</label>
+        <div style="position:relative;">
+          <input type="password" id="admin-ai-key" class="form-control" placeholder="APIキーを入力..."
+            style="padding-right:48px;font-family:monospace;font-size:0.85rem;">
+          <button type="button" onclick="toggleAdminAiKey()" id="admin-ai-key-eye"
+            style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1rem;">👁️</button>
+        </div>
+      </div>
+
+      <div class="form-group" id="admin-cf-section" style="display:none;">
+        <label class="form-label">Account ID（Cloudflareのみ）</label>
+        <input type="text" id="admin-cf-account" class="form-control" placeholder="Cloudflare Account ID"
+          style="font-family:monospace;font-size:0.85rem;">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">管理者パスワード（確認用）</label>
+        <input type="password" id="ai-admin-pw" class="form-control" placeholder="管理者パスワード">
+      </div>
+
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
+        <span style="font-size:0.85rem;color:#9CA3AF;">AI採点</span>
+        <button type="button" id="toggle-ai" class="toggle {% if group_info.ai_scoring %}on{% endif %}" aria-label="AI採点切替"></button>
+        <span id="ai-status" style="font-size:0.82rem;color:{{ '#34D399' if group_info.ai_scoring else '#9CA3AF' }};">
+          現在: {% if group_info.ai_scoring %}有効{% else %}無効{% endif %}
+        </span>
+      </div>
+
+      <div style="display:flex;gap:8px;">
+        <button type="button" onclick="saveAdminAiConfig()" class="btn btn-primary" style="flex:1;">💾 保存する</button>
+        <button type="button" onclick="loadAdminAiConfig()" class="btn btn-secondary" style="padding:8px 16px;">📋 現在の設定</button>
+      </div>
+      <div id="ai-config-status" style="margin-top:8px;font-size:0.82rem;color:#9CA3AF;display:none;"></div>
+    </div>
+
+
     {# ---- 閲覧のみモード切替 ---- #}
     <div class="admin-card">
       <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:12px;">
@@ -132,12 +198,33 @@
       </button>
     </div>
 
+    {# ---- フィードバック ---- #}
+    <div class="admin-card" style="margin-top:16px;">
+      <h3>💬 フィードバック</h3>
+      <p>ユーザーから届いたフィードバックを確認できるよ。</p>
+      <button type="button" id="btn-feedback" class="btn btn-block"
+        style="background:rgba(251,191,36,0.2); color:#FCD34D; border:1px solid rgba(251,191,36,0.3);">
+        📊 フィードバック集計を見る
+      </button>
+    </div>
+
     {# ---- クイズ管理 ---- #}
     <div class="admin-card" style="margin-top:16px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
         <h3 style="margin:0;">📝 クイズ管理</h3>
         <button type="button" id="btn-load-quizzes" style="padding:6px 14px; background:rgba(255,255,255,0.08); color:#9CA3AF; border:1px solid rgba(255,255,255,0.1); border-radius:8px; cursor:pointer; font-size:0.85rem;">
           🔄 一覧を読み込む
+        </button>
+      </div>
+      <div id="bulk-delete-bar" style="display:none; gap:8px; align-items:center; margin-bottom:10px; padding:8px 12px; background:rgba(239,68,68,0.1); border-radius:8px; border:1px solid rgba(239,68,68,0.2);">
+        <label style="display:flex; align-items:center; gap:6px; cursor:pointer; color:#FCA5A5; font-size:0.85rem;">
+          <input type="checkbox" id="select-all-quizzes" style="width:16px; height:16px; accent-color:#EF4444;">
+          すべて選択
+        </label>
+        <span style="color:#6B7280; font-size:0.8rem;" id="selected-quiz-count">0件選択中</span>
+        <button type="button" id="btn-bulk-delete" disabled
+          style="margin-left:auto; padding:5px 14px; background:rgba(239,68,68,0.3); color:#FCA5A5; border:1px solid rgba(239,68,68,0.4); border-radius:6px; cursor:pointer; font-size:0.8rem;">
+          🗑️ まとめて削除
         </button>
       </div>
       <div id="quiz-admin-list" style="color:#6B7280; font-size:0.85rem;">
@@ -186,6 +273,20 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
 const groupIdRaw = '{{ group_id }}';
 
 // ---- 閲覧モードの切替 ----
+document.getElementById('toggle-ai').addEventListener('click', async () => {
+  const tgl = document.getElementById('toggle-ai');
+  const next = !tgl.classList.contains('on');
+  if (!confirm(next ? 'AI採点を有効にするよ?' : 'AI採点を無効にするよ?')) return;
+  const r = await window.api.post(`/api/admin/ai-scoring/${encodeURIComponent(groupIdRaw)}`, {ai_scoring: next});
+  tgl.classList.toggle('on', r.ai_scoring);
+  const status = document.getElementById('ai-status');
+  if (status) {
+    status.style.background = r.ai_scoring ? 'rgba(52,211,153,0.1)' : 'rgba(156,163,175,0.1)';
+    status.style.color = r.ai_scoring ? '#34D399' : '#9CA3AF';
+    status.textContent = r.ai_scoring ? '現在: AI採点 有効' : '現在: AI採点 無効';
+  }
+});
+
 document.getElementById('toggle-view').addEventListener('click', async () => {
   const tgl = document.getElementById('toggle-view');
   const next = !tgl.classList.contains('on');
@@ -259,20 +360,47 @@ document.getElementById('btn-enter-group').addEventListener('click', async () =>
   }
 });
 
+// ---- フィードバックページへ ----
+document.getElementById('btn-feedback').addEventListener('click', () => {
+  const pw = prompt('管理者パスワードを入力してね');
+  if (pw) window.open('/feedback/list?pw=' + encodeURIComponent(pw), '_blank');
+});
+
 // ---- クイズ一覧を読み込む ----
+let allQuizzes = [];
+const selectedQuizIds = new Set();
+
 document.getElementById('btn-load-quizzes').addEventListener('click', async () => {
   const list = document.getElementById('quiz-admin-list');
   list.innerHTML = '読み込み中...';
+  selectedQuizIds.clear();
   try {
     const r = await window.api.get(`/api/admin/quizzes/${encodeURIComponent(groupIdRaw)}`);
-    if (!r.quizzes || r.quizzes.length === 0) {
+    allQuizzes = r.quizzes || [];
+    if (allQuizzes.length === 0) {
       list.innerHTML = '<p style="color:#9CA3AF; margin:8px 0;">クイズがないよ</p>';
+      document.getElementById('bulk-delete-bar').style.display = 'none';
       return;
     }
-    list.innerHTML = r.quizzes.map((q, i) => `
-      <div style="display:flex; justify-content:space-between; align-items:center;
-                  padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
-        <div style="flex:1; min-width:0; margin-right:8px;">
+    document.getElementById('bulk-delete-bar').style.display = 'flex';
+    renderQuizList();
+  } catch (err) {
+    window.toast(err.message, 'error');
+    list.innerHTML = '<p style="color:#EF4444;">読み込み失敗</p>';
+  }
+});
+
+function renderQuizList() {
+  const list = document.getElementById('quiz-admin-list');
+  list.innerHTML = allQuizzes.map((q, i) => `
+    <div style="display:flex; justify-content:space-between; align-items:center;
+                padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+      <label style="display:flex; align-items:center; gap:8px; flex:1; min-width:0; cursor:pointer;">
+        <input type="checkbox" class="quiz-check" data-id="${q.id}"
+          onchange="onQuizCheck(this)"
+          style="width:16px; height:16px; flex-shrink:0; accent-color:#EF4444;"
+          ${selectedQuizIds.has(q.id) ? 'checked' : ''}>
+        <div style="min-width:0;">
           <div style="color:#e2e8f0; font-size:0.85rem;
                       overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
             ${i+1}. ${window.escapeHtml(q.question || '（問題）')}
@@ -282,18 +410,67 @@ document.getElementById('btn-load-quizzes').addEventListener('click', async () =
             ${q.created_at ? ' · ' + q.created_at.substring(0,10) : ''}
           </div>
         </div>
-        <button onclick="deleteQuizAdmin('${q.id}')"
-          style="padding:4px 10px; background:rgba(239,68,68,0.15);
-                 color:#FCA5A5; border:1px solid rgba(239,68,68,0.3);
-                 border-radius:6px; cursor:pointer; font-size:0.8rem; flex-shrink:0;">
-          🗑️ 削除
-        </button>
-      </div>
-    `).join('');
-  } catch (err) {
-    window.toast(err.message, 'error');
-    list.innerHTML = '<p style="color:#EF4444;">読み込み失敗</p>';
+      </label>
+      <button onclick="deleteQuizAdmin('${q.id}')"
+        style="padding:4px 10px; background:rgba(239,68,68,0.15);
+               color:#FCA5A5; border:1px solid rgba(239,68,68,0.3);
+               border-radius:6px; cursor:pointer; font-size:0.8rem; flex-shrink:0; margin-left:8px;">
+        🗑️
+      </button>
+    </div>
+  `).join('');
+  updateBulkBar();
+}
+
+function onQuizCheck(cb) {
+  if (cb.checked) selectedQuizIds.add(cb.dataset.id);
+  else selectedQuizIds.delete(cb.dataset.id);
+  updateBulkBar();
+  // すべて選択チェックボックスを同期
+  const total = document.querySelectorAll('.quiz-check').length;
+  document.getElementById('select-all-quizzes').checked = (selectedQuizIds.size === total && total > 0);
+}
+
+function updateBulkBar() {
+  const count = selectedQuizIds.size;
+  document.getElementById('selected-quiz-count').textContent = count + '件選択中';
+  document.getElementById('btn-bulk-delete').disabled = count === 0;
+}
+
+document.getElementById('select-all-quizzes').addEventListener('change', function() {
+  document.querySelectorAll('.quiz-check').forEach(cb => {
+    cb.checked = this.checked;
+    if (this.checked) selectedQuizIds.add(cb.dataset.id);
+    else selectedQuizIds.delete(cb.dataset.id);
+  });
+  updateBulkBar();
+});
+
+document.getElementById('btn-bulk-delete').addEventListener('click', async () => {
+  const ids = [...selectedQuizIds];
+  if (ids.length === 0) return;
+  if (!confirm(ids.length + '件のクイズを削除するよ？\n挑戦記録・感想も全部消えるよ。')) return;
+  const btn = document.getElementById('btn-bulk-delete');
+  btn.disabled = true; btn.textContent = '削除中...';
+  let ok = 0, ng = 0;
+  for (const id of ids) {
+    try {
+      await window.api.del(`/api/admin/quizzes/${encodeURIComponent(groupIdRaw)}/${id}`);
+      ok++;
+      allQuizzes = allQuizzes.filter(q => q.id !== id);
+      selectedQuizIds.delete(id);
+    } catch(e) { ng++; }
   }
+  if (ok > 0) window.toast(ok + '件削除したよ', 'success');
+  if (ng > 0) window.toast(ng + '件は失敗したよ', 'error');
+  if (allQuizzes.length === 0) {
+    document.getElementById('quiz-admin-list').innerHTML = '<p style="color:#9CA3AF; margin:8px 0;">クイズがないよ</p>';
+    document.getElementById('bulk-delete-bar').style.display = 'none';
+  } else {
+    renderQuizList();
+  }
+  btn.textContent = '🗑️ まとめて削除';
+  updateBulkBar();
 });
 
 // ---- クイズを削除する ----
@@ -318,6 +495,109 @@ document.getElementById('btn-logout-admin').addEventListener('click', async () =
     window.toast(err.message, 'error');
   }
 });
+
+// ===== Admin AI設定 =====
+const ADMIN_AI_PROVIDERS = {
+  gemini:     { model:'gemini-1.5-flash', help:'Google AI StudioでAPIキーを取得（無料枠あり）' },
+  openai:     { model:'gpt-4o-mini',      help:'platform.openai.comでAPIキーを取得（有料）' },
+  anthropic:  { model:'claude-haiku',     help:'console.anthropic.comでAPIキーを取得（有料）' },
+  cloudflare: { model:'Llama 3 8B',       help:'Account IDとAPIトークン両方が必要（無料）' },
+};
+let adminSelectedProvider = 'gemini';
+
+document.querySelectorAll('.admin-ai-pvd-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    adminSelectedProvider = btn.dataset.provider;
+    document.querySelectorAll('.admin-ai-pvd-btn').forEach(b => {
+      const active = b.dataset.provider === adminSelectedProvider;
+      b.style.borderColor = active ? '#667eea' : '#444';
+      b.style.background  = active ? 'rgba(99,102,241,0.2)' : '#1e1e2e';
+      b.style.color       = active ? '#a5b4fc' : '#e0e0ff';
+    });
+    document.getElementById('admin-cf-section').style.display =
+      adminSelectedProvider === 'cloudflare' ? 'block' : 'none';
+    const info = ADMIN_AI_PROVIDERS[adminSelectedProvider];
+    document.getElementById('admin-ai-model-info').textContent =
+      `使用モデル: ${info.model} — ${info.help}`;
+    document.getElementById('admin-ai-key-label').textContent =
+      adminSelectedProvider === 'cloudflare' ? 'APIトークン' : 'APIキー';
+  });
+});
+document.querySelector('.admin-ai-pvd-btn[data-provider="gemini"]').click();
+
+function toggleAdminAiKey() {
+  const input = document.getElementById('admin-ai-key');
+  const btn   = document.getElementById('admin-ai-key-eye');
+  if (input.type === 'password') { input.type = 'text';     btn.textContent = '🙈'; }
+  else                           { input.type = 'password'; btn.textContent = '👁️'; }
+}
+
+async function saveAdminAiConfig() {
+  const apiKey    = document.getElementById('admin-ai-key').value.trim();
+  const cfAccount = document.getElementById('admin-cf-account').value.trim();
+  const pw        = document.getElementById('ai-admin-pw').value;
+  const status    = document.getElementById('ai-config-status');
+  if (!pw)     { window.toast('管理者パスワードを入力してね', 'error'); return; }
+  if (!apiKey) { window.toast('APIキーを入力してね', 'error'); return; }
+  if (adminSelectedProvider === 'cloudflare' && !cfAccount) {
+    window.toast('CloudflareはAccount IDも必要だよ', 'error'); return;
+  }
+  status.style.display = 'block';
+  status.style.color   = '#9CA3AF';
+  status.textContent   = '保存中...';
+  try {
+    const r = await fetch('/api/group/ai_config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        ai_provider:    adminSelectedProvider,
+        ai_api_key:     apiKey,
+        cf_account_id:  cfAccount,
+        cf_api_token:   adminSelectedProvider === 'cloudflare' ? apiKey : '',
+        admin_password: pw,
+      })
+    });
+    const data = await r.json();
+    if (data.ok) {
+      status.style.color = '#34D399';
+      status.textContent = '✅ 保存しました！AI採点が有効になります。';
+      window.toast('AI設定を保存したよ！', 'success');
+      const tgl = document.getElementById('toggle-ai');
+      if (tgl && !tgl.classList.contains('on')) tgl.click();
+    } else {
+      status.style.color = '#ef4444';
+      status.textContent = '❌ ' + (data.error || 'エラー');
+    }
+  } catch(e) {
+    status.style.color = '#ef4444';
+    status.textContent = '❌ 通信エラー';
+  }
+}
+
+async function loadAdminAiConfig() {
+  const status = document.getElementById('ai-config-status');
+  status.style.display = 'block';
+  try {
+    const r    = await fetch('/api/group/ai_config');
+    const data = await r.json();
+    if (data.ok) {
+      const pvdBtn = document.querySelector(`.admin-ai-pvd-btn[data-provider="${data.ai_provider || 'gemini'}"]`);
+      if (pvdBtn) pvdBtn.click();
+      if (data.has_config) {
+        status.style.color = '#34D399';
+        status.textContent = '✅ APIキーが設定済みです（キーは非表示）';
+      } else {
+        status.style.color = '#9CA3AF';
+        status.textContent = 'APIキーは未設定。サーバー共通キーが使われます。';
+      }
+    }
+  } catch(e) {
+    status.style.color = '#ef4444';
+    status.textContent = '❌ 取得エラー';
+  }
+}
+
+
 </script>
 {% endif %}
 {% endblock %}
