@@ -6,3 +6,6 @@ venv/
 *.sqlite
 *.db
 .DS_Store
+
+# ユーザー画像はGitHubに上げない(プライバシー保護)
+static/uploads/*
