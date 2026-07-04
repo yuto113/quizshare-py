@@ -4215,6 +4215,18 @@ def api_staff_login():
     session['staff_name'] = dec(row[2])
     return ok(redirect='/staff/board')
 
+def staff_can_chat(status, active_from):
+    # 在籍中かどうか(退社済み・承認待ち・入社日前はFalse)
+    if (status or 'active') != 'active':
+        return False
+    if active_from:
+        import pytz as _p
+        from datetime import datetime as _d
+        today = _d.now(_p.timezone('Asia/Tokyo')).strftime('%Y-%m-%d')
+        if today < active_from:
+            return False
+    return True
+
 def staff_is_admin():
     # 今ログインしているスタッフが管理者(admin)かどうか調べる
     sid = session.get('staff_id')
@@ -4636,9 +4648,10 @@ def api_staff_list():
     my_id = session.get('staff_id')
     import sqlite3 as _sq
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
-    rows = conn.execute('SELECT staff_id, name FROM qz_staff WHERE staff_id != ?', (my_id,)).fetchall()
+    rows = conn.execute('SELECT staff_id, name, status, active_from FROM qz_staff WHERE staff_id != ?', (my_id,)).fetchall()
     conn.close()
-    return ok(staff=[{'staff_id': r[0], 'name': dec(r[1])} for r in rows])
+    # 在籍中の人だけリストに出す(退社済み・承認待ち・入社前は出さない)
+    return ok(staff=[{'staff_id': r[0], 'name': dec(r[1])} for r in rows if staff_can_chat(r[2], r[3])])
 
 @app.route('/api/staff/channels', methods=['POST'])
 def api_staff_channels_create():
@@ -4664,10 +4677,13 @@ def api_staff_channels_create():
         if not member_id:
             conn.close()
             return err('相手を選んでね')
-        target = conn.execute('SELECT staff_id FROM qz_staff WHERE staff_id=?', (member_id,)).fetchone()
+        target = conn.execute('SELECT staff_id, status, active_from FROM qz_staff WHERE staff_id=?', (member_id,)).fetchone()
         if not target:
             conn.close()
             return err('その社員は見つからないよ')
+        if not staff_can_chat(target[1], target[2]):
+            conn.close()
+            return err('その人は今は在籍していないよ(退社済みか入社前)')
         my_id = session.get('staff_id')
         members = sorted([my_id, member_id])
         existing = conn.execute("SELECT id FROM qz_channels WHERE channel_type='dm' AND members=?", (_json.dumps(members),)).fetchone()
@@ -4701,7 +4717,10 @@ def api_staff_channel_invite():
     if my_id not in members:
         conn.close()
         return err('参加していないグループには招待できないよ', 403)
-    target = conn.execute('SELECT staff_id FROM qz_staff WHERE staff_id=?', (invite_id,)).fetchone()
+    target = conn.execute('SELECT staff_id, status, active_from FROM qz_staff WHERE staff_id=?', (invite_id,)).fetchone()
+    if target and not staff_can_chat(target[1], target[2]):
+        conn.close()
+        return err('その人は今は在籍していないよ(退社済みか入社前)')
     if not target:
         conn.close()
         return err('その社員は見つからないよ')
