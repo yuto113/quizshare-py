@@ -4470,6 +4470,49 @@ def api_staff_messages_post():
     conn.close()
     return ok(message='投稿しました')
 
+@app.route('/staff/file/<int:message_id>')
+def page_staff_file_view(message_id):
+    # 添付ファイルの専用プレビューページ
+    if not session.get('staff_id'):
+        return redirect('/staff/login')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT file_name, file_data FROM qz_messages WHERE id=?', (message_id,)).fetchone()
+    conn.close()
+    if not row or not row[1]:
+        return 'ファイルが見つからないよ', 404
+    from markupsafe import escape
+    fname = dec(row[0]) if row[0] else 'ファイル'
+    # data:image/png;base64,... の形式からファイルの種類を取り出す
+    mime = ''
+    try:
+        mime = row[1].split(':', 1)[1].split(';', 1)[0]
+    except Exception:
+        pass
+    blob_url = '/api/staff/messages/' + str(message_id) + '/blob?kind=file'
+    # 種類ごとにプレビューの方法を変える
+    if mime.startswith('image/'):
+        body = '<img src="' + blob_url + '" style="max-width:100%; border-radius:10px;">'
+    elif mime == 'application/pdf' or mime.startswith('text/'):
+        body = '<iframe src="' + blob_url + '" style="width:100%; height:80vh; border:1px solid #e3ddd0; border-radius:10px; background:white;"></iframe>'
+    elif mime.startswith('audio/'):
+        body = '<audio controls src="' + blob_url + '" style="width:100%;"></audio>'
+    elif mime.startswith('video/'):
+        body = '<video controls src="' + blob_url + '" style="max-width:100%; border-radius:10px;"></video>'
+    else:
+        body = ('<p style="color:#8a8270;">この形式(' + str(escape(mime or '不明')) +
+                ')はブラウザでプレビューできないよ。「ダウンロード」ボタンで保存して開いてね。</p>')
+    return ('<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
+            '<title>' + str(escape(fname)) + ' - Q\'z</title></head>'
+            '<body style="font-family:sans-serif; background:#fdfbf6; padding:20px; max-width:900px; margin:0 auto;">'
+            '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">'
+            '<h3 style="margin:0; color:#14213d; word-break:break-all;">🗂️ ' + str(escape(fname)) + '</h3>'
+            '<span style="flex-shrink:0;">'
+            '<a href="' + blob_url + '&dl=1" style="background:#14213d; color:white; padding:8px 14px; border-radius:8px; text-decoration:none; font-size:13px;">⬇ ダウンロード</a> '
+            '<a href="/staff/board" style="background:#e3ddd0; color:#14213d; padding:8px 14px; border-radius:8px; text-decoration:none; font-size:13px;">← 掲示板へ</a>'
+            '</span></div>'
+            + body + '</body></html>')
+
 @app.route('/api/staff/messages/<int:message_id>/blob', methods=['GET'])
 def api_staff_message_blob(message_id):
     # 画像やファイルの中身だけを返す(ブラウザがキャッシュできるから2回目以降は一瞬)
@@ -4496,9 +4539,9 @@ def api_staff_message_blob(message_id):
     if kind == 'file':
         from urllib.parse import quote as _quote
         fname = dec(row[1]) if row[1] else 'file'
-        # inline = ブラウザで表示できる形式(PDF/画像/テキストなど)はプレビューする
-        # 表示できない形式は、ブラウザが自動でダウンロードに切り替えてくれる
-        resp.headers['Content-Disposition'] = "inline; filename*=UTF-8''" + _quote(fname)
+        # ?dl=1がついていたらダウンロード、なければブラウザで表示
+        disp = 'attachment' if request.args.get('dl') else 'inline'
+        resp.headers['Content-Disposition'] = disp + "; filename*=UTF-8''" + _quote(fname)
     return resp
 
 @app.route('/api/staff/reactions', methods=['POST'])
