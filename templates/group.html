@@ -9,15 +9,20 @@
   </div>
   {% endif %}
 
-  <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:20px;">
+  <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
     <div>
       <h1 class="page-title">🎯 クイズ一覧</h1>
       <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
         <button id="btn-random" class="btn btn-secondary" style="font-size:12px; padding:6px 12px;">🎲 ランダム出題</button>
-        <button onclick="openAiConfigModal()" class="btn btn-secondary" style="font-size:12px; padding:6px 12px;">🤖 AI設定</button>
+        <a href="/battle" class="btn btn-secondary" style="font-size:12px; padding:6px 12px; text-decoration:none;">⚔️ 対戦</a>
+        <button id="ai-config-btn" onclick="openAiConfigModal()" class="btn btn-secondary" style="font-size:12px; padding:6px 12px; display:none;">🤖 AI設定</button>
         {% if group.school_mode %}
         <button onclick="openAccessLogModal()" class="btn btn-secondary" style="font-size:12px; padding:6px 12px; background:#4a90d9; color:white;">📋 入室ログ</button>
+        <a href="/notices" class="btn btn-secondary" style="font-size:12px; padding:6px 12px; background:#7c3aed; color:white;" id="btn-notice">📨 お知らせ</a>
+        <button onclick="openGoalCalendar()" class="btn btn-secondary" style="font-size:12px; padding:6px 12px; background:#10b981; color:white;" id="btn-goal">🎯 目標</button>
+        <button onclick="openTeacherModal()" id="btn-teacher" class="btn btn-secondary" style="font-size:12px; padding:6px 12px; display:none; background:#10b981; color:white;">👩‍🏫 先生メニュー</button>
         {% endif %}
+        {% if group.school_mode %}<a href="/tasks" class="btn btn-secondary" style="font-size:12px; padding:6px 12px; background:#f59e0b; color:white;">📝 課題</a>{% endif %}
         <a href="/sets" id="btn-sets" class="btn btn-secondary" style="font-size:12px; padding:6px 12px;">📚 セット</a>
         <a href="/groupstats" id="btn-stats" class="btn btn-secondary" style="font-size:12px; padding:6px 12px;">📊 全体統計</a>
         <select id="sort-select" class="form-control" style="font-size:12px; padding:6px 12px; width:auto; display:inline-block;">
@@ -38,6 +43,12 @@
         📋 {{ current_group_id }}
       </button>
     </div>
+  </div>
+
+  <!-- 今日の目標（先生モード） -->
+  <div id="today-goal-bar" style="display:none; background:linear-gradient(135deg,#667eea,#764ba2); color:white; border-radius:14px; padding:14px 18px; margin-bottom:16px; display:none;">
+    <div style="font-size:11px; font-weight:900; opacity:0.8; margin-bottom:4px;">🎯 今日の目標</div>
+    <div id="today-goal-text" style="font-weight:bold; font-size:15px;"></div>
   </div>
 
   <!-- AIトークン使用量バー -->
@@ -128,7 +139,10 @@
 
         <div class="form-group">
           <label class="form-label">🏷️ タグ</label>
-          <input type="text" id="q-tag-input" class="form-control" placeholder="タグを入力してEnter" maxlength="20">
+          <div style="position:relative;">
+            <input type="text" id="q-tag-input" class="form-control" placeholder="タグを入力してEnter" maxlength="20">
+            <div id="tag-suggest-box" style="display:none; position:absolute; top:100%; left:0; right:0; background:white; border:2px solid #e5e7eb; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,0.12); z-index:100; overflow:hidden; margin-top:4px;"></div>
+          </div>
           <div id="q-tags" style="display:flex; flex-wrap:wrap; gap:4px; margin-top:8px;"></div>
         </div>
 
@@ -371,6 +385,46 @@
   </div>
 </div>
 
+<!-- クイズ詳細モーダル -->
+<div id="quiz-detail-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+  <div style="background:white; border-radius:24px; padding:28px; max-width:480px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+      <h2 style="margin:0; font-size:18px; font-weight:900;">📝 クイズ詳細</h2>
+      <button onclick="document.getElementById('quiz-detail-modal').style.display='none'" style="background:none; border:none; font-size:20px; cursor:pointer;">✕</button>
+    </div>
+    <div style="background:#f9fafb; border-radius:14px; padding:16px; margin-bottom:16px;">
+      <div style="font-size:11px; color:#9CA3AF; font-weight:900; margin-bottom:6px;">❓ 問題</div>
+      <div id="qd-question" style="font-size:16px; font-weight:bold; color:#1a1a1a; line-height:1.6;"></div>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:20px;">
+      <div style="background:#eff6ff; border-radius:12px; padding:12px; text-align:center;">
+        <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">👥 挑戦</div>
+        <div id="qd-attempts" style="font-size:22px; font-weight:900; color:#3b82f6;"></div>
+        <div style="font-size:10px; color:#9CA3AF;">人</div>
+      </div>
+      <div style="background:#f0fdf4; border-radius:12px; padding:12px; text-align:center;">
+        <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">🏆 正解率</div>
+        <div id="qd-acc" style="font-size:22px; font-weight:900; color:#10b981;"></div>
+      </div>
+      <div style="background:#fef3c7; border-radius:12px; padding:12px; text-align:center;">
+        <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">⭐ 難易度</div>
+        <div id="qd-diff" style="font-size:22px; font-weight:900; color:#f59e0b;"></div>
+      </div>
+    </div>
+    <div id="qd-tags" style="margin-bottom:20px; display:flex; flex-wrap:wrap; gap:6px;"></div>
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:20px; padding:12px; background:#f9fafb; border-radius:12px;">
+      <div id="qd-avatar" style="width:36px; height:36px; border-radius:50%; background:var(--c-main); display:flex; align-items:center; justify-content:center; color:white; font-weight:900; font-size:15px;"></div>
+      <div>
+        <div id="qd-name" style="font-weight:900; font-size:14px;"></div>
+        <div id="qd-class" style="font-size:12px; color:#9CA3AF;"></div>
+      </div>
+    </div>
+    <a id="qd-start-btn" href="#" style="display:block; padding:16px; background:linear-gradient(135deg,var(--c-main),#e85a8a); color:white; text-align:center; border-radius:14px; text-decoration:none; font-weight:900; font-size:18px;">
+      🚀 挑戦する！
+    </a>
+  </div>
+</div>
+
 <!-- 入室ログモーダル -->
 <div id="access-log-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;">
   <div style="background:white; margin:40px auto; padding:24px; border-radius:16px; max-width:600px; width:90%;">
@@ -431,6 +485,473 @@ function deviceIcon(dev) {
 
 function closeAccessLogModal() {
   document.getElementById('access-log-modal').style.display = 'none';
+}
+</script>
+<!-- お知らせモーダル（Gmail風） -->
+<div id="notice-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;">
+  <div style="background:white; margin:20px auto; border-radius:16px; max-width:700px; width:95%; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <div style="background:#7c3aed; padding:16px 20px; display:flex; justify-content:space-between; align-items:center;">
+      <h2 style="margin:0; font-size:18px; color:white; font-weight:900;">📨 お知らせ</h2>
+      <button onclick="document.getElementById('notice-modal').style.display='none'" style="background:rgba(255,255,255,0.2); border:none; color:white; font-size:18px; cursor:pointer; border-radius:50%; width:32px; height:32px;">✕</button>
+    </div>
+    <div id="notice-inbox" style="max-height:70vh; overflow-y:auto;">
+      <div id="notice-list" style="font-size:14px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 目標カレンダーモーダル -->
+<div id="goal-calendar-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;">
+  <div style="background:white; margin:40px auto; padding:24px; border-radius:16px; max-width:640px; width:90%;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <h2 style="margin:0; font-size:18px;">🎯 目標カレンダー</h2>
+      <button onclick="document.getElementById('goal-calendar-modal').style.display='none'" style="background:none; border:none; font-size:20px; cursor:pointer;">✕</button>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center; margin-bottom:16px;">
+      <button onclick="changeGoalMonth(-1)" style="background:#f3f4f6; border:none; border-radius:8px; padding:6px 12px; cursor:pointer;">◀</button>
+      <span id="goal-month-label" style="font-weight:900; font-size:16px; flex:1; text-align:center;"></span>
+      <button onclick="changeGoalMonth(1)" style="background:#f3f4f6; border:none; border-radius:8px; padding:6px 12px; cursor:pointer;">▶</button>
+    </div>
+    <div id="goal-calendar" style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:16px; text-align:center;"></div>
+    <div id="goal-detail" style="background:#f0fdf4; border:1px solid #86efac; border-radius:12px; padding:16px; display:none;">
+      <div id="goal-detail-date" style="font-size:12px; color:#6b7280; margin-bottom:4px;"></div>
+      <div id="goal-detail-text" style="font-weight:bold; font-size:16px; color:#166534;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 先生メニューモーダル -->
+<div id="teacher-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;">
+  <div style="background:white; margin:40px auto; padding:24px; border-radius:16px; max-width:560px; width:90%;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <h2 style="margin:0; font-size:18px;">👩‍🏫 先生メニュー</h2>
+      <button onclick="document.getElementById('teacher-modal').style.display='none'" style="background:none; border:none; font-size:20px; cursor:pointer;">✕</button>
+    </div>
+    <div id="teacher-menu-content">
+      <!-- タブ -->
+      <div style="display:flex; gap:8px; margin-bottom:16px;">
+        <button onclick="switchTeacherTab('goal')" id="t-tab-goal" style="flex:1; padding:8px; border-radius:8px; border:none; background:#7c3aed; color:white; font-weight:bold; cursor:pointer;">🎯 目標設定</button>
+        <button onclick="switchTeacherTab('notice')" id="t-tab-notice" style="flex:1; padding:8px; border-radius:8px; border:none; background:#f3f4f6; color:#333; font-weight:bold; cursor:pointer;">📨 お知らせ送信</button>
+        <button onclick="switchTeacherTab('add')" id="t-tab-add" style="flex:1; padding:8px; border-radius:8px; border:none; background:#f3f4f6; color:#333; font-weight:bold; cursor:pointer;">👤 先生追加</button>
+      </div>
+      <!-- 目標設定 -->
+      <div id="t-section-goal">
+        <div style="margin-bottom:10px;">
+          <label style="font-size:12px; font-weight:900; color:#374151; display:block; margin-bottom:4px;">📅 日付</label>
+          <input type="date" id="goal-date" style="width:100%; padding:10px; border:2px solid #e5e7eb; border-radius:10px; font-size:14px; box-sizing:border-box;">
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="font-size:12px; font-weight:900; color:#374151; display:block; margin-bottom:4px;">🎯 今日の目標</label>
+          <textarea id="goal-text" rows="3" style="width:100%; padding:10px; border:2px solid #e5e7eb; border-radius:10px; font-size:14px; box-sizing:border-box; resize:vertical;" placeholder="例: 英単語を10個覚えよう！"></textarea>
+        </div>
+        <button onclick="saveGoal()" style="width:100%; padding:12px; background:#7c3aed; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">💾 目標を保存</button>
+      </div>
+      <!-- お知らせ送信 -->
+      <div id="t-section-notice" style="display:none;">
+        <div style="margin-bottom:10px;">
+          <label style="font-size:12px; font-weight:900; color:#374151; display:block; margin-bottom:4px;">📅 日付</label>
+          <input type="date" id="notice-date-input" style="width:100%; padding:10px; border:2px solid #e5e7eb; border-radius:10px; font-size:14px; box-sizing:border-box;">
+        </div>
+        <div style="margin-bottom:10px;">
+          <label style="font-size:12px; font-weight:900; color:#374151; display:block; margin-bottom:4px;">📝 タイトル</label>
+          <input type="text" id="notice-title" style="width:100%; padding:10px; border:2px solid #e5e7eb; border-radius:10px; font-size:14px; box-sizing:border-box;" placeholder="例: 明日の宿題について">
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="font-size:12px; font-weight:900; color:#374151; display:block; margin-bottom:4px;">💬 本文</label>
+          <textarea id="notice-body" rows="4" style="width:100%; padding:10px; border:2px solid #e5e7eb; border-radius:10px; font-size:14px; box-sizing:border-box; resize:vertical;" placeholder="お知らせの内容を入力してね"></textarea>
+        </div>
+        <button onclick="sendNotice()" style="width:100%; padding:12px; background:#7c3aed; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">📨 送信する</button>
+      </div>
+      <!-- 先生追加 -->
+      <div id="t-section-add" style="display:none;">
+        <div style="margin-bottom:10px;">
+          <label style="font-size:12px; font-weight:900; color:#374151; display:block; margin-bottom:4px;">👤 先生の名前</label>
+          <input type="text" id="new-teacher-name" style="width:100%; padding:10px; border:2px solid #e5e7eb; border-radius:10px; font-size:14px; box-sizing:border-box;" placeholder="例: 田中先生">
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="font-size:12px; font-weight:900; color:#374151; display:block; margin-bottom:4px;">🔒 初期パスワード</label>
+          <input type="password" id="new-teacher-pw" style="width:100%; padding:10px; border:2px solid #e5e7eb; border-radius:10px; font-size:14px; box-sizing:border-box;" placeholder="4文字以上">
+        </div>
+        <button onclick="addTeacher()" style="width:100%; padding:12px; background:#10b981; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">➕ 先生を追加</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- パスワード変更モーダル（初回ログイン時） -->
+<div id="pw-change-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:2000; overflow-y:auto;">
+  <div style="background:white; margin:40px auto; padding:28px; border-radius:16px; max-width:480px; width:90%;">
+    <h2 style="margin:0 0 8px; font-size:18px;">🔒 パスワードを変更してください</h2>
+    <p style="color:#9CA3AF; font-size:13px; margin-bottom:20px;">初回ログインのため、パスワードの変更が必要です。</p>
+    <div style="margin-bottom:10px;">
+      <label style="font-size:12px; font-weight:900; color:#374151; display:block; margin-bottom:4px;">現在のパスワード</label>
+      <input type="password" id="old-pw-input" style="width:100%; padding:10px; border:2px solid #e5e7eb; border-radius:10px; font-size:14px; box-sizing:border-box;">
+    </div>
+    <div style="margin-bottom:16px;">
+      <label style="font-size:12px; font-weight:900; color:#374151; display:block; margin-bottom:4px;">新しいパスワード（4文字以上）</label>
+      <input type="password" id="new-pw-input" style="width:100%; padding:10px; border:2px solid #e5e7eb; border-radius:10px; font-size:14px; box-sizing:border-box;">
+    </div>
+    <button onclick="changePassword()" style="width:100%; padding:12px; background:#7c3aed; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer; font-size:16px;">✅ 変更する</button>
+  </div>
+</div>
+
+<!-- 初回先生登録モーダル -->
+<div id="first-teacher-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;">
+  <div style="background:white; margin:40px auto; padding:24px; border-radius:16px; max-width:480px; width:90%;">
+    <h2 style="margin:0 0 8px; font-size:18px;">👩‍🏫 最初の先生を登録</h2>
+    <p style="color:#9CA3AF; font-size:13px; margin-bottom:16px;">まだ先生が登録されていません。管理者として最初の先生を登録できます。</p>
+    <div style="margin-bottom:10px;">
+      <label style="font-size:12px; font-weight:900; color:#374151; display:block; margin-bottom:4px;">👤 先生の名前</label>
+      <input type="text" id="first-teacher-name" style="width:100%; padding:10px; border:2px solid #e5e7eb; border-radius:10px; font-size:14px; box-sizing:border-box;" placeholder="例: 田中先生">
+    </div>
+    <div style="margin-bottom:10px;">
+      <label style="font-size:12px; font-weight:900; color:#374151; display:block; margin-bottom:4px;">🔒 初期パスワード</label>
+      <input type="password" id="first-teacher-pw" style="width:100%; padding:10px; border:2px solid #e5e7eb; border-radius:10px; font-size:14px; box-sizing:border-box;" placeholder="4文字以上">
+    </div>
+    <div style="margin-bottom:16px;">
+      <label style="font-size:12px; font-weight:900; color:#374151; display:block; margin-bottom:4px;">🔑 管理者パスワード</label>
+      <input type="password" id="first-admin-pw" style="width:100%; padding:10px; border:2px solid #e5e7eb; border-radius:10px; font-size:14px; box-sizing:border-box;">
+    </div>
+    <button onclick="registerFirstTeacher()" style="width:100%; padding:12px; background:#10b981; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">✅ 登録する</button>
+    <button onclick="document.getElementById('first-teacher-modal').style.display='none'" style="width:100%; padding:10px; background:#f3f4f6; color:#333; border:none; border-radius:10px; font-weight:bold; cursor:pointer; margin-top:8px;">キャンセル</button>
+  </div>
+</div>
+
+<script>
+// ===== 先生機能 =====
+let isTeacher = false;
+let teacherName = '';
+let noticeYear, noticeMonth;
+let selectedNoticeDate = '';
+
+async function initTeacherMode() {
+  {% if group.school_mode %}
+  // 先生かどうか確認
+  try {
+    const r = await fetch('/api/teacher/status');
+    const data = await r.json();
+    if (data.ok && data.is_teacher) {
+      isTeacher = true;
+      teacherName = data.teacher_name;
+      document.getElementById('btn-teacher').style.display = 'inline-flex';
+      // 初回パスワード変更チェック
+      const r2 = await fetch('/api/teacher/check_initial');
+      const d2 = await r2.json();
+      if (d2.is_initial) {
+        document.getElementById('pw-change-modal').style.display = 'block';
+      }
+    } else {
+      // 先生がいるか確認
+      const r3 = await fetch('/api/teacher/count');
+      const d3 = await r3.json();
+      if (d3.ok && d3.count === 0) {
+        // 先生がいない→管理者向けに登録ボタンを表示
+        document.getElementById('first-teacher-modal').style.display = 'block';
+      }
+    }
+  } catch(e) {}
+  // 今日の目標を取得
+  const today = new Date().toLocaleDateString('sv-SE', {timeZone:'Asia/Tokyo'});
+  try {
+    const r = await fetch('/api/group/goals?date=' + today);
+    const data = await r.json();
+    if (data.ok && data.goals.length > 0) {
+      const bar = document.getElementById('today-goal-bar');
+      document.getElementById('today-goal-text').textContent = data.goals[0].goal;
+      bar.style.display = 'block';
+    }
+  } catch(e) {}
+  {% endif %}
+}
+
+function switchTeacherTab(tab) {
+  ['goal','notice','add'].forEach(t => {
+    document.getElementById('t-section-' + t).style.display = t === tab ? 'block' : 'none';
+    const btn = document.getElementById('t-tab-' + t);
+    btn.style.background = t === tab ? '#7c3aed' : '#f3f4f6';
+    btn.style.color = t === tab ? 'white' : '#333';
+  });
+}
+
+function openTeacherModal() {
+  const today = new Date().toLocaleDateString('sv-SE', {timeZone:'Asia/Tokyo'});
+  document.getElementById('goal-date').value = today;
+  document.getElementById('notice-date-input').value = today;
+  document.getElementById('teacher-modal').style.display = 'block';
+}
+
+async function saveGoal() {
+  const date = document.getElementById('goal-date').value;
+  const goal = document.getElementById('goal-text').value.trim();
+  if (!date || !goal) { window.toast('日付と目標を入力してね', 'error'); return; }
+  const r = await fetch('/api/teacher/goal', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({date, goal})
+  });
+  const data = await r.json();
+  if (data.ok) {
+    window.toast('目標を保存したよ！', 'success');
+    document.getElementById('teacher-modal').style.display = 'none';
+    // 今日の目標なら即反映
+    const today = new Date().toISOString().split('T')[0];
+    if (date === today) {
+      document.getElementById('today-goal-text').textContent = goal;
+      document.getElementById('today-goal-bar').style.display = 'block';
+    }
+  } else { window.toast(data.error || 'エラー', 'error'); }
+}
+
+async function sendNotice() {
+  const title = document.getElementById('notice-title').value.trim();
+  const body = document.getElementById('notice-body').value.trim();
+  const notice_date = document.getElementById('notice-date-input').value;
+  if (!title || !body || !notice_date) { window.toast('すべて入力してね', 'error'); return; }
+  const r = await fetch('/api/teacher/notice', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({title, body, notice_date})
+  });
+  const data = await r.json();
+  if (data.ok) {
+    window.toast('お知らせを送信したよ！', 'success');
+    document.getElementById('notice-title').value = '';
+    document.getElementById('notice-body').value = '';
+    document.getElementById('teacher-modal').style.display = 'none';
+  } else { window.toast(data.error || 'エラー', 'error'); }
+}
+
+async function addTeacher() {
+  const name = document.getElementById('new-teacher-name').value.trim();
+  const pw = document.getElementById('new-teacher-pw').value;
+  if (!name || !pw) { window.toast('名前とパスワードを入力してね', 'error'); return; }
+  const r = await fetch('/api/teacher/add', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({name, password: pw})
+  });
+  const data = await r.json();
+  if (data.ok) {
+    window.toast(`${name}をT${data.teacher_num || ''}として追加したよ！`, 'success');
+    document.getElementById('new-teacher-name').value = '';
+    document.getElementById('new-teacher-pw').value = '';
+  } else { window.toast(data.error || 'エラー', 'error'); }
+}
+
+async function changePassword() {
+  const oldPw = document.getElementById('old-pw-input').value;
+  const newPw = document.getElementById('new-pw-input').value;
+  if (!oldPw || !newPw) { window.toast('両方入力してね', 'error'); return; }
+  const r = await fetch('/api/teacher/change_password', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({old_password: oldPw, new_password: newPw})
+  });
+  const data = await r.json();
+  if (data.ok) {
+    window.toast('パスワードを変更したよ！', 'success');
+    document.getElementById('pw-change-modal').style.display = 'none';
+  } else { window.toast(data.error || 'エラー', 'error'); }
+}
+
+async function registerFirstTeacher() {
+  const name = document.getElementById('first-teacher-name').value.trim();
+  const pw = document.getElementById('first-teacher-pw').value;
+  const adminPw = document.getElementById('first-admin-pw').value;
+  if (!name || !pw || !adminPw) { window.toast('すべて入力してね', 'error'); return; }
+  const r = await fetch('/api/teacher/register_first', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({name, password: pw, admin_password: adminPw, group_id: '{{ current_group_id }}'})
+  });
+  const data = await r.json();
+  if (data.ok) {
+    window.toast(`${name}をT1として登録したよ！`, 'success');
+    document.getElementById('first-teacher-modal').style.display = 'none';
+  } else { window.toast(data.error || 'エラー', 'error'); }
+}
+
+// ===== お知らせ（Gmail風） =====
+let allNotices = [];
+
+async function openNoticeModal() {
+  document.getElementById('notice-modal').style.display = 'block';
+  const list = document.getElementById('notice-list');
+  list.innerHTML = '<div style="padding:32px;text-align:center;color:#9CA3AF;">読み込み中...</div>';
+  try {
+    const r = await fetch('/api/group/notices');
+    const data = await r.json();
+    if (data.ok) allNotices = data.notices;
+  } catch(e) {}
+  if (allNotices.length === 0) {
+    list.innerHTML = '<div style="padding:48px;text-align:center;color:#9CA3AF;"><div style="font-size:48px;margin-bottom:12px;">📭</div><div>お知らせはまだありません</div></div>';
+    return;
+  }
+  list.innerHTML = allNotices.map((n, i) => `
+    <div onclick="toggleNotice(${i})" style="border-bottom:1px solid #f3f4f6;padding:16px 20px;cursor:pointer;transition:background 0.1s;" onmouseover="this.style.background='#f9f9f9'" onmouseout="this.style.background='white'">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <div style="font-weight:900;font-size:15px;color:#1a1a1a;">${esc(n.title)}</div>
+        <div style="font-size:11px;color:#9CA3AF;flex-shrink:0;margin-left:12px;">${esc(n.notice_date)}</div>
+      </div>
+      <div style="font-size:12px;color:#6b7280;">${esc(n.teacher_name)} · ${esc(n.body.substring(0,60))}${n.body.length>60?'...':''}</div>
+      <div id="notice-body-${i}" style="display:none;margin-top:12px;padding:12px;background:#f9fafb;border-radius:8px;white-space:pre-wrap;font-size:14px;color:#374151;line-height:1.7;">${esc(n.body)}</div>
+    </div>
+  `).join('');
+}
+
+function toggleNotice(i) {
+  const el = document.getElementById('notice-body-' + i);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+// ===== 目標カレンダー =====
+let goalYear, goalMonth;
+let allGoals = {};
+let selectedGoalDate = '';
+
+async function openGoalCalendar() {
+  const now = new Date();
+  goalYear = now.getFullYear();
+  goalMonth = now.getMonth();
+  document.getElementById('goal-calendar-modal').style.display = 'block';
+  try {
+    const r = await fetch('/api/group/goals');
+    const data = await r.json();
+    if (data.ok) {
+      allGoals = {};
+      data.goals.forEach(g => { allGoals[g.date] = g.goal; });
+    }
+  } catch(e) {}
+  renderGoalCalendar();
+}
+
+function changeGoalMonth(diff) {
+  goalMonth += diff;
+  if (goalMonth > 11) { goalMonth = 0; goalYear++; }
+  if (goalMonth < 0) { goalMonth = 11; goalYear--; }
+  renderGoalCalendar();
+}
+
+function renderGoalCalendar() {
+  document.getElementById('goal-month-label').textContent = `${goalYear}年${goalMonth+1}月`;
+  const cal = document.getElementById('goal-calendar');
+  const days = ['日','月','火','水','木','金','土'];
+  let html = days.map(d => `<div style="font-size:11px;font-weight:900;color:#9CA3AF;">${d}</div>`).join('');
+  const first = new Date(goalYear, goalMonth, 1).getDay();
+  const last = new Date(goalYear, goalMonth+1, 0).getDate();
+  const today = new Date().toISOString().split('T')[0];
+  for(let i=0;i<first;i++) html += '<div></div>';
+  for(let d=1;d<=last;d++) {
+    const dateStr = `${goalYear}-${String(goalMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const hasGoal = !!allGoals[dateStr];
+    const isSelected = dateStr === selectedGoalDate;
+    const isToday = dateStr === today;
+    html += `<div onclick="selectGoalDate('${dateStr}')" style="cursor:pointer;padding:6px 2px;border-radius:8px;font-size:13px;font-weight:${isToday?'900':'500'};background:${isSelected?'#10b981':hasGoal?'#d1fae5':'transparent'};color:${isSelected?'white':hasGoal?'#065f46':isToday?'#e85a8a':'#333'};">
+      ${d}${hasGoal?'<div style="width:4px;height:4px;background:#10b981;border-radius:50%;margin:1px auto;"></div>':''}
+    </div>`;
+  }
+  cal.innerHTML = html;
+  if (selectedGoalDate) showGoalDetail(selectedGoalDate);
+}
+
+function selectGoalDate(date) {
+  selectedGoalDate = date;
+  renderGoalCalendar();
+  showGoalDetail(date);
+}
+
+function showGoalDetail(date) {
+  const detail = document.getElementById('goal-detail');
+  const goal = allGoals[date];
+  if (goal) {
+    document.getElementById('goal-detail-date').textContent = date + ' の目標';
+    document.getElementById('goal-detail-text').textContent = goal;
+    detail.style.display = 'block';
+  } else {
+    detail.style.display = 'none';
+  }
+}
+
+function changeNoticeMonth(diff) {
+  noticeMonth += diff;
+  if (noticeMonth > 11) { noticeMonth = 0; noticeYear++; }
+  if (noticeMonth < 0) { noticeMonth = 11; noticeYear--; }
+  renderNoticeCalendar();
+}
+
+function renderNoticeCalendar() {
+  const label = document.getElementById('notice-month-label');
+  label.textContent = `${noticeYear}年${noticeMonth+1}月`;
+  const cal = document.getElementById('notice-calendar');
+  const days = ['日','月','火','水','木','金','土'];
+  let html = days.map(d => `<div style="font-size:11px;font-weight:900;color:#9CA3AF;">${d}</div>`).join('');
+  const first = new Date(noticeYear, noticeMonth, 1).getDay();
+  const last = new Date(noticeYear, noticeMonth+1, 0).getDate();
+  const noticeDates = new Set(allNotices.map(n => n.notice_date));
+  for(let i=0;i<first;i++) html += '<div></div>';
+  for(let d=1;d<=last;d++) {
+    const dateStr = `${noticeYear}-${String(noticeMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const hasNotice = noticeDates.has(dateStr);
+    const isSelected = dateStr === selectedNoticeDate;
+    const today = new Date().toISOString().split('T')[0];
+    const isToday = dateStr === today;
+    html += `<div onclick="selectNoticeDate('${dateStr}')" style="cursor:pointer;padding:6px 2px;border-radius:8px;font-size:13px;font-weight:${isToday?'900':'500'};background:${isSelected?'#7c3aed':hasNotice?'#ede9fe':'transparent'};color:${isSelected?'white':hasNotice?'#7c3aed':isToday?'#e85a8a':'#333'};position:relative;">
+      ${d}${hasNotice?'<span style="position:absolute;top:2px;right:2px;width:6px;height:6px;background:#7c3aed;border-radius:50;display:block;"></span>':''}
+    </div>`;
+  }
+  cal.innerHTML = html;
+  if (selectedNoticeDate) showNoticesForDate(selectedNoticeDate);
+}
+
+function selectNoticeDate(date) {
+  selectedNoticeDate = date;
+  renderNoticeCalendar();
+  showNoticesForDate(date);
+}
+
+function showNoticesForDate(date) {
+  const list = document.getElementById('notice-list');
+  const filtered = allNotices.filter(n => n.notice_date === date);
+  if (filtered.length === 0) {
+    list.innerHTML = `<p style="color:#9CA3AF;text-align:center;padding:16px;">${date} のお知らせはありません</p>`;
+    return;
+  }
+  list.innerHTML = filtered.map(n => `
+    <div style="border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div style="font-weight:900;font-size:15px;">${esc(n.title)}</div>
+        <div style="font-size:11px;color:#9CA3AF;">${esc(n.teacher_name)}</div>
+      </div>
+      <div style="white-space:pre-wrap;font-size:14px;color:#374151;line-height:1.7;">${esc(n.body)}</div>
+    </div>
+  `).join('');
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+initTeacherMode();
+
+// ベータ期間チェック
+fetch('/api/beta/status?feature=ai_scoring')
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok && data.active) {
+      const btn = document.getElementById('ai-config-btn');
+      if (btn) btn.style.display = 'inline-flex';
+    }
+  }).catch(() => {});
+
+// クイズ詳細モーダル
+function openQuizDetail(quizId) {
+  const q = state.quizzes.find(q => q.id === quizId);
+  if (!q) return;
+  document.getElementById('qd-question').textContent = q.question;
+  document.getElementById('qd-attempts').textContent = q.attempts;
+  const acc = q.attempts > 0 ? Math.round(q.corrects / q.attempts * 100) : null;
+  document.getElementById('qd-acc').textContent = acc !== null ? acc + '%' : '-';
+  document.getElementById('qd-diff').textContent = q.avg_difficulty > 0 ? q.avg_difficulty.toFixed(1) : '-';
+  document.getElementById('qd-avatar').textContent = (q.name||'?')[0];
+  document.getElementById('qd-name').textContent = q.name;
+  document.getElementById('qd-class').textContent = q.class_name || '';
+  const tagsEl = document.getElementById('qd-tags');
+  tagsEl.innerHTML = (q.tags||[]).map(t => `<span class="q-tag">#${escapeHtml(t)}</span>`).join('');
+  document.getElementById('qd-start-btn').href = '/answer/' + encodeURIComponent(quizId);
+  document.getElementById('quiz-detail-modal').style.display = 'flex';
 }
 </script>
 {% endblock %}
@@ -648,6 +1169,8 @@ const state = {
   perPage: 50,
 };
 
+
+
 async function loadQuizzes() {
   try {
     const r = await window.api.get('/api/quizzes');
@@ -655,6 +1178,20 @@ async function loadQuizzes() {
     state.viewOnly = r.view_only;
     renderTagFilter();
     renderQuizzes();
+    // 課題タグの自動設定
+    if (window._taskTagPending) {
+      const taskTag = window._taskTagPending;
+      window._taskTagPending = null;
+      tagSet.add(taskTag);
+      renderQTags();
+      const tagInput = document.getElementById('q-tag-input');
+      if (tagInput) {
+        tagInput.disabled = true;
+        tagInput.placeholder = 'タグは自動設定されます';
+        tagInput.style.background = '#f3f4f6';
+      }
+      setTimeout(() => window.openModal('modal-add'), 300);
+    }
   } catch (err) {
     window.toast(err.message, 'error');
   }
@@ -830,7 +1367,7 @@ function cardHtml(q) {
   }
   return '<div class="quiz-card" style="position:relative;">' +
     editBtn +
-    '<a href="/answer/' + encodeURIComponent(q.id) + '" style="text-decoration:none; color:inherit; display:flex; flex-direction:column; flex:1;">' +
+    '<div onclick="openQuizDetail(\'' + q.id + '\')" style="text-decoration:none; color:inherit; display:flex; flex-direction:column; flex:1; cursor:pointer;">' +
     '<div class="q-tags">' + tags + optBadge + '</div>' +
     '<div class="q-question">' + escapeHtml(q.question) + '</div>' +
     statsHtml +
@@ -838,7 +1375,7 @@ function cardHtml(q) {
     '<div style="flex:1; min-width:0;"><div class="q-author-name">' + escapeHtml(q.name) + '</div>' +
     (q.class_name ? '<div class="q-author-class">' + escapeHtml(q.class_name) + '</div>' : '') +
     '</div><span style="color:var(--c-main); font-weight:900;">→</span></div>' +
-    '</a></div>';
+    '</div></div>';
 }
 
 document.getElementById('copy-id-btn').addEventListener('click', async () => {
@@ -904,14 +1441,59 @@ function renderQTags() {
     '<span class="q-tag" style="cursor:pointer;">#' + escapeHtml(t) + ' <span data-remove="' + escapeHtml(t) + '" style="margin-left:4px;">✕</span></span>'
   ).join('');
 }
+// タグサジェスト
+let suggestTimer = null;
+document.getElementById('q-tag-input').addEventListener('input', (e) => {
+  e.target.value = e.target.value.replace(/:/g, '');
+  const val = e.target.value.trim();
+  clearTimeout(suggestTimer);
+  if (!val) {
+    document.getElementById('tag-suggest-box').style.display = 'none';
+    return;
+  }
+  suggestTimer = setTimeout(async () => {
+    const gid = state.groupId || '';
+    const r = await fetch('/api/tags/suggest?q=' + encodeURIComponent(val) + '&group_id=' + encodeURIComponent(gid));
+    const data = await r.json();
+    const box = document.getElementById('tag-suggest-box');
+    if (!data.ok || data.tags.length === 0) { box.style.display = 'none'; return; }
+    box.innerHTML = data.tags.map(t => `
+      <div onclick="selectTag('${escapeHtml(t.name)}')"
+        style="padding:10px 14px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #f3f4f6; transition:background 0.15s;"
+        onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='white'">
+        <span style="font-weight:bold;">#${escapeHtml(t.name)}</span>
+        <span style="font-size:12px; color:#9CA3AF;">${t.count}件</span>
+      </div>
+    `).join('');
+    box.style.display = 'block';
+  }, 200);
+});
+
+function selectTag(tagName) {
+  tagSet.add(tagName);
+  renderQTags();
+  document.getElementById('q-tag-input').value = '';
+  document.getElementById('tag-suggest-box').style.display = 'none';
+}
+
+// 外クリックで閉じる
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#q-tag-input') && !e.target.closest('#tag-suggest-box')) {
+    document.getElementById('tag-suggest-box').style.display = 'none';
+  }
+});
+
 document.getElementById('q-tag-input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' || e.key === ',') {
     e.preventDefault();
-    const v = e.target.value.trim().replace(/,/g, '');
+    const v = e.target.value.trim().replace(/,/g, '').replace(/:/g, '');
     if (v && v.length <= 20) tagSet.add(v);
     e.target.value = '';
     renderQTags();
   }
+});
+document.getElementById('q-tag-input').addEventListener('input', (e) => {
+  e.target.value = e.target.value.replace(/:/g, '');
 });
 document.getElementById('q-tags').addEventListener('click', (e) => {
   const rm = e.target.closest('[data-remove]');
@@ -1476,6 +2058,17 @@ loadAiTokenBars();
 loadQuizzes();
 setInterval(loadQuizzes, 10000);
 setInterval(loadAiTokenBars, 30000);
+setInterval(initTeacherMode, 30000);
+
+// URLパラメータからtask_tagを取得して自動設定
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const taskTag = params.get('task_tag');
+  if (!taskTag) return;
+  // クイズ読み込み後に実行
+  const origLoad = loadQuizzes;
+  window._taskTagPending = taskTag;
+})();
 </script>
 <!-- 入室ログモーダル -->
 <div id="access-log-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;">

@@ -38,6 +38,17 @@ setTimeout(killQzTheme, 800);
     <button onclick="staffLogin()" style="width:100%; padding:14px; background:#fb6f5b; color:white; border:none; border-radius:10px; font-weight:700; cursor:pointer; font-size:15px;">
       ログイン
     </button>
+    <div style="text-align:center; margin-top:14px;">
+      <a href="#" onclick="toggleRegister(); return false;" style="color:rgba(255,255,255,0.6); font-size:13px; text-decoration:none;">📨 入社に応募する(登録コードが必要)</a>
+    </div>
+    <div id="register-area" style="display:none; margin-top:16px; border-top:1px solid rgba(255,255,255,0.15); padding-top:16px;">
+      <p style="color:rgba(255,255,255,0.5); font-size:12px; margin:0 0 10px;">応募すると管理者が審査するよ。承認されたら翌月1日に入社だよ。</p>
+      <input type="password" id="reg-code" placeholder="登録コード" style="width:100%; padding:12px; border-radius:10px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.05); color:white; font-size:15px; box-sizing:border-box; margin-bottom:8px;">
+      <input type="text" id="reg-id" placeholder="希望のスタッフID(半角英数3〜20)" style="width:100%; padding:12px; border-radius:10px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.05); color:white; font-size:15px; box-sizing:border-box; margin-bottom:8px;">
+      <input type="text" id="reg-name" placeholder="名前" style="width:100%; padding:12px; border-radius:10px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.05); color:white; font-size:15px; box-sizing:border-box; margin-bottom:8px;">
+      <input type="password" id="reg-pw" placeholder="パスワード(6文字以上)" style="width:100%; padding:12px; border-radius:10px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.05); color:white; font-size:15px; box-sizing:border-box; margin-bottom:10px;">
+      <button onclick="staffRegister()" style="width:100%; padding:14px; background:#2a9d8f; color:white; border:none; border-radius:10px; font-weight:700; cursor:pointer; font-size:15px;">応募する 📨</button>
+    </div>
     <div style="text-align:center; margin-top:20px;">
       <a href="/homepage" style="color:rgba(255,255,255,0.4); font-size:12px; text-decoration:none;">← Q'zトップへ</a>
     </div>
@@ -65,5 +76,33 @@ async function staffLogin() {
 document.getElementById('staff-pw').addEventListener('keydown', e => {
   if (e.key === 'Enter') staffLogin();
 });
+
+function toggleRegister() {
+  const area = document.getElementById('register-area');
+  area.style.display = (area.style.display === 'none') ? 'block' : 'none';
+}
+
+async function staffRegister() {
+  const signup_code = document.getElementById('reg-code').value.trim();
+  const staff_id = document.getElementById('reg-id').value.trim();
+  const name = document.getElementById('reg-name').value.trim();
+  const password = document.getElementById('reg-pw').value;
+  if (signup_code === '' || staff_id === '' || name === '' || password === '') {
+    window.toast('全部の欄を入力してね', 'error'); return;
+  }
+  try {
+    const r = await fetch('/api/staff/register', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({signup_code, staff_id, name, password})
+    });
+    const data = await r.json();
+    if (data.ok) {
+      window.toast(data.message || '応募を受け付けたよ!', 'success');
+      toggleRegister();
+    } else {
+      window.toast(data.error || '応募に失敗したよ', 'error');
+    }
+  } catch(e) { window.toast('通信エラー', 'error'); }
+}
 </script>
 {% endblock %}

@@ -95,16 +95,7 @@
     <!-- 公開期間設定タブ -->
     <div id="section-schedule" class="section">
       <div id="pages-schedule-list"></div>
-      <div class="card">
-        <h3 style="margin:0 0 12px; color:#a5b4fc;">📅 公開期間を手動追加</h3>
-        <p style="color:#9CA3AF; font-size:0.82rem; margin-bottom:12px;">※ページ作成タブで作ったページは自動でここに追加されます</p>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
-          <div><label>ページキー</label><input type="text" id="manual-key" class="form-input" placeholder="例: quizclub2027"></div>
-          <div><label>ページ名</label><input type="text" id="manual-name" class="form-input" placeholder="例: クイズ研究部2027"></div>
-        </div>
-        <div style="margin-bottom:10px;"><label>URL</label><input type="text" id="manual-url" class="form-input" placeholder="例: /quizclub-2027"></div>
-        <button class="btn-add" onclick="addManualPage()">➕ 追加する</button>
-      </div>
+
     </div>
   </div>
 </div>
@@ -240,8 +231,15 @@ async function deletePage(key, name) {
     body: JSON.stringify({password: adminPw})
   });
   const data = await r.json();
-  if (data.ok) { alert('削除しました'); await loadCustomPages(); }
-  else { alert('削除失敗: ' + (data.error || 'エラー')); }
+  if (data.ok) {
+    // 公開期間設定も連動削除
+    await fetch('/api/page_schedules/' + key + '/delete', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({password: adminPw})
+    });
+    alert('削除しました');
+    await loadCustomPages();
+  } else { alert('削除失敗: ' + (data.error || 'エラー')); }
 }
 
 // ===== 公開期間設定 =====

@@ -61,6 +61,21 @@ setTimeout(killQzTheme, 800);
     <h3 style="margin:0 0 12px; color:#14213d; font-size:1rem;">🎯 最近解かれたクイズ</h3>
     <div id="recent-attempts">読み込み中...</div>
   </div>
+
+  <div class="recent-box" id="hr-box" style="display:none; margin-top:20px;">
+    <h3 style="margin:0 0 12px; color:#14213d; font-size:1rem;">🧑‍💼 人事(管理者専用)</h3>
+    <div id="hr-pending"></div>
+    <div id="hr-staff-list" style="margin-top:10px;"></div>
+    <div style="margin-top:14px; border-top:1px solid #f0ece2; padding-top:12px;">
+      <b style="font-size:13px; color:#14213d;">➕ スタッフを即時追加</b>
+      <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
+        <input id="hr-id" placeholder="ID(半角英数3〜20)" style="flex:1; min-width:120px; padding:8px; border:1px solid #e3ddd0; border-radius:8px; font-size:13px;">
+        <input id="hr-name" placeholder="名前" style="flex:1; min-width:100px; padding:8px; border:1px solid #e3ddd0; border-radius:8px; font-size:13px;">
+        <input id="hr-pw" type="password" placeholder="パスワード(6文字以上)" style="flex:1; min-width:130px; padding:8px; border:1px solid #e3ddd0; border-radius:8px; font-size:13px;">
+        <button onclick="hrAdd()" style="padding:8px 14px; background:#2a9d8f; color:white; border:none; border-radius:8px; cursor:pointer; font-size:13px;">追加</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -94,6 +109,58 @@ async function loadDashboard() {
 
 function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+async function loadHR() {
+  const r = await fetch('/api/staff/hr/list');
+  const data = await r.json();
+  if (data.ok === false || data.ok === undefined) return;  // 管理者以外には表示しない
+  document.getElementById('hr-box').style.display = 'block';
+  const pending = data.staff.filter(s => s.status === 'pending');
+  const active = data.staff.filter(s => s.status !== 'pending');
+  document.getElementById('hr-pending').innerHTML = pending.length === 0
+    ? '<p style="color:#8a8270; font-size:13px; margin:4px 0;">承認待ちの応募はないよ</p>'
+    : '<b style="font-size:13px; color:#fb6f5b;">📥 承認待ちの応募</b>' + pending.map(s => `
+      <div class="recent-row"><span>${esc(s.name)} (${esc(s.staff_id)})</span>
+      <span>
+        <button onclick="hrDecide('${esc(s.staff_id)}', true)" style="padding:4px 10px; background:#2a9d8f; color:white; border:none; border-radius:6px; cursor:pointer; font-size:12px; margin-right:4px;">✅ 承認(翌月入社)</button>
+        <button onclick="hrDecide('${esc(s.staff_id)}', false)" style="padding:4px 10px; background:#e76f51; color:white; border:none; border-radius:6px; cursor:pointer; font-size:12px;">❌ 不承認</button>
+      </span></div>`).join('');
+  document.getElementById('hr-staff-list').innerHTML =
+    '<b style="font-size:13px; color:#14213d;">👥 スタッフ一覧</b>' + active.map(s => `
+      <div class="recent-row"><span>${esc(s.name)} (${esc(s.staff_id)}) ${s.role === 'admin' ? '👑' : ''}</span>
+      <span style="color:#8a8270;">${s.active_from ? '入社日: ' + s.active_from : ''}</span></div>`).join('');
+}
+
+async function hrDecide(staffId, approve) {
+  if (approve === false && confirm('この応募を不承認にして削除するよ？') === false) return;
+  const r = await fetch('/api/staff/hr/decide', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({staff_id: staffId, approve})
+  });
+  const data = await r.json();
+  window.toast(data.ok ? data.message : (data.error || 'エラー'), data.ok ? 'success' : 'error');
+  loadHR();
+}
+
+async function hrAdd() {
+  const staff_id = document.getElementById('hr-id').value.trim();
+  const name = document.getElementById('hr-name').value.trim();
+  const password = document.getElementById('hr-pw').value;
+  if (staff_id === '' || name === '' || password === '') { window.toast('全部の欄を入力してね', 'error'); return; }
+  const r = await fetch('/api/staff/hr/add', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({staff_id, name, password})
+  });
+  const data = await r.json();
+  window.toast(data.ok ? '追加したよ' : (data.error || 'エラー'), data.ok ? 'success' : 'error');
+  if (data.ok) {
+    document.getElementById('hr-id').value = '';
+    document.getElementById('hr-name').value = '';
+    document.getElementById('hr-pw').value = '';
+    loadHR();
+  }
+}
+
 loadDashboard();
+loadHR();
 </script>
 {% endblock %}

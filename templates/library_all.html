@@ -275,6 +275,11 @@ async function importOne(quizData, btn) {
 }
 
 (async function() {
+  if (!window.checkAllLibraryConsent) {
+    window.checkAllLibraryConsent = async function() {
+      return confirm('引用するクイズの著作権・利用規約を確認しましたか？');
+    };
+  }
   const agreed = await window.checkAllLibraryConsent();
   if (!agreed) { window.location.href = '/library'; return; }
   loadAll();

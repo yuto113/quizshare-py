@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}人事管理 - Q'z{% endblock %}
+{% block head_extra %}
+<script>
+function killQzTheme() {
+  document.body.style.background = '#fdfbf6';
+  document.querySelectorAll('.seasonal-emoji').forEach(e => e.remove());
+}
+window.applyTheme = function() { killQzTheme(); };
+window.checkAutoTheme = function() { killQzTheme(); };
+document.addEventListener('DOMContentLoaded', killQzTheme);
+setTimeout(killQzTheme, 50);
+setTimeout(killQzTheme, 300);
+setTimeout(killQzTheme, 800);
+</script>
+{% endblock %}
+{% block body_class %}qz-board-page{% endblock %}
+{% block content %}
+<style>
+.site-header { display: none !important; }
+.qz-staff-nav { background:#14213d; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; }
+.qz-staff-nav a { color:rgba(255,255,255,0.6); font-size:0.8rem; text-decoration:none; }
+.qz-staff-nav a:hover { color:white; }
+.qz-staff-logo { font-size:0.85rem; letter-spacing:0.2em; color:#fb6f5b; font-weight:700; }
+.hr-wrap { max-width:760px; margin:24px auto; padding:0 20px; }
+.hr-box { background:white; border:1px solid #e3ddd0; border-radius:14px; padding:18px; margin-bottom:20px; }
+.hr-row { display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid #f0ece2; font-size:14px; flex-wrap:wrap; gap:6px; }
+.hr-btn { padding:5px 12px; border:none; border-radius:8px; cursor:pointer; font-size:12px; color:white; }
+</style>
+
+<nav class="qz-staff-nav">
+  <span class="qz-staff-logo">Q'Z STAFF</span>
+  <div style="display:flex; gap:18px;">
+    <a href="/staff/board">← 掲示板へ</a>
+    <a href="/staff/dashboard">📊 統計</a>
+    <a href="/homepage">Q'zトップへ</a>
+  </div>
+</nav>
+
+<div class="hr-wrap">
+  <h2 style="color:#14213d;">👑 人事管理</h2>
+
+  <div class="hr-box">
+    <h3 style="margin:0 0 10px; color:#fb6f5b; font-size:1rem;">📥 承認待ちの応募</h3>
+    <div id="hr-pending">読み込み中...</div>
+  </div>
+
+  <div class="hr-box">
+    <h3 style="margin:0 0 10px; color:#14213d; font-size:1rem;">👥 スタッフ一覧</h3>
+    <div id="hr-staff-list">読み込み中...</div>
+  </div>
+
+  <div class="hr-box">
+    <h3 style="margin:0 0 10px; color:#8a8270; font-size:1rem;">🚪 退社済み</h3>
+    <div id="hr-retired">読み込み中...</div>
+  </div>
+
+  <div class="hr-box">
+    <h3 style="margin:0 0 10px; color:#2a9d8f; font-size:1rem;">➕ スタッフを即時追加</h3>
+    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+      <input id="hr-id" placeholder="ID(半角英数3〜20)" style="flex:1; min-width:130px; padding:9px; border:1px solid #e3ddd0; border-radius:8px; font-size:13px;">
+      <input id="hr-name" placeholder="名前" style="flex:1; min-width:100px; padding:9px; border:1px solid #e3ddd0; border-radius:8px; font-size:13px;">
+      <input id="hr-pw" type="password" placeholder="パスワード(6文字以上)" style="flex:1; min-width:140px; padding:9px; border:1px solid #e3ddd0; border-radius:8px; font-size:13px;">
+      <button onclick="hrAdd()" class="hr-btn" style="background:#2a9d8f; padding:9px 16px; font-size:13px;">追加</button>
+    </div>
+    <p style="color:#8a8270; font-size:12px; margin:8px 0 0;">追加した人には、最初のログインのあとプロフィールページで自分だけのパスワードに変えてもらってね。</p>
+  </div>
+</div>
+
+<script>
+const MY_ID = '{{ my_id }}';
+
+async function loadHR() {
+  const r = await fetch('/api/staff/hr/list');
+  const data = await r.json();
+  if (data.ok === false || data.ok === undefined) { window.location.href = '/staff/board'; return; }
+  const pending = data.staff.filter(s => s.status === 'pending');
+  const active = data.staff.filter(s => s.status !== 'pending' && s.status !== 'retired');
+  const retired = data.staff.filter(s => s.status === 'retired');
+
+  document.getElementById('hr-pending').innerHTML = pending.length === 0
+    ? '<p style="color:#8a8270; font-size:13px;">いまは無いよ</p>'
+    : pending.map(s => `
+      <div class="hr-row"><span>${esc(s.name)} (${esc(s.staff_id)})</span>
+      <span>
+        <button onclick="hrDecide('${esc(s.staff_id)}', true)" class="hr-btn" style="background:#2a9d8f; margin-right:4px;">✅ 承認(翌月入社)</button>
+        <button onclick="hrDecide('${esc(s.staff_id)}', false)" class="hr-btn" style="background:#e76f51;">❌ 不承認</button>
+      </span></div>`).join('');
+
+  document.getElementById('hr-staff-list').innerHTML = active.map(s => `
+      <div class="hr-row">
+        <span>${s.role === 'admin' ? '👑 ' : ''}${esc(s.name)} (${esc(s.staff_id)})
+          ${s.active_from ? '<span style="color:#8a8270; font-size:12px;"> 入社日: ' + s.active_from + '</span>' : ''}</span>
+        <span>${(s.role === 'admin' || s.staff_id === MY_ID) ? '' : '<button onclick="hrRemove(&quot;' + esc(s.staff_id) + '&quot;)" class="hr-btn" style="background:#8a8270;">🚪 退社</button>'}</span>
+      </div>`).join('') || '<p style="color:#8a8270; font-size:13px;">いないよ</p>';
+
+  document.getElementById('hr-retired').innerHTML = retired.map(s => `
+      <div class="hr-row"><span style="color:#8a8270;">${esc(s.name)} (${esc(s.staff_id)})</span><span style="color:#8a8270; font-size:12px;">退社済み</span></div>`).join('') || '<p style="color:#8a8270; font-size:13px;">いないよ</p>';
+}
+
+async function hrDecide(staffId, approve) {
+  if (approve === false && confirm('この応募を不承認にして削除するよ？') === false) return;
+  const r = await fetch('/api/staff/hr/decide', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({staff_id: staffId, approve})
+  });
+  const data = await r.json();
+  window.toast(data.ok ? data.message : (data.error || 'エラー'), data.ok ? 'success' : 'error');
+  loadHR();
+}
+
+async function hrRemove(staffId) {
+  if (confirm(staffId + ' さんを退社にするよ？(ログインできなくなるよ。投稿は残るよ)') === false) return;
+  const r = await fetch('/api/staff/hr/remove', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({staff_id: staffId})
+  });
+  const data = await r.json();
+  window.toast(data.ok ? data.message : (data.error || 'エラー'), data.ok ? 'success' : 'error');
+  loadHR();
+}
+
+async function hrAdd() {
+  const staff_id = document.getElementById('hr-id').value.trim();
+  const name = document.getElementById('hr-name').value.trim();
+  const password = document.getElementById('hr-pw').value;
+  if (staff_id === '' || name === '' || password === '') { window.toast('全部の欄を入力してね', 'error'); return; }
+  const r = await fetch('/api/staff/hr/add', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({staff_id, name, password})
+  });
+  const data = await r.json();
+  window.toast(data.ok ? '追加したよ' : (data.error || 'エラー'), data.ok ? 'success' : 'error');
+  if (data.ok) {
+    document.getElementById('hr-id').value = '';
+    document.getElementById('hr-name').value = '';
+    document.getElementById('hr-pw').value = '';
+    loadHR();
+  }
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+loadHR();
+</script>
+{% endblock %}

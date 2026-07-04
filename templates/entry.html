@@ -50,6 +50,9 @@ entry.html : さいしょのページ(ログインか、新しいグループを
     </a>
   </div>
 
+  <!-- お知らせ・イベントリンク -->
+  <div id="home-notices" style="margin-top:16px;"></div>
+
   <!-- <div style="margin-top:20px; padding:12px 16px; background:rgba(255,255,255,0.6);
               backdrop-filter:blur(8px); border-radius:16px; border:1px solid #fff;
               font-size:12px; color:#374151; display:flex; gap:8px; align-items:flex-start;">
@@ -71,7 +74,10 @@ entry.html : さいしょのページ(ログインか、新しいグループを
   function clearInvalidGroupId() {
     var inp = document.getElementById('login-group-id');
     if (inp && inp.value.indexOf('/') !== -1) {
-      inp.value = '';
+      // /T数字 の形式は先生モードなので消さない
+      if (!/\/T\d+$/i.test(inp.value)) {
+        inp.value = '';
+      }
     }
   }
   // # 100ms・500ms・1000msで3回チェック（ブラウザによってタイミングが違う）
@@ -91,16 +97,21 @@ entry.html : さいしょのページ(ログインか、新しいグループを
       if (gid) window.location.href = '/' + gid + '/setting/';
       return null;
     }
+    // /T数字の形式は先生モードなのでそのまま返す
+    if (/\/T\d+$/i.test(val)) return val;
     return val.split('/')[0].trim();
   }
 
   // パスワードが必要かどうかのフラグ
   let needsPassword = false;
+  let savedGroupId = '';
 
   document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const groupId = sanitizeGroupId(document.getElementById('login-group-id').value);
+    const rawId = document.getElementById('login-group-id').value;
+    const groupId = savedGroupId || sanitizeGroupId(rawId);
     if (groupId === null) return;
+    if (!savedGroupId) savedGroupId = groupId;
     // # パスワード欄はあとから表示されるのでnullチェックが必要
     const groupPwEl = document.getElementById('login-group-pw');
     const groupPw = groupPwEl ? groupPwEl.value : '';
@@ -109,6 +120,49 @@ entry.html : さいしょのページ(ログインか、新しいグループを
     btn.textContent = 'チェック中...';
 
     // # 2段階目のときはパスワードも一緒に送る
+    // /T対応（先生モード）
+    const tMatch = groupId.match(/^(.+)\/T(\d+)$/i);
+    if (tMatch) {
+      const realGroupId = tMatch[1];
+      const teacherNum = parseInt(tMatch[2]);
+      // 1回目はパスワード欄を表示するだけ
+      if (!needsPassword) {
+        needsPassword = true;
+        const pwSection = document.getElementById('pw-section');
+        if (pwSection) pwSection.style.display = 'block';
+        document.getElementById('login-group-id').disabled = true;
+        btn.disabled = false;
+        btn.textContent = '🔓 先生パスワードで入る';
+        window.toast('先生番号を確認しました。パスワードを入力してね', 'success');
+        return;
+      }
+      // 2回目はパスワード付きでログイン
+      try {
+        const r = await fetch('/api/teacher/login', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({group_id: realGroupId, teacher_num: teacherNum, password: groupPw})
+        });
+        const data = await r.json();
+        if (data.ok) { window.location.href = data.redirect || '/group'; return; }
+        else {
+          if (data.error) {
+            window.toast(data.error, 'error');
+            btn.disabled = false;
+            btn.textContent = '🔓 先生パスワードで入る';
+          } else {
+            window.toast(data.error || 'エラー', 'error');
+            btn.disabled = false;
+            btn.textContent = '➡ 入る';
+          }
+          return;
+        }
+      } catch(e) {
+        window.toast('エラーが発生したよ', 'error');
+        btn.disabled = false; btn.textContent = '➡ 入る';
+        return;
+      }
+    }
+
     const body = { group_id: groupId };
     if (needsPassword) body.group_password = groupPw;
 
@@ -132,22 +186,42 @@ entry.html : さいしょのページ(ログインか、新しいグループを
     }
   });
 
-  // お知らせ・イベントをトップに表示
+  // お知らせ・イベントをトップに表示（新しい3つ＋一覧ボタン）
   (async () => {
     try {
       const r = await fetch('/api/custom_pages/home');
       const data = await r.json();
       if (!data.ok || data.pages.length === 0) return;
       const box = document.getElementById('home-notices');
-      box.innerHTML = data.pages.map(p => {
+      const pages = data.pages.reverse().slice(0, 3);
+      const hasMore = data.pages.length > 3;
+      box.innerHTML = pages.map(p => {
         const icon = {announce:'📢',event:'🎉',group_intro:'👥',blank:'✨'}[p.type]||'📄';
         const color = {announce:'#f97316',event:'#7c3aed',group_intro:'#10b981',blank:'#667eea'}[p.type]||'#667eea';
         return `<a href="${p.url}" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:white;border:2px solid ${color};border-radius:14px;text-decoration:none;color:#333;margin-bottom:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);transition:transform 0.15s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
           <span style="font-size:28px;">${icon}</span>
           <div><div style="font-weight:900;font-size:15px;">${p.name}</div><div style="font-size:12px;color:#9CA3AF;margin-top:2px;">タップして見る →</div></div>
         </a>`;
-      }).join('');
+      }).join('') + (hasMore ? `
+        <button onclick="showAllNotices()" style="width:100%;padding:12px;background:#f3f4f6;border:2px dashed #d1d5db;border-radius:14px;color:#6b7280;font-weight:bold;cursor:pointer;font-size:14px;margin-bottom:8px;">
+          📋 すべて見る（${data.pages.length}件）
+        </button>
+        <div id="all-notices-popup" style="display:none;">
+          ${data.pages.slice(3).map(p => {
+            const icon = {announce:'📢',event:'🎉',group_intro:'👥',blank:'✨'}[p.type]||'📄';
+            const color = {announce:'#f97316',event:'#7c3aed',group_intro:'#10b981',blank:'#667eea'}[p.type]||'#667eea';
+            return `<a href="${p.url}" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:white;border:2px solid ${color};border-radius:14px;text-decoration:none;color:#333;margin-bottom:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+              <span style="font-size:28px;">${icon}</span>
+              <div><div style="font-weight:900;font-size:15px;">${p.name}</div><div style="font-size:12px;color:#9CA3AF;margin-top:2px;">タップして見る →</div></div>
+            </a>`;
+          }).join('')}
+        </div>` : '');
     } catch(e) {}
   })();
+
+  function showAllNotices() {
+    const popup = document.getElementById('all-notices-popup');
+    if (popup) popup.style.display = popup.style.display === 'none' ? 'block' : 'none';
+  }
 </script>
 {% endblock %}

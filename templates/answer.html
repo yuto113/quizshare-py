@@ -261,8 +261,12 @@ const QUIZ_ID = {{ quiz.id | tojson }};
 // ランダムモード(URLに?random=1...5があれば)
 const urlParams = new URLSearchParams(window.location.search);
 const randomMode = urlParams.get('random');
-const randomTotal = 5;
+const randomIds = JSON.parse(sessionStorage.getItem('random_ids') || '[]');
+const randomTotal = randomIds.length || parseInt(urlParams.get('total') || '5', 10);
+let randomIdx = parseInt(sessionStorage.getItem('random_idx') || '0', 10);
 let randomCurrent = randomMode ? parseInt(randomMode, 10) : 0;
+// ランダム結果記録
+let randomResults = JSON.parse(sessionStorage.getItem('random_results') || '[]');
 
 // 問題の画像を読み込む
 (async () => {
@@ -363,15 +367,26 @@ document.getElementById('submit-answer').addEventListener('click', async () => {
         correct_answer: r.correct_answer,
         user_answer: userAnswer,
       };
-      document.getElementById('ai-score-area').style.display = 'block';
+      // ベータチェックしてから表示
+  fetch('/api/beta/status?feature=ai_scoring')
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok && data.active) {
+        document.getElementById('ai-score-area').style.display = 'block';
+      }
+    }).catch(() => {});
     }
 
     // ランダムモードならボタンを切替
     if (randomMode) {
+      // 結果を記録
+      randomResults.push({correct: r.correct, time_ms: r.time_ms || 0});
+      sessionStorage.setItem('random_results', JSON.stringify(randomResults));
+
       document.getElementById('normal-buttons').style.display = 'none';
       document.getElementById('random-next-area').style.display = 'block';
       if (randomCurrent >= randomTotal) {
-        document.getElementById('btn-random-next').innerHTML = '🎉 完了!一覧へ戻る';
+        document.getElementById('btn-random-next').innerHTML = '🎉 結果を見る';
         document.getElementById('random-progress').textContent = randomCurrent + '/' + randomTotal;
       } else {
         document.getElementById('random-progress').textContent = randomCurrent + '/' + randomTotal;
@@ -663,12 +678,19 @@ function renderStats(s, fbs) {
 const btnRandomNext = document.getElementById('btn-random-next');
 if (btnRandomNext) btnRandomNext.addEventListener('click', async () => {
   if (randomCurrent >= randomTotal) {
-    window.location.href = '/group';
+    // 結果ページを表示
+    showRandomResults();
     return;
   }
   try {
-    const r = await window.api.get('/api/quizzes/random');
-    window.location.href = '/answer/' + encodeURIComponent(r.quiz_id) + '?random=' + (randomCurrent + 1);
+    randomIdx++;
+    sessionStorage.setItem('random_idx', String(randomIdx));
+    if (randomIds.length > 0 && randomIdx < randomIds.length) {
+      window.location.href = '/answer/' + encodeURIComponent(randomIds[randomIdx]) + '?random=' + (randomCurrent + 1) + '&total=' + randomTotal;
+    } else {
+      const r = await window.api.get('/api/quizzes/random');
+      window.location.href = '/answer/' + encodeURIComponent(r.quiz_id) + '?random=' + (randomCurrent + 1) + '&total=' + randomTotal;
+    }
   } catch(err) { window.toast(err.message, 'error'); }
 });
 
@@ -699,6 +721,59 @@ if (setIds.length > 0) {
     const normalBtns = document.getElementById('normal-buttons');
     if (normalBtns) normalBtns.style.display = 'none';
   }
+}
+
+function showRandomResults() {
+  const results = JSON.parse(sessionStorage.getItem('random_results') || '[]');
+  const total = results.length;
+  const correct = results.filter(r => r.correct).length;
+  const wrong = total - correct;
+  const rate = total > 0 ? Math.round(correct / total * 100) : 0;
+  const totalMs = results.reduce((s, r) => s + (r.time_ms || 0), 0);
+  const avgMs = total > 0 ? Math.round(totalMs / total) : 0;
+  const formatTime = ms => {
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    if (m > 0) return m + '分' + (s % 60) + '秒';
+    return s + '秒';
+  };
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  modal.innerHTML = `
+    <div style="background:white;border-radius:24px;padding:32px;max-width:480px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+      <div style="font-size:64px;margin-bottom:8px;">${rate >= 80 ? '🎉' : rate >= 50 ? '😊' : '😅'}</div>
+      <h2 style="margin:0 0 24px;font-size:22px;font-weight:900;">ランダム出題 完了！</h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
+        <div style="background:#f0fdf4;border-radius:16px;padding:16px;">
+          <div style="font-size:11px;color:#6b7280;margin-bottom:4px;">✅ 正解</div>
+          <div style="font-size:32px;font-weight:900;color:#10b981;">${correct}</div>
+          <div style="font-size:11px;color:#6b7280;">/ ${total}問</div>
+        </div>
+        <div style="background:#fff1f2;border-radius:16px;padding:16px;">
+          <div style="font-size:11px;color:#6b7280;margin-bottom:4px;">❌ 不正解</div>
+          <div style="font-size:32px;font-weight:900;color:#ef4444;">${wrong}</div>
+          <div style="font-size:11px;color:#6b7280;">/ ${total}問</div>
+        </div>
+        <div style="background:#eff6ff;border-radius:16px;padding:16px;">
+          <div style="font-size:11px;color:#6b7280;margin-bottom:4px;">🎯 正解率</div>
+          <div style="font-size:32px;font-weight:900;color:#3b82f6;">${rate}%</div>
+        </div>
+        <div style="background:#fef3c7;border-radius:16px;padding:16px;">
+          <div style="font-size:11px;color:#6b7280;margin-bottom:4px;">⏱️ 平均タイム</div>
+          <div style="font-size:24px;font-weight:900;color:#f59e0b;">${formatTime(avgMs)}</div>
+        </div>
+      </div>
+      <div style="background:#f9fafb;border-radius:12px;padding:12px;margin-bottom:20px;">
+        <div style="font-size:12px;color:#6b7280;">合計時間: ${formatTime(totalMs)}</div>
+      </div>
+      <button onclick="location.href='/group'" style="width:100%;padding:14px;background:#667eea;color:white;border:none;border-radius:12px;font-weight:900;cursor:pointer;font-size:16px;">🏠 一覧へ戻る</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  sessionStorage.removeItem('random_ids');
+  sessionStorage.removeItem('random_idx');
+  sessionStorage.removeItem('random_total');
+  sessionStorage.removeItem('random_results');
 }
 </script>
 {% endblock %}

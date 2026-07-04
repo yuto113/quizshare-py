@@ -80,6 +80,26 @@
     </div>
 
   </div>
+
+  <!-- AI採点ベータ期間設定 -->
+  <div style="background:#1e1e2e; border-radius:16px; padding:20px; margin-top:16px; border:1px solid #3d3d5c;">
+    <h3 style="margin:0 0 16px; color:#e0e0ff; font-size:16px;">🧪 AI採点ベータ期間設定</h3>
+    <div id="beta-status-display" style="margin-bottom:16px; padding:12px; border-radius:10px; background:rgba(255,255,255,0.05); font-size:13px; color:#9CA3AF;">読み込み中...</div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+      <div>
+        <label style="font-size:11px; color:#9CA3AF; display:block; margin-bottom:4px;">📅 ベータ開始日時</label>
+        <input type="datetime-local" id="beta-start" style="width:100%; background:#2a2a3e; border:2px solid #4a4a6a; color:#e0e0ff; border-radius:8px; padding:8px; font-size:13px; box-sizing:border-box;">
+      </div>
+      <div>
+        <label style="font-size:11px; color:#9CA3AF; display:block; margin-bottom:4px;">🏁 ベータ終了日時</label>
+        <input type="datetime-local" id="beta-end" style="width:100%; background:#2a2a3e; border:2px solid #4a4a6a; color:#e0e0ff; border-radius:8px; padding:8px; font-size:13px; box-sizing:border-box;">
+      </div>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button onclick="saveBetaSettings(true)" style="flex:1; padding:10px; background:#10b981; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">✅ 有効にする</button>
+      <button onclick="saveBetaSettings(false)" style="flex:1; padding:10px; background:#ef4444; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">🚫 無効にする</button>
+    </div>
+  </div>
 </div>
 
 <!-- 制限設定モーダル -->
@@ -102,6 +122,39 @@
 
 <script>
 let adminPw = '';
+
+async function loadBetaStatus() {
+  const r = await fetch('/api/beta/status?feature=ai_scoring');
+  const data = await r.json();
+  const display = document.getElementById('beta-status-display');
+  if (!data.ok) return;
+  if (data.is_active && data.in_period) {
+    display.style.color = '#34d399';
+    display.textContent = '✅ ベータ有効中 (' + (data.start_date||'').replace('T',' ') + ' 〜 ' + (data.end_date||'').replace('T',' ') + ')';
+  } else if (data.is_active && !data.in_period) {
+    display.style.color = '#f59e0b';
+    display.textContent = '⏰ 期間外（設定済み）: ' + (data.start_date||'').replace('T',' ') + ' 〜 ' + (data.end_date||'').replace('T',' ');
+  } else {
+    display.style.color = '#ef4444';
+    display.textContent = '🚫 ベータ無効';
+  }
+  if (data.start_date) document.getElementById('beta-start').value = (data.start_date||'').replace(' ','T').substring(0,16);
+  if (data.end_date) document.getElementById('beta-end').value = (data.end_date||'').replace(' ','T').substring(0,16);
+}
+
+async function saveBetaSettings(isActive) {
+  const start = document.getElementById('beta-start').value;
+  const end = document.getElementById('beta-end').value;
+  const r = await fetch('/api/beta/update', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({password: adminPw, feature_key: 'ai_scoring', start_date: start, end_date: end, is_active: isActive})
+  });
+  const data = await r.json();
+  if (data.ok) {
+    alert(isActive ? 'ベータを有効にしました！' : 'ベータを無効にしました');
+    loadBetaStatus();
+  } else { alert(data.error || 'エラー'); }
+}
 let currentGroupId = '';
 let currentData = {groups: []};
 
@@ -114,6 +167,7 @@ async function loadData() {
     if (!data.ok) { alert(data.error || 'パスワードが違うよ'); return; }
     document.getElementById('login-section').style.display = 'none';
     document.getElementById('data-section').style.display = 'block';
+  loadBetaStatus();
     renderData(data);
   } catch(e) { alert('エラー: ' + e.message); }
 }

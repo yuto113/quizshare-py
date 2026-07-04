@@ -106,6 +106,7 @@ setTimeout(killQzTheme, 800);
     <a href="/staff/files">📁 ファイル</a>
     <a href="/staff/calendar">📅 カレンダー</a>
     <a href="/staff/tasks">✅ タスク</a>
+    {% if is_admin %}<a href="/staff/hr" style="color:#FCD34D;">👑 人事</a>{% endif %}
     <a href="/staff/dashboard">📊 統計</a>
     <a href="/staff/profile">プロフィール</a>
     <a href="/homepage">← Q'zトップへ</a>
@@ -678,6 +679,7 @@ function switchChannel(id, name, type) {
   document.getElementById('current-channel-name').textContent = name;
   document.getElementById('invite-btn').style.display = (currentChannelType === 'group') ? 'inline-block' : 'none';
   document.getElementById('chat-input-area-wrap').style.display = 'block';
+  loadedLimit = 30;
   lastDataHash = '';
   loadMessages();
   fetch('/api/staff/channels/read', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({channel_id:id})}).then(()=>loadChannels());
@@ -762,9 +764,16 @@ async function createChannel() {
   } else { window.toast(data.error || 'エラー', 'error'); }
 }
 
+let loadedLimit = 30;
+function loadOlder() {
+  // 「過去のメッセージを読み込む」ボタン用: 30件ずつ増やす
+  loadedLimit += 30;
+  lastDataHash = '';
+  loadMessages();
+}
 async function loadMessages() {
   if (!currentChannelId) return;
-  const r = await fetch('/api/staff/messages?channel_id=' + currentChannelId);
+  const r = await fetch('/api/staff/messages?channel_id=' + currentChannelId + '&limit=' + loadedLimit);
   const data = await r.json();
   const list = document.getElementById('message-list');
   if (!data.ok || data.messages.length === 0) {
@@ -807,8 +816,8 @@ async function loadMessages() {
             ${m.reply_preview ? `<div style="border-left:3px solid #fb6f5b; padding-left:8px; margin-bottom:6px; opacity:0.75; font-size:12px;">${esc(m.reply_preview.staff_name)}: ${esc(m.reply_preview.body)}</div>` : ''}
             ${m.title ? `<div class="title">${esc(m.title)}</div>` : ''}
             ${m.body ? `<div class="body">${esc(m.body)}</div>` : ''}
-            ${m.image_data ? `<img class="chat-image" src="${m.image_data}" onclick="window.open(this.src)">` : ''}
-            ${m.file_data ? `<a href="${m.file_data}" download="${escAttr(m.file_name||'file')}" style="display:inline-flex;align-items:center;gap:6px;background:#f1ece0;color:#14213d;border-radius:10px;padding:8px 12px;text-decoration:none;margin-top:4px;font-size:13px;">📎 ${esc(m.file_name||'ファイル')}</a>` : ''}
+            ${m.has_image ? `<img class="chat-image" src="/api/staff/messages/${m.id}/blob?kind=image" onclick="window.open(this.src)">` : ''}
+            ${m.has_file ? `<a href="/api/staff/messages/${m.id}/blob?kind=file" style="display:inline-flex;align-items:center;gap:6px;background:#f1ece0;color:#14213d;border-radius:10px;padding:8px 12px;text-decoration:none;margin-top:4px;font-size:13px;">📎 ${esc(m.file_name||'ファイル')}</a>` : ''}
             ${m.stamp_id ? `<img class="chat-stamp-img" src="/static/stamps/${m.stamp_id}.svg">` : ''}
           </div>
         </div>
@@ -817,6 +826,9 @@ async function loadMessages() {
       </div>
     </div>`;
   }).join('');
+  if (data.has_more) {
+    list.innerHTML = '<div style="text-align:center; margin:8px 0;"><button onclick="loadOlder()" style="padding:6px 14px; border:1px solid #e3ddd0; border-radius:10px; background:white; cursor:pointer; font-size:12px; color:#8a8270;">⬆ 過去のメッセージを読み込む</button></div>' + list.innerHTML;
+  }
   if (wasAtBottom) {
     list.scrollTop = list.scrollHeight;
   } else {

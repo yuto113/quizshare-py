@@ -158,7 +158,7 @@ document.addEventListener('DOMContentLoaded', function() {
   </div>
 
   <!-- ===== カスタムテーマ作成 ===== -->
-  <div id="custom-theme-section" style="display:none; margin-top:32px; border-top:2px solid #f0f0f0; padding-top:24px;">
+  <div id="custom-theme-section" style="margin-top:32px; border-top:2px solid #f0f0f0; padding-top:24px;">
     <h2 style="font-size:1.2rem; margin-bottom:4px;">🎨 カスタムテーマ作成</h2>
     <p style="color:#888; font-size:0.85rem; margin-bottom:16px;">オリジナルの背景テーマを作れます（管理者のみ）</p>
 
@@ -364,12 +364,32 @@ async function loadSpecialDays() {
     const r = await window.api.get('/api/special_days');
     specialDays = r.days || [];
     document.getElementById('special-days-list').style.display = 'block';
-    document.getElementById('custom-theme-section').style.display = 'block';
     renderDaysTable();
     renderMonthGrid();
     loadCustomThemes();
+    await addCustomThemesToSelect();
     window.toast('読み込みました', 'success');
   } catch(e) { window.toast('エラーが起きたよ', 'error'); }
+}
+
+async function addCustomThemesToSelect() {
+  try {
+    const r = await window.api.get('/api/custom_themes');
+    if (!r.themes || r.themes.length === 0) return;
+    const sel = document.getElementById('new-theme');
+    // 既存のカスタムテーマoptionを削除
+    sel.querySelectorAll('option[data-custom]').forEach(o => o.remove());
+    // カスタムテーマを追加
+    r.themes.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.key;
+      opt.textContent = t.emoji + ' ' + t.name + '（カスタム）';
+      opt.dataset.custom = '1';
+      sel.appendChild(opt);
+      // THEMESに登録
+      if (typeof THEMES !== 'undefined') THEMES[t.key] = {name: t.name, bg: t.bg, style: t.style};
+    });
+  } catch(e) {}
 }
 
 function renderMonthGrid() {
@@ -517,9 +537,7 @@ async function deleteSpecialDay(id) {
     await loadSpecialDays();
   } catch(e) { window.toast('エラー', 'error'); }
 }
-</script>
-{% endblock %}
-<script>
+
 // カスタムテーマのプレビュー更新
 function updateBgPreview() {
   const type = document.getElementById('ct-bg-type').value;
@@ -594,3 +612,4 @@ document.addEventListener('DOMContentLoaded', function() {
   updateCardLock();
 });
 </script>
+{% endblock %}

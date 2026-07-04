@@ -4196,19 +4196,183 @@ def api_staff_login():
         return err('IDとパスワードを入力してね')
     import sqlite3 as _sq
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
-    row = conn.execute('SELECT id, password_hash, name FROM qz_staff WHERE staff_id=?', (staff_id,)).fetchone()
+    row = conn.execute('SELECT id, password_hash, name, status, active_from FROM qz_staff WHERE staff_id=?', (staff_id,)).fetchone()
     conn.close()
     if not row or not verify_password(password, row[1]):
         return err('IDまたはパスワードが違うよ', 401)
+    # 承認待ち・入社日前の人はまだ入れない
+    if (row[3] or 'active') == 'pending':
+        return err('承認待ちだよ。管理者の審査が終わるまで待っててね', 403)
+    if (row[3] or 'active') == 'retired':
+        return err('このアカウントは退社済みだよ', 403)
+    if row[4]:
+        import pytz as _p_login
+        from datetime import datetime as _d_login
+        today = _d_login.now(_p_login.timezone('Asia/Tokyo')).strftime('%Y-%m-%d')
+        if today < row[4]:
+            return err('入社日は ' + row[4] + ' だよ。その日からログインできるよ', 403)
     session['staff_id'] = staff_id
     session['staff_name'] = dec(row[2])
     return ok(redirect='/staff/board')
+
+def staff_is_admin():
+    # 今ログインしているスタッフが管理者(admin)かどうか調べる
+    sid = session.get('staff_id')
+    if not sid:
+        return False
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT role FROM qz_staff WHERE staff_id=?', (sid,)).fetchone()
+    conn.close()
+    return bool(row and row[0] == 'admin')
+
+def _next_month_first():
+    # 「翌月1日」の日付を作る(入社日用)
+    import pytz as _p
+    from datetime import datetime as _d
+    now = _d.now(_p.timezone('Asia/Tokyo'))
+    if now.month == 12:
+        return f'{now.year + 1:04d}-01-01'
+    return f'{now.year:04d}-{now.month + 1:02d}-01'
+
+@app.route('/api/staff/hr/list', methods=['GET'])
+def api_staff_hr_list():
+    # 人事: スタッフ全員と承認待ちの一覧(管理者だけ)
+    if not staff_is_admin():
+        return err('管理者だけが見られるよ', 403)
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    rows = conn.execute('SELECT staff_id, name, role, status, active_from FROM qz_staff ORDER BY id').fetchall()
+    conn.close()
+    staff = [{'staff_id': r[0], 'name': dec(r[1]), 'role': r[2] or 'member',
+              'status': r[3] or 'active', 'active_from': r[4]} for r in rows]
+    return ok(staff=staff)
+
+@app.route('/api/staff/hr/add', methods=['POST'])
+def api_staff_hr_add():
+    # 人事: 管理者がその場でアカウントを作る(即時追加)
+    if not staff_is_admin():
+        return err('管理者だけができるよ', 403)
+    data = request.get_json(silent=True) or {}
+    staff_id = (data.get('staff_id') or '').strip()
+    name = (data.get('name') or '').strip()
+    password = (data.get('password') or '')
+    import re as _re
+    if not _re.fullmatch(r'[A-Za-z0-9_]{3,20}', staff_id):
+        return err('IDは半角英数字と_(アンダーバー)で3〜20文字にしてね')
+    if not name or len(name) > 20:
+        return err('名前は1〜20文字にしてね')
+    if len(password) < 6:
+        return err('パスワードは6文字以上にしてね')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    if conn.execute('SELECT id FROM qz_staff WHERE staff_id=?', (staff_id,)).fetchone():
+        conn.close()
+        return err('そのIDはもう使われているよ')
+    conn.execute('INSERT INTO qz_staff (staff_id, name, password_hash, role, status) VALUES (?,?,?,?,?)',
+                 (staff_id, enc(name), hash_password(password), 'member', 'active'))
+    conn.commit()
+    conn.close()
+    return ok(message='追加したよ')
+
+@app.route('/api/staff/hr/decide', methods=['POST'])
+def api_staff_hr_decide():
+    # 人事: 応募を承認(翌月1日入社)か不承認(削除)にする
+    if not staff_is_admin():
+        return err('管理者だけができるよ', 403)
+    data = request.get_json(silent=True) or {}
+    staff_id = (data.get('staff_id') or '').strip()
+    approve = bool(data.get('approve'))
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT status FROM qz_staff WHERE staff_id=?', (staff_id,)).fetchone()
+    if not row:
+        conn.close()
+        return err('見つからないよ', 404)
+    if (row[0] or 'active') != 'pending':
+        conn.close()
+        return err('その人は承認待ちじゃないよ')
+    if approve:
+        start = _next_month_first()
+        conn.execute('UPDATE qz_staff SET status=?, active_from=? WHERE staff_id=?', ('active', start, staff_id))
+        msg = '承認したよ。入社日は ' + start
+    else:
+        conn.execute('DELETE FROM qz_staff WHERE staff_id=?', (staff_id,))
+        msg = '不承認にして削除したよ'
+    conn.commit()
+    conn.close()
+    return ok(message=msg)
+
+@app.route('/api/staff/hr/remove', methods=['POST'])
+def api_staff_hr_remove():
+    # 人事: スタッフを退社にする(ログイン不可になるけど投稿は残る)
+    if not staff_is_admin():
+        return err('管理者だけができるよ', 403)
+    data = request.get_json(silent=True) or {}
+    staff_id = (data.get('staff_id') or '').strip()
+    if staff_id == session.get('staff_id'):
+        return err('自分自身は退社にできないよ')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT role FROM qz_staff WHERE staff_id=?', (staff_id,)).fetchone()
+    if not row:
+        conn.close()
+        return err('見つからないよ', 404)
+    if row[0] == 'admin':
+        conn.close()
+        return err('管理者は退社にできないよ')
+    conn.execute("UPDATE qz_staff SET status='retired', active_from=NULL WHERE staff_id=?", (staff_id,))
+    conn.commit()
+    conn.close()
+    return ok(message=staff_id + ' さんを退社にしたよ。おつかれさま')
+
+@app.route('/api/staff/register', methods=['POST'])
+def api_staff_register():
+    # 入社応募: 登録コードを知っている人だけ。承認されるまで「承認待ち」
+    import hmac as _hmac
+    signup_code = os.environ.get('STAFF_SIGNUP_CODE', '')
+    if not signup_code:
+        return err('応募の受付はまだ準備中だよ(登録コードが未設定)')
+    data = request.get_json(silent=True) or {}
+    code = (data.get('signup_code') or '').strip()
+    staff_id = (data.get('staff_id') or '').strip()
+    name = (data.get('name') or '').strip()
+    password = (data.get('password') or '')
+    # compare_digest = 比較の時間から答えを推測されない安全な比べ方
+    if not _hmac.compare_digest(code, signup_code):
+        return err('登録コードが違うよ', 403)
+    import re as _re
+    if not _re.fullmatch(r'[A-Za-z0-9_]{3,20}', staff_id):
+        return err('IDは半角英数字と_(アンダーバー)で3〜20文字にしてね')
+    if not name or len(name) > 20:
+        return err('名前は1〜20文字にしてね')
+    if len(password) < 6:
+        return err('パスワードは6文字以上にしてね')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    if conn.execute('SELECT id FROM qz_staff WHERE staff_id=?', (staff_id,)).fetchone():
+        conn.close()
+        return err('そのIDはもう使われているよ')
+    conn.execute('INSERT INTO qz_staff (staff_id, name, password_hash, role, status) VALUES (?,?,?,?,?)',
+                 (staff_id, enc(name), hash_password(password), 'member', 'pending'))
+    conn.commit()
+    conn.close()
+    return ok(message='応募を受け付けたよ! 管理者が審査するから待っててね。承認されたら翌月1日に入社だよ')
+
+@app.route('/staff/hr')
+def page_staff_hr():
+    # 人事ページ(管理者だけが開ける)
+    if not session.get('staff_id'):
+        return redirect('/staff/login')
+    if not staff_is_admin():
+        return redirect('/staff/board')
+    return render_template('staff_hr.html', my_id=session.get('staff_id'))
 
 @app.route('/staff/board')
 def page_staff_board():
     if not session.get('staff_id'):
         return redirect('/staff/login')
-    return render_template('staff_board.html', staff_name=session.get('staff_name'))
+    return render_template('staff_board.html', staff_name=session.get('staff_name'), is_admin=staff_is_admin())
 
 @app.route('/api/staff/logout', methods=['POST'])
 def api_staff_logout():
@@ -4221,25 +4385,48 @@ def api_staff_messages_get():
     if not session.get('staff_id'):
         return err('ログインしてね', 401)
     channel_id = request.args.get('channel_id', '1')
+    limit = min(200, max(1, int(request.args.get('limit') or 30)))
     import sqlite3 as _sq
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
-    rows = conn.execute('SELECT id, staff_name, title, body, created_at, image_data, stamp_id, file_data, file_name FROM qz_messages WHERE channel_id=? ORDER BY id DESC', (channel_id,)).fetchall()
+    # 重いデータ(画像・ファイルの中身)は返さず「有無」だけ返す。中身は別URLで配る
+    rows = conn.execute(
+        'SELECT id, staff_name, title, body, created_at, stamp_id, is_system, reply_to, '
+        '(image_data IS NOT NULL) AS has_image, (file_data IS NOT NULL) AS has_file, file_name '
+        'FROM qz_messages WHERE channel_id=? ORDER BY id DESC LIMIT ?', (channel_id, limit + 1)).fetchall()
+    has_more = len(rows) > limit
+    rows = rows[:limit]
     my_staff_id = session.get('staff_id')
+    ids = [r[0] for r in rows]
+    # リアクションは1回のSQLでまとめて取る(前は1件ごとで遅かった)
+    reactions_map = {}
+    if ids:
+        marks = ','.join(['?'] * len(ids))
+        for mid, emoji, sid in conn.execute('SELECT message_id, emoji, staff_id FROM qz_reactions WHERE message_id IN (' + marks + ')', ids).fetchall():
+            summary = reactions_map.setdefault(mid, {})
+            info = summary.setdefault(emoji, {'count': 0, 'mine': False})
+            info['count'] += 1
+            if sid == my_staff_id:
+                info['mine'] = True
+    # 返信プレビューもまとめて取る
+    reply_ids = [r[7] for r in rows if r[7]]
+    reply_map = {}
+    if reply_ids:
+        marks = ','.join(['?'] * len(reply_ids))
+        for rid, rname, rbody in conn.execute('SELECT id, staff_name, body FROM qz_messages WHERE id IN (' + marks + ')', reply_ids).fetchall():
+            reply_map[rid] = {'staff_name': dec(rname or ''), 'body': (dec(rbody or '') or '')[:60]}
     messages = []
     for r in rows:
-        msg_id = r[0]
-        reactions_raw = conn.execute('SELECT emoji, staff_id FROM qz_reactions WHERE message_id=?', (msg_id,)).fetchall()
-        reaction_summary = {}
-        for emoji, sid in reactions_raw:
-            if emoji not in reaction_summary:
-                reaction_summary[emoji] = {'count': 0, 'mine': False}
-            reaction_summary[emoji]['count'] += 1
-            if sid == my_staff_id:
-                reaction_summary[emoji]['mine'] = True
-        is_sys = conn.execute('SELECT is_system FROM qz_messages WHERE id=?', (msg_id,)).fetchone()
-        messages.append({'id':r[0],'staff_name':dec(r[1]),'title':dec(r[2]),'body':dec(r[3]),'created_at':r[4],'image_data':r[5],'stamp_id':r[6],'reactions':reaction_summary,'is_system': bool(is_sys[0]) if is_sys else False, 'file_data': r[7], 'file_name': dec(r[8]) if r[8] else None})
+        messages.append({
+            'id': r[0], 'staff_name': dec(r[1]), 'title': dec(r[2]), 'body': dec(r[3]),
+            'created_at': r[4], 'stamp_id': r[5],
+            'is_system': bool(r[6]),
+            'reply_preview': reply_map.get(r[7]) if r[7] else None,
+            'has_image': bool(r[8]), 'has_file': bool(r[9]),
+            'file_name': dec(r[10]) if r[10] else None,
+            'reactions': reactions_map.get(r[0], {}),
+        })
     conn.close()
-    return ok(messages=messages)
+    return ok(messages=messages, has_more=has_more)
 
 @app.route('/api/staff/messages', methods=['POST'])
 def api_staff_messages_post():
@@ -4256,17 +4443,49 @@ def api_staff_messages_post():
         return err('内容を入力してね')
     if image_data and len(image_data) > 6_000_000:
         return err('画像が大きすぎるよ')
+    if file_data and len(file_data) > 8_000_000:
+        return err('ファイルが大きすぎるよ(5MBまで)')
+    reply_to = data.get('reply_to')
     import sqlite3 as _sq
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
     channel_id = data.get('channel_id', 1)
     import pytz as _pytz_jst
     from datetime import datetime as _dt_jst
     _jst_now_str = _dt_jst.now(_pytz_jst.timezone('Asia/Tokyo')).strftime('%Y-%m-%d %H:%M:%S')
-    conn.execute('INSERT INTO qz_messages (staff_id, staff_name, title, body, image_data, stamp_id, channel_id, file_data, file_name, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)',
-                 (session.get('staff_id'), enc(session.get('staff_name')), enc(title), enc(body), image_data, stamp_id, channel_id, file_data, enc(file_name) if file_name else None, _jst_now_str))
+    conn.execute('INSERT INTO qz_messages (staff_id, staff_name, title, body, image_data, stamp_id, channel_id, file_data, file_name, reply_to, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+                 (session.get('staff_id'), enc(session.get('staff_name')), enc(title), enc(body), image_data, stamp_id, channel_id, file_data, enc(file_name) if file_name else None, reply_to, _jst_now_str))
     conn.commit()
     conn.close()
     return ok(message='投稿しました')
+
+@app.route('/api/staff/messages/<int:message_id>/blob', methods=['GET'])
+def api_staff_message_blob(message_id):
+    # 画像やファイルの中身だけを返す(ブラウザがキャッシュできるから2回目以降は一瞬)
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    kind = request.args.get('kind', 'image')
+    col = 'file_data' if kind == 'file' else 'image_data'
+    import sqlite3 as _sq, base64 as _b64
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT ' + col + ', file_name FROM qz_messages WHERE id=?', (message_id,)).fetchone()
+    conn.close()
+    if not row or not row[0]:
+        return err('データが見つからないよ', 404)
+    # 「data:image/png;base64,〜」形式を分解して本物のデータに戻す
+    try:
+        header, b64 = row[0].split(',', 1)
+        mime = header.split(':', 1)[1].split(';', 1)[0]
+        raw = _b64.b64decode(b64)
+    except Exception:
+        return err('データの形式がおかしいよ', 500)
+    from flask import Response
+    resp = Response(raw, mimetype=mime or 'application/octet-stream')
+    resp.headers['Cache-Control'] = 'private, max-age=86400'
+    if kind == 'file':
+        from urllib.parse import quote as _quote
+        fname = dec(row[1]) if row[1] else 'file'
+        resp.headers['Content-Disposition'] = "attachment; filename*=UTF-8''" + _quote(fname)
+    return resp
 
 @app.route('/api/staff/reactions', methods=['POST'])
 def api_staff_reaction_toggle():
