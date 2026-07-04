@@ -593,8 +593,36 @@ function handleGenericFile(e) {
   if (!file) return;
   if (file.size > 5*1024*1024) { window.toast('ファイルは5MBまでだよ','error'); return; }
   const reader = new FileReader();
-  reader.onload = ev => { pendingFile = ev.target.result; pendingFileName = file.name; window.toast(file.name + ' を添付したよ','success'); };
+  reader.onload = ev => {
+    pendingFile = ev.target.result;
+    pendingFileName = file.name;
+    showFileChip();
+    window.toast(file.name + ' を添付したよ','success');
+  };
   reader.readAsDataURL(file);
+}
+
+function showFileChip() {
+  // 入力欄の上に「🗂️ファイル名 ✕」を表示する
+  let chip = document.getElementById('file-chip');
+  if (chip === null) {
+    chip = document.createElement('div');
+    chip.id = 'file-chip';
+    chip.style.cssText = 'display:flex; align-items:center; gap:8px; padding:6px 12px; font-size:13px; color:#14213d; background:#f4f1ea; border-top:1px solid #e3ddd0;';
+    const anchorEl = document.getElementById('img-preview-area');
+    anchorEl.parentNode.insertBefore(chip, anchorEl);
+  }
+  chip.innerHTML = '🗂️ ' + esc(pendingFileName) +
+    ' <button onclick="removeFile()" style="border:none; background:none; cursor:pointer; color:#e76f51; font-size:14px;">✕</button>';
+}
+
+function removeFile() {
+  pendingFile = null;
+  pendingFileName = '';
+  const chip = document.getElementById('file-chip');
+  if (chip) chip.remove();
+  const inp = document.getElementById('file-input');
+  if (inp) inp.value = '';
 }
 let newChType = 'group';
 let newGroupPublic = true;
@@ -817,7 +845,7 @@ async function loadMessages() {
             ${m.title ? `<div class="title">${esc(m.title)}</div>` : ''}
             ${m.body ? `<div class="body">${esc(m.body)}</div>` : ''}
             ${m.has_image ? `<img class="chat-image" src="/api/staff/messages/${m.id}/blob?kind=image" onclick="window.open(this.src)">` : ''}
-            ${m.has_file ? `<a href="/api/staff/messages/${m.id}/blob?kind=file" style="display:inline-flex;align-items:center;gap:6px;background:#f1ece0;color:#14213d;border-radius:10px;padding:8px 12px;text-decoration:none;margin-top:4px;font-size:13px;">📎 ${esc(m.file_name||'ファイル')}</a>` : ''}
+            ${m.has_file ? `<a href="/api/staff/messages/${m.id}/blob?kind=file" style="display:inline-flex;align-items:center;gap:6px;background:#f1ece0;color:#14213d;border-radius:10px;padding:8px 12px;text-decoration:none;margin-top:4px;font-size:13px;">🗂️ ${esc(m.file_name||'ファイル')}</a>` : ''}
             ${m.stamp_id ? `<img class="chat-stamp-img" src="/static/stamps/${m.stamp_id}.svg">` : ''}
           </div>
         </div>
@@ -921,7 +949,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function postMessage() {
   const body = document.getElementById('msg-body').value.trim();
-  if (!body && !pendingImage) { return; }
+  if (!body && !pendingImage && !pendingFile) { return; }
   const r = await fetch('/api/staff/messages', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({title: '', body, image_data: pendingImage, channel_id: currentChannelId, file_data: pendingFile, file_name: pendingFileName, reply_to: replyToId})
@@ -930,7 +958,7 @@ async function postMessage() {
   if (data.ok) {
     document.getElementById('msg-body').value = '';
     document.getElementById('msg-body').style.height = 'auto';
-    pendingFile = null; pendingFileName = '';
+    removeFile();
     cancelReply();
     removeImage();
     lastDataHash = '';
