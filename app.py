@@ -675,6 +675,21 @@ def page_answer(quiz_id):
     if not quiz:
         return redirect(url_for('page_group'))
     quiz = dict(quiz)
+    # 調査中のクイズは解けないようにする(利用規約違反の疑いを調べている間)
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q('SELECT under_review FROM quizzes WHERE id = %s'), (quiz_id,))
+        r = cur.fetchone()
+    if r and dict(r).get('under_review'):
+        return ('<html><head><meta charset="utf-8"><title>調査中</title></head>'
+                '<body style="font-family:sans-serif;text-align:center;'
+                'padding-top:80px;background:#f0f4f8;">'
+                '<div style="background:white;display:inline-block;'
+                'padding:40px 60px;border-radius:12px;">'
+                '<h2>このクイズはいま解けません</h2>'
+                '<p>利用規約違反の可能性があるため調査中です。</p>'
+                '<p><a href="' + url_for('page_group') + '">クイズ一覧にもどる</a></p>'
+                '</div></body></html>')
     # JSONっぽく解釈(SQLiteはJSONをTEXTで保存してる)
     opts = quiz.get('answer_options')
     if isinstance(opts, str) and opts:
@@ -1166,11 +1181,13 @@ def api_answer_quiz(quiz_id):
 
     with get_db() as conn:
         cur = make_cursor(conn)
-        cur.execute(q('SELECT answer, answers, explanation, hint FROM quizzes WHERE id = %s AND group_id = %s'),
+        cur.execute(q('SELECT answer, answers, explanation, hint, under_review FROM quizzes WHERE id = %s AND group_id = %s'),
                     (quiz_id, grp['id']))
         row = cur.fetchone()
         if not row:
             return err('クイズが見つからないよ', 404)
+        if dict(row).get('under_review'):
+            return err('このクイズは利用規約違反の可能性があるため調査中です', 403)
         row_dict = dict(row)
         correct_answer = dec(row_dict.get('answer') or '')
         answers_raw = row_dict.get('answers')
