@@ -3979,7 +3979,7 @@ def api_battle_create():
         return err('人数は2〜5人にしてね')
     with get_db() as gconn:
         gcur = make_cursor(gconn)
-        gcur.execute(q('SELECT id FROM quizzes WHERE group_id=%s'), (grp['id'],))
+        gcur.execute(q('SELECT id FROM quizzes WHERE group_id=%s AND COALESCE(under_review,0)=0'), (grp['id'],))
         all_ids = [str(dict(r)['id']) for r in gcur.fetchall()]
     if len(all_ids) < quiz_count:
         return err('クイズが足りないよ（' + str(len(all_ids)) + '問しかない）')
@@ -4076,11 +4076,15 @@ def api_battle_answer():
     quiz_id = (data.get('quiz_id') or '').strip()
     user_answer = str(data.get('user_answer', ''))[:500]
     time_ms = int(data.get('time_ms') or 0)
-    grp_id = data.get('group_id', '')
+    time_ms = max(0, min(7200000, time_ms))
+    # ログイン中のグループのクイズしか採点しない(答えの漏洩を防ぐ)
+    grp = current_group()
+    if not grp:
+        return err('ログインしてね', 401)
     # 採点
     with get_db() as gconn:
         gcur = make_cursor(gconn)
-        gcur.execute(q('SELECT answer, answers, has_options FROM quizzes WHERE id=%s'), (quiz_id,))
+        gcur.execute(q('SELECT answer, answers, has_options FROM quizzes WHERE id=%s AND group_id=%s'), (quiz_id, grp['id']))
         row = gcur.fetchone()
     if not row:
         return err('クイズが見つからないよ', 404)
@@ -4144,11 +4148,19 @@ def api_quiz_info(quiz_id):
         return err('ログインしてね', 401)
     with get_db() as conn:
         cur = make_cursor(conn)
-        cur.execute(q('SELECT id, question, answer, answers, has_options, answer_options, hint, explanation FROM quizzes WHERE id=%s AND group_id=%s'), (quiz_id, grp['id']))
+        cur.execute(q('SELECT id, question, answer, answers, has_options, answer_options, hint, explanation, under_review FROM quizzes WHERE id=%s AND group_id=%s'), (quiz_id, grp['id']))
         row = cur.fetchone()
     if not row:
         return err('クイズが見つからないよ', 404)
     r = dict(row)
+    # 調査中のクイズはバトルでも出さない
+    if r.get('under_review'):
+        return err('このクイズは調査中だよ', 403)
+    # 画像も一緒に返す(バトルモードで表示するため)
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q('SELECT filename FROM quiz_images WHERE quiz_id = %s ORDER BY created_at'), (quiz_id,))
+        imgs = ['/static/uploads/' + (r2['filename'] if hasattr(r2, 'keys') else r2[0]) for r2 in cur.fetchall()]
     import json as _json
     opts = None
     if r.get('answer_options'):
@@ -4162,6 +4174,7 @@ def api_quiz_info(quiz_id):
         has_options=bool(r['has_options']),
         answer_options=opts,
         hint=dec(r['hint'] or '') if r.get('hint') else None,
+        images=imgs,
     )
 
 @app.route('/homepage')

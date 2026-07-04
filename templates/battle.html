@@ -266,9 +266,16 @@ async function showBattleQuiz(idx) {
   document.getElementById('battle-answer-btn').onclick = submitBattleAnswer;
   selectedOption = null;
 
-  const r = await fetch('/api/battle/answer', {
-    method: 'GET'
-  }).catch(()=>null);
+  // タイマーは問題表示と同時にスタートする
+  // (前はクイズ取得に成功するとタイマーが動かないバグがあった)
+  startTime = Date.now();
+  let secs = 0;
+  clearInterval(timerInterval);
+  document.getElementById('battle-timer').textContent = '0秒';
+  timerInterval = setInterval(() => {
+    secs++;
+    document.getElementById('battle-timer').textContent = secs + '秒';
+  }, 1000);
 
   // クイズ取得（グループAPIを使用）
   try {
@@ -278,18 +285,21 @@ async function showBattleQuiz(idx) {
 
   // フォールバック
   renderBattleQuiz({question: 'クイズ ' + (idx+1), has_options: false});
-
-  startTime = Date.now();
-  let secs = 0;
-  clearInterval(timerInterval);
-  timerInterval = setInterval(() => {
-    secs++;
-    document.getElementById('battle-timer').textContent = secs + '秒';
-  }, 1000);
 }
 
 function renderBattleQuiz(data) {
   document.getElementById('battle-question').textContent = data.question || '';
+  // 画像があれば問題文の下に表示する
+  let imgBox = document.getElementById('battle-images');
+  if (imgBox === null) {
+    imgBox = document.createElement('div');
+    imgBox.id = 'battle-images';
+    imgBox.style.margin = '0 0 20px 0';
+    document.getElementById('battle-question').after(imgBox);
+  }
+  imgBox.innerHTML = (data.images || []).map(u =>
+    '<img src="' + u + '" style="max-width:100%; max-height:280px; border-radius:10px; display:block; margin:0 auto 8px;">'
+  ).join('');
   if (data.has_options && data.answer_options) {
     document.getElementById('battle-options').style.display = 'block';
     document.getElementById('battle-text-input').style.display = 'none';
