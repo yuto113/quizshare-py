@@ -111,7 +111,7 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,   # JavaScriptから読めないようにする
     SESSION_COOKIE_SAMESITE='Lax',  # 他のサイトから送られないようにする
     SESSION_COOKIE_SECURE=os.environ.get('FLASK_DEBUG', '0') != '1',  # HTTPSの時だけクッキーを送る(本番用)
-    MAX_CONTENT_LENGTH=256 * 1024,  # 大きすぎるデータ(256KB超)は拒否
+    MAX_CONTENT_LENGTH=20 * 1024 * 1024,  # 大きすぎるデータ(20MB超)は拒否
 )
 
 
@@ -250,7 +250,7 @@ def init_db():
             options_type = 'TEXT'
         else:
             id_default = 'TEXT PRIMARY KEY'
-            time_default = 'TEXT NOT NULL DEFAULT (datetime(\'now\'))'
+            time_default = 'TEXT NOT NULL DEFAULT (datetime(\'now\',\'localtime\'))'
             tags_type = 'TEXT NOT NULL DEFAULT \'\''
             options_type = 'TEXT'
 
@@ -604,11 +604,17 @@ def check_answer(user_answer, quiz_row):
     else:
         answers = [quiz_row['answer']]
     ua = normalize_answer(user_answer)
+    has_options = bool(quiz_row.get('has_options'))
     for a in answers:
         na = normalize_answer(a)
-        ok_flag, reason = smart_check(ua, na)
-        if ok_flag:
-            return True
+        if has_options:
+            # 選択問題は完全一致のみ
+            if ua == na:
+                return True
+        else:
+            ok_flag, reason = smart_check(ua, na)
+            if ok_flag:
+                return True
     return False
 
 # ====================================================================
@@ -655,6 +661,13 @@ def page_group():
     grp = current_group()
     if not grp:
         return redirect(url_for('page_home'))
+    # イベントグループなら管理ページへリダイレクト
+    import sqlite3 as _sq_grp
+    _conn_grp = _sq_grp.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    _ev = _conn_grp.execute('SELECT event_key FROM events WHERE group_id=? AND is_published=1', (str(grp['id']),)).fetchone()
+    _conn_grp.close()
+    if _ev:
+        return redirect('/event/' + _ev[0] + '/manage/')
     return render_template('group.html', group=grp, group_id=session.get('group_id'))
 
 
@@ -678,16 +691,20 @@ def page_answer(quiz_id):
     # 調査中のクイズは解けないようにする(利用規約違反の疑いを調べている間)
     with get_db() as conn:
         cur = make_cursor(conn)
-        cur.execute(q('SELECT under_review FROM quizzes WHERE id = %s'), (quiz_id,))
+        cur.execute(q('SELECT under_review, review_reason FROM quizzes WHERE id = %s'), (quiz_id,))
         r = cur.fetchone()
     if r and dict(r).get('under_review'):
+        from markupsafe import escape
+        reason = dec(dict(r).get('review_reason') or '')
+        if not reason:
+            reason = '利用規約違反の可能性があるため調査中です。'
         return ('<html><head><meta charset="utf-8"><title>調査中</title></head>'
                 '<body style="font-family:sans-serif;text-align:center;'
                 'padding-top:80px;background:#f0f4f8;">'
                 '<div style="background:white;display:inline-block;'
-                'padding:40px 60px;border-radius:12px;">'
+                'padding:40px 60px;border-radius:12px;max-width:600px;">'
                 '<h2>このクイズはいま解けません</h2>'
-                '<p>利用規約違反の可能性があるため調査中です。</p>'
+                '<p style="white-space:pre-wrap;text-align:left;">' + str(escape(reason)) + '</p>'
                 '<p><a href="' + url_for('page_group') + '">クイズ一覧にもどる</a></p>'
                 '</div></body></html>')
     # JSONっぽく解釈(SQLiteはJSONをTEXTで保存してる)
@@ -742,8 +759,6 @@ def api_admin_groups():
 
 @app.route('/<group_id>/setting/')
 def page_admin_entry(group_id):
-    # 管理者画面の入口(URLを直接打ってアクセス)
-    # まず、そのグループが本当にあるかをチェック
     with get_db() as conn:
         cur = make_cursor(conn)
         cur.execute(q('''
@@ -752,11 +767,25 @@ def page_admin_entry(group_id):
         '''), (hash_group_id(group_id),))
         row = cur.fetchone()
     group_info = dict(row) if row else None
+    # イベントグループか確認
+    event = None
+    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
+    if group_info:
+        import sqlite3 as _sq_adm
+        _conn_adm = _sq_adm.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+        ev_row = _conn_adm.execute('SELECT id,event_key,title,start_date,end_date,result_date FROM events WHERE group_id=?',
+                                    (str(group_info['id']),)).fetchone()
+        _conn_adm.close()
+        if ev_row:
+            event = {'id':ev_row[0],'event_key':ev_row[1],'title':ev_row[2],
+                     'start_date':ev_row[3],'end_date':ev_row[4],'result_date':ev_row[5]}
     return render_template(
         'admin.html',
         group_id=group_id,
         group_info=group_info,
         logged_in=bool(group_info) and admin_logged_in_for(group_info['id']),
+        event=event,
+        admin_pw=admin_pw,
     )
 
 
@@ -899,6 +928,14 @@ def api_login():
             return err('パスワードが違うよ', 401)
     session.clear()
     session['group_id'] = group_id
+    # イベントグループならイベントページへリダイレクト
+    import sqlite3 as _sq_ev
+    _conn_ev = _sq_ev.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    _ev_row = _conn_ev.execute('SELECT event_key FROM events WHERE group_id=? AND is_published=1', 
+                                (str(row['id']),)).fetchone()
+    _conn_ev.close()
+    _event_redirect = '/event/' + _ev_row[0] + '/manage/' if _ev_row else None
+    _grp_id_for_event = str(dict(row)['id'])
     # アクセスログ記録
     try:
         _grp_row = dict(row)
@@ -921,7 +958,7 @@ def api_login():
         _lconn.close()
     except Exception as _le:
         print(f'アクセスログエラー: {_le}')
-    return ok(redirect='/group')
+    return ok(redirect=_event_redirect or '/group')
 
 
 @app.route('/api/groups/check', methods=['POST'])
@@ -1127,7 +1164,9 @@ def api_create_quiz():
             '''), (new_quiz_id, grp['id'], name, class_name, question, answer,
                    options_json, 1 if has_options else 0, tags_str,
                    answers_json_str, edit_pw_hash, explanation, hint))
-            created_at = datetime.now(timezone.utc).isoformat()
+            import pytz as _pytz
+            _jst = _pytz.timezone('Asia/Tokyo')
+            created_at = datetime.now(_jst).strftime('%Y-%m-%d %H:%M:%S')
 
     return ok(quiz={
         'id': new_quiz_id,
@@ -1181,13 +1220,15 @@ def api_answer_quiz(quiz_id):
 
     with get_db() as conn:
         cur = make_cursor(conn)
-        cur.execute(q('SELECT answer, answers, explanation, hint, under_review FROM quizzes WHERE id = %s AND group_id = %s'),
+        cur.execute(q('SELECT answer, answers, explanation, hint, under_review, review_reason FROM quizzes WHERE id = %s AND group_id = %s'),
                     (quiz_id, grp['id']))
         row = cur.fetchone()
         if not row:
             return err('クイズが見つからないよ', 404)
         if dict(row).get('under_review'):
-            return err('このクイズは利用規約違反の可能性があるため調査中です', 403)
+            reason = dec(dict(row).get('review_reason') or '')
+            msg = 'このクイズは調査中だよ' + ('。理由: ' + reason if reason else '')
+            return err(msg, 403)
         row_dict = dict(row)
         correct_answer = dec(row_dict.get('answer') or '')
         answers_raw = row_dict.get('answers')
@@ -1429,7 +1470,7 @@ def api_admin_quizzes(group_id):
         return err("管理者としてログインしてね", 401)
     with get_db() as conn:
         cur = make_cursor(conn)
-        cur.execute(q("SELECT id, author_name, question, created_at FROM quizzes WHERE group_id = %s ORDER BY created_at DESC"), (row["id"],))
+        cur.execute(q("SELECT id, author_name, question, created_at, under_review, review_reason FROM quizzes WHERE group_id = %s ORDER BY created_at DESC"), (row["id"],))
         quizzes = [dict(r) for r in cur.fetchall()]
     for q2 in quizzes:
         q2["id"]          = str(q2["id"])
@@ -1437,6 +1478,8 @@ def api_admin_quizzes(group_id):
         # # 暗号化されたフィールドを復号して返す
         q2["author_name"] = dec(q2.get("author_name") or "")
         q2["question"]    = dec(q2.get("question") or "")
+        q2["under_review"] = 1 if q2.get("under_review") else 0
+        q2["review_reason"] = dec(q2.get("review_reason") or "")
     return ok(quizzes=quizzes)
 
 @app.route("/api/admin/quizzes/<group_id>/<quiz_id>", methods=["DELETE"])
@@ -1455,6 +1498,27 @@ def api_admin_delete_quiz(group_id, quiz_id):
         cur.execute(q("DELETE FROM attempts WHERE quiz_id = %s"), (quiz_id,))
         cur.execute(q("DELETE FROM feedbacks WHERE quiz_id = %s"), (quiz_id,))
         cur.execute(q("DELETE FROM quizzes WHERE id = %s AND group_id = %s"), (quiz_id, row["id"]))
+    return ok()
+
+@app.route("/api/admin/quizzes/<group_id>/<quiz_id>/review", methods=["POST"])
+def api_admin_review_quiz(group_id, quiz_id):
+    # 管理者がクイズの調査中フラグと理由を設定する
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q("SELECT id FROM groups WHERE group_id_hash = %s"), (hash_group_id(group_id),))
+        row = cur.fetchone()
+    if not row:
+        return err("グループが見つからないよ", 404)
+    if not admin_logged_in_for(row["id"]):
+        return err("管理者としてログインしてね", 401)
+    data = request.get_json(silent=True) or {}
+    flag = 1 if data.get("under_review") else 0
+    reason = str(data.get("reason") or "")[:200]
+    enc_reason = enc(reason) if (flag and reason) else None
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q("UPDATE quizzes SET under_review = %s, review_reason = %s WHERE id = %s AND group_id = %s"),
+                    (flag, enc_reason, quiz_id, row["id"]))
     return ok()
 
 @app.route('/api/quizzes/<quiz_id>/ranking', methods=['POST'])
@@ -1970,6 +2034,9 @@ def api_ai_score():
     grp = current_group()
     if not grp:
         return err('ログインしてね', 401)
+    # ベータ期間チェック
+    if not check_beta_active('ai_scoring'):
+        return err('AI採点はベータ期間外です', 403)
     # APIキーが設定されていればai_scoringがOFFでも使える
     import sqlite3 as _sq_chk
     _conn_chk = _sq_chk.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
@@ -2938,6 +3005,1784 @@ def page_custom(page_key):
         page_name=row[0], template_type=row[1],
         content=json.loads(row[2]), page_key=page_key)
 
+
+# ===== 先生モード =====
+
+def hash_teacher_password(pw):
+    import hashlib, secrets
+    salt = secrets.token_hex(16)
+    dk = hashlib.scrypt(pw.encode(), salt=salt.encode(), n=16384, r=8, p=1, dklen=64)
+    return f'scrypt$16384$8$1${salt}${dk.hex()}'
+
+def verify_teacher_password(pw, stored):
+    try:
+        parts = stored.split('$')
+        if len(parts) != 6: return False
+        _, n, r, p, salt, expected = parts
+        import hashlib
+        dk = hashlib.scrypt(pw.encode(), salt=salt.encode(), n=int(n), r=int(r), p=int(p), dklen=64)
+        import hmac as _hmac
+        return _hmac.compare_digest(dk.hex(), expected)
+    except: return False
+
+@app.route('/api/teacher/login', methods=['POST'])
+def api_teacher_login():
+    data = request.get_json(silent=True) or {}
+    group_id = (data.get('group_id') or '').strip()
+    teacher_num = int(data.get('teacher_num') or 0)
+    password = data.get('password') or ''
+    if not group_id or not teacher_num or not password:
+        return err('入力が不足しているよ')
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q('SELECT id FROM groups WHERE group_id_hash = %s AND school_mode = 1'),
+                    (hash_group_id(group_id),))
+        grp = cur.fetchone()
+    if not grp:
+        return err('学校グループが見つからないよ', 403)
+    import sqlite3 as _sq
+    conn2 = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn2.execute('SELECT id, name, password_hash FROM teachers WHERE group_id=? AND teacher_num=?',
+                        (str(dict(grp)['id']), teacher_num)).fetchone()
+    conn2.close()
+    if not row:
+        return err('先生番号が見つからないよ', 403)
+    if not verify_teacher_password(password, row[2]):
+        return err('パスワードが違うよ', 401)
+    session['teacher'] = {'group_id': group_id, 'teacher_id': row[0], 'teacher_name': row[1], 'teacher_num': teacher_num}
+    session['group_id'] = group_id
+    return ok(redirect='/group', teacher_name=row[1])
+
+@app.route('/api/teacher/register_first', methods=['POST'])
+def api_teacher_register_first():
+    # 管理者が最初の先生を登録
+    data = request.get_json(silent=True) or {}
+    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
+    if data.get('admin_password') != admin_pw:
+        return err('管理者パスワードが違うよ', 403)
+    group_id = (data.get('group_id') or '').strip()
+    password = data.get('password') or ''
+    name = (data.get('name') or '先生').strip()
+    if not group_id or not password:
+        return err('グループIDとパスワードは必須だよ')
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q('SELECT id FROM groups WHERE group_id_hash = %s AND school_mode = 1'),
+                    (hash_group_id(group_id),))
+        grp = cur.fetchone()
+    if not grp:
+        return err('学校グループが見つからないよ', 403)
+    group_uuid = str(dict(grp)['id'])
+    import sqlite3 as _sq
+    conn2 = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    count = conn2.execute('SELECT COUNT(*) FROM teachers WHERE group_id=?', (group_uuid,)).fetchone()[0]
+    pw_hash = hash_teacher_password(password)
+    try:
+        conn2.execute('INSERT INTO teachers (group_id, teacher_num, name, password_hash) VALUES (?,?,?,?)',
+                      (group_uuid, count+1, name, pw_hash))
+        conn2.commit()
+    except Exception as e:
+        conn2.close()
+        return err(str(e))
+    conn2.close()
+    return ok(teacher_num=count+1, message=f'T{count+1}として登録しました')
+
+@app.route('/api/teacher/add', methods=['POST'])
+def api_teacher_add():
+    # 先生が新しい先生を追加
+    teacher = session.get('teacher')
+    if not teacher:
+        return err('先生としてログインしてね', 401)
+    data = request.get_json(silent=True) or {}
+    password = data.get('password') or ''
+    name = (data.get('name') or '先生').strip()
+    if not password or len(password) < 4:
+        return err('パスワードは4文字以上にしてね')
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q('SELECT id FROM groups WHERE group_id_hash = %s'),
+                    (hash_group_id(teacher['group_id']),))
+        grp = cur.fetchone()
+    if not grp:
+        return err('グループが見つからないよ', 404)
+    group_uuid = str(dict(grp)['id'])
+    import sqlite3 as _sq
+    conn2 = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    count = conn2.execute('SELECT COUNT(*) FROM teachers WHERE group_id=?', (group_uuid,)).fetchone()[0]
+    pw_hash = hash_teacher_password(password)
+    try:
+        conn2.execute('INSERT INTO teachers (group_id, teacher_num, name, password_hash) VALUES (?,?,?,?)',
+                      (group_uuid, count+1, name, pw_hash))
+        conn2.commit()
+    except Exception as e:
+        conn2.close()
+        return err(str(e))
+    conn2.close()
+    return ok(teacher_num=count+1, message=f'T{count+1}として登録しました')
+
+@app.route('/api/teacher/goal', methods=['POST'])
+def api_teacher_goal():
+    teacher = session.get('teacher')
+    if not teacher:
+        return err('先生としてログインしてね', 401)
+    data = request.get_json(silent=True) or {}
+    date = (data.get('date') or '').strip()
+    goal = (data.get('goal') or '').strip()
+    if not date or not goal:
+        return err('日付と目標は必須だよ')
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q('SELECT id FROM groups WHERE group_id_hash = %s'),
+                    (hash_group_id(teacher['group_id']),))
+        grp = cur.fetchone()
+    group_uuid = str(dict(grp)['id'])
+    import sqlite3 as _sq
+    conn2 = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    conn2.execute('INSERT OR REPLACE INTO teacher_goals (group_id, teacher_id, date, goal) VALUES (?,?,?,?)',
+                  (group_uuid, teacher['teacher_id'], date, goal))
+    conn2.commit()
+    conn2.close()
+    return ok(message='目標を設定しました')
+
+@app.route('/api/teacher/notice', methods=['POST'])
+def api_teacher_notice():
+    teacher = session.get('teacher')
+    if not teacher:
+        return err('先生としてログインしてね', 401)
+    data = request.get_json(silent=True) or {}
+    title = (data.get('title') or '').strip()
+    body = (data.get('body') or '').strip()
+    notice_date = (data.get('notice_date') or '').strip()
+    if not title or not body or not notice_date:
+        return err('タイトル・本文・日付は必須だよ')
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q('SELECT id FROM groups WHERE group_id_hash = %s'),
+                    (hash_group_id(teacher['group_id']),))
+        grp = cur.fetchone()
+    group_uuid = str(dict(grp)['id'])
+    import sqlite3 as _sq
+    conn2 = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    conn2.execute('INSERT INTO teacher_notices (group_id, teacher_id, teacher_name, title, body, notice_date) VALUES (?,?,?,?,?,?)',
+                  (group_uuid, teacher['teacher_id'], teacher['teacher_name'], title, body, notice_date))
+    conn2.commit()
+    conn2.close()
+    return ok(message='お知らせを送信しました')
+
+@app.route('/api/group/goals', methods=['GET'])
+def api_group_goals():
+    grp = current_group()
+    if not grp:
+        return err('ログインしてね', 401)
+    date = request.args.get('date', '')
+    import sqlite3 as _sq
+    conn2 = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    if date:
+        rows = conn2.execute('SELECT goal, date FROM teacher_goals WHERE group_id=? AND date=? ORDER BY id DESC',
+                             (grp['id'], date)).fetchall()
+    else:
+        rows = conn2.execute('SELECT goal, date FROM teacher_goals WHERE group_id=? ORDER BY date DESC LIMIT 30',
+                             (grp['id'],)).fetchall()
+    conn2.close()
+    return ok(goals=[{'goal':r[0],'date':r[1]} for r in rows])
+
+@app.route('/api/group/notices', methods=['GET'])
+def api_group_notices():
+    grp = current_group()
+    if not grp:
+        return err('ログインしてね', 401)
+    import sqlite3 as _sq
+    import pytz as _pytz
+    from datetime import datetime as _dt
+    now_str = _dt.now(_pytz.timezone('Asia/Tokyo')).strftime('%Y-%m-%d %H:%M:%S')
+    conn2 = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    # 未来の日時(予約投稿)は生徒には見せない
+    rows = conn2.execute('SELECT id, teacher_name, title, body, notice_date, created_at FROM teacher_notices WHERE group_id=? AND notice_date<=? ORDER BY notice_date DESC, id DESC LIMIT 50',
+                         (grp['id'], now_str)).fetchall()
+    conn2.close()
+    return ok(notices=[{'id':r[0],'teacher_name':r[1],'title':r[2],'body':r[3],'notice_date':r[4],'created_at':r[5]} for r in rows])
+
+@app.route('/api/teacher/status', methods=['GET'])
+def api_teacher_status():
+    teacher = session.get('teacher')
+    if not teacher:
+        return ok(is_teacher=False)
+    return ok(is_teacher=True, teacher_name=teacher.get('teacher_name'), teacher_num=teacher.get('teacher_num'))
+
+
+@app.route('/api/teacher/change_password', methods=['POST'])
+def api_teacher_change_password():
+    teacher = session.get('teacher')
+    if not teacher:
+        return err('先生としてログインしてね', 401)
+    data = request.get_json(silent=True) or {}
+    old_pw = data.get('old_password') or ''
+    new_pw = data.get('new_password') or ''
+    if not new_pw or len(new_pw) < 4:
+        return err('新しいパスワードは4文字以上にしてね')
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q('SELECT id FROM groups WHERE group_id_hash = %s'),
+                    (hash_group_id(teacher['group_id']),))
+        grp = cur.fetchone()
+    group_uuid = str(dict(grp)['id'])
+    import sqlite3 as _sq
+    conn2 = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn2.execute('SELECT password_hash, is_initial FROM teachers WHERE id=?',
+                        (teacher['teacher_id'],)).fetchone()
+    if not row:
+        conn2.close()
+        return err('先生情報が見つからないよ', 404)
+    if not verify_teacher_password(old_pw, row[0]):
+        conn2.close()
+        return err('現在のパスワードが違うよ', 401)
+    new_hash = hash_teacher_password(new_pw)
+    conn2.execute('UPDATE teachers SET password_hash=?, is_initial=0 WHERE id=?',
+                  (new_hash, teacher['teacher_id']))
+    conn2.commit()
+    conn2.close()
+    return ok(message='パスワードを変更しました')
+
+@app.route('/api/teacher/check_initial', methods=['GET'])
+def api_teacher_check_initial():
+    teacher = session.get('teacher')
+    if not teacher:
+        return ok(is_initial=False)
+    import sqlite3 as _sq
+    conn2 = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn2.execute('SELECT is_initial FROM teachers WHERE id=?',
+                        (teacher['teacher_id'],)).fetchone()
+    conn2.close()
+    is_initial = bool(row and row[0]) if row else False
+    return ok(is_initial=is_initial)
+
+@app.route('/api/teacher/count', methods=['GET'])
+def api_teacher_count():
+    grp = current_group()
+    if not grp:
+        return err('ログインしてね', 401)
+    import sqlite3 as _sq
+    conn2 = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    count = conn2.execute('SELECT COUNT(*) FROM teachers WHERE group_id=?',
+                          (grp['id'],)).fetchone()[0]
+    conn2.close()
+    return ok(count=int(count))
+
+
+@app.route('/api/admin/teachers/<group_id>', methods=['GET'])
+def api_admin_get_teachers(group_id):
+    pw = request.args.get('pw', '')
+    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
+    if not admin_pw or pw != admin_pw:
+        return err('管理者パスワードが違うよ', 403)
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    rows = conn.execute('SELECT id, teacher_num, name, is_initial, is_admin FROM teachers WHERE group_id=? ORDER BY teacher_num',
+                        (group_id,)).fetchall()
+    conn.close()
+    return ok(teachers=[{'id':r[0],'num':r[1],'name':r[2],'is_initial':bool(r[3]),'is_admin':bool(r[4])} for r in rows])
+
+@app.route('/api/admin/teacher/add', methods=['POST'])
+def api_admin_add_teacher():
+    data = request.get_json(silent=True) or {}
+    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
+    if data.get('password') != admin_pw:
+        return err('管理者パスワードが違うよ', 403)
+    group_id = data.get('group_id', '')
+    name = (data.get('name') or '先生').strip()
+    pw = data.get('teacher_password') or ''
+    is_admin = 1 if data.get('is_admin') else 0
+    if not pw or len(pw) < 4:
+        return err('パスワードは4文字以上にしてね')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    if is_admin:
+        count = conn.execute('SELECT COUNT(*) FROM teachers WHERE group_id=? AND is_admin=1', (group_id,)).fetchone()[0]
+        if count > 0:
+            conn.close()
+            return err('管理者先生はすでに設定されています')
+    count = conn.execute('SELECT COUNT(*) FROM teachers WHERE group_id=?', (group_id,)).fetchone()[0]
+    pw_hash = hash_teacher_password(pw)
+    try:
+        conn.execute('INSERT INTO teachers (group_id, teacher_num, name, password_hash, is_admin) VALUES (?,?,?,?,?)',
+                     (group_id, count+1, name, pw_hash, is_admin))
+        conn.commit()
+    except Exception as e:
+        conn.close()
+        return err(str(e))
+    conn.close()
+    return ok(teacher_num=count+1, message=f'T{count+1}「{name}」を追加しました')
+
+@app.route('/api/admin/teacher/delete', methods=['POST'])
+def api_admin_delete_teacher():
+    data = request.get_json(silent=True) or {}
+    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
+    if data.get('password') != admin_pw:
+        return err('管理者パスワードが違うよ', 403)
+    teacher_id = data.get('teacher_id')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    conn.execute('DELETE FROM teachers WHERE id=?', (teacher_id,))
+    conn.commit()
+    conn.close()
+    return ok(message='削除しました')
+
+@app.route('/notices')
+def page_notices():
+    grp = current_group()
+    if not grp:
+        return redirect(url_for('page_home'))
+    if not grp.get('school_mode'):
+        return redirect(url_for('page_group'))
+    return render_template('notices.html', group=grp, group_id=session.get('group_id'))
+
+@app.route('/api/teacher/notice/<int:notice_id>/delete', methods=['POST'])
+def api_teacher_notice_delete(notice_id):
+    teacher = session.get('teacher')
+    if not teacher:
+        return err('先生としてログインしてね', 401)
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT teacher_id FROM teacher_notices WHERE id=?', (notice_id,)).fetchone()
+    if not row:
+        conn.close()
+        return err('お知らせが見つからないよ', 404)
+    if row[0] != teacher['teacher_id']:
+        conn.close()
+        return err('自分のお知らせしか削除できないよ', 403)
+    conn.execute('DELETE FROM teacher_notices WHERE id=?', (notice_id,))
+    conn.commit()
+    conn.close()
+    return ok(message='削除しました')
+
+@app.route('/api/teacher/notice/<int:notice_id>/edit', methods=['POST'])
+def api_teacher_notice_edit(notice_id):
+    teacher = session.get('teacher')
+    if not teacher:
+        return err('先生としてログインしてね', 401)
+    data = request.get_json(silent=True) or {}
+    title = (data.get('title') or '').strip()
+    body = (data.get('body') or '').strip()
+    if not title or not body:
+        return err('タイトルと本文は必須だよ')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT teacher_id FROM teacher_notices WHERE id=?', (notice_id,)).fetchone()
+    if not row:
+        conn.close()
+        return err('お知らせが見つからないよ', 404)
+    if row[0] != teacher['teacher_id']:
+        conn.close()
+        return err('自分のお知らせしか編集できないよ', 403)
+    conn.execute('UPDATE teacher_notices SET title=?, body=? WHERE id=?', (title, body, notice_id))
+    conn.commit()
+    conn.close()
+    return ok(message='編集しました')
+
+# ===== 課題機能 =====
+
+@app.route('/api/tasks', methods=['GET'])
+def api_get_tasks():
+    grp = current_group()
+    if not grp:
+        return err('ログインしてね', 401)
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    rows = conn.execute('SELECT id, teacher_name, title, description, due_date, created_at FROM tasks WHERE group_id=? ORDER BY created_at DESC',
+                        (grp['id'],)).fetchall()
+    conn.close()
+    return ok(tasks=[{'id':r[0],'teacher_name':r[1],'title':r[2],'description':r[3],'due_date':r[4],'created_at':r[5]} for r in rows])
+
+@app.route('/api/tasks', methods=['POST'])
+def api_create_task():
+    teacher = session.get('teacher')
+    if not teacher:
+        return err('先生としてログインしてね', 401)
+    data = request.get_json(silent=True) or {}
+    title = (data.get('title') or '').strip()
+    description = (data.get('description') or '').strip()
+    due_date = (data.get('due_date') or '').strip()
+    if not title or not description:
+        return err('タイトルと説明は必須だよ')
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q('SELECT id FROM groups WHERE group_id_hash = %s'),
+                    (hash_group_id(teacher['group_id']),))
+        grp = cur.fetchone()
+    if not grp:
+        return err('グループが見つからないよ', 404)
+    group_uuid = str(dict(grp)['id'])
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    conn.execute('INSERT INTO tasks (group_id, teacher_id, teacher_name, title, description, due_date) VALUES (?,?,?,?,?,?)',
+                 (group_uuid, teacher['teacher_id'], teacher['teacher_name'], title, description, due_date or None))
+    conn.commit()
+    conn.close()
+    return ok(message='課題を作成しました')
+
+@app.route('/api/tasks/<int:task_id>', methods=['GET'])
+def api_get_task(task_id):
+    grp = current_group()
+    if not grp:
+        return err('ログインしてね', 401)
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT id, teacher_name, title, description, due_date, created_at FROM tasks WHERE id=? AND group_id=?',
+                       (task_id, grp['id'])).fetchone()
+    if not row:
+        conn.close()
+        return err('課題が見つからないよ', 404)
+    subs = conn.execute('SELECT id, author_name, question, answer, created_at FROM task_submissions WHERE task_id=? ORDER BY created_at DESC',
+                        (task_id,)).fetchall()
+    conn.close()
+    return ok(
+        task={'id':row[0],'teacher_name':row[1],'title':row[2],'description':row[3],'due_date':row[4],'created_at':row[5]},
+        submissions=[{'id':s[0],'author_name':s[1],'question':s[2],'answer':s[3],'created_at':s[4]} for s in subs]
+    )
+
+@app.route('/api/tasks/<int:task_id>/submit', methods=['POST'])
+def api_submit_task(task_id):
+    grp = current_group()
+    if not grp:
+        return err('ログインしてね', 401)
+    data = request.get_json(silent=True) or {}
+    author_name = (data.get('author_name') or '').strip()
+    question = (data.get('question') or '').strip()
+    answer = (data.get('answer') or '').strip()
+    if not author_name or not question or not answer:
+        return err('名前・問題・答えは必須だよ')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT id FROM tasks WHERE id=? AND group_id=?', (task_id, grp['id'])).fetchone()
+    if not row:
+        conn.close()
+        return err('課題が見つからないよ', 404)
+    conn.execute('INSERT INTO task_submissions (task_id, group_id, author_name, question, answer) VALUES (?,?,?,?,?)',
+                 (task_id, grp['id'], author_name, question, answer))
+    conn.commit()
+    conn.close()
+    return ok(message='提出しました')
+
+@app.route('/api/tasks/<int:task_id>/delete', methods=['POST'])
+def api_delete_task(task_id):
+    teacher = session.get('teacher')
+    if not teacher:
+        return err('先生としてログインしてね', 401)
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT teacher_id FROM tasks WHERE id=?', (task_id,)).fetchone()
+    if not row:
+        conn.close()
+        return err('課題が見つからないよ', 404)
+    if row[0] != teacher['teacher_id']:
+        conn.close()
+        return err('自分の課題しか削除できないよ', 403)
+    conn.execute('DELETE FROM task_submissions WHERE task_id=?', (task_id,))
+    conn.execute('DELETE FROM tasks WHERE id=?', (task_id,))
+    conn.commit()
+    conn.close()
+    return ok(message='削除しました')
+
+@app.route('/tasks')
+def page_tasks():
+    grp = current_group()
+    if not grp:
+        return redirect(url_for('page_home'))
+    if not grp.get('school_mode'):
+        return redirect(url_for('page_group'))
+    return render_template('tasks.html', group=grp, group_id=session.get('group_id'))
+
+@app.route('/tasks/<int:task_id>')
+def page_task_detail(task_id):
+    grp = current_group()
+    if not grp:
+        return redirect(url_for('page_home'))
+    if not grp.get('school_mode'):
+        return redirect(url_for('page_group'))
+    return render_template('task_detail.html', group=grp, group_id=session.get('group_id'), task_id=task_id)
+
+@app.route('/api/tasks/<int:task_id>/edit', methods=['POST'])
+def api_edit_task(task_id):
+    teacher = session.get('teacher')
+    if not teacher:
+        return err('先生としてログインしてね', 401)
+    data = request.get_json(silent=True) or {}
+    title = (data.get('title') or '').strip()
+    description = (data.get('description') or '').strip()
+    due_date = (data.get('due_date') or '').strip()
+    if not title or not description:
+        return err('タイトルと説明は必須だよ')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT teacher_id FROM tasks WHERE id=?', (task_id,)).fetchone()
+    if not row:
+        conn.close()
+        return err('課題が見つからないよ', 404)
+    if row[0] != teacher['teacher_id']:
+        conn.close()
+        return err('自分の課題しか編集できないよ', 403)
+    conn.execute('UPDATE tasks SET title=?, description=?, due_date=? WHERE id=?',
+                 (title, description, due_date or None, task_id))
+    conn.commit()
+    conn.close()
+    return ok(message='編集しました')
+
+# ===== イベント機能 =====
+
+@app.route('/event/<event_key>')
+def page_event(event_key):
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT * FROM events WHERE event_key=? AND is_published=1', (event_key,)).fetchone()
+    conn.close()
+    if not row:
+        return render_template('404.html'), 404
+    event = dict(zip([d[0] for d in conn.description if conn.description], row)) if False else None
+    # dict変換
+    conn2 = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row2 = conn2.execute('SELECT id,event_key,title,description,start_date,end_date,result_date,group_id,is_published FROM events WHERE event_key=? AND is_published=1', (event_key,)).fetchone()
+    conn2.close()
+    if not row2:
+        return render_template('404.html'), 404
+    event = {
+        'id': row2[0], 'event_key': row2[1], 'title': row2[2],
+        'description': row2[3], 'start_date': row2[4], 'end_date': row2[5],
+        'result_date': row2[6], 'group_id': row2[7], 'is_published': row2[8]
+    }
+    return render_template('event.html', event=event)
+
+@app.route('/api/events', methods=['GET'])
+def api_get_events():
+    pw = request.args.get('pw', '')
+    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
+    if not admin_pw or pw != admin_pw:
+        return err('管理者パスワードが違うよ', 403)
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    rows = conn.execute('SELECT id,event_key,title,description,start_date,end_date,result_date,group_id,is_published,created_at FROM events ORDER BY id DESC').fetchall()
+    conn.close()
+    return ok(events=[{'id':r[0],'event_key':r[1],'title':r[2],'description':r[3],'start_date':r[4],'end_date':r[5],'result_date':r[6],'group_id':r[7],'is_published':bool(r[8]),'created_at':r[9]} for r in rows])
+
+@app.route('/api/events', methods=['POST'])
+def api_create_event():
+    data = request.get_json(silent=True) or {}
+    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
+    if data.get('password') != admin_pw:
+        return err('管理者パスワードが違うよ', 403)
+    event_key = (data.get('event_key') or '').strip()
+    title = (data.get('title') or '').strip()
+    description = (data.get('description') or '').strip()
+    start_date = (data.get('start_date') or '').strip()
+    end_date = (data.get('end_date') or '').strip()
+    result_date = (data.get('result_date') or '').strip()
+    group_id = (data.get('group_id') or '').strip()
+    if not event_key or not title or not group_id:
+        return err('キー・タイトル・グループIDは必須だよ')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    try:
+        conn.execute('INSERT INTO events (event_key,title,description,start_date,end_date,result_date,group_id) VALUES (?,?,?,?,?,?,?)',
+                     (event_key, title, description, start_date, end_date, result_date, group_id))
+        conn.commit()
+    except Exception as e:
+        conn.close()
+        return err(str(e))
+    conn.close()
+    return ok(message='イベントを作成しました', url='/event/'+event_key)
+
+@app.route('/api/events/<int:event_id>/publish', methods=['POST'])
+def api_publish_event(event_id):
+    data = request.get_json(silent=True) or {}
+    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
+    if data.get('password') != admin_pw:
+        return err('管理者パスワードが違うよ', 403)
+    is_published = 1 if data.get('is_published') else 0
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    conn.execute('UPDATE events SET is_published=? WHERE id=?', (is_published, event_id))
+    conn.commit()
+    conn.close()
+    return ok(message='更新しました')
+
+@app.route('/api/events/<event_key>/quizzes', methods=['GET'])
+def api_event_quizzes(event_key):
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    event = conn.execute('SELECT id,group_id,end_date FROM events WHERE event_key=? AND is_published=1', (event_key,)).fetchone()
+    conn.close()
+    if not event:
+        return err('イベントが見つからないよ', 404)
+    event_id, group_id, end_date = event
+    # グループのクイズを取得
+    with get_db() as gconn:
+        gcur = make_cursor(gconn)
+        gcur.execute(q('SELECT id, question, has_options, answer_options FROM quizzes WHERE group_id = %s ORDER BY created_at'), (group_id,))
+        rows = [dict(r) for r in gcur.fetchall()]
+    return ok(quizzes=[{'id':str(r['id']),'question':r['question'],'has_options':bool(r['has_options'])} for r in rows])
+
+@app.route('/api/events/<event_key>/submit', methods=['POST'])
+def api_event_submit(event_key):
+    import sqlite3 as _sq, hashlib as _hl
+    data = request.get_json(silent=True) or {}
+    nickname = (data.get('nickname') or '').strip()
+    if not nickname:
+        return err('ニックネームを入力してね')
+    fp = data.get('fingerprint', '')
+    ip_hash = _hl.sha256(client_ip().encode()).hexdigest()[:16]
+    combined = _hl.sha256((fp + ip_hash).encode()).hexdigest()[:16] if fp else ip_hash
+    ip_hash = combined
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    event = conn.execute('SELECT id,end_date FROM events WHERE event_key=? AND is_published=1', (event_key,)).fetchone()
+    if not event:
+        conn.close()
+        return err('イベントが見つからないよ', 404)
+    event_id, end_date = event
+    # 締切チェック
+    if end_date:
+        import pytz as _pytz
+        from datetime import datetime as _dt
+        now = _dt.now(_pytz.timezone('Asia/Tokyo')).replace(tzinfo=None)
+        end = _dt.fromisoformat(end_date.replace('T',' '))
+        if now > end:
+            conn.close()
+            return err('イベントの受付は終了しました', 403)
+    # 2回目防止チェック
+    existing = conn.execute('SELECT id FROM event_participants WHERE event_id=? AND ip_hash=?', (event_id, ip_hash)).fetchone()
+    if existing:
+        conn.close()
+        return err('このIPアドレスからは既に参加済みです', 403)
+    # 回答を記録（ヒント使用で2/3点）
+    answers = data.get('answers', [])
+    total_correct = 0
+    total_time = 0
+    for ans in answers:
+        quiz_id = ans.get('quiz_id')
+        correct = 1 if ans.get('correct') else 0
+        time_ms = int(ans.get('time_ms') or 0)
+        hint_used = 1 if ans.get('hint_used') else 0
+        # ヒント使用時は2/3点（スコアを累積）
+        if correct and hint_used:
+            total_correct += 2/3
+        else:
+            total_correct += correct
+        total_time += time_ms
+        conn.execute('INSERT INTO event_attempts (event_id,nickname,ip_hash,quiz_id,correct,time_ms) VALUES (?,?,?,?,?,?)',
+                     (event_id, nickname, ip_hash, quiz_id, correct, time_ms))
+    total_correct_rounded = round(total_correct * 100) / 100
+    # 参加者登録
+    try:
+        conn.execute('INSERT INTO event_participants (event_id,nickname,ip_hash,total_correct,total_time_ms,total_questions) VALUES (?,?,?,?,?,?)',
+                     (event_id, nickname, ip_hash, total_correct_rounded, total_time, len(answers)))
+        conn.commit()
+    except Exception as e:
+        conn.close()
+        return err('既に参加済みです', 403)
+    conn.close()
+    return ok(message='回答を記録しました', total_correct=total_correct_rounded, total=len(answers))
+
+@app.route('/api/events/<event_key>/ranking', methods=['GET'])
+def api_event_ranking(event_key):
+    import sqlite3 as _sq
+    from datetime import datetime as _dt
+    import pytz as _pytz
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    event = conn.execute('SELECT id,result_date FROM events WHERE event_key=? AND is_published=1', (event_key,)).fetchone()
+    if not event:
+        conn.close()
+        return err('イベントが見つからないよ', 404)
+    event_id, result_date = event
+    # 結果発表日チェック
+    pw = request.args.get('pw', '')
+    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
+    is_admin = pw == admin_pw
+    if result_date and not is_admin:
+        now = _dt.now(_pytz.timezone('Asia/Tokyo')).replace(tzinfo=None)
+        rd = _dt.fromisoformat(result_date.replace('T',' '))
+        if now < rd:
+            conn.close()
+            return ok(ranking=[], result_date=result_date, not_yet=True)
+    rows = conn.execute('''SELECT nickname, total_correct, total_time_ms, total_questions
+        FROM event_participants WHERE event_id=?
+        ORDER BY total_correct DESC, total_time_ms ASC''', (event_id,)).fetchall()
+    conn.close()
+    ranking = [{'rank':i+1,'nickname':r[0],'correct':r[1],'time_ms':r[2],'total':r[3]} for i,r in enumerate(rows)]
+    return ok(ranking=ranking, result_date=result_date, not_yet=False)
+
+@app.route('/api/events/<event_key>/check_ip', methods=['GET'])
+def api_event_check_ip(event_key):
+    import sqlite3 as _sq, hashlib as _hl
+    fp = request.args.get('fp', '')
+    ip_hash = _hl.sha256(client_ip().encode()).hexdigest()[:16]
+    # フィンガープリントとIPを組み合わせ
+    combined = _hl.sha256((fp + ip_hash).encode()).hexdigest()[:16] if fp else ip_hash
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    event = conn.execute('SELECT id FROM events WHERE event_key=? AND is_published=1', (event_key,)).fetchone()
+    if not event:
+        conn.close()
+        return err('イベントが見つからないよ', 404)
+    existing = conn.execute('SELECT nickname FROM event_participants WHERE event_id=? AND ip_hash=?', (event[0], combined)).fetchone()
+    conn.close()
+    return ok(already_participated=bool(existing), nickname=existing[0] if existing else None)
+
+@app.route('/api/events/<int:event_id>/schedule', methods=['POST'])
+def api_update_event_schedule(event_id):
+    data = request.get_json(silent=True) or {}
+    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
+    if data.get('password') != admin_pw:
+        return err('管理者パスワードが違うよ', 403)
+    start_date = (data.get('start_date') or '').strip()
+    end_date = (data.get('end_date') or '').strip()
+    result_date = (data.get('result_date') or '').strip()
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    conn.execute('UPDATE events SET start_date=?, end_date=?, result_date=? WHERE id=?',
+                 (start_date or None, end_date or None, result_date or None, event_id))
+    conn.commit()
+    conn.close()
+    return ok(message='日程を更新しました')
+
+@app.route('/api/events/<event_key>/add_quiz', methods=['POST'])
+def api_event_add_quiz(event_key):
+    data = request.get_json(silent=True) or {}
+    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
+    if data.get('admin_password') != admin_pw:
+        return err('管理者パスワードが違うよ', 403)
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    event = conn.execute('SELECT group_id FROM events WHERE event_key=?', (event_key,)).fetchone()
+    conn.close()
+    if not event:
+        return err('イベントが見つからないよ', 404)
+    group_id = event[0]
+    name = (data.get('name') or '主催者').strip()
+    question = (data.get('question') or '').strip()
+    answer = (data.get('answer') or '').strip()
+    answers = data.get('answers') or [answer]
+    hint = (data.get('hint') or '').strip()
+    explanation = (data.get('explanation') or '').strip()
+    answer_options = data.get('answer_options')
+    has_options = 1 if answer_options else 0
+    import json as _json
+    options_json = _json.dumps(answer_options, ensure_ascii=False) if answer_options else None
+    answers_json = _json.dumps(answers, ensure_ascii=False)
+    if not question or not answer:
+        return err('問題と答えは必須だよ')
+    with get_db() as gconn:
+        gcur = make_cursor(gconn)
+        quiz_id = new_id()
+        gcur.execute(q('INSERT INTO quizzes (id,group_id,author_name,class_name,question,answer,answers,hint,explanation,tags,has_options,answer_options) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'),
+                     (quiz_id, group_id, name, '', question, answer, answers_json, hint, explanation, 'イベント', has_options, options_json))
+    return ok(message='追加しました', quiz_id=quiz_id)
+
+@app.route('/api/events/<event_key>/answer', methods=['POST'])
+def api_event_answer(event_key):
+    import sqlite3 as _sq
+    data = request.get_json(silent=True) or {}
+    quiz_id = data.get('quiz_id')
+    user_answer = str(data.get('user_answer', ''))[:500]
+    time_ms = int(data.get('time_ms') or 0)
+
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    event = conn.execute('SELECT group_id FROM events WHERE event_key=? AND is_published=1', (event_key,)).fetchone()
+    conn.close()
+    if not event:
+        return err('イベントが見つからないよ', 404)
+
+    with get_db() as gconn:
+        gcur = make_cursor(gconn)
+        gcur.execute(q('SELECT answer, answers, explanation FROM quizzes WHERE id = %s AND group_id = %s'),
+                     (quiz_id, event[0]))
+        row = gcur.fetchone()
+    if not row:
+        return err('クイズが見つからないよ', 404)
+
+    row_dict = dict(row)
+    correct_answer = dec(row_dict.get('answer') or '')
+    row_dict['answer'] = correct_answer
+    # answersも復号
+    import json as _json
+    answers_raw = row_dict.get('answers')
+    if answers_raw:
+        try:
+            ans_list = _json.loads(answers_raw)
+            row_dict['answers'] = _json.dumps([dec(a) for a in ans_list], ensure_ascii=False)
+        except: pass
+    is_correct = check_answer(user_answer, row_dict)
+
+    return ok(correct=is_correct, correct_answer=correct_answer,
+              explanation=dec(row_dict.get('explanation') or ''), time_ms=time_ms)
+
+@app.route('/api/events/<event_key>/quizzes_detail', methods=['GET'])
+def api_event_quizzes_detail(event_key):
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    event = conn.execute('SELECT id, group_id, result_date FROM events WHERE event_key=? AND is_published=1', (event_key,)).fetchone()
+    conn.close()
+    if not event:
+        return err('イベントが見つからないよ', 404)
+    # 結果発表日チェック
+    import pytz as _pytz
+    from datetime import datetime as _dt
+    now = _dt.now(_pytz.timezone('Asia/Tokyo')).replace(tzinfo=None)
+    if event[2]:
+        rd = _dt.fromisoformat(event[2].replace('T',' '))
+        if now < rd:
+            return ok(quizzes=[], not_yet=True)
+    with get_db() as gconn:
+        gcur = make_cursor(gconn)
+        gcur.execute(q('''SELECT q.id, q.author_name, q.question, q.answer, q.explanation,
+            (SELECT COUNT(*) FROM attempts WHERE quiz_id=q.id) as attempts,
+            (SELECT COUNT(*) FROM attempts WHERE quiz_id=q.id AND correct=1) as corrects,
+            (SELECT COALESCE(AVG(difficulty),0) FROM feedbacks WHERE quiz_id=q.id) as avg_difficulty
+            FROM quizzes q WHERE q.group_id=%s ORDER BY q.created_at'''), (event[1],))
+        rows = [dict(r) for r in gcur.fetchall()]
+    result = []
+    for r in rows:
+        result.append({
+            'id': str(r['id']),
+            'author_name': dec(r['author_name'] or ''),
+            'question': dec(r['question'] or ''),
+            'answer': dec(r['answer'] or ''),
+            'explanation': dec(r['explanation'] or ''),
+            'attempts': int(r['attempts'] or 0),
+            'corrects': int(r['corrects'] or 0),
+            'avg_difficulty': float(r['avg_difficulty'] or 0),
+        })
+    return ok(quizzes=result)
+
+@app.route('/api/banner', methods=['GET'])
+def api_get_banner():
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT message, color, is_active, link_url FROM site_banner WHERE id=1').fetchone()
+    conn.close()
+    if not row or not row[2]:
+        return ok(active=False)
+    return ok(active=True, message=row[0], color=row[1], link_url=row[3] or '')
+
+@app.route('/api/banner', methods=['POST'])
+def api_set_banner():
+    data = request.get_json(silent=True) or {}
+    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
+    if data.get('password') != admin_pw:
+        return err('管理者パスワードが違うよ', 403)
+    message = (data.get('message') or '').strip()
+    color = (data.get('color') or '#667eea').strip()
+    is_active = 1 if data.get('is_active') else 0
+    link_url = (data.get('link_url') or '').strip()
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    conn.execute('UPDATE site_banner SET message=?, color=?, is_active=?, link_url=?, updated_at=datetime("now","localtime") WHERE id=1',
+                 (message, color, is_active, link_url))
+    conn.commit()
+    conn.close()
+    return ok(message='更新しました')
+
+@app.route('/api/tags/suggest', methods=['GET'])
+def api_tags_suggest():
+    q_word = request.args.get('q', '').strip()
+    group_id = request.args.get('group_id', '').strip()
+    if not q_word:
+        return ok(tags=[])
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        if group_id:
+            cur.execute(q('SELECT tags FROM quizzes WHERE group_id=%s'), (group_id,))
+        else:
+            cur.execute(q('SELECT tags FROM quizzes'))
+        rows = cur.fetchall()
+    
+    tag_count = {}
+    for row in rows:
+        tags_raw = dict(row).get('tags') or ''
+        tags = [t.strip() for t in tags_raw.split(',') if t.strip()]
+        for tag in tags:
+            tag_dec = dec(tag)
+            if q_word.lower() in tag_dec.lower():
+                tag_count[tag_dec] = tag_count.get(tag_dec, 0) + 1
+    
+    sorted_tags = sorted(tag_count.items(), key=lambda x: -x[1])[:10]
+    return ok(tags=[{'name': t[0], 'count': t[1]} for t in sorted_tags])
+
+@app.route('/api/beta/status', methods=['GET'])
+def api_beta_status():
+    feature = request.args.get('feature', 'ai_scoring')
+    import sqlite3 as _sq
+    from datetime import datetime as _dt
+    import pytz as _pytz
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT feature_key, feature_name, start_date, end_date, is_active, description FROM beta_features WHERE feature_key=?', (feature,)).fetchone()
+    conn.close()
+    if not row:
+        return ok(active=False)
+    now = _dt.now(_pytz.timezone('Asia/Tokyo')).replace(tzinfo=None)
+    start = _dt.fromisoformat(row[2].replace('T',' ')) if row[2] else None
+    end = _dt.fromisoformat(row[3].replace('T',' ')) if row[3] else None
+    in_period = True
+    if start and now < start: in_period = False
+    if end and now > end: in_period = False
+    active = bool(row[4]) and in_period
+    return ok(active=active, feature_key=row[0], feature_name=row[1],
+              start_date=row[2], end_date=row[3], is_active=bool(row[4]),
+              in_period=in_period, description=row[5])
+
+@app.route('/api/beta/update', methods=['POST'])
+def api_beta_update():
+    data = request.get_json(silent=True) or {}
+    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
+    if data.get('password') != admin_pw:
+        return err('管理者パスワードが違うよ', 403)
+    feature = (data.get('feature_key') or 'ai_scoring').strip()
+    start_date = (data.get('start_date') or '').strip() or None
+    end_date = (data.get('end_date') or '').strip() or None
+    is_active = 1 if data.get('is_active') else 0
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    conn.execute('UPDATE beta_features SET start_date=?, end_date=?, is_active=? WHERE feature_key=?',
+                 (start_date, end_date, is_active, feature))
+    conn.commit()
+    conn.close()
+    return ok(message='更新しました')
+
+def check_beta_active(feature_key='ai_scoring'):
+    import sqlite3 as _sq
+    from datetime import datetime as _dt
+    import pytz as _pytz
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT start_date, end_date, is_active FROM beta_features WHERE feature_key=?', (feature_key,)).fetchone()
+    conn.close()
+    if not row or not row[2]: return False
+    now = _dt.now(_pytz.timezone('Asia/Tokyo')).replace(tzinfo=None)
+    start = _dt.fromisoformat(row[0].replace('T',' ')) if row[0] else None
+    end = _dt.fromisoformat(row[1].replace('T',' ')) if row[1] else None
+    if start and now < start: return False
+    if end and now > end: return False
+    return True
+
+# ===== 対戦モード =====
+
+@app.route('/api/battle/create', methods=['POST'])
+def api_battle_create():
+    import sqlite3 as _sq, json as _json, random as _random
+    data = request.get_json(silent=True) or {}
+    grp = current_group()
+    if not grp:
+        return err('ログインしてね', 401)
+    nickname = (data.get('nickname') or '').strip()
+    quiz_count = int(data.get('quiz_count') or 5)
+    max_players = int(data.get('max_players') or 2)
+    if not nickname:
+        return err('ニックネームを入力してね')
+    if quiz_count < 1 or quiz_count > 20:
+        return err('問題数は1〜20にしてね')
+    if max_players < 2 or max_players > 5:
+        return err('人数は2〜5人にしてね')
+    with get_db() as gconn:
+        gcur = make_cursor(gconn)
+        gcur.execute(q('SELECT id FROM quizzes WHERE group_id=%s'), (grp['id'],))
+        all_ids = [str(dict(r)['id']) for r in gcur.fetchall()]
+    if len(all_ids) < quiz_count:
+        return err('クイズが足りないよ（' + str(len(all_ids)) + '問しかない）')
+    quiz_ids = _random.sample(all_ids, quiz_count)
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    for _ in range(10):
+        code = str(_random.randint(1000, 9999))
+        existing = conn.execute('SELECT id FROM battle_rooms WHERE room_code=? AND status!=?', (code, 'finished')).fetchone()
+        if not existing:
+            break
+    players = _json.dumps([nickname])
+    conn.execute('INSERT INTO battle_rooms (room_code, group_id, host_nickname, quiz_count, quiz_ids, max_players, players) VALUES (?,?,?,?,?,?,?)',
+                 (code, str(grp['id']), nickname, quiz_count, _json.dumps(quiz_ids), max_players, players))
+    conn.commit()
+    conn.close()
+    return ok(room_code=code, quiz_ids=quiz_ids)
+
+@app.route('/api/battle/join', methods=['POST'])
+def api_battle_join():
+    import sqlite3 as _sq, json as _json
+    data = request.get_json(silent=True) or {}
+    room_code = (data.get('room_code') or '').strip()
+    nickname = (data.get('nickname') or '').strip()
+    if not room_code or not nickname:
+        return err('ルームコードとニックネームを入力してね')
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    room = conn.execute('SELECT id,host_nickname,status,quiz_count,quiz_ids,max_players,players FROM battle_rooms WHERE room_code=?', (room_code,)).fetchone()
+    if not room:
+        conn.close()
+        return err('ルームが見つからないよ')
+    if room[2] == 'playing':
+        conn.close()
+        return err('このルームはすでに始まっているよ')
+    if room[2] == 'finished':
+        conn.close()
+        return err('このルームは終了しているよ')
+    players = _json.loads(room[6] or '[]')
+    max_players = room[5] or 2
+    if nickname in players:
+        conn.close()
+        return err('同じニックネームはすでに参加しているよ')
+    if len(players) >= max_players:
+        conn.close()
+        return err('このルームはすでに満員だよ（' + str(max_players) + '人）')
+    players.append(nickname)
+    conn.execute('UPDATE battle_rooms SET players=? WHERE room_code=?', (_json.dumps(players), room_code))
+    conn.commit()
+    quiz_ids = _json.loads(room[4])
+    conn.close()
+    return ok(room_code=room_code, host_nickname=room[1], quiz_count=room[3], quiz_ids=quiz_ids, players=players)
+
+@app.route('/api/battle/status', methods=['GET'])
+def api_battle_status():
+    import sqlite3 as _sq, json as _json
+    room_code = request.args.get('room_code', '')
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    room = conn.execute('SELECT host_nickname,status,quiz_count,quiz_ids,max_players,players FROM battle_rooms WHERE room_code=?', (room_code,)).fetchone()
+    if not room:
+        conn.close()
+        return err('ルームが見つからないよ', 404)
+    quiz_ids = _json.loads(room[3])
+    players = _json.loads(room[5] or '[]')
+    conn.close()
+    return ok(host=room[0], status=room[1], quiz_count=room[2], quiz_ids=quiz_ids, max_players=room[4], players=players)
+
+@app.route('/api/battle/start', methods=['POST'])
+def api_battle_start():
+    import sqlite3 as _sq
+    data = request.get_json(silent=True) or {}
+    room_code = (data.get('room_code') or '').strip()
+    nickname = (data.get('nickname') or '').strip()
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    room = conn.execute('SELECT host_nickname, status FROM battle_rooms WHERE room_code=?', (room_code,)).fetchone()
+    if not room:
+        conn.close()
+        return err('ルームが見つからないよ', 404)
+    if room[0] != nickname:
+        conn.close()
+        return err('ホストだけがスタートできるよ')
+    if room[1] == 'playing':
+        conn.close()
+        return err('すでに始まっているよ')
+    conn.execute('UPDATE battle_rooms SET status=? WHERE room_code=?', ('playing', room_code))
+    conn.commit()
+    conn.close()
+    return ok(message='スタートしました')
+
+@app.route('/api/battle/answer', methods=['POST'])
+def api_battle_answer():
+    import sqlite3 as _sq
+    data = request.get_json(silent=True) or {}
+    room_code = (data.get('room_code') or '').strip()
+    nickname = (data.get('nickname') or '').strip()
+    quiz_id = (data.get('quiz_id') or '').strip()
+    user_answer = str(data.get('user_answer', ''))[:500]
+    time_ms = int(data.get('time_ms') or 0)
+    grp_id = data.get('group_id', '')
+    # 採点
+    with get_db() as gconn:
+        gcur = make_cursor(gconn)
+        gcur.execute(q('SELECT answer, answers, has_options FROM quizzes WHERE id=%s'), (quiz_id,))
+        row = gcur.fetchone()
+    if not row:
+        return err('クイズが見つからないよ', 404)
+    row_dict = dict(row)
+    row_dict['answer'] = dec(row_dict.get('answer') or '')
+    import json as _json
+    answers_raw = row_dict.get('answers')
+    if answers_raw:
+        try:
+            ans_list = _json.loads(answers_raw)
+            row_dict['answers'] = _json.dumps([dec(a) for a in ans_list], ensure_ascii=False)
+        except: pass
+    is_correct = check_answer(user_answer, row_dict)
+    # 回答を記録
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    conn.execute('INSERT INTO battle_answers (room_code,nickname,quiz_id,correct,time_ms) VALUES (?,?,?,?,?)',
+                 (room_code, nickname, quiz_id, 1 if is_correct else 0, time_ms))
+    conn.commit()
+    conn.close()
+    return ok(correct=is_correct, correct_answer=dec(row_dict.get('answer') or ''))
+
+@app.route('/api/battle/result', methods=['GET'])
+def api_battle_result():
+    import sqlite3 as _sq, json as _json
+    room_code = request.args.get('room_code', '')
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    room = conn.execute('SELECT host_nickname,quiz_count,players FROM battle_rooms WHERE room_code=?', (room_code,)).fetchone()
+    if not room:
+        conn.close()
+        return err('ルームが見つからないよ', 404)
+    host, quiz_count, players_json = room
+    players = _json.loads(players_json or '[]')
+    # 全員の回答数を確認
+    def get_score(nick):
+        rows = conn.execute('SELECT correct, time_ms FROM battle_answers WHERE room_code=? AND nickname=?', (room_code, nick)).fetchall()
+        correct = sum(r[0] for r in rows)
+        total_time = sum(r[1] for r in rows)
+        return {'nickname': nick, 'correct': correct, 'total_time': total_time, 'answered': len(rows)}
+    scores = [get_score(p) for p in players]
+    both_done = all(s['answered'] >= quiz_count for s in scores)
+    # 順位付け
+    scores.sort(key=lambda s: (-s['correct'], s['total_time']))
+    winner = scores[0]['nickname'] if both_done and len(scores) > 0 else None
+    if both_done:
+        conn.execute('UPDATE battle_rooms SET status=? WHERE room_code=?', ('finished', room_code))
+        conn.commit()
+    conn.close()
+    return ok(scores=scores, both_done=both_done, winner=winner, quiz_count=quiz_count)
+
+@app.route('/battle')
+def page_battle():
+    grp = current_group()
+    if not grp:
+        return redirect(url_for('page_home'))
+    return render_template('battle.html', group=grp)
+
+@app.route('/api/quizzes/<quiz_id>/info', methods=['GET'])
+def api_quiz_info(quiz_id):
+    grp = current_group()
+    if not grp:
+        return err('ログインしてね', 401)
+    with get_db() as conn:
+        cur = make_cursor(conn)
+        cur.execute(q('SELECT id, question, answer, answers, has_options, answer_options, hint, explanation FROM quizzes WHERE id=%s AND group_id=%s'), (quiz_id, grp['id']))
+        row = cur.fetchone()
+    if not row:
+        return err('クイズが見つからないよ', 404)
+    r = dict(row)
+    import json as _json
+    opts = None
+    if r.get('answer_options'):
+        try:
+            raw = _json.loads(r['answer_options'])
+            opts = [dec(o) for o in raw]
+        except: pass
+    return ok(
+        id=str(r['id']),
+        question=dec(r['question'] or ''),
+        has_options=bool(r['has_options']),
+        answer_options=opts,
+        hint=dec(r['hint'] or '') if r.get('hint') else None,
+    )
+
+@app.route('/homepage')
+def page_homepage():
+    return render_template('company.html')
+
+# ===== Q'z 社員システム =====
+
+@app.route('/staff/login')
+def page_staff_login():
+    return render_template('staff_login.html')
+
+@app.route('/api/staff/login', methods=['POST'])
+def api_staff_login():
+    data = request.get_json(silent=True) or {}
+    staff_id = (data.get('staff_id') or '').strip()
+    password = (data.get('password') or '')
+    if not staff_id or not password:
+        return err('IDとパスワードを入力してね')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT id, password_hash, name FROM qz_staff WHERE staff_id=?', (staff_id,)).fetchone()
+    conn.close()
+    if not row or not verify_password(password, row[1]):
+        return err('IDまたはパスワードが違うよ', 401)
+    session['staff_id'] = staff_id
+    session['staff_name'] = dec(row[2])
+    return ok(redirect='/staff/board')
+
+@app.route('/staff/board')
+def page_staff_board():
+    if not session.get('staff_id'):
+        return redirect('/staff/login')
+    return render_template('staff_board.html', staff_name=session.get('staff_name'))
+
+@app.route('/api/staff/logout', methods=['POST'])
+def api_staff_logout():
+    session.pop('staff_id', None)
+    session.pop('staff_name', None)
+    return ok(message='ログアウトしました')
+
+@app.route('/api/staff/messages', methods=['GET'])
+def api_staff_messages_get():
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    channel_id = request.args.get('channel_id', '1')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    rows = conn.execute('SELECT id, staff_name, title, body, created_at, image_data, stamp_id, file_data, file_name FROM qz_messages WHERE channel_id=? ORDER BY id DESC', (channel_id,)).fetchall()
+    my_staff_id = session.get('staff_id')
+    messages = []
+    for r in rows:
+        msg_id = r[0]
+        reactions_raw = conn.execute('SELECT emoji, staff_id FROM qz_reactions WHERE message_id=?', (msg_id,)).fetchall()
+        reaction_summary = {}
+        for emoji, sid in reactions_raw:
+            if emoji not in reaction_summary:
+                reaction_summary[emoji] = {'count': 0, 'mine': False}
+            reaction_summary[emoji]['count'] += 1
+            if sid == my_staff_id:
+                reaction_summary[emoji]['mine'] = True
+        is_sys = conn.execute('SELECT is_system FROM qz_messages WHERE id=?', (msg_id,)).fetchone()
+        messages.append({'id':r[0],'staff_name':dec(r[1]),'title':dec(r[2]),'body':dec(r[3]),'created_at':r[4],'image_data':r[5],'stamp_id':r[6],'reactions':reaction_summary,'is_system': bool(is_sys[0]) if is_sys else False, 'file_data': r[7], 'file_name': dec(r[8]) if r[8] else None})
+    conn.close()
+    return ok(messages=messages)
+
+@app.route('/api/staff/messages', methods=['POST'])
+def api_staff_messages_post():
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    data = request.get_json(silent=True) or {}
+    title = (data.get('title') or '').strip()
+    body = (data.get('body') or '').strip()
+    image_data = data.get('image_data')
+    stamp_id = (data.get('stamp_id') or '').strip()
+    file_data = data.get('file_data')
+    file_name = data.get('file_name', '')
+    if not body and not image_data and not stamp_id and not file_data:
+        return err('内容を入力してね')
+    if image_data and len(image_data) > 6_000_000:
+        return err('画像が大きすぎるよ')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    channel_id = data.get('channel_id', 1)
+    import pytz as _pytz_jst
+    from datetime import datetime as _dt_jst
+    _jst_now_str = _dt_jst.now(_pytz_jst.timezone('Asia/Tokyo')).strftime('%Y-%m-%d %H:%M:%S')
+    conn.execute('INSERT INTO qz_messages (staff_id, staff_name, title, body, image_data, stamp_id, channel_id, file_data, file_name, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)',
+                 (session.get('staff_id'), enc(session.get('staff_name')), enc(title), enc(body), image_data, stamp_id, channel_id, file_data, enc(file_name) if file_name else None, _jst_now_str))
+    conn.commit()
+    conn.close()
+    return ok(message='投稿しました')
+
+@app.route('/api/staff/reactions', methods=['POST'])
+def api_staff_reaction_toggle():
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    data = request.get_json(silent=True) or {}
+    message_id = data.get('message_id')
+    emoji = (data.get('emoji') or '').strip()
+    if not message_id or emoji not in ['👍','❤️','😂','😮','👏']:
+        return err('不正なリクエストだよ')
+    staff_id = session.get('staff_id')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    existing = conn.execute('SELECT id FROM qz_reactions WHERE message_id=? AND staff_id=? AND emoji=?',
+                            (message_id, staff_id, emoji)).fetchone()
+    if existing:
+        conn.execute('DELETE FROM qz_reactions WHERE id=?', (existing[0],))
+        action = 'removed'
+    else:
+        conn.execute('INSERT INTO qz_reactions (message_id, staff_id, emoji) VALUES (?,?,?)', (message_id, staff_id, emoji))
+        action = 'added'
+    conn.commit()
+    conn.close()
+    return ok(action=action)
+
+@app.route('/api/staff/channels', methods=['GET'])
+def api_staff_channels_get():
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    my_id = session.get('staff_id')
+    import sqlite3 as _sq, json as _json
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    rows = conn.execute('SELECT id, channel_type, name, members, is_public FROM qz_channels ORDER BY id').fetchall()
+    joined = []
+    available = []
+    for r in rows:
+        members = _json.loads(r[3] or '[]')
+        is_member = my_id in members
+        if r[1] == 'dm':
+            if not is_member:
+                continue
+            other_staff = [m for m in members if m != my_id]
+            display_name = r[2]
+            if other_staff:
+                other_row = conn.execute('SELECT name FROM qz_staff WHERE staff_id=?', (other_staff[0],)).fetchone()
+                if other_row:
+                    display_name = dec(other_row[0])
+            last_msg = conn.execute('SELECT body, stamp_id, image_data, created_at FROM qz_messages WHERE channel_id=? ORDER BY id DESC LIMIT 1', (r[0],)).fetchone()
+            preview = ''
+            if last_msg:
+                if last_msg[0]: preview = dec(last_msg[0])[:30]
+                elif last_msg[1]: preview = '🎨 スタンプ'
+                elif last_msg[2]: preview = '📷 画像'
+            unread_row = conn.execute('SELECT last_read_msg_id FROM qz_read_status WHERE channel_id=? AND staff_id=?', (r[0], my_id)).fetchone()
+            last_read = unread_row[0] if unread_row else 0
+            unread_count = conn.execute('SELECT COUNT(*) FROM qz_messages WHERE channel_id=? AND id>? AND staff_id!=?', (r[0], last_read, my_id)).fetchone()[0]
+            joined.append({'id': r[0], 'type': r[1], 'name': display_name, 'preview': preview, 'last_time': last_msg[3] if last_msg else None, 'unread': unread_count})
+        else:
+            last_msg = conn.execute('SELECT body, stamp_id, image_data, created_at FROM qz_messages WHERE channel_id=? ORDER BY id DESC LIMIT 1', (r[0],)).fetchone()
+            preview = ''
+            if last_msg:
+                if last_msg[0]: preview = dec(last_msg[0])[:30]
+                elif last_msg[1]: preview = '🎨 スタンプ'
+                elif last_msg[2]: preview = '📷 画像'
+            unread_row = conn.execute('SELECT last_read_msg_id FROM qz_read_status WHERE channel_id=? AND staff_id=?', (r[0], my_id)).fetchone()
+            last_read = unread_row[0] if unread_row else 0
+            unread_count = conn.execute('SELECT COUNT(*) FROM qz_messages WHERE channel_id=? AND id>? AND staff_id!=?', (r[0], last_read, my_id)).fetchone()[0]
+            item = {'id': r[0], 'type': r[1], 'name': r[2], 'preview': preview, 'last_time': last_msg[3] if last_msg else None, 'member_count': len(members), 'unread': unread_count}
+            if is_member:
+                joined.append(item)
+            elif len(r) > 4 and r[4] == 1:
+                # 公開グループのみ未参加者に表示
+                available.append(item)
+    conn.close()
+    return ok(channels=joined, available_groups=available)
+
+@app.route('/api/staff/channels/join', methods=['POST'])
+def api_staff_channel_join():
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    data = request.get_json(silent=True) or {}
+    channel_id = data.get('channel_id')
+    my_id = session.get('staff_id')
+    my_name = session.get('staff_name')
+    import sqlite3 as _sq, json as _json
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT members, channel_type FROM qz_channels WHERE id=?', (channel_id,)).fetchone()
+    if not row:
+        conn.close()
+        return err('チャンネルが見つからないよ', 404)
+    if row[1] != 'group':
+        conn.close()
+        return err('グループチャンネルだけ参加できるよ')
+    members = _json.loads(row[0] or '[]')
+    if my_id not in members:
+        members.append(my_id)
+        conn.execute('UPDATE qz_channels SET members=? WHERE id=?', (_json.dumps(members), channel_id))
+        import pytz as _pytz_jst
+        from datetime import datetime as _dt_jst
+        _jst_now_str = _dt_jst.now(_pytz_jst.timezone('Asia/Tokyo')).strftime('%Y-%m-%d %H:%M:%S')
+        conn.execute('INSERT INTO qz_messages (staff_id, staff_name, title, body, channel_id, is_system, created_at) VALUES (?,?,?,?,?,1,?)',
+                     (my_id, enc(my_name), '', enc(my_name + 'さんが参加しました'), channel_id, _jst_now_str))
+        conn.commit()
+    conn.close()
+    return ok(message='参加しました')
+
+@app.route('/api/staff/channels/leave', methods=['POST'])
+def api_staff_channel_leave():
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    data = request.get_json(silent=True) or {}
+    channel_id = data.get('channel_id')
+    my_id = session.get('staff_id')
+    my_name = session.get('staff_name')
+    import sqlite3 as _sq, json as _json
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT members, channel_type FROM qz_channels WHERE id=?', (channel_id,)).fetchone()
+    if not row:
+        conn.close()
+        return err('チャンネルが見つからないよ', 404)
+    if row[1] != 'group':
+        conn.close()
+        return err('グループチャンネルだけ退出できるよ')
+    members = _json.loads(row[0] or '[]')
+    disbanded = False
+    if my_id in members:
+        members.remove(my_id)
+        import pytz as _pytz_jst
+        from datetime import datetime as _dt_jst
+        _jst_now_str = _dt_jst.now(_pytz_jst.timezone('Asia/Tokyo')).strftime('%Y-%m-%d %H:%M:%S')
+        conn.execute('INSERT INTO qz_messages (staff_id, staff_name, title, body, channel_id, is_system, created_at) VALUES (?,?,?,?,?,1,?)',
+                     (my_id, enc(my_name), '', enc(my_name + 'さんが退出しました'), channel_id, _jst_now_str))
+        if len(members) <= 1:
+            # 残り1人以下なら自動解散
+            conn.execute('DELETE FROM qz_messages WHERE channel_id=?', (channel_id,))
+            conn.execute('DELETE FROM qz_channels WHERE id=?', (channel_id,))
+            disbanded = True
+        else:
+            conn.execute('UPDATE qz_channels SET members=? WHERE id=?', (_json.dumps(members), channel_id))
+        conn.commit()
+    conn.close()
+    return ok(message='退出しました', disbanded=disbanded)
+
+@app.route('/api/staff/list', methods=['GET'])
+def api_staff_list():
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    my_id = session.get('staff_id')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    rows = conn.execute('SELECT staff_id, name FROM qz_staff WHERE staff_id != ?', (my_id,)).fetchall()
+    conn.close()
+    return ok(staff=[{'staff_id': r[0], 'name': dec(r[1])} for r in rows])
+
+@app.route('/api/staff/channels', methods=['POST'])
+def api_staff_channels_create():
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    data = request.get_json(silent=True) or {}
+    channel_type = data.get('type', 'group')
+    name = (data.get('name') or '').strip()
+    member_id = (data.get('member_id') or '').strip()
+    import sqlite3 as _sq, json as _json
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    if channel_type == 'group':
+        if not name:
+            conn.close()
+            return err('チャンネル名を入力してね')
+        is_public = 1 if data.get('is_public', True) else 0
+        my_id = session.get('staff_id')
+        conn.execute("INSERT INTO qz_channels (channel_type, name, members, is_public) VALUES ('group', ?, ?, ?)",
+                     (name, _json.dumps([my_id]), is_public))
+        conn.commit()
+        new_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
+    else:
+        if not member_id:
+            conn.close()
+            return err('相手を選んでね')
+        target = conn.execute('SELECT staff_id FROM qz_staff WHERE staff_id=?', (member_id,)).fetchone()
+        if not target:
+            conn.close()
+            return err('その社員は見つからないよ')
+        my_id = session.get('staff_id')
+        members = sorted([my_id, member_id])
+        existing = conn.execute("SELECT id FROM qz_channels WHERE channel_type='dm' AND members=?", (_json.dumps(members),)).fetchone()
+        if existing:
+            conn.close()
+            return ok(channel_id=existing[0], already_exists=True)
+        conn.execute("INSERT INTO qz_channels (channel_type, name, members) VALUES ('dm', ?, ?)", (member_id, _json.dumps(members)))
+        conn.commit()
+        new_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
+    conn.close()
+    return ok(channel_id=new_id)
+
+@app.route('/api/staff/channels/invite', methods=['POST'])
+def api_staff_channel_invite():
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    data = request.get_json(silent=True) or {}
+    channel_id = data.get('channel_id')
+    invite_id = (data.get('staff_id') or '').strip()
+    my_id = session.get('staff_id')
+    import sqlite3 as _sq, json as _json
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT members, channel_type FROM qz_channels WHERE id=?', (channel_id,)).fetchone()
+    if not row:
+        conn.close()
+        return err('チャンネルが見つからないよ', 404)
+    if row[1] != 'group':
+        conn.close()
+        return err('グループだけ招待できるよ')
+    members = _json.loads(row[0] or '[]')
+    if my_id not in members:
+        conn.close()
+        return err('参加していないグループには招待できないよ', 403)
+    target = conn.execute('SELECT staff_id FROM qz_staff WHERE staff_id=?', (invite_id,)).fetchone()
+    if not target:
+        conn.close()
+        return err('その社員は見つからないよ')
+    if invite_id not in members:
+        members.append(invite_id)
+        conn.execute('UPDATE qz_channels SET members=? WHERE id=?', (_json.dumps(members), channel_id))
+        conn.commit()
+    conn.close()
+    return ok(message='招待しました')
+
+@app.route('/api/staff/channels/members', methods=['GET'])
+def api_staff_channel_members():
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    channel_id = request.args.get('channel_id')
+    import sqlite3 as _sq, json as _json
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT members FROM qz_channels WHERE id=?', (channel_id,)).fetchone()
+    if not row:
+        conn.close()
+        return err('見つからないよ', 404)
+    members = _json.loads(row[0] or '[]')
+    result = []
+    for m in members:
+        srow = conn.execute('SELECT name FROM qz_staff WHERE staff_id=?', (m,)).fetchone()
+        result.append({'staff_id': m, 'name': dec(srow[0]) if srow else m})
+    conn.close()
+    return ok(members=result)
+
+@app.route('/staff/profile')
+def page_staff_profile():
+    if not session.get('staff_id'):
+        return redirect('/staff/login')
+    return render_template('staff_profile.html', staff_id=session.get('staff_id'), staff_name=session.get('staff_name'))
+
+@app.route('/api/staff/profile/update', methods=['POST'])
+def api_staff_profile_update():
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    data = request.get_json(silent=True) or {}
+    new_id = (data.get('staff_id') or '').strip()
+    new_name = (data.get('name') or '').strip()
+    new_password = data.get('password', '')
+    current_id = session.get('staff_id')
+    if not new_id or not new_name:
+        return err('IDと名前を入力してね')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    if new_id != current_id:
+        existing = conn.execute('SELECT id FROM qz_staff WHERE staff_id=?', (new_id,)).fetchone()
+        if existing:
+            conn.close()
+            return err('そのIDは既に使われているよ')
+    if new_password:
+        pw_hash = hash_password(new_password)
+        conn.execute('UPDATE qz_staff SET staff_id=?, name=?, password_hash=? WHERE staff_id=?',
+                     (new_id, enc(new_name), pw_hash, current_id))
+    else:
+        conn.execute('UPDATE qz_staff SET staff_id=?, name=? WHERE staff_id=?',
+                     (new_id, enc(new_name), current_id))
+    if new_id != current_id:
+        # 関連テーブルの古いIDも書き換える
+        conn.execute('UPDATE qz_messages SET staff_id=? WHERE staff_id=?', (new_id, current_id))
+        conn.execute('UPDATE qz_reactions SET staff_id=? WHERE staff_id=?', (new_id, current_id))
+        import json as _json
+        ch_rows = conn.execute('SELECT id, members FROM qz_channels').fetchall()
+        for ch_id, members_json in ch_rows:
+            members = _json.loads(members_json or '[]')
+            if current_id in members:
+                members = [new_id if m == current_id else m for m in members]
+                conn.execute('UPDATE qz_channels SET members=? WHERE id=?', (_json.dumps(members), ch_id))
+    conn.commit()
+    conn.close()
+    session['staff_id'] = new_id
+    session['staff_name'] = new_name
+    return ok(message='更新しました')
+
+@app.route('/api/staff/channels/read', methods=['POST'])
+def api_staff_channel_read():
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    data = request.get_json(silent=True) or {}
+    channel_id = data.get('channel_id')
+    my_id = session.get('staff_id')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    last_msg = conn.execute('SELECT MAX(id) FROM qz_messages WHERE channel_id=?', (channel_id,)).fetchone()[0] or 0
+    conn.execute('INSERT INTO qz_read_status (channel_id, staff_id, last_read_msg_id) VALUES (?,?,?) ON CONFLICT(channel_id, staff_id) DO UPDATE SET last_read_msg_id=?',
+                 (channel_id, my_id, last_msg, last_msg))
+    conn.commit()
+    conn.close()
+    return ok()
+
+@app.route('/staff/files')
+def page_staff_files():
+    if not session.get('staff_id'):
+        return redirect('/staff/login')
+    return render_template('staff_files.html', staff_name=session.get('staff_name'))
+
+@app.route('/api/staff/files', methods=['GET'])
+def api_staff_files_get():
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    rows = conn.execute('SELECT id, staff_name, file_name, description, created_at FROM qz_files ORDER BY id DESC').fetchall()
+    conn.close()
+    return ok(files=[{'id':r[0],'staff_name':dec(r[1]),'file_name':dec(r[2]),'description':dec(r[3]),'created_at':r[4]} for r in rows])
+
+@app.route('/api/staff/files', methods=['POST'])
+def api_staff_files_post():
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    data = request.get_json(silent=True) or {}
+    file_name = (data.get('file_name') or '').strip()
+    file_data = data.get('file_data')
+    description = (data.get('description') or '').strip()
+    if not file_name or not file_data:
+        return err('ファイルを選んでね')
+    if len(file_data) > 18_000_000:
+        return err('ファイルが大きすぎるよ（15MBまで）')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    import pytz as _pytz_jst
+    from datetime import datetime as _dt_jst
+    _jst_now_str = _dt_jst.now(_pytz_jst.timezone('Asia/Tokyo')).strftime('%Y-%m-%d %H:%M:%S')
+    conn.execute('INSERT INTO qz_files (staff_id, staff_name, file_name, file_data, description, created_at) VALUES (?,?,?,?,?,?)',
+                 (session.get('staff_id'), enc(session.get('staff_name')), enc(file_name), file_data, enc(description), _jst_now_str))
+    conn.commit()
+    conn.close()
+    return ok(message='アップロードしました')
+
+@app.route('/api/staff/files/<int:file_id>', methods=['GET'])
+def api_staff_file_download(file_id):
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT file_name, file_data FROM qz_files WHERE id=?', (file_id,)).fetchone()
+    conn.close()
+    if not row:
+        return err('見つからないよ', 404)
+    return ok(file_name=dec(row[0]), file_data=row[1])
+
+@app.route('/api/staff/files/<int:file_id>/delete', methods=['POST'])
+def api_staff_file_delete(file_id):
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    conn.execute('DELETE FROM qz_files WHERE id=?', (file_id,))
+    conn.commit()
+    conn.close()
+    return ok(message='削除しました')
+
+@app.route('/staff/calendar')
+def page_staff_calendar():
+    if not session.get('staff_id'):
+        return redirect('/staff/login')
+    return render_template('staff_calendar.html', staff_name=session.get('staff_name'))
+
+@app.route('/api/staff/events', methods=['GET'])
+def api_staff_events_get():
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    rows = conn.execute('SELECT id, staff_name, title, description, event_date, event_time, color FROM qz_events ORDER BY event_date').fetchall()
+    conn.close()
+    return ok(events=[{'id':r[0],'staff_name':dec(r[1]),'title':dec(r[2]),'description':dec(r[3]),'date':r[4],'time':r[5],'color':r[6]} for r in rows])
+
+@app.route('/api/staff/events', methods=['POST'])
+def api_staff_events_post():
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    data = request.get_json(silent=True) or {}
+    title = (data.get('title') or '').strip()
+    description = (data.get('description') or '').strip()
+    event_date = (data.get('date') or '').strip()
+    event_time = (data.get('time') or '').strip()
+    color = data.get('color', '#fb6f5b')
+    if not title or not event_date:
+        return err('タイトルと日付を入力してね')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    import pytz as _pytz_jst
+    from datetime import datetime as _dt_jst
+    _jst_now_str = _dt_jst.now(_pytz_jst.timezone('Asia/Tokyo')).strftime('%Y-%m-%d %H:%M:%S')
+    conn.execute('INSERT INTO qz_events (staff_id, staff_name, title, description, event_date, event_time, color, created_at) VALUES (?,?,?,?,?,?,?,?)',
+                 (session.get('staff_id'), enc(session.get('staff_name')), enc(title), enc(description), event_date, event_time, color, _jst_now_str))
+    conn.commit()
+    conn.close()
+    return ok(message='追加しました')
+
+@app.route('/api/staff/events/<int:event_id>/delete', methods=['POST'])
+def api_staff_events_delete(event_id):
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    conn.execute('DELETE FROM qz_events WHERE id=?', (event_id,))
+    conn.commit()
+    conn.close()
+    return ok(message='削除しました')
+
+@app.route('/staff/tasks')
+def page_staff_tasks():
+    if not session.get('staff_id'):
+        return redirect('/staff/login')
+    return render_template('staff_tasks.html', staff_name=session.get('staff_name'), my_id=session.get('staff_id'))
+
+@app.route('/api/staff/tasks', methods=['GET'])
+def api_staff_tasks_get():
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    rows = conn.execute('SELECT id, staff_name, title, description, assignee_id, due_date, status, created_at FROM qz_tasks ORDER BY id DESC').fetchall()
+    result = []
+    for r in rows:
+        assignee_name = ''
+        if r[4]:
+            ar = conn.execute('SELECT name FROM qz_staff WHERE staff_id=?', (r[4],)).fetchone()
+            assignee_name = dec(ar[0]) if ar else r[4]
+        result.append({'id':r[0],'staff_name':dec(r[1]),'title':dec(r[2]),'description':dec(r[3]),'assignee_id':r[4],'assignee_name':assignee_name,'due_date':r[5],'status':r[6],'created_at':r[7]})
+    conn.close()
+    return ok(tasks=result)
+
+@app.route('/api/staff/tasks', methods=['POST'])
+def api_staff_tasks_post():
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    data = request.get_json(silent=True) or {}
+    title = (data.get('title') or '').strip()
+    description = (data.get('description') or '').strip()
+    assignee_id = data.get('assignee_id') or None
+    due_date = data.get('due_date') or None
+    if not title:
+        return err('タスク名を入力してね')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    import pytz as _pytz_jst
+    from datetime import datetime as _dt_jst
+    _jst_now_str = _dt_jst.now(_pytz_jst.timezone('Asia/Tokyo')).strftime('%Y-%m-%d %H:%M:%S')
+    conn.execute('INSERT INTO qz_tasks (staff_id, staff_name, title, description, assignee_id, due_date, created_at) VALUES (?,?,?,?,?,?,?)',
+                 (session.get('staff_id'), enc(session.get('staff_name')), enc(title), enc(description), assignee_id, due_date, _jst_now_str))
+    conn.commit()
+    conn.close()
+    return ok(message='追加しました')
+
+@app.route('/api/staff/tasks/<int:task_id>/status', methods=['POST'])
+def api_staff_tasks_status(task_id):
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    data = request.get_json(silent=True) or {}
+    status = data.get('status', 'todo')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    conn.execute('UPDATE qz_tasks SET status=? WHERE id=?', (status, task_id))
+    conn.commit()
+    conn.close()
+    return ok(message='更新しました')
+
+@app.route('/api/staff/tasks/<int:task_id>/delete', methods=['POST'])
+def api_staff_tasks_delete(task_id):
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    conn.execute('DELETE FROM qz_tasks WHERE id=?', (task_id,))
+    conn.commit()
+    conn.close()
+    return ok(message='削除しました')
+
+@app.route('/staff/dashboard')
+def page_staff_dashboard():
+    if not session.get('staff_id'):
+        return redirect('/staff/login')
+    return render_template('staff_dashboard.html', staff_name=session.get('staff_name'))
+
+@app.route('/api/staff/dashboard', methods=['GET'])
+def api_staff_dashboard():
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    total_groups = conn.execute('SELECT COUNT(*) FROM groups').fetchone()[0]
+    total_quizzes = conn.execute('SELECT COUNT(*) FROM quizzes').fetchone()[0]
+    total_attempts = conn.execute('SELECT COUNT(*) FROM attempts').fetchone()[0]
+    total_events = conn.execute('SELECT COUNT(*) FROM events').fetchone()[0]
+    school_groups = conn.execute('SELECT COUNT(*) FROM groups WHERE school_mode=1').fetchone()[0]
+    official_groups = conn.execute('SELECT COUNT(*) FROM groups WHERE is_official=1').fetchone()[0]
+    recent_groups = conn.execute("SELECT name, datetime(created_at, '+9 hours') FROM groups ORDER BY created_at DESC LIMIT 5").fetchall()
+    import pytz as _pytz_dash
+    from datetime import datetime as _dt_dash
+    today_jst = _dt_dash.now(_pytz_dash.timezone('Asia/Tokyo')).strftime('%Y-%m-%d')
+    today_attempts = conn.execute('SELECT COUNT(*) FROM attempts WHERE date(created_at)=?', (today_jst,)).fetchone()[0]
+    recent_quizzes = conn.execute("SELECT question, datetime(created_at, '+9 hours') FROM quizzes ORDER BY created_at DESC LIMIT 5").fetchall()
+    recent_attempts = conn.execute('''SELECT q.question, datetime(a.created_at, '+9 hours') FROM attempts a
+        JOIN quizzes q ON a.quiz_id = q.id ORDER BY a.created_at DESC LIMIT 5''').fetchall()
+    conn.close()
+    return ok(
+        total_groups=total_groups,
+        total_quizzes=total_quizzes,
+        total_attempts=total_attempts,
+        total_events=total_events,
+        school_groups=school_groups,
+        official_groups=official_groups,
+        today_attempts=today_attempts,
+        recent_groups=[{'name': dec(r[0]), 'created_at': r[1]} for r in recent_groups],
+        recent_quizzes=[{'question': dec(r[0])[:40], 'created_at': r[1]} for r in recent_quizzes],
+        recent_attempts=[{'question': dec(r[0])[:40], 'created_at': r[1]} for r in recent_attempts],
+    )
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_DEBUG', '0') == '1'
@@ -3118,17 +4963,14 @@ def api_check_page_schedule(page_key):
     if not row[1]:
         return ok(open=False, reason='無効化されています')
     schedules = json.loads(row[0])
+    import pytz as _pytz2
     from datetime import datetime
-    now = datetime.utcnow()
+    now = datetime.now(_pytz2.timezone('Asia/Tokyo')).replace(tzinfo=None)
     for s in schedules:
         try:
             start = datetime.fromisoformat(s['start'].replace('T', ' '))
             end = datetime.fromisoformat(s['end'].replace('T', ' '))
-            # JSTをUTCに変換（-9時間）
-            from datetime import timedelta
-            start_utc = start - timedelta(hours=9)
-            end_utc = end - timedelta(hours=9)
-            if start_utc <= now <= end_utc:
+            if start <= now <= end:
                 return ok(open=True, label=s.get('label',''))
         except:
             pass

@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}カレンダー - Q'z{% endblock %}
+{% block head_extra %}
+<script>
+function killQzTheme() {
+  document.body.style.background = '#fdfbf6';
+  document.querySelectorAll('.seasonal-emoji').forEach(e => e.remove());
+}
+window.applyTheme = function() { killQzTheme(); };
+window.checkAutoTheme = function() { killQzTheme(); };
+document.addEventListener('DOMContentLoaded', killQzTheme);
+setTimeout(killQzTheme, 50);
+setTimeout(killQzTheme, 300);
+setTimeout(killQzTheme, 800);
+</script>
+{% endblock %}
+{% block body_class %}qz-board-page{% endblock %}
+{% block content %}
+<style>
+.site-header { display: none !important; }
+.qz-staff-nav { background:#14213d; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; }
+.qz-staff-nav a { color:rgba(255,255,255,0.6); font-size:0.8rem; text-decoration:none; }
+.qz-staff-nav a:hover { color:white; }
+.qz-staff-logo { font-size:0.85rem; letter-spacing:0.2em; color:#fb6f5b; font-weight:700; }
+.cal-wrap { max-width:760px; margin:24px auto; padding:0 20px; }
+.cal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+.cal-header h2 { color:#14213d; margin:0; }
+.cal-nav-btn { background:#f1ece0; border:none; border-radius:8px; padding:8px 14px; cursor:pointer; font-weight:700; color:#14213d; }
+.cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+.cal-dow { text-align:center; font-size:11px; color:#8a8270; font-weight:700; padding:6px 0; }
+.cal-day { background:white; border:1px solid #e3ddd0; border-radius:10px; min-height:70px; padding:6px; font-size:11px; cursor:pointer; }
+.cal-day.empty { background:transparent; border:none; cursor:default; }
+.cal-day.today { border:2px solid #fb6f5b; }
+.cal-day-num { font-weight:700; color:#14213d; margin-bottom:3px; }
+.cal-event-pill { background:#fb6f5b; color:white; border-radius:4px; padding:1px 4px; font-size:10px; margin-bottom:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.add-event-box { background:white; border:1px solid #e3ddd0; border-radius:14px; padding:18px; margin-top:20px; }
+.add-event-box input, .add-event-box textarea { width:100%; padding:9px; border:1px solid #e3ddd0; border-radius:8px; margin-bottom:10px; box-sizing:border-box; }
+.add-event-box button { padding:9px 20px; background:#fb6f5b; color:white; border:none; border-radius:8px; font-weight:700; cursor:pointer; }
+.event-list-item { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #f0ece2; font-size:13px; }
+</style>
+
+<nav class="qz-staff-nav">
+  <span class="qz-staff-logo">Q'Z STAFF</span>
+  <div style="display:flex; gap:18px;">
+    <a href="/staff/board">← 掲示板へ</a>
+    <a href="/homepage">Q'zトップへ</a>
+  </div>
+</nav>
+
+<div class="cal-wrap">
+  <div class="cal-header">
+    <button class="cal-nav-btn" onclick="changeMonth(-1)">← 前</button>
+    <h2 id="cal-title"></h2>
+    <button class="cal-nav-btn" onclick="changeMonth(1)">次 →</button>
+  </div>
+  <div class="cal-grid" id="cal-dow"></div>
+  <div class="cal-grid" id="cal-grid" style="margin-top:6px;"></div>
+
+  <div class="add-event-box">
+    <h3 style="margin:0 0 12px; color:#14213d; font-size:1rem;">＋ 予定を追加</h3>
+    <input type="text" id="ev-title" placeholder="予定タイトル">
+    <div style="display:flex; gap:8px;">
+      <input type="date" id="ev-date" style="flex:1;">
+      <input type="time" id="ev-time" style="flex:1;">
+    </div>
+    <textarea id="ev-desc" placeholder="メモ（任意）" rows="2"></textarea>
+    <button onclick="addEvent()">追加する</button>
+  </div>
+
+  <div style="margin-top:24px;">
+    <h3 style="color:#14213d; font-size:1rem;">📋 今後の予定</h3>
+    <div id="event-list-upcoming">読み込み中...</div>
+  </div>
+</div>
+
+<script>
+let calYear, calMonth, allEvents = [];
+const today = new Date();
+calYear = today.getFullYear();
+calMonth = today.getMonth();
+
+function changeMonth(diff) {
+  calMonth += diff;
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  renderCalendar();
+}
+
+function renderCalendar() {
+  document.getElementById('cal-title').textContent = calYear + '年 ' + (calMonth+1) + '月';
+  const dow = document.getElementById('cal-dow');
+  dow.innerHTML = ['日','月','火','水','木','金','土'].map(d => `<div class="cal-dow">${d}</div>`).join('');
+
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const grid = document.getElementById('cal-grid');
+  let html = '';
+  for (let i = 0; i < firstDay; i++) html += '<div class="cal-day empty"></div>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = calYear + '-' + String(calMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    const todayJST = new Date().toLocaleDateString('en-CA', {timeZone: 'Asia/Tokyo'});
+    const isToday = dateStr === todayJST;
+    const dayEvents = allEvents.filter(e => e.date === dateStr);
+    html += `<div class="cal-day ${isToday?'today':''}">
+      <div class="cal-day-num">${d}</div>
+      ${dayEvents.map(e => `<div class="cal-event-pill" style="background:${e.color}" title="${esc(e.title)}">${esc(e.title)}</div>`).join('')}
+    </div>`;
+  }
+  grid.innerHTML = html;
+}
+
+async function loadEvents() {
+  const r = await fetch('/api/staff/events');
+  const data = await r.json();
+  if (data.ok) { allEvents = data.events; renderCalendar(); renderUpcoming(); }
+}
+
+function renderUpcoming() {
+  const todayStr = new Date().toLocaleDateString('en-CA', {timeZone: 'Asia/Tokyo'});
+  const upcoming = allEvents.filter(e => e.date >= todayStr).sort((a,b) => a.date.localeCompare(b.date)).slice(0, 8);
+  const list = document.getElementById('event-list-upcoming');
+  if (upcoming.length === 0) { list.innerHTML = '<p style="color:#8a8270; font-size:13px;">予定はないよ</p>'; return; }
+  list.innerHTML = upcoming.map(e => `
+    <div class="event-list-item">
+      <div>
+        <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${e.color}; margin-right:6px;"></span>
+        <strong>${esc(e.title)}</strong> - ${e.date}${e.time ? ' ' + e.time : ''} <span style="color:#8a8270;">(${esc(e.staff_name)})</span>
+      </div>
+      <button onclick="deleteEvent(${e.id})" style="background:none; border:none; color:#9b9489; cursor:pointer; font-size:12px;">削除</button>
+    </div>
+  `).join('');
+}
+
+async function addEvent() {
+  const title = document.getElementById('ev-title').value.trim();
+  const date = document.getElementById('ev-date').value;
+  const time = document.getElementById('ev-time').value;
+  const description = document.getElementById('ev-desc').value.trim();
+  if (!title || !date) { window.toast('タイトルと日付を入力してね', 'error'); return; }
+  const colors = ['#fb6f5b','#2a9d8f','#e9c46a','#5b8fd6','#9b6fb0'];
+  const color = colors[Math.floor(Math.random()*colors.length)];
+  const r = await fetch('/api/staff/events', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({title, date, time, description, color})
+  });
+  const data = await r.json();
+  if (data.ok) {
+    document.getElementById('ev-title').value = '';
+    document.getElementById('ev-date').value = '';
+    document.getElementById('ev-time').value = '';
+    document.getElementById('ev-desc').value = '';
+    loadEvents();
+  } else { window.toast(data.error || 'エラー', 'error'); }
+}
+
+async function deleteEvent(id) {
+  if (!confirm('この予定を削除する？')) return;
+  await fetch('/api/staff/events/' + id + '/delete', {method:'POST'});
+  loadEvents();
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+loadEvents();
+</script>
+{% endblock %}

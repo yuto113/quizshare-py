@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}社員ログイン - Q'z{% endblock %}
+{% block head_extra %}
+<style>
+body.qz-login-page { background: #14213d !important; background-image: none !important; }
+function killQzTheme() {}
+</style>
+<script>
+function killQzTheme() {
+  document.body.style.background = '#14213d';
+  document.querySelectorAll('.seasonal-emoji').forEach(e => e.remove());
+}
+window.applyTheme = function() { killQzTheme(); };
+window.checkAutoTheme = function() { killQzTheme(); };
+document.addEventListener('DOMContentLoaded', killQzTheme);
+setTimeout(killQzTheme, 50);
+setTimeout(killQzTheme, 300);
+setTimeout(killQzTheme, 800);
+</script>
+{% endblock %}
+{% block body_class %}qz-login-page{% endblock %}
+{% block nav_items %}{% endblock %}
+{% block content %}
+<div style="min-height:80vh; display:flex; align-items:center; justify-content:center; padding:20px;">
+  <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:20px; padding:40px; max-width:380px; width:100%; backdrop-filter:blur(10px);">
+    <div style="text-align:center; margin-bottom:32px;">
+      <div style="font-size:1.3rem; letter-spacing:0.3em; color:#fb6f5b; font-weight:700; margin-bottom:8px;">Q'Z</div>
+      <h1 style="color:white; font-size:1.4rem; margin:0;">社員ログイン</h1>
+    </div>
+    <div style="margin-bottom:16px;">
+      <label style="font-size:12px; color:rgba(255,255,255,0.6); display:block; margin-bottom:6px;">社員ID</label>
+      <input type="text" id="staff-id" style="width:100%; padding:12px; border-radius:10px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.05); color:white; font-size:15px; box-sizing:border-box;">
+    </div>
+    <div style="margin-bottom:24px;">
+      <label style="font-size:12px; color:rgba(255,255,255,0.6); display:block; margin-bottom:6px;">パスワード</label>
+      <input type="password" id="staff-pw" style="width:100%; padding:12px; border-radius:10px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.05); color:white; font-size:15px; box-sizing:border-box;">
+    </div>
+    <button onclick="staffLogin()" style="width:100%; padding:14px; background:#fb6f5b; color:white; border:none; border-radius:10px; font-weight:700; cursor:pointer; font-size:15px;">
+      ログイン
+    </button>
+    <div style="text-align:center; margin-top:20px;">
+      <a href="/homepage" style="color:rgba(255,255,255,0.4); font-size:12px; text-decoration:none;">← Q'zトップへ</a>
+    </div>
+  </div>
+</div>
+
+<script>
+async function staffLogin() {
+  const staff_id = document.getElementById('staff-id').value.trim();
+  const password = document.getElementById('staff-pw').value;
+  if (!staff_id || !password) { window.toast('IDとパスワードを入力してね', 'error'); return; }
+  try {
+    const r = await fetch('/api/staff/login', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({staff_id, password})
+    });
+    const data = await r.json();
+    if (data.ok) {
+      window.location.href = data.redirect;
+    } else {
+      window.toast(data.error || 'ログインに失敗したよ', 'error');
+    }
+  } catch(e) { window.toast('通信エラー', 'error'); }
+}
+document.getElementById('staff-pw').addEventListener('keydown', e => {
+  if (e.key === 'Enter') staffLogin();
+});
+</script>
+{% endblock %}

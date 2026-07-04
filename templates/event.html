@@ -1,0 +1,716 @@
+{% extends "base.html" %}
+{% block title %}{{ event.title }} - クイズシェア{% endblock %}
+{% block head_extra %}
+<style>
+@keyframes float {
+  0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)}
+}
+@keyframes bounce {
+  0%,100%{transform:scale(1)} 50%{transform:scale(1.1)}
+}
+@keyframes sparkle {
+  0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.3)}
+}
+@keyframes slideIn {
+  from{transform:translateY(30px);opacity:0} to{transform:translateY(0);opacity:1}
+}
+@keyframes shake {
+  0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)}
+}
+@keyframes popIn {
+  0%{transform:scale(0)} 70%{transform:scale(1.1)} 100%{transform:scale(1)}
+}
+@keyframes starSpin {
+  from{transform:rotate(0deg)} to{transform:rotate(360deg)}
+}
+@keyframes gradient {
+  0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%}
+}
+
+.ev-body {
+  min-height:100vh;
+  background: linear-gradient(135deg, #667eea, #764ba2, #f093fb, #f5576c);
+  background-size: 400% 400%;
+  animation: gradient 8s ease infinite;
+  padding: 20px 16px;
+}
+
+.ev-card {
+  background: white;
+  border-radius: 24px;
+  padding: 28px;
+  margin-bottom: 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+  animation: slideIn 0.5s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.ev-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #667eea, #f093fb, #f5576c, #667eea);
+  background-size: 200%;
+  animation: gradient 3s linear infinite;
+}
+
+.ev-title-card {
+  background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+  color: white;
+  border-radius: 24px;
+  padding: 32px;
+  margin-bottom: 16px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+
+.ev-stars {
+  position: absolute;
+  width: 100%; height: 100%;
+  top: 0; left: 0;
+  pointer-events: none;
+}
+
+.ev-star {
+  position: absolute;
+  font-size: 20px;
+  animation: sparkle 2s infinite;
+}
+
+.nickname-input {
+  width: 100%;
+  padding: 16px 20px;
+  border: 3px solid #667eea;
+  border-radius: 16px;
+  font-size: 18px;
+  font-weight: bold;
+  text-align: center;
+  box-sizing: border-box;
+  outline: none;
+  transition: all 0.3s;
+}
+.nickname-input:focus {
+  border-color: #f093fb;
+  box-shadow: 0 0 20px rgba(240,147,251,0.4);
+  transform: scale(1.02);
+}
+
+.start-btn {
+  width: 100%;
+  padding: 18px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+  border-radius: 16px;
+  font-size: 20px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: all 0.3s;
+  animation: bounce 2s infinite;
+  box-shadow: 0 6px 20px rgba(102,126,234,0.5);
+}
+.start-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 30px rgba(102,126,234,0.6);
+  animation: none;
+}
+
+.quiz-question-card {
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  color: white;
+  border-radius: 20px;
+  padding: 28px;
+  margin-bottom: 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  animation: slideIn 0.4s ease;
+}
+
+.option-btn {
+  width: 100%;
+  padding: 14px 20px;
+  margin-bottom: 10px;
+  border: 3px solid rgba(255,255,255,0.2);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.1);
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+}
+.option-btn:hover {
+  border-color: #f093fb;
+  background: rgba(240,147,251,0.2);
+  transform: translateX(5px);
+}
+.option-btn.selected {
+  border-color: #f093fb;
+  background: rgba(240,147,251,0.3);
+}
+
+.answer-btn {
+  width: 100%;
+  padding: 16px;
+  background: linear-gradient(135deg, #f093fb, #f5576c);
+  color: white;
+  border: none;
+  border-radius: 14px;
+  font-size: 18px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 6px 20px rgba(245,87,108,0.4);
+}
+.answer-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(245,87,108,0.5);
+}
+
+.hint-btn {
+  width: 100%;
+  padding: 12px;
+  background: rgba(255,220,50,0.2);
+  color: #ffd700;
+  border: 2px solid #ffd700;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-bottom: 10px;
+  transition: all 0.3s;
+}
+.hint-btn:hover {
+  background: rgba(255,220,50,0.3);
+  transform: scale(1.02);
+}
+
+.result-correct {
+  background: linear-gradient(135deg, #11998e, #38ef7d);
+  color: white;
+  border-radius: 16px;
+  padding: 20px;
+  text-align: center;
+  animation: popIn 0.4s ease;
+}
+.result-wrong {
+  background: linear-gradient(135deg, #f5576c, #f093fb);
+  color: white;
+  border-radius: 16px;
+  padding: 20px;
+  text-align: center;
+  animation: shake 0.4s ease;
+}
+
+.progress-bar-wrap {
+  background: rgba(255,255,255,0.2);
+  border-radius: 10px;
+  height: 12px;
+  overflow: hidden;
+  margin-top: 10px;
+}
+.progress-bar-fill {
+  height: 12px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #f093fb, #f5576c);
+  transition: width 0.5s ease;
+  box-shadow: 0 0 10px rgba(245,87,108,0.6);
+}
+
+.ranking-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  margin-bottom: 8px;
+  animation: slideIn 0.3s ease;
+  transition: transform 0.2s;
+}
+.ranking-row:hover { transform: translateX(4px); }
+.rank-1 { background: linear-gradient(135deg, #ffd700, #ffec6e); }
+.rank-2 { background: linear-gradient(135deg, #c0c0c0, #e8e8e8); }
+.rank-3 { background: linear-gradient(135deg, #cd7f32, #e8a96e); }
+.rank-other { background: #f9fafb; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ev-body">
+  <div style="max-width:600px; margin:0 auto;">
+
+    <!-- タイトルカード -->
+    <div class="ev-title-card">
+      <div class="ev-stars">
+        <span class="ev-star" style="top:10%;left:10%;animation-delay:0s;">⭐</span>
+        <span class="ev-star" style="top:20%;right:15%;animation-delay:0.5s;">✨</span>
+        <span class="ev-star" style="bottom:15%;left:20%;animation-delay:1s;">⭐</span>
+        <span class="ev-star" style="bottom:10%;right:10%;animation-delay:1.5s;">✨</span>
+        <span class="ev-star" style="top:50%;left:5%;animation-delay:0.8s;">🌟</span>
+        <span class="ev-star" style="top:30%;right:5%;animation-delay:1.2s;">🌟</span>
+      </div>
+      <div style="font-size:56px; animation:float 3s ease infinite; margin-bottom:12px;">🏆</div>
+      <h1 style="margin:0 0 8px; font-size:24px; font-weight:900; text-shadow:0 2px 10px rgba(0,0,0,0.3);">{{ event.title }}</h1>
+      <p style="margin:0; opacity:0.85; font-size:14px; line-height:1.7;">{{ event.description }}</p>
+      <!-- カウントダウン -->
+      <div id="countdown-area" style="margin-top:16px; display:none;">
+        <div style="font-size:11px; opacity:0.7; margin-bottom:8px;" id="countdown-label"></div>
+        <div style="display:flex; justify-content:center; gap:8px;">
+          <div style="background:rgba(255,255,255,0.15); border-radius:12px; padding:10px 14px; min-width:60px; text-align:center; backdrop-filter:blur(10px);">
+            <div id="cd-days" style="font-size:28px; font-weight:900; line-height:1;">0</div>
+            <div style="font-size:10px; opacity:0.8; margin-top:2px;">日</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.15); border-radius:12px; padding:10px 14px; min-width:60px; text-align:center; backdrop-filter:blur(10px);">
+            <div id="cd-hours" style="font-size:28px; font-weight:900; line-height:1;">0</div>
+            <div style="font-size:10px; opacity:0.8; margin-top:2px;">時間</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.15); border-radius:12px; padding:10px 14px; min-width:60px; text-align:center; backdrop-filter:blur(10px);">
+            <div id="cd-minutes" style="font-size:28px; font-weight:900; line-height:1;">0</div>
+            <div style="font-size:10px; opacity:0.8; margin-top:2px;">分</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.15); border-radius:12px; padding:10px 14px; min-width:60px; text-align:center; backdrop-filter:blur(10px);">
+            <div id="cd-seconds" style="font-size:28px; font-weight:900; line-height:1; animation:bounce 1s infinite;">0</div>
+            <div style="font-size:10px; opacity:0.8; margin-top:2px;">秒</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:center; gap:12px; margin-top:20px; flex-wrap:wrap;">
+        {% if event.start_date %}
+        <div style="background:rgba(255,255,255,0.15); border-radius:12px; padding:10px 16px; backdrop-filter:blur(10px);">
+          <div style="font-size:10px; opacity:0.8;">📅 開始</div>
+          <div style="font-weight:900; font-size:13px;">{{ event.start_date.replace('T',' ') if event.start_date else '' }}</div>
+        </div>
+        {% endif %}
+        {% if event.end_date %}
+        <div style="background:rgba(255,255,255,0.15); border-radius:12px; padding:10px 16px; backdrop-filter:blur(10px);">
+          <div style="font-size:10px; opacity:0.8;">🏁 締切</div>
+          <div style="font-weight:900; font-size:13px;">{{ event.end_date.replace('T',' ') if event.end_date else '' }}</div>
+        </div>
+        {% endif %}
+        {% if event.result_date %}
+        <div style="background:rgba(255,255,255,0.15); border-radius:12px; padding:10px 16px; backdrop-filter:blur(10px);">
+          <div style="font-size:10px; opacity:0.8;">🏆 結果発表</div>
+          <div style="font-weight:900; font-size:13px;">{{ event.result_date.replace('T',' ') if event.result_date else '' }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- 未開始メッセージ -->
+    <div id="not-started" style="display:none;">
+      <div class="ev-card" style="text-align:center;">
+        <div style="font-size:64px; animation:float 3s ease infinite; margin-bottom:12px;">⏰</div>
+        <div style="font-weight:900; font-size:22px; color:#667eea; margin-bottom:8px;">まだ開始していません！</div>
+        <div style="color:#9CA3AF;">開始日時: {{ event.start_date.replace('T',' ') if event.start_date else '' }}</div>
+      </div>
+    </div>
+
+    <!-- 終了メッセージ -->
+    <div id="ended" style="display:none;">
+      <div class="ev-card" style="text-align:center;">
+        <div style="font-size:64px; animation:float 3s ease infinite; margin-bottom:12px;">🏁</div>
+        <div style="font-weight:900; font-size:22px; color:#f5576c; margin-bottom:8px;">受付終了しました！</div>
+        <div style="color:#9CA3AF;">締切: {{ event.end_date.replace('T',' ') if event.end_date else '' }}</div>
+      </div>
+    </div>
+
+    <!-- 参加済みメッセージ -->
+    <div id="already-msg" style="display:none;">
+      <div class="ev-card" style="text-align:center; border:3px solid #667eea;">
+        <div style="font-size:48px; margin-bottom:8px; animation:bounce 2s infinite;">✅</div>
+        <div style="font-weight:900; font-size:20px; color:#667eea;">参加済みです！</div>
+        <div id="already-nickname" style="color:#9CA3AF; margin-top:6px;"></div>
+      </div>
+    </div>
+
+    <!-- ニックネーム入力 -->
+    <div id="nickname-section">
+      <div class="ev-card">
+        <h2 style="margin:0 0 8px; font-size:18px; font-weight:900; color:#1a1a2e;">👤 ニックネームを入力してバトル開始！</h2>
+        <p style="font-size:13px; color:#9CA3AF; margin:0 0 16px;">※1つのIPアドレスにつき1回のみ参加できます</p>
+        <input type="text" id="nickname-input" maxlength="20" placeholder="例: クイズマスター"
+          class="nickname-input" style="margin-bottom:12px;">
+        <button onclick="startEvent()" class="start-btn">⚔️ クイズバトル開始！</button>
+      </div>
+    </div>
+
+    <!-- クイズセクション -->
+    <div id="quiz-section" style="display:none;">
+      <div class="ev-card" style="padding:16px 20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <div id="quiz-progress" style="font-weight:900; color:#667eea; font-size:15px;"></div>
+          <div id="quiz-timer" style="font-size:22px; font-weight:900; color:#f5576c;"></div>
+        </div>
+        <div class="progress-bar-wrap">
+          <div id="progress-bar" class="progress-bar-fill" style="width:0%"></div>
+        </div>
+      </div>
+
+      <div class="quiz-question-card">
+        <div style="font-size:12px; font-weight:900; color:rgba(255,255,255,0.6); margin-bottom:12px; letter-spacing:2px;">❓ QUESTION</div>
+        <div id="quiz-question" style="font-size:20px; font-weight:bold; line-height:1.7; margin-bottom:24px;"></div>
+        <div id="quiz-options" style="display:none;"></div>
+        <div id="quiz-text-input" style="display:none; margin-bottom:16px;">
+          <input type="text" id="answer-input" placeholder="答えを入力してね"
+            style="width:100%; padding:16px; border:3px solid rgba(255,255,255,0.3); border-radius:14px; font-size:16px; background:rgba(255,255,255,0.1); color:white; box-sizing:border-box; outline:none; font-weight:bold;"
+            onfocus="this.style.borderColor='#f093fb'" onblur="this.style.borderColor='rgba(255,255,255,0.3)'">
+        </div>
+        <button class="hint-btn" id="hint-btn" onclick="showHint()">💡 ヒントを見る（点数×2/3）</button>
+        <div id="hint-box" style="display:none; background:rgba(255,220,50,0.15); border:2px solid #ffd700; border-radius:12px; padding:14px; margin-bottom:12px;">
+          <div style="font-size:12px; color:#ffd700; margin-bottom:4px; font-weight:900;">💡 ヒント</div>
+          <div id="hint-text" style="color:#fff8dc; font-size:15px;"></div>
+        </div>
+        <button class="answer-btn" id="answer-btn" onclick="submitAnswer()">✅ 回答する！</button>
+        <div id="answer-result" style="display:none; margin-top:16px;"></div>
+      </div>
+    </div>
+
+    <!-- 結果セクション -->
+    <div id="result-section" style="display:none;">
+      <div class="ev-card" style="text-align:center;">
+        <div id="result-emoji" style="font-size:72px; margin-bottom:12px; animation:bounce 1s ease 3;"></div>
+        <h2 style="margin:0 0 20px; font-size:24px; font-weight:900; color:#1a1a2e;">お疲れさまでした！</h2>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px;">
+          <div style="background:linear-gradient(135deg,#11998e,#38ef7d); border-radius:16px; padding:20px; color:white;">
+            <div style="font-size:12px; opacity:0.9; margin-bottom:6px;">🏅 スコア</div>
+            <div id="res-correct" style="font-size:36px; font-weight:900;"></div>
+          </div>
+          <div style="background:linear-gradient(135deg,#667eea,#764ba2); border-radius:16px; padding:20px; color:white;">
+            <div style="font-size:12px; opacity:0.9; margin-bottom:6px;">📊 正解数</div>
+            <div id="res-rate" style="font-size:36px; font-weight:900;"></div>
+          </div>
+        </div>
+        <div style="background:linear-gradient(135deg,#ffecd2,#fcb69f); border-radius:14px; padding:14px; margin-bottom:16px;">
+          <div style="font-size:13px; color:#8b4513; font-weight:bold;">🏆 結果発表は <strong id="res-result-date"></strong></div>
+        </div>
+      </div>
+
+      <!-- ランキング -->
+      <div class="ev-card">
+        <h2 style="margin:0 0 16px; font-size:20px; font-weight:900; color:#1a1a2e;">🏆 ランキング</h2>
+        <div id="ranking-list"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const eventKey = '{{ event.event_key }}';
+
+// ブラウザフィンガープリント生成
+async function getFingerprint() {
+  const data = [
+    navigator.userAgent,
+    navigator.language,
+    screen.width + 'x' + screen.height,
+    screen.colorDepth,
+    new Date().getTimezoneOffset(),
+    navigator.hardwareConcurrency || '',
+    navigator.platform || '',
+  ].join('|');
+  // SHA-256ハッシュ
+  const msgBuffer = new TextEncoder().encode(data);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 32);
+}
+const resultDate = '{{ event.result_date or "" }}';
+let nickname = '';
+let quizzes = [];
+let currentIdx = 0;
+let answers = [];
+let timerInterval = null;
+let startTime = null;
+let hintUsed = false;
+
+// カウントダウンタイマー
+function startCountdown() {
+  const startDate = '{{ event.start_date or "" }}'.replace('T', ' ');
+  const endDate = '{{ event.end_date or "" }}'.replace('T', ' ');
+  const resultDate = '{{ event.result_date or "" }}'.replace('T', ' ');
+
+  function updateCountdown() {
+    const now = new Date();
+    let target = null;
+    let label = '';
+
+    const start = startDate ? new Date(startDate.replace(' ', 'T')) : null;
+    const end = endDate ? new Date(endDate.replace(' ', 'T')) : null;
+    const result = resultDate ? new Date(resultDate.replace(' ', 'T')) : null;
+
+    if (start && now < start) {
+      target = start; label = '🚀 開始まで';
+    } else if (end && now < end) {
+      target = end; label = '🏁 締切まで';
+    } else if (result && now < result) {
+      target = result; label = '🏆 結果発表まで';
+    } else {
+      document.getElementById('countdown-area').style.display = 'none';
+      return;
+    }
+
+    const diff = target - now;
+    const days = Math.floor(diff / (1000*60*60*24));
+    const hours = Math.floor((diff % (1000*60*60*24)) / (1000*60*60));
+    const minutes = Math.floor((diff % (1000*60*60)) / (1000*60));
+    const seconds = Math.floor((diff % (1000*60)) / 1000);
+
+    document.getElementById('countdown-area').style.display = 'block';
+    document.getElementById('countdown-label').textContent = label;
+    document.getElementById('cd-days').textContent = days;
+    document.getElementById('cd-hours').textContent = hours;
+    document.getElementById('cd-minutes').textContent = minutes;
+    document.getElementById('cd-seconds').textContent = seconds;
+  }
+
+  updateCountdown();
+  setInterval(updateCountdown, 1000);
+}
+
+startCountdown();
+
+function showHint() {
+  const q = quizzes[currentIdx];
+  if (!q.hint) { window.toast('このクイズにはヒントがありません', 'error'); return; }
+  hintUsed = true;
+  document.getElementById('hint-text').textContent = q.hint;
+  document.getElementById('hint-box').style.display = 'block';
+  const btn = document.getElementById('hint-btn');
+  btn.disabled = true;
+  btn.style.opacity = '0.5';
+  btn.textContent = '💡 ヒント使用済み（点数×2/3）';
+}
+
+async function init() {
+  // リロード後のスコア復元
+  const evCorrect = sessionStorage.getItem('ev_correct');
+  const evTotal = sessionStorage.getItem('ev_total');
+  const evRate = sessionStorage.getItem('ev_rate');
+  if (evCorrect !== null) {
+    document.getElementById('result-emoji').textContent = parseInt(evRate) >= 80 ? '🎉' : parseInt(evRate) >= 50 ? '😊' : '😅';
+    document.getElementById('res-correct').textContent = evCorrect + '/' + evTotal;
+    document.getElementById('res-rate').textContent = evRate + '%';
+    document.getElementById('res-result-date').textContent = (resultDate || '未定').replace('T', ' ');
+  }
+
+  // 開始日時チェック
+  if ('{{ event.start_date }}') {
+    const start = new Date('{{ event.start_date }}'.replace(' ','T'));
+    const now = new Date();
+    if (now < start) {
+      document.getElementById('nickname-section').style.display = 'none';
+      document.getElementById('not-started').style.display = 'block';
+      return;
+    }
+  }
+  // 締切チェック
+  if ('{{ event.end_date }}') {
+    const end = new Date('{{ event.end_date }}'.replace(' ','T'));
+    const now = new Date();
+    if (now > end) {
+      document.getElementById('nickname-section').style.display = 'none';
+      document.getElementById('ended').style.display = 'block';
+      loadRanking();
+      document.getElementById('result-section').style.display = 'block';
+      return;
+    }
+  }
+  // フィンガープリント確認
+  const fp = await getFingerprint();
+  const r = await fetch('/api/events/' + eventKey + '/check_ip?fp=' + fp);
+  const data = await r.json();
+  if (data.ok && data.already_participated) {
+    document.getElementById('already-msg').style.display = 'block';
+    document.getElementById('already-nickname').textContent = data.nickname + 'さんとして参加済みです';
+    document.getElementById('nickname-section').style.display = 'none';
+    loadRanking();
+    document.getElementById('result-section').style.display = 'block';
+    document.getElementById('res-result-date').textContent = (resultDate || '未定').replace('T', ' ');
+  }
+}
+
+async function startEvent() {
+  nickname = document.getElementById('nickname-input').value.trim();
+  if (!nickname) { window.toast('ニックネームを入力してね', 'error'); return; }
+  const r = await fetch('/api/events/' + eventKey + '/quizzes');
+  const data = await r.json();
+  if (!data.ok || data.quizzes.length === 0) { window.toast('クイズが見つかりませんでした', 'error'); return; }
+  quizzes = data.quizzes;
+  document.getElementById('nickname-section').style.display = 'none';
+  document.getElementById('quiz-section').style.display = 'block';
+  showQuiz(0);
+}
+
+function showQuiz(idx) {
+  currentIdx = idx;
+  const q = quizzes[idx];
+  const total = quizzes.length;
+  document.getElementById('quiz-progress').textContent = `問題 ${idx+1} / ${total}`;
+  document.getElementById('progress-bar').style.width = ((idx+1)/total*100) + '%';
+  document.getElementById('quiz-question').textContent = q.question;
+  document.getElementById('answer-result').style.display = 'none';
+  document.getElementById('answer-btn').style.display = 'block';
+  document.getElementById('answer-btn').disabled = false;
+  document.getElementById('answer-btn').textContent = '✅ 回答する！';
+  document.getElementById('answer-btn').onclick = submitAnswer;
+  // ヒントリセット
+  hintUsed = false;
+  document.getElementById('hint-box').style.display = 'none';
+  const hintBtn = document.getElementById('hint-btn');
+  hintBtn.disabled = false;
+  hintBtn.style.opacity = '1';
+  hintBtn.textContent = '💡 ヒントを見る（点数×2/3）';
+
+  if (q.has_options && q.options) {
+    document.getElementById('quiz-options').style.display = 'block';
+    document.getElementById('quiz-text-input').style.display = 'none';
+    document.getElementById('quiz-options').innerHTML = q.options.map((opt, i) =>
+      `<button class="option-btn" onclick="selectOption(this, '${esc(opt)}')">${String.fromCharCode(65+i)}. ${esc(opt)}</button>`
+    ).join('');
+  } else {
+    document.getElementById('quiz-options').style.display = 'none';
+    document.getElementById('quiz-text-input').style.display = 'block';
+    document.getElementById('answer-input').value = '';
+    document.getElementById('answer-input').focus();
+  }
+
+  startTime = Date.now();
+  let secs = 0;
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    secs++;
+    document.getElementById('quiz-timer').textContent = secs + '秒';
+  }, 1000);
+}
+
+let selectedOption = null;
+function selectOption(btn, val) {
+  selectedOption = val;
+  document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+
+async function submitAnswer() {
+  const q = quizzes[currentIdx];
+  let userAnswer = '';
+  if (q.has_options) {
+    if (!selectedOption) { window.toast('選択肢を選んでね', 'error'); return; }
+    userAnswer = selectedOption;
+  } else {
+    userAnswer = document.getElementById('answer-input').value.trim();
+    if (!userAnswer) { window.toast('答えを入力してね', 'error'); return; }
+  }
+
+  clearInterval(timerInterval);
+  const timeMs = Date.now() - startTime;
+
+  const r = await fetch('/api/events/' + eventKey + '/answer', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({quiz_id: q.id, user_answer: userAnswer, time_ms: timeMs})
+  });
+  const data = await r.json();
+  const correct = data.correct;
+
+  answers.push({quiz_id: q.id, correct, time_ms: timeMs, hint_used: hintUsed, score: correct ? (hintUsed ? 2/3 : 1) : 0});
+
+  const resultEl = document.getElementById('answer-result');
+  resultEl.style.display = 'block';
+  if (correct) {
+    resultEl.innerHTML = `<div class="result-correct">
+      <div style="font-size:40px; animation:bounce 0.5s ease 3;">⭕</div>
+      <div style="font-size:22px; font-weight:900; margin:8px 0;">せいかい！${hintUsed ? '<span style="font-size:14px; opacity:0.8;">（×2/3点）</span>' : ''}</div>
+      <div style="font-size:13px; opacity:0.9;">正解: ${esc(data.correct_answer || '')}</div>
+    </div>`;
+  } else {
+    resultEl.innerHTML = `<div class="result-wrong">
+      <div style="font-size:40px; animation:shake 0.5s ease;">❌</div>
+      <div style="font-size:22px; font-weight:900; margin:8px 0;">ざんねん！</div>
+      <div style="font-size:13px; opacity:0.9;">正解: ${esc(data.correct_answer || '')}</div>
+    </div>`;
+  }
+
+  document.getElementById('answer-btn').textContent = currentIdx + 1 < quizzes.length ? '次の問題へ ▶' : '結果を見る 🎉';
+  document.getElementById('answer-btn').onclick = () => {
+    if (currentIdx + 1 < quizzes.length) {
+      selectedOption = null;
+      showQuiz(currentIdx + 1);
+    } else {
+      finishEvent();
+    }
+  };
+}
+
+async function finishEvent() {
+  document.getElementById('quiz-section').style.display = 'none';
+  const fp = await getFingerprint();
+  const r = await fetch('/api/events/' + eventKey + '/submit', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({nickname, answers, fingerprint: fp})
+  });
+  const data = await r.json();
+  const correct = data.total_correct !== undefined ? data.total_correct : answers.filter(a=>a.correct).length;
+  const total = answers.length;
+  const rate = total > 0 ? Math.round(correct / total * 100) : 0;
+
+  document.getElementById('result-emoji').textContent = rate >= 80 ? '🎉' : rate >= 50 ? '😊' : '😅';
+  document.getElementById('res-correct').textContent = correct + '/' + total;
+  document.getElementById('res-rate').textContent = rate + '%';
+  document.getElementById('res-result-date').textContent = (resultDate || '未定').replace('T', ' ');
+  document.getElementById('result-section').style.display = 'block';
+  sessionStorage.setItem('ev_correct', correct);
+  sessionStorage.setItem('ev_total', total);
+  sessionStorage.setItem('ev_rate', rate);
+  loadRanking();
+}
+
+async function loadRanking() {
+  const r = await fetch('/api/events/' + eventKey + '/ranking');
+  const data = await r.json();
+  const list = document.getElementById('ranking-list');
+  if (data.not_yet) {
+    list.innerHTML = `<div style="text-align:center; padding:32px; color:#9CA3AF;">
+      <div style="font-size:48px; margin-bottom:8px; animation:float 3s ease infinite;">🔒</div>
+      <div style="font-weight:bold; font-size:16px;">結果発表まで非公開</div>
+      <div style="font-size:13px; margin-top:4px;">発表日: ${(resultDate||'未定').replace('T',' ')}</div>
+    </div>`;
+    return;
+  }
+  if (!data.ranking || data.ranking.length === 0) {
+    list.innerHTML = '<div style="text-align:center; color:#9CA3AF; padding:20px;">まだ参加者がいません</div>';
+    return;
+  }
+  const medals = ['🥇','🥈','🥉'];
+  const rankClass = ['rank-1','rank-2','rank-3'];
+  list.innerHTML = data.ranking.map(r => `
+    <div class="ranking-row ${r.rank<=3 ? rankClass[r.rank-1] : 'rank-other'}">
+      <div style="font-size:${r.rank<=3?'28':'16'}px; font-weight:900; width:36px; text-align:center;">
+        ${r.rank<=3 ? medals[r.rank-1] : r.rank}
+      </div>
+      <div style="flex:1; font-weight:900; font-size:15px;">${esc(r.nickname)}</div>
+      <div style="text-align:right;">
+        <div style="font-weight:900; color:${r.rank<=3?'#333':'#10b981'}; font-size:16px;">${r.correct}/${r.total}</div>
+        <div style="font-size:11px; color:#666;">${Math.round(r.time_ms/1000)}秒</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('quiz-section').style.display !== 'none') {
+    submitAnswer();
+  }
+});
+
+init();
+</script>
+{% endblock %}

@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}ファイル共有 - Q'z{% endblock %}
+{% block head_extra %}
+<script>
+function killQzTheme() {
+  document.body.style.background = '#fdfbf6';
+  document.querySelectorAll('.seasonal-emoji').forEach(e => e.remove());
+}
+window.applyTheme = function() { killQzTheme(); };
+window.checkAutoTheme = function() { killQzTheme(); };
+document.addEventListener('DOMContentLoaded', killQzTheme);
+setTimeout(killQzTheme, 50);
+setTimeout(killQzTheme, 300);
+setTimeout(killQzTheme, 800);
+</script>
+{% endblock %}
+{% block body_class %}qz-board-page{% endblock %}
+{% block content %}
+<style>
+.site-header { display: none !important; }
+.qz-staff-nav { background:#14213d; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; }
+.qz-staff-nav a { color:rgba(255,255,255,0.6); font-size:0.8rem; text-decoration:none; }
+.qz-staff-nav a:hover { color:white; }
+.qz-staff-logo { font-size:0.85rem; letter-spacing:0.2em; color:#fb6f5b; font-weight:700; }
+.files-wrap { max-width:760px; margin:30px auto; padding:0 20px; }
+.upload-box { background:white; border:2px dashed #e3ddd0; border-radius:16px; padding:24px; text-align:center; margin-bottom:24px; }
+.upload-box input[type=file] { margin-bottom:12px; }
+.upload-box input[type=text] { width:100%; padding:10px; border:1px solid #e3ddd0; border-radius:8px; margin-bottom:12px; box-sizing:border-box; }
+.upload-box button { padding:10px 24px; background:#fb6f5b; color:white; border:none; border-radius:8px; font-weight:700; cursor:pointer; }
+.file-row { background:white; border:1px solid #e3ddd0; border-radius:14px; padding:16px 20px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; }
+.file-icon { font-size:28px; margin-right:14px; }
+.file-name { font-weight:700; color:#14213d; }
+.file-meta { font-size:12px; color:#8a8270; margin-top:2px; }
+.file-desc { font-size:13px; color:#5b5546; margin-top:4px; }
+.file-actions button, .file-actions a { padding:6px 14px; border-radius:8px; border:none; cursor:pointer; font-size:12px; text-decoration:none; margin-left:6px; }
+</style>
+
+<nav class="qz-staff-nav">
+  <span class="qz-staff-logo">Q'Z STAFF</span>
+  <div style="display:flex; gap:18px;">
+    <a href="/staff/board">← 掲示板へ</a>
+    <a href="/homepage">Q'zトップへ</a>
+  </div>
+</nav>
+
+<div class="files-wrap">
+  <h2 style="color:#14213d; margin-bottom:20px;">📁 ファイル共有</h2>
+
+  <div class="upload-box">
+    <input type="file" id="file-upload-input">
+    <input type="text" id="file-desc-input" placeholder="ファイルの説明（任意）">
+    <button onclick="uploadFile()">アップロード</button>
+  </div>
+
+  <div id="file-list">読み込み中...</div>
+</div>
+
+<script>
+let uploadFileData = null;
+let uploadFileName = '';
+
+document.getElementById('file-upload-input').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (file.size > 15 * 1024 * 1024) { window.toast('ファイルは15MBまでだよ', 'error'); return; }
+  uploadFileName = file.name;
+  const reader = new FileReader();
+  reader.onload = ev => { uploadFileData = ev.target.result; };
+  reader.readAsDataURL(file);
+});
+
+async function uploadFile() {
+  if (!uploadFileData) { window.toast('ファイルを選んでね', 'error'); return; }
+  const btn = document.querySelector('.upload-box button');
+  const originalText = btn.textContent;
+  btn.textContent = 'アップロード中...';
+  btn.disabled = true;
+  const description = document.getElementById('file-desc-input').value.trim();
+  try {
+    const r = await fetch('/api/staff/files', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({file_name: uploadFileName, file_data: uploadFileData, description})
+    });
+    const data = await r.json();
+    if (data.ok) {
+      window.toast('アップロードしました！', 'success');
+      document.getElementById('file-upload-input').value = '';
+      document.getElementById('file-desc-input').value = '';
+      uploadFileData = null;
+      loadFiles();
+    } else { window.toast(data.error || 'エラー', 'error'); }
+  } finally {
+    btn.textContent = originalText;
+    btn.disabled = false;
+  }
+}
+
+async function loadFiles() {
+  const r = await fetch('/api/staff/files');
+  const data = await r.json();
+  const list = document.getElementById('file-list');
+  if (!data.ok || data.files.length === 0) {
+    list.innerHTML = '<p style="color:#8a8270; text-align:center; padding:30px;">まだファイルがありません</p>';
+    return;
+  }
+  list.innerHTML = data.files.map(f => `
+    <div class="file-row">
+      <div style="display:flex; align-items:center;">
+        <div class="file-icon">📄</div>
+        <div>
+          <div class="file-name">${esc(f.file_name)}</div>
+          <div class="file-meta">${esc(f.staff_name)} · ${(f.created_at||'').substring(0,16)}</div>
+          ${f.description ? `<div class="file-desc">${esc(f.description)}</div>` : ''}
+        </div>
+      </div>
+      <div class="file-actions">
+        <a href="#" onclick="previewFile(${f.id}); return false;" style="background:#2a9d8f; color:white;">プレビュー</a>
+        <a href="#" onclick="downloadFile(${f.id}); return false;" style="background:#14213d; color:white;">ダウンロード</a>
+        <button onclick="deleteFile(${f.id})" style="background:#fee2e2; color:#ef4444;">削除</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function dataURLtoBlob(dataUrl) {
+  const arr = dataUrl.split(',');
+  const mimeMatch = arr[0].match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) { u8arr[n] = bstr.charCodeAt(n); }
+  return new Blob([u8arr], {type: mime});
+}
+
+async function previewFile(fileId) {
+  // 先に空タブを開いておく（ポップアップブロック回避 + 即時フィードバック）
+  const newTab = window.open('', '_blank');
+  if (newTab) {
+    newTab.document.write('<body style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;color:#8a8270;">読み込み中...</body>');
+  }
+  window.toast('読み込み中...', 'success');
+  const r = await fetch('/api/staff/files/' + fileId);
+  const data = await r.json();
+  if (!data.ok) { window.toast('プレビューに失敗したよ', 'error'); if(newTab) newTab.close(); return; }
+  try {
+    const blob = dataURLtoBlob(data.file_data);
+    const blobUrl = URL.createObjectURL(blob);
+    if (newTab) {
+      newTab.location.href = blobUrl;
+    } else {
+      window.open(blobUrl, '_blank');
+    }
+  } catch(e) {
+    window.toast('プレビューに失敗したよ: ' + e.message, 'error');
+    if (newTab) newTab.close();
+  }
+}
+
+async function downloadFile(fileId) {
+  const r = await fetch('/api/staff/files/' + fileId);
+  const data = await r.json();
+  if (!data.ok) { window.toast('ダウンロードに失敗したよ', 'error'); return; }
+  const a = document.createElement('a');
+  a.href = data.file_data;
+  a.download = data.file_name;
+  a.click();
+}
+
+async function deleteFile(fileId) {
+  if (!confirm('このファイルを削除しますか？')) return;
+  await fetch('/api/staff/files/' + fileId + '/delete', {method: 'POST'});
+  loadFiles();
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+loadFiles();
+</script>
+{% endblock %}

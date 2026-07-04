@@ -403,14 +403,22 @@ function renderQuizList() {
         <div style="min-width:0;">
           <div style="color:#e2e8f0; font-size:0.85rem;
                       overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-            ${i+1}. ${window.escapeHtml(q.question || '（問題）')}
+            ${q.under_review ? '<span style="color:#F59E0B;">【調査中】</span>' : ''}${i+1}. ${window.escapeHtml(q.question || '（問題）')}
           </div>
           <div style="color:#6B7280; font-size:0.75rem; margin-top:2px;">
             ${window.escapeHtml(q.author_name || '')}
             ${q.created_at ? ' · ' + q.created_at.substring(0,10) : ''}
           </div>
+          ${q.under_review && q.review_reason ? '<div style="color:#F59E0B; font-size:0.75rem; margin-top:2px;">理由: ' + window.escapeHtml(q.review_reason) + '</div>' : ''}
         </div>
       </label>
+      <button onclick="toggleReviewAdmin('${q.id}', ${q.under_review ? 1 : 0})"
+        title="${q.under_review ? '調査中を解除' : '調査中にする'}"
+        style="padding:4px 10px; background:rgba(245,158,11,0.15);
+               color:#FCD34D; border:1px solid rgba(245,158,11,0.3);
+               border-radius:6px; cursor:pointer; font-size:0.8rem; flex-shrink:0; margin-left:8px;">
+        ${q.under_review ? '✅' : '⚠️'}
+      </button>
       <button onclick="deleteQuizAdmin('${q.id}')"
         style="padding:4px 10px; background:rgba(239,68,68,0.15);
                color:#FCA5A5; border:1px solid rgba(239,68,68,0.3);
@@ -480,6 +488,27 @@ async function deleteQuizAdmin(quizId) {
     await window.api.del(`/api/admin/quizzes/${encodeURIComponent(groupIdRaw)}/${quizId}`);
     window.toast('削除したよ', 'success');
     // 削除後に一覧を再読み込みする
+    document.getElementById('btn-load-quizzes').click();
+  } catch (err) {
+    window.toast(err.message, 'error');
+  }
+}
+
+// ---- 調査中フラグを切り替える ----
+async function toggleReviewAdmin(quizId, current) {
+  let reason = '';
+  if (!current) {
+    // 調査中にするとき: 理由を入力してもらう(クイズを開いた人に表示される)
+    reason = prompt('調査中にする理由を入力してね(みんなに表示されるよ)',
+                    '利用規約違反の可能性があるため調査中です。');
+    if (reason === null) return;  // キャンセルされたら何もしない
+  } else {
+    if (!confirm('調査中を解除するよ？')) return;
+  }
+  try {
+    await window.api.post(`/api/admin/quizzes/${encodeURIComponent(groupIdRaw)}/${quizId}/review`,
+                          { under_review: current ? 0 : 1, reason: reason });
+    window.toast(current ? '解除したよ' : '調査中にしたよ', 'success');
     document.getElementById('btn-load-quizzes').click();
   } catch (err) {
     window.toast(err.message, 'error');

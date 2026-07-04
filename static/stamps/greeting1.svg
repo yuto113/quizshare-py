@@ -1,0 +1,11 @@
+<svg viewBox="0 0 88 100" xmlns="http://www.w3.org/2000/svg">
+<circle cx="44" cy="40" r="38" fill="#fdfbf6" stroke="#e3ddd0" stroke-width="1"/>
+<circle cx="44" cy="40" r="26" fill="#e9c46a"/>
+<circle cx="44" cy="40" r="16" fill="#fdfbf6"/>
+<circle cx="44" cy="40" r="7" fill="#e9c46a"/>
+<path d="M30 32 Q34 28 38 32" fill="none" stroke="#14213d" stroke-width="2.5" stroke-linecap="round"/>
+<path d="M50 32 Q54 28 58 32" fill="none" stroke="#14213d" stroke-width="2.5" stroke-linecap="round"/>
+<path d="M34 52 Q44 60 54 52" fill="none" stroke="#14213d" stroke-width="2.5" stroke-linecap="round"/>
+<path d="M18 16 L10 4 M70 16 L78 4" stroke="#fb6f5b" stroke-width="2" stroke-linecap="round"/>
+<text x="44" y="96" text-anchor="middle" font-size="20" font-weight="900" fill="#14213d" font-family="sans-serif">おはよう！</text>
+</svg>

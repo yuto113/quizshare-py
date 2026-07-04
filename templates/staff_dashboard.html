@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}統計ダッシュボード - Q'z{% endblock %}
+{% block head_extra %}
+<script>
+function killQzTheme() {
+  document.body.style.background = '#fdfbf6';
+  document.querySelectorAll('.seasonal-emoji').forEach(e => e.remove());
+}
+window.applyTheme = function() { killQzTheme(); };
+window.checkAutoTheme = function() { killQzTheme(); };
+document.addEventListener('DOMContentLoaded', killQzTheme);
+setTimeout(killQzTheme, 50);
+setTimeout(killQzTheme, 300);
+setTimeout(killQzTheme, 800);
+</script>
+{% endblock %}
+{% block body_class %}qz-board-page{% endblock %}
+{% block content %}
+<style>
+.site-header { display: none !important; }
+.qz-staff-nav { background:#14213d; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; }
+.qz-staff-nav a { color:rgba(255,255,255,0.6); font-size:0.8rem; text-decoration:none; }
+.qz-staff-nav a:hover { color:white; }
+.qz-staff-logo { font-size:0.85rem; letter-spacing:0.2em; color:#fb6f5b; font-weight:700; }
+.dash-wrap { max-width:900px; margin:24px auto; padding:0 20px; }
+.stat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:24px; }
+.stat-card { background:white; border:1px solid #e3ddd0; border-radius:14px; padding:18px; text-align:center; }
+.stat-num { font-size:1.8rem; font-weight:900; color:#14213d; }
+.stat-label { font-size:12px; color:#8a8270; margin-top:4px; }
+.recent-box { background:white; border:1px solid #e3ddd0; border-radius:14px; padding:18px; }
+.recent-row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #f0ece2; font-size:13px; }
+@media (max-width: 700px) { .stat-grid { grid-template-columns:repeat(2,1fr); } }
+</style>
+
+<nav class="qz-staff-nav">
+  <span class="qz-staff-logo">Q'Z STAFF</span>
+  <div style="display:flex; gap:18px;">
+    <a href="/staff/board">← 掲示板へ</a>
+    <a href="/homepage">Q'zトップへ</a>
+  </div>
+</nav>
+
+<div class="dash-wrap">
+  <h2 style="color:#14213d;">📊 クイズシェア 統計ダッシュボード</h2>
+
+  <div class="stat-grid" id="stat-grid">
+    <div class="stat-card"><div class="stat-num">-</div><div class="stat-label">読み込み中</div></div>
+  </div>
+
+  <div class="recent-box" style="margin-bottom:20px;">
+    <h3 style="margin:0 0 12px; color:#14213d; font-size:1rem;">🆕 最近作られたグループ</h3>
+    <div id="recent-groups">読み込み中...</div>
+  </div>
+
+  <div class="recent-box" style="margin-bottom:20px;">
+    <h3 style="margin:0 0 12px; color:#14213d; font-size:1rem;">📝 最近作られたクイズ</h3>
+    <div id="recent-quizzes">読み込み中...</div>
+  </div>
+
+  <div class="recent-box">
+    <h3 style="margin:0 0 12px; color:#14213d; font-size:1rem;">🎯 最近解かれたクイズ</h3>
+    <div id="recent-attempts">読み込み中...</div>
+  </div>
+</div>
+
+<script>
+async function loadDashboard() {
+  const r = await fetch('/api/staff/dashboard');
+  const data = await r.json();
+  if (!data.ok) return;
+
+  document.getElementById('stat-grid').innerHTML = `
+    <div class="stat-card"><div class="stat-num">${data.total_groups}</div><div class="stat-label">グループ数</div></div>
+    <div class="stat-card"><div class="stat-num">${data.total_quizzes}</div><div class="stat-label">クイズ数</div></div>
+    <div class="stat-card"><div class="stat-num">${data.total_attempts}</div><div class="stat-label">挑戦数</div></div>
+    <div class="stat-card"><div class="stat-num">${data.today_attempts}</div><div class="stat-label">今日の挑戦数</div></div>
+    <div class="stat-card"><div class="stat-num">${data.total_events}</div><div class="stat-label">イベント数</div></div>
+    <div class="stat-card"><div class="stat-num">${data.school_groups}</div><div class="stat-label">学校グループ</div></div>
+    <div class="stat-card"><div class="stat-num">${data.official_groups}</div><div class="stat-label">公式グループ</div></div>
+  `;
+
+  document.getElementById('recent-groups').innerHTML = data.recent_groups.map(g => `
+    <div class="recent-row"><span>${esc(g.name)}</span><span style="color:#8a8270;">${(g.created_at||'').substring(0,16)}</span></div>
+  `).join('') || '<p style="color:#8a8270; font-size:13px;">まだないよ</p>';
+
+  document.getElementById('recent-quizzes').innerHTML = data.recent_quizzes.map(q => `
+    <div class="recent-row"><span>${esc(q.question)}</span><span style="color:#8a8270;">${(q.created_at||'').substring(0,16)}</span></div>
+  `).join('') || '<p style="color:#8a8270; font-size:13px;">まだないよ</p>';
+
+  document.getElementById('recent-attempts').innerHTML = data.recent_attempts.map(a => `
+    <div class="recent-row"><span>${esc(a.question)}</span><span style="color:#8a8270;">${(a.created_at||'').substring(0,16)}</span></div>
+  `).join('') || '<p style="color:#8a8270; font-size:13px;">まだないよ</p>';
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+loadDashboard();
+</script>
+{% endblock %}

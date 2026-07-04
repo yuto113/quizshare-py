@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}タスク管理 - Q'z{% endblock %}
+{% block head_extra %}
+<script>
+function killQzTheme() {
+  document.body.style.background = '#fdfbf6';
+  document.querySelectorAll('.seasonal-emoji').forEach(e => e.remove());
+}
+window.applyTheme = function() { killQzTheme(); };
+window.checkAutoTheme = function() { killQzTheme(); };
+document.addEventListener('DOMContentLoaded', killQzTheme);
+setTimeout(killQzTheme, 50);
+setTimeout(killQzTheme, 300);
+setTimeout(killQzTheme, 800);
+</script>
+{% endblock %}
+{% block body_class %}qz-board-page{% endblock %}
+{% block content %}
+<style>
+.site-header { display: none !important; }
+.qz-staff-nav { background:#14213d; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; }
+.qz-staff-nav a { color:rgba(255,255,255,0.6); font-size:0.8rem; text-decoration:none; }
+.qz-staff-nav a:hover { color:white; }
+.qz-staff-logo { font-size:0.85rem; letter-spacing:0.2em; color:#fb6f5b; font-weight:700; }
+.tasks-wrap { max-width:900px; margin:24px auto; padding:0 20px; }
+.add-task-box { background:white; border:1px solid #e3ddd0; border-radius:14px; padding:18px; margin-bottom:24px; }
+.add-task-box input, .add-task-box select, .add-task-box textarea { padding:9px; border:1px solid #e3ddd0; border-radius:8px; margin-bottom:10px; box-sizing:border-box; }
+.add-task-box button { padding:9px 20px; background:#fb6f5b; color:white; border:none; border-radius:8px; font-weight:700; cursor:pointer; }
+.task-columns { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+.task-col-header { font-weight:700; color:#14213d; margin-bottom:10px; padding:8px 12px; border-radius:8px; }
+.task-col-header.todo { background:#fee2e2; }
+.task-col-header.doing { background:#fef3c7; }
+.task-col-header.done { background:#dcfce7; }
+.task-card { background:white; border:1px solid #e3ddd0; border-radius:12px; padding:12px; margin-bottom:10px; }
+.task-card-title { font-weight:700; color:#14213d; font-size:13px; }
+.task-card-meta { font-size:11px; color:#8a8270; margin-top:4px; }
+.task-card-actions { display:flex; gap:6px; margin-top:8px; }
+.task-card-actions button { font-size:11px; padding:4px 8px; border-radius:6px; border:none; cursor:pointer; }
+@media (max-width: 700px) { .task-columns { grid-template-columns:1fr; } }
+</style>
+
+<nav class="qz-staff-nav">
+  <span class="qz-staff-logo">Q'Z STAFF</span>
+  <div style="display:flex; gap:18px;">
+    <a href="/staff/board">← 掲示板へ</a>
+    <a href="/homepage">Q'zトップへ</a>
+  </div>
+</nav>
+
+<div class="tasks-wrap">
+  <h2 style="color:#14213d;">✅ タスク管理</h2>
+
+  <div class="add-task-box">
+    <h3 style="margin:0 0 12px; color:#14213d; font-size:1rem;">＋ タスクを追加</h3>
+    <div style="display:flex; gap:8px;">
+      <input type="text" id="task-title" placeholder="タスク名" style="flex:2;">
+      <select id="task-assignee" style="flex:1;"><option value="">担当者なし</option></select>
+      <input type="date" id="task-due" style="flex:1;">
+    </div>
+    <textarea id="task-desc" placeholder="詳細（任意）" rows="2" style="width:100%;"></textarea>
+    <button onclick="addTask()">追加する</button>
+  </div>
+
+  <div class="task-columns">
+    <div>
+      <div class="task-col-header todo">📝 やること</div>
+      <div id="col-todo"></div>
+    </div>
+    <div>
+      <div class="task-col-header doing">🚧 進行中</div>
+      <div id="col-doing"></div>
+    </div>
+    <div>
+      <div class="task-col-header done">✅ 完了</div>
+      <div id="col-done"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const myId = '{{ my_id }}';
+
+async function loadStaffForSelect() {
+  const r = await fetch('/api/staff/list');
+  const data = await r.json();
+  const sel = document.getElementById('task-assignee');
+  if (data.ok) {
+    sel.innerHTML = '<option value="">担当者なし</option><option value="' + myId + '">自分</option>' +
+      data.staff.map(s => `<option value="${s.staff_id}">${esc(s.name)}</option>`).join('');
+  }
+}
+
+async function loadTasks() {
+  const r = await fetch('/api/staff/tasks');
+  const data = await r.json();
+  if (!data.ok) return;
+  ['todo','doing','done'].forEach(status => {
+    const col = document.getElementById('col-' + status);
+    const tasks = data.tasks.filter(t => t.status === status);
+    col.innerHTML = tasks.map(t => `
+      <div class="task-card">
+        <div class="task-card-title">${esc(t.title)}</div>
+        ${t.description ? `<div style="font-size:12px; color:#5b5546; margin-top:4px;">${esc(t.description)}</div>` : ''}
+        <div class="task-card-meta">
+          ${t.assignee_name ? '👤 ' + esc(t.assignee_name) : ''} ${t.due_date ? '· 期限: ' + t.due_date : ''}
+        </div>
+        <div class="task-card-actions">
+          ${status !== 'todo' ? `<button onclick="moveTask(${t.id},'todo')" style="background:#fee2e2; color:#ef4444;">戻す</button>` : ''}
+          ${status !== 'doing' ? `<button onclick="moveTask(${t.id},'doing')" style="background:#fef3c7; color:#d97706;">進行中</button>` : ''}
+          ${status !== 'done' ? `<button onclick="moveTask(${t.id},'done')" style="background:#dcfce7; color:#16a34a;">完了</button>` : ''}
+          <button onclick="deleteTask(${t.id})" style="background:#f1ece0; color:#9b9489;">削除</button>
+        </div>
+      </div>
+    `).join('') || '<p style="color:#bbb; font-size:12px;">なし</p>';
+  });
+}
+
+async function addTask() {
+  const title = document.getElementById('task-title').value.trim();
+  const assignee_id = document.getElementById('task-assignee').value;
+  const due_date = document.getElementById('task-due').value;
+  const description = document.getElementById('task-desc').value.trim();
+  if (!title) { window.toast('タスク名を入力してね', 'error'); return; }
+  const r = await fetch('/api/staff/tasks', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({title, assignee_id, due_date, description})
+  });
+  const data = await r.json();
+  if (data.ok) {
+    document.getElementById('task-title').value = '';
+    document.getElementById('task-due').value = '';
+    document.getElementById('task-desc').value = '';
+    loadTasks();
+  } else { window.toast(data.error || 'エラー', 'error'); }
+}
+
+async function moveTask(id, status) {
+  await fetch('/api/staff/tasks/' + id + '/status', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({status})
+  });
+  loadTasks();
+}
+
+async function deleteTask(id) {
+  if (!confirm('このタスクを削除する？')) return;
+  await fetch('/api/staff/tasks/' + id + '/delete', {method:'POST'});
+  loadTasks();
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+loadStaffForSelect();
+loadTasks();
+</script>
+{% endblock %}

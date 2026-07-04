@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}プロフィール設定 - Q'z{% endblock %}
+{% block head_extra %}
+<script>
+function killQzTheme() {
+  document.body.style.background = '#fdfbf6';
+  document.querySelectorAll('.seasonal-emoji').forEach(e => e.remove());
+}
+window.applyTheme = function() { killQzTheme(); };
+window.checkAutoTheme = function() { killQzTheme(); };
+document.addEventListener('DOMContentLoaded', killQzTheme);
+setTimeout(killQzTheme, 50);
+setTimeout(killQzTheme, 300);
+setTimeout(killQzTheme, 800);
+</script>
+{% endblock %}
+{% block body_class %}qz-board-page{% endblock %}
+{% block content %}
+<style>
+.site-header { display: none !important; }
+.qz-staff-nav { background:#14213d; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; }
+.qz-staff-nav a { color:rgba(255,255,255,0.6); font-size:0.8rem; text-decoration:none; }
+.qz-staff-nav a:hover { color:white; }
+.qz-staff-logo { font-size:0.85rem; letter-spacing:0.2em; color:#fb6f5b; font-weight:700; }
+.profile-box { max-width:420px; margin:50px auto; background:white; border:1px solid #e3ddd0; border-radius:16px; padding:32px; }
+.profile-box label { font-size:12px; color:#8a8270; font-weight:700; display:block; margin-bottom:6px; }
+.profile-box input { width:100%; padding:11px; border:1px solid #e3ddd0; border-radius:10px; margin-bottom:18px; box-sizing:border-box; font-size:14px; }
+.profile-box button { width:100%; padding:12px; background:#fb6f5b; color:white; border:none; border-radius:10px; font-weight:700; cursor:pointer; font-size:15px; }
+</style>
+
+<nav class="qz-staff-nav">
+  <span class="qz-staff-logo">Q'Z STAFF</span>
+  <div style="display:flex; gap:18px;">
+    <a href="/staff/board">← 掲示板へ</a>
+    <a href="/homepage">Q'zトップへ</a>
+  </div>
+</nav>
+
+<div class="profile-box">
+  <h2 style="margin:0 0 24px; font-size:1.3rem; color:#14213d;">プロフィール設定</h2>
+  <label>社員ID</label>
+  <input type="text" id="p-staff-id" value="{{ staff_id }}">
+  <label>名前</label>
+  <input type="text" id="p-name" value="{{ staff_name }}">
+  <label>新しいパスワード（変更する場合だけ入力）</label>
+  <input type="password" id="p-password" placeholder="変更しない場合は空欄でOK">
+  <button onclick="updateProfile()">保存する</button>
+</div>
+
+<script>
+async function updateProfile() {
+  const staff_id = document.getElementById('p-staff-id').value.trim();
+  const name = document.getElementById('p-name').value.trim();
+  const password = document.getElementById('p-password').value;
+  const r = await fetch('/api/staff/profile/update', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({staff_id, name, password})
+  });
+  const data = await r.json();
+  if (data.ok) {
+    window.toast('更新しました！', 'success');
+    document.getElementById('p-password').value = '';
+  } else {
+    window.toast(data.error || 'エラー', 'error');
+  }
+}
+</script>
+{% endblock %}

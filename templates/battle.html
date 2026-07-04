@@ -1,0 +1,408 @@
+{% extends "base.html" %}
+{% block title %}対戦モード - クイズシェア{% endblock %}
+{% block content %}
+<div style="max-width:600px; margin:0 auto; padding:20px 16px;">
+
+  <!-- ロビー画面 -->
+  <div id="lobby-section">
+    <div style="text-align:center; margin-bottom:24px;">
+      <div style="font-size:56px; margin-bottom:8px;">⚔️</div>
+      <h1 style="margin:0; font-size:24px; font-weight:900;">クイズ対戦モード</h1>
+      <p style="color:#9CA3AF; font-size:14px; margin-top:8px;">友達と同じ問題を解いて、速さと正確さを競おう！</p>
+    </div>
+
+    <!-- ニックネーム -->
+    <div style="background:white; border-radius:16px; padding:20px; margin-bottom:16px; box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+      <label style="font-size:13px; font-weight:900; display:block; margin-bottom:8px;">👤 ニックネーム</label>
+      <input type="text" id="nickname-input" maxlength="20" placeholder="例: クイズマスター"
+        style="width:100%; padding:12px; border:2px solid #e5e7eb; border-radius:10px; font-size:16px; box-sizing:border-box;">
+    </div>
+
+    <!-- 部屋を作る -->
+    <div style="background:white; border-radius:16px; padding:20px; margin-bottom:16px; box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+      <h2 style="margin:0 0 16px; font-size:18px; font-weight:900;">🏠 部屋を作る</h2>
+      <div style="margin-bottom:12px;">
+        <label style="font-size:13px; font-weight:900; display:block; margin-bottom:6px;">問題数</label>
+        <div style="display:flex; gap:8px;">
+          <button onclick="setQuizCount(3)" id="cnt-3" class="cnt-btn" style="flex:1; padding:10px; border-radius:10px; border:2px solid #e5e7eb; background:white; cursor:pointer; font-weight:bold;">3問</button>
+          <button onclick="setQuizCount(5)" id="cnt-5" class="cnt-btn" style="flex:1; padding:10px; border-radius:10px; border:2px solid #667eea; background:#667eea; color:white; cursor:pointer; font-weight:bold;">5問</button>
+          <button onclick="setQuizCount(10)" id="cnt-10" class="cnt-btn" style="flex:1; padding:10px; border-radius:10px; border:2px solid #e5e7eb; background:white; cursor:pointer; font-weight:bold;">10問</button>
+        </div>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="font-size:13px; font-weight:900; display:block; margin-bottom:6px;">人数（2〜5人）</label>
+        <div style="display:flex; gap:8px;">
+          <button onclick="setMaxPlayers(2)" id="mp-2" class="mp-btn" style="flex:1; padding:10px; border-radius:10px; border:2px solid #667eea; background:#667eea; color:white; cursor:pointer; font-weight:bold;">2人</button>
+          <button onclick="setMaxPlayers(3)" id="mp-3" class="mp-btn" style="flex:1; padding:10px; border-radius:10px; border:2px solid #e5e7eb; background:white; cursor:pointer; font-weight:bold;">3人</button>
+          <button onclick="setMaxPlayers(4)" id="mp-4" class="mp-btn" style="flex:1; padding:10px; border-radius:10px; border:2px solid #e5e7eb; background:white; cursor:pointer; font-weight:bold;">4人</button>
+          <button onclick="setMaxPlayers(5)" id="mp-5" class="mp-btn" style="flex:1; padding:10px; border-radius:10px; border:2px solid #e5e7eb; background:white; cursor:pointer; font-weight:bold;">5人</button>
+        </div>
+      </div>
+      <button onclick="createRoom()" style="width:100%; padding:14px; background:linear-gradient(135deg,#667eea,#764ba2); color:white; border:none; border-radius:12px; font-weight:900; cursor:pointer; font-size:16px;">
+        ⚔️ 部屋を作る
+      </button>
+    </div>
+
+    <!-- 部屋に参加 -->
+    <div style="background:white; border-radius:16px; padding:20px; box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+      <h2 style="margin:0 0 16px; font-size:18px; font-weight:900;">🚪 部屋に参加</h2>
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="room-code-input" maxlength="4" placeholder="4桁のコード"
+          style="flex:1; padding:12px; border:2px solid #e5e7eb; border-radius:10px; font-size:20px; text-align:center; font-weight:900; letter-spacing:4px; box-sizing:border-box;">
+        <button onclick="joinRoom()" style="padding:12px 20px; background:#10b981; color:white; border:none; border-radius:10px; font-weight:900; cursor:pointer; font-size:16px;">参加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 待機画面 -->
+  <div id="waiting-section" style="display:none;">
+    <div style="background:white; border-radius:16px; padding:32px; text-align:center; box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+      <h2 style="margin:0 0 16px; font-size:22px; font-weight:900;">🏠 待機中...</h2>
+      <div style="background:#f9fafb; border-radius:14px; padding:20px; margin-bottom:20px;">
+        <div style="font-size:14px; color:#6b7280; margin-bottom:8px;">ルームコードを相手に教えてね！</div>
+        <div id="room-code-display" style="font-size:48px; font-weight:900; color:#667eea; letter-spacing:8px;"></div>
+      </div>
+      <!-- 参加者一覧 -->
+      <div style="margin-bottom:20px;">
+        <div style="font-size:13px; font-weight:900; margin-bottom:8px; color:#374151;">👥 参加者</div>
+        <div id="players-list" style="display:flex; flex-wrap:wrap; gap:8px; justify-content:center;"></div>
+        <div id="waiting-count" style="font-size:13px; color:#9CA3AF; margin-top:8px;"></div>
+      </div>
+      <!-- ホストのみスタートボタン -->
+      <div id="host-start-area" style="display:none;">
+        <button onclick="startBattleHost()" id="start-btn"
+          style="width:100%; padding:16px; background:linear-gradient(135deg,#10b981,#059669); color:white; border:none; border-radius:12px; font-weight:900; cursor:pointer; font-size:18px;">
+          ⚔️ バトルスタート！
+        </button>
+        <p style="font-size:12px; color:#9CA3AF; margin-top:8px;">2人以上集まったらスタートできるよ！</p>
+      </div>
+      <div id="guest-wait-area" style="display:none;">
+        <div style="color:#9CA3AF; font-size:14px;">ホストがスタートするのを待っています...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- クイズ画面 -->
+  <div id="quiz-section" style="display:none;">
+    <div style="background:white; border-radius:16px; padding:16px; margin-bottom:16px; box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div id="battle-progress" style="font-weight:900; color:#667eea;"></div>
+        <div id="battle-timer" style="font-size:22px; font-weight:900; color:#ef4444;"></div>
+      </div>
+      <div style="background:#f3f4f6; border-radius:8px; height:8px; margin-top:8px;">
+        <div id="battle-progress-bar" style="background:linear-gradient(135deg,#667eea,#764ba2); height:8px; border-radius:8px; transition:width 0.3s;"></div>
+      </div>
+      <div id="players-score" style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;"></div>
+    </div>
+
+    <div style="background:white; border-radius:20px; padding:24px; box-shadow:0 4px 20px rgba(0,0,0,0.1);">
+      <div style="font-size:13px; font-weight:900; color:#9CA3AF; margin-bottom:12px;">❓ 問題</div>
+      <div id="battle-question" style="font-size:18px; font-weight:bold; color:#1a1a1a; line-height:1.7; margin-bottom:20px;"></div>
+      <div id="battle-options" style="display:none; margin-bottom:12px;"></div>
+      <div id="battle-text-input" style="display:none; margin-bottom:12px;">
+        <input type="text" id="battle-answer-input" placeholder="答えを入力してね"
+          style="width:100%; padding:14px; border:2px solid #e5e7eb; border-radius:12px; font-size:16px; box-sizing:border-box;">
+      </div>
+      <button id="battle-answer-btn" onclick="submitBattleAnswer()"
+        style="width:100%; padding:14px; background:linear-gradient(135deg,#667eea,#764ba2); color:white; border:none; border-radius:12px; font-weight:900; cursor:pointer; font-size:16px;">
+        ✅ 回答する
+      </button>
+      <div id="battle-result" style="display:none; margin-top:16px; padding:16px; border-radius:12px; text-align:center;"></div>
+    </div>
+  </div>
+
+  <!-- 結果画面 -->
+  <div id="result-section" style="display:none;">
+    <div style="background:white; border-radius:20px; padding:28px; text-align:center; box-shadow:0 4px 20px rgba(0,0,0,0.1);">
+      <div id="result-emoji" style="font-size:72px; margin-bottom:12px;"></div>
+      <h2 id="result-title" style="margin:0 0 20px; font-size:24px; font-weight:900;"></h2>
+      <div id="final-ranking" style="margin-bottom:20px;"></div>
+      <button onclick="location.href='/group'" style="width:100%; padding:14px; background:#667eea; color:white; border:none; border-radius:12px; font-weight:900; cursor:pointer; font-size:16px;">
+        🏠 一覧へ戻る
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+let myNickname = '';
+let roomCode = '';
+let quizIds = [];
+let currentIdx = 0;
+let myCorrect = 0;
+let selectedOption = null;
+let startTime = null;
+let timerInterval = null;
+let pollInterval = null;
+let isHost = false;
+let quizCount = 5;
+let maxPlayers = 2;
+let allPlayers = [];
+let playerScores = {};
+
+function setQuizCount(n) {
+  quizCount = n;
+  document.querySelectorAll('.cnt-btn').forEach(btn => {
+    btn.style.background = 'white'; btn.style.color = '#333'; btn.style.borderColor = '#e5e7eb';
+  });
+  const btn = document.getElementById('cnt-' + n);
+  if (btn) { btn.style.background = '#667eea'; btn.style.color = 'white'; btn.style.borderColor = '#667eea'; }
+}
+
+function setMaxPlayers(n) {
+  maxPlayers = n;
+  document.querySelectorAll('.mp-btn').forEach(btn => {
+    btn.style.background = 'white'; btn.style.color = '#333'; btn.style.borderColor = '#e5e7eb';
+  });
+  const btn = document.getElementById('mp-' + n);
+  if (btn) { btn.style.background = '#667eea'; btn.style.color = 'white'; btn.style.borderColor = '#667eea'; }
+}
+
+async function createRoom() {
+  myNickname = document.getElementById('nickname-input').value.trim();
+  if (!myNickname) { window.toast('ニックネームを入力してね', 'error'); return; }
+  const r = await window.api.post('/api/battle/create', {nickname: myNickname, quiz_count: quizCount, max_players: maxPlayers});
+  if (!r) return;
+  roomCode = r.room_code;
+  quizIds = r.quiz_ids;
+  isHost = true;
+  allPlayers = [myNickname];
+  playerScores = {[myNickname]: 0};
+  document.getElementById('lobby-section').style.display = 'none';
+  document.getElementById('waiting-section').style.display = 'block';
+  document.getElementById('room-code-display').textContent = roomCode;
+  document.getElementById('host-start-area').style.display = 'block';
+  document.getElementById('guest-wait-area').style.display = 'none';
+  document.getElementById('start-btn').disabled = true;
+  updatePlayersList([myNickname], maxPlayers);
+  startWaitingPoll();
+}
+
+async function joinRoom() {
+  myNickname = document.getElementById('nickname-input').value.trim();
+  const code = document.getElementById('room-code-input').value.trim();
+  if (!myNickname) { window.toast('ニックネームを入力してね', 'error'); return; }
+  if (!code || code.length !== 4) { window.toast('4桁のコードを入力してね', 'error'); return; }
+  const r = await window.api.post('/api/battle/join', {nickname: myNickname, room_code: code});
+  if (!r) return;
+  roomCode = code;
+  quizIds = r.quiz_ids;
+  isHost = false;
+  allPlayers = r.players || [r.host_nickname, myNickname];
+  r.players.forEach(p => { playerScores[p] = 0; });
+  document.getElementById('lobby-section').style.display = 'none';
+  document.getElementById('waiting-section').style.display = 'block';
+  document.getElementById('room-code-display').textContent = roomCode;
+  document.getElementById('host-start-area').style.display = 'none';
+  document.getElementById('guest-wait-area').style.display = 'block';
+  updatePlayersList(allPlayers, maxPlayers);
+  startWaitingPoll();
+}
+
+function updatePlayersList(players, max) {
+  const list = document.getElementById('players-list');
+  list.innerHTML = players.map(p => `
+    <span style="background:#eff6ff; color:#667eea; border-radius:20px; padding:6px 14px; font-weight:bold; font-size:14px;">
+      ${p === players[0] ? '👑 ' : '👤 '}${esc(p)}
+    </span>
+  `).join('');
+  document.getElementById('waiting-count').textContent = players.length + '/' + max + '人参加中';
+  // ホストのスタートボタン制御
+  if (isHost) {
+    const startBtn = document.getElementById('start-btn');
+    if (startBtn) startBtn.disabled = players.length < 2;
+  }
+}
+
+function startWaitingPoll() {
+  pollInterval = setInterval(async () => {
+    const status = await fetch('/api/battle/status?room_code=' + roomCode).then(r=>r.json());
+    if (!status.ok) return;
+    allPlayers = status.players || [];
+    status.players.forEach(p => { if (!playerScores[p]) playerScores[p] = 0; });
+    updatePlayersList(allPlayers, status.max_players);
+    if (status.status === 'playing') {
+      clearInterval(pollInterval);
+      quizIds = status.quiz_ids;
+      startBattle();
+    }
+  }, 1500);
+}
+
+async function startBattleHost() {
+  if (allPlayers.length < 2) { window.toast('2人以上必要だよ', 'error'); return; }
+  const r = await window.api.post('/api/battle/start', {room_code: roomCode, nickname: myNickname});
+  if (!r) return;
+  clearInterval(pollInterval);
+  startBattle();
+}
+
+function startBattle() {
+  document.getElementById('waiting-section').style.display = 'none';
+  document.getElementById('quiz-section').style.display = 'block';
+  updateScoreDisplay();
+  showBattleQuiz(0);
+}
+
+function updateScoreDisplay() {
+  const el = document.getElementById('players-score');
+  el.innerHTML = allPlayers.map(p => `
+    <span style="background:${p===myNickname?'#eff6ff':'#f9fafb'}; border-radius:10px; padding:4px 10px; font-size:12px; font-weight:bold;">
+      ${p===allPlayers[0]?'👑':'👤'} ${esc(p)}: ${playerScores[p]||0}点
+    </span>
+  `).join('');
+}
+
+async function showBattleQuiz(idx) {
+  currentIdx = idx;
+  const quizId = quizIds[idx];
+  const total = quizIds.length;
+  document.getElementById('battle-progress').textContent = '問題 ' + (idx+1) + ' / ' + total;
+  document.getElementById('battle-progress-bar').style.width = ((idx+1)/total*100) + '%';
+  document.getElementById('battle-result').style.display = 'none';
+  document.getElementById('battle-answer-btn').style.display = 'block';
+  document.getElementById('battle-answer-btn').disabled = false;
+  document.getElementById('battle-answer-btn').textContent = '✅ 回答する';
+  document.getElementById('battle-answer-btn').onclick = submitBattleAnswer;
+  selectedOption = null;
+
+  const r = await fetch('/api/battle/answer', {
+    method: 'GET'
+  }).catch(()=>null);
+
+  // クイズ取得（グループAPIを使用）
+  try {
+    const res = await fetch('/api/quizzes/' + quizId + '/info').then(r=>r.json());
+    if (res && res.ok) { renderBattleQuiz(res); return; }
+  } catch(e) {}
+
+  // フォールバック
+  renderBattleQuiz({question: 'クイズ ' + (idx+1), has_options: false});
+
+  startTime = Date.now();
+  let secs = 0;
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    secs++;
+    document.getElementById('battle-timer').textContent = secs + '秒';
+  }, 1000);
+}
+
+function renderBattleQuiz(data) {
+  document.getElementById('battle-question').textContent = data.question || '';
+  if (data.has_options && data.answer_options) {
+    document.getElementById('battle-options').style.display = 'block';
+    document.getElementById('battle-text-input').style.display = 'none';
+    let opts = data.answer_options;
+    if (typeof opts === 'string') { try { opts = JSON.parse(opts); } catch(e) { opts = []; } }
+    document.getElementById('battle-options').innerHTML = (opts||[]).map((opt, i) =>
+      `<button class="opt-btn" onclick="selectBattleOption(this,'${esc(opt)}')"
+        style="width:100%; padding:12px; margin-bottom:8px; border:2px solid #e5e7eb; border-radius:10px; background:white; cursor:pointer; font-size:15px; text-align:left; transition:all 0.15s;">
+        ${String.fromCharCode(65+i)}. ${esc(opt)}
+      </button>`
+    ).join('');
+  } else {
+    document.getElementById('battle-options').style.display = 'none';
+    document.getElementById('battle-text-input').style.display = 'block';
+    document.getElementById('battle-answer-input').value = '';
+    document.getElementById('battle-answer-input').focus();
+  }
+  startTime = Date.now();
+  let secs = 0;
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    secs++;
+    document.getElementById('battle-timer').textContent = secs + '秒';
+  }, 1000);
+}
+
+function selectBattleOption(btn, val) {
+  selectedOption = val;
+  document.querySelectorAll('.opt-btn').forEach(b => { b.style.borderColor='#e5e7eb'; b.style.background='white'; });
+  btn.style.borderColor = '#667eea'; btn.style.background = '#eff6ff';
+}
+
+async function submitBattleAnswer() {
+  const quizId = quizIds[currentIdx];
+  let userAnswer = '';
+  if (document.getElementById('battle-options').style.display !== 'none') {
+    if (!selectedOption) { window.toast('選択肢を選んでね', 'error'); return; }
+    userAnswer = selectedOption;
+  } else {
+    userAnswer = document.getElementById('battle-answer-input').value.trim();
+    if (!userAnswer) { window.toast('答えを入力してね', 'error'); return; }
+  }
+  clearInterval(timerInterval);
+  const timeMs = Date.now() - startTime;
+
+  const r = await fetch('/api/battle/answer', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({room_code: roomCode, nickname: myNickname, quiz_id: quizId, user_answer: userAnswer, time_ms: timeMs})
+  }).then(r=>r.json());
+
+  if (r.correct) {
+    myCorrect++;
+    playerScores[myNickname] = myCorrect;
+    updateScoreDisplay();
+  }
+
+  const resultEl = document.getElementById('battle-result');
+  resultEl.style.display = 'block';
+  resultEl.style.background = r.correct ? '#f0fdf4' : '#fff1f2';
+  resultEl.style.border = '2px solid ' + (r.correct ? '#10b981' : '#ef4444');
+  resultEl.innerHTML = `<div style="font-size:28px;">${r.correct?'⭕':'❌'}</div>
+    <div style="font-weight:900; color:${r.correct?'#10b981':'#ef4444'};">${r.correct?'正解！':'不正解'}</div>
+    <div style="font-size:13px; color:#6b7280; margin-top:4px;">正解: ${esc(r.correct_answer||'')}</div>`;
+
+  document.getElementById('battle-answer-btn').textContent = currentIdx+1 < quizIds.length ? '次の問題へ →' : '結果を見る 🎉';
+  document.getElementById('battle-answer-btn').onclick = () => {
+    if (currentIdx+1 < quizIds.length) {
+      selectedOption = null;
+      showBattleQuiz(currentIdx+1);
+    } else {
+      waitForResult();
+    }
+  };
+}
+
+async function waitForResult() {
+  document.getElementById('quiz-section').style.display = 'none';
+  let tries = 0;
+  const poll = setInterval(async () => {
+    tries++;
+    const r = await fetch('/api/battle/result?room_code=' + roomCode).then(r=>r.json());
+    if (r.ok && r.both_done) { clearInterval(poll); showResult(r); }
+    if (tries > 20) { clearInterval(poll); if (r.ok) showResult(r); }
+  }, 2000);
+}
+
+function showResult(data) {
+  document.getElementById('result-section').style.display = 'block';
+  const isWinner = data.winner === myNickname;
+  document.getElementById('result-emoji').textContent = isWinner ? '🏆' : data.winner ? '😢' : '🤝';
+  document.getElementById('result-title').textContent = isWinner ? 'あなたの勝ち！🎉' : data.winner ? data.winner + 'の勝ち！' : '引き分け！';
+
+  // ランキング表示
+  const medals = ['🥇','🥈','🥉'];
+  const scores = data.scores || [];
+  document.getElementById('final-ranking').innerHTML = scores.map((s, i) => `
+    <div style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:12px; margin-bottom:8px; background:${s.nickname===myNickname?'#eff6ff':'#f9fafb'};">
+      <div style="font-size:${i<3?'24':'16'}px; width:32px; text-align:center;">${i<3?medals[i]:i+1}</div>
+      <div style="flex:1; font-weight:bold;">${esc(s.nickname)}${s.nickname===myNickname?' (あなた)':''}</div>
+      <div style="text-align:right;">
+        <div style="font-weight:900; color:#10b981;">${s.correct}/${data.quiz_count}問</div>
+        <div style="font-size:11px; color:#9CA3AF;">${Math.round(s.total_time/1000)}秒</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('quiz-section').style.display !== 'none') {
+    submitBattleAnswer();
+  }
+});
+</script>
+{% endblock %}
