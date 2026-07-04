@@ -845,7 +845,7 @@ async function loadMessages() {
             ${m.title ? `<div class="title">${esc(m.title)}</div>` : ''}
             ${m.body ? `<div class="body">${esc(m.body)}</div>` : ''}
             ${m.has_image ? `<img class="chat-image" src="/api/staff/messages/${m.id}/blob?kind=image" onclick="window.open(this.src)">` : ''}
-            ${m.has_file ? `<a href="/api/staff/messages/${m.id}/blob?kind=file" style="display:inline-flex;align-items:center;gap:6px;background:#f1ece0;color:#14213d;border-radius:10px;padding:8px 12px;text-decoration:none;margin-top:4px;font-size:13px;">🗂️ ${esc(m.file_name||'ファイル')}</a>` : ''}
+            ${m.has_file ? `<a href="/api/staff/messages/${m.id}/blob?kind=file" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:#f1ece0;color:#14213d;border-radius:10px;padding:8px 12px;text-decoration:none;margin-top:4px;font-size:13px;">🗂️ ${esc(m.file_name||'ファイル')}</a>` : ''}
             ${m.stamp_id ? `<img class="chat-stamp-img" src="/static/stamps/${m.stamp_id}.svg">` : ''}
           </div>
         </div>

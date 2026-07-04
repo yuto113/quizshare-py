@@ -4496,7 +4496,9 @@ def api_staff_message_blob(message_id):
     if kind == 'file':
         from urllib.parse import quote as _quote
         fname = dec(row[1]) if row[1] else 'file'
-        resp.headers['Content-Disposition'] = "attachment; filename*=UTF-8''" + _quote(fname)
+        # inline = ブラウザで表示できる形式(PDF/画像/テキストなど)はプレビューする
+        # 表示できない形式は、ブラウザが自動でダウンロードに切り替えてくれる
+        resp.headers['Content-Disposition'] = "inline; filename*=UTF-8''" + _quote(fname)
     return resp
 
 @app.route('/api/staff/reactions', methods=['POST'])
