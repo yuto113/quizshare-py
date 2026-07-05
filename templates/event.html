@@ -404,21 +404,29 @@
 const eventKey = '{{ event.event_key }}';
 
 // ブラウザフィンガープリント生成
-async function getFingerprint() {
-  const data = [
-    navigator.userAgent,
-    navigator.language,
-    screen.width + 'x' + screen.height,
-    screen.colorDepth,
-    new Date().getTimezoneOffset(),
-    navigator.hardwareConcurrency || '',
-    navigator.platform || '',
-  ].join('|');
-  // SHA-256ハッシュ
-  const msgBuffer = new TextEncoder().encode(data);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 32);
+function getFingerprint() {
+  // 端末の特徴から推理する方式は、同じ機種+同じWi-Fiだと全員同じに
+  // なってしまう欠陥があったので、「ランダムな参加券」方式に変更。
+  // 初回にランダムな番号を作ってブラウザに保存し、それを本人の目印にする。
+  try {
+    let token = localStorage.getItem('qz_event_device');
+    if (token) return token;
+    let rand = '';
+    if (window.crypto && crypto.getRandomValues) {
+      const arr = new Uint8Array(16);
+      crypto.getRandomValues(arr);
+      rand = Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+    } else {
+      // 古いブラウザ用の予備手段
+      rand = String(Date.now()) + String(Math.random()).slice(2);
+    }
+    token = 'dev-' + rand;
+    localStorage.setItem('qz_event_device', token);
+    return token;
+  } catch (e) {
+    // ブラウザの保存機能が使えない端末でも、その場かぎりの券で参加はできる
+    return 'tmp-' + String(Date.now()) + String(Math.random()).slice(2);
+  }
 }
 const resultDate = '{{ event.result_date or "" }}';
 let nickname = '';

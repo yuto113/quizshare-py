@@ -3629,7 +3629,8 @@ def api_event_submit(event_key):
         return err('ニックネームを入力してね')
     fp = data.get('fingerprint', '')
     ip_hash = _hl.sha256(client_ip().encode()).hexdigest()[:16]
-    combined = _hl.sha256((fp + ip_hash).encode()).hexdigest()[:16] if fp else ip_hash
+    # 参加券(fp)だけで判定する。IPを混ぜると同じWi-Fiの人を巻き込むから使わない
+    combined = _hl.sha256(fp.encode()).hexdigest()[:16] if fp else ip_hash
     ip_hash = combined
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
     event = conn.execute('SELECT id,end_date FROM events WHERE event_key=? AND is_published=1', (event_key,)).fetchone()
@@ -3650,7 +3651,7 @@ def api_event_submit(event_key):
     existing = conn.execute('SELECT id FROM event_participants WHERE event_id=? AND ip_hash=?', (event_id, ip_hash)).fetchone()
     if existing:
         conn.close()
-        return err('このIPアドレスからは既に参加済みです', 403)
+        return err('この端末からは既に参加済みです', 403)
     # 回答を記録（ヒント使用で2/3点）
     answers = data.get('answers', [])
     total_correct = 0
@@ -3713,8 +3714,8 @@ def api_event_check_ip(event_key):
     import sqlite3 as _sq, hashlib as _hl
     fp = request.args.get('fp', '')
     ip_hash = _hl.sha256(client_ip().encode()).hexdigest()[:16]
-    # フィンガープリントとIPを組み合わせ
-    combined = _hl.sha256((fp + ip_hash).encode()).hexdigest()[:16] if fp else ip_hash
+    # 参加券(fp)だけで判定する。IPを混ぜると同じWi-Fiの人を巻き込むから使わない
+    combined = _hl.sha256(fp.encode()).hexdigest()[:16] if fp else ip_hash
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
     event = conn.execute('SELECT id FROM events WHERE event_key=? AND is_published=1', (event_key,)).fetchone()
     if not event:
