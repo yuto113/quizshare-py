@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}モデレーション - Q'z{% endblock %}
+{% block body_class %}qz-board-page{% endblock %}
+{% block content %}
+<style>
+.site-header { display: none !important; }
+.mod-wrap { max-width:820px; margin:24px auto; padding:0 20px; }
+.mod-card { background:white; border:1px solid #e3ddd0; border-radius:12px; padding:14px 16px; margin-bottom:12px; }
+.mod-badge { display:inline-block; background:#14213d; color:white; border-radius:6px; padding:2px 10px; font-size:11px; margin-right:8px; }
+.mod-btn { padding:6px 12px; border:none; border-radius:8px; cursor:pointer; font-size:12px; color:white; white-space:nowrap; }
+</style>
+
+{% include '_staff_nav.html' %}
+
+<div class="mod-wrap">
+  <h2 style="color:#14213d;">🛡️ モデレーション</h2>
+  <p style="color:#8a8270; font-size:13px;">調査中のクイズを全グループまとめて管理できるよ。理由はクイズを開いた人に表示される。</p>
+  <div id="mod-list">読み込み中...</div>
+</div>
+
+<script>
+async function loadMod() {
+  const r = await fetch('/api/staff/moderation/list');
+  const data = await r.json();
+  if (data.ok === false || data.ok === undefined) { window.location.href = '/staff/board'; return; }
+  if (data.items.length === 0) {
+    document.getElementById('mod-list').innerHTML =
+      '<p style="color:#2a9d8f; font-size:14px;">🎉 調査中のクイズは1つもないよ!</p>';
+    return;
+  }
+  document.getElementById('mod-list').innerHTML = data.items.map(m => `
+    <div class="mod-card">
+      <div><span class="mod-badge">${escM(m.group)}</span>
+        <b style="color:#14213d;">${escM(m.question)}</b></div>
+      <div style="color:#8a8270; font-size:12px; margin-top:4px;">
+        作者: ${escM(m.author)} ・ ${m.created_at}</div>
+      <div style="color:#b45309; font-size:13px; margin-top:6px; background:#fef3c7; border-radius:8px; padding:8px 10px;">
+        📢 表示中の理由: ${m.reason ? escM(m.reason) : '(未設定 → 標準の文章が表示される)'}</div>
+      <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; justify-content:flex-end;">
+        <button class="mod-btn" style="background:#3a6fd8;" onclick="editReason('${m.quiz_id}', '${escAttrM(m.reason)}')">✏️ 理由を編集</button>
+        <button class="mod-btn" style="background:#2a9d8f;" onclick="unflag('${m.quiz_id}')">✅ 解除して復活</button>
+      </div>
+    </div>`).join('');
+}
+
+async function editReason(quizId, current) {
+  const reason = prompt('新しい理由を入力してね(クイズを開いた人に表示されるよ)',
+                        current || '画像の出どころが確認できないため、公開を一時停止しています。心当たりのある方は運営まで連絡してください。');
+  if (reason === null) return;
+  await modUpdate({quiz_id: quizId, action: 'reason', reason: reason});
+}
+
+async function unflag(quizId) {
+  if (confirm('調査中を解除してクイズを復活させるよ？') === false) return;
+  await modUpdate({quiz_id: quizId, action: 'unflag'});
+}
+
+async function modUpdate(body) {
+  const r = await fetch('/api/staff/moderation/update', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  });
+  const data = await r.json();
+  window.toast(data.ok ? data.message : (data.error || 'エラー'), data.ok ? 'success' : 'error');
+  loadMod();
+}
+
+function escM(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function escAttrM(s) { return String(s || '').replace(/\\/g, '').replace(/'/g, '').replace(/"/g, ''); }
+loadMod();
+</script>
+{% endblock %}

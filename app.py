@@ -4543,6 +4543,65 @@ def _inject_staff_nav_flags():
         flag = False
     return dict(staff_nav_is_admin=flag)
 
+@app.route('/api/staff/moderation/list', methods=['GET'])
+def api_staff_moderation_list():
+    # 調査中クイズを全グループ横断で一覧する(管理者だけ)
+    if not staff_is_admin():
+        return err('管理者だけが見られるよ', 403)
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    rows = conn.execute("""SELECT q.id, q.question, q.author_name, q.review_reason, q.created_at, g.name
+                           FROM quizzes q LEFT JOIN groups g ON q.group_id = g.id
+                           WHERE q.under_review = 1 ORDER BY q.created_at DESC""").fetchall()
+    conn.close()
+    items = []
+    for r in rows:
+        items.append({'quiz_id': r[0],
+                      'question': str(dec(r[1] or ''))[:80],
+                      'author': dec(r[2] or ''),
+                      'reason': dec(r[3] or '') if r[3] else '',
+                      'created_at': str(r[4] or '')[:16],
+                      'group': r[5] or '(不明なグループ)'})
+    return ok(items=items)
+
+@app.route('/api/staff/moderation/update', methods=['POST'])
+def api_staff_moderation_update():
+    # 理由の書き換え or 調査中の解除(管理者だけ)
+    if not staff_is_admin():
+        return err('管理者だけができるよ', 403)
+    data = request.get_json(silent=True) or {}
+    quiz_id = str(data.get('quiz_id') or '')
+    action = data.get('action')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT id FROM quizzes WHERE id=? AND under_review=1', (quiz_id,)).fetchone()
+    if not row:
+        conn.close()
+        return err('そのクイズは調査中じゃないよ', 404)
+    if action == 'unflag':
+        conn.execute('UPDATE quizzes SET under_review=0, review_reason=NULL WHERE id=?', (quiz_id,))
+        msg = '解除したよ。クイズが復活!'
+    elif action == 'reason':
+        reason = str(data.get('reason') or '')[:200]
+        conn.execute('UPDATE quizzes SET review_reason=? WHERE id=?',
+                     (enc(reason) if reason else None, quiz_id))
+        msg = '理由を書き換えたよ'
+    else:
+        conn.close()
+        return err('actionがおかしいよ')
+    conn.commit()
+    conn.close()
+    return ok(message=msg)
+
+@app.route('/staff/moderation')
+def page_staff_moderation():
+    # モデレーションページ(管理者だけ)
+    if not session.get('staff_id'):
+        return redirect('/staff/login')
+    if not staff_is_admin():
+        return redirect('/staff/board')
+    return render_template('staff_moderation.html')
+
 @app.route('/staff/board')
 def page_staff_board():
     if not session.get('staff_id'):
