@@ -114,7 +114,7 @@ async function loadFiles() {
         </div>
       </div>
       <div class="file-actions">
-        <a href="#" onclick="previewFile(${f.id}); return false;" style="background:#2a9d8f; color:white;">プレビュー</a>
+        <a href="/staff/files/view/${f.id}" target="_blank" rel="noopener" style="background:#2a9d8f; color:white;">プレビュー</a>
         <a href="#" onclick="downloadFile(${f.id}); return false;" style="background:#14213d; color:white;">ダウンロード</a>
         <button onclick="deleteFile(${f.id})" style="background:#fee2e2; color:#ef4444;">削除</button>
       </div>
