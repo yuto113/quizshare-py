@@ -34,7 +34,8 @@ setTimeout(killQzTheme, 800);
 .task-card { background:white; border:1px solid #e3ddd0; border-radius:12px; padding:12px; margin-bottom:10px; }
 .task-card-title { font-weight:700; color:#14213d; font-size:13px; }
 .task-card-meta { font-size:11px; color:#8a8270; margin-top:4px; }
-.task-card-actions { display:flex; gap:6px; margin-top:8px; }
+.task-card-actions { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+.task-card-actions button { white-space:nowrap; }
 .task-card-actions button { font-size:11px; padding:4px 8px; border-radius:6px; border:none; cursor:pointer; }
 @media (max-width: 700px) { .task-columns { grid-template-columns:1fr; } }
 </style>
@@ -46,10 +47,10 @@ setTimeout(killQzTheme, 800);
 
   <div class="add-task-box">
     <h3 style="margin:0 0 12px; color:#14213d; font-size:1rem;">＋ タスクを追加</h3>
-    <div style="display:flex; gap:8px;">
-      <input type="text" id="task-title" placeholder="タスク名" style="flex:2;">
-      <select id="task-assignee" style="flex:1;"><option value="">担当者なし</option></select>
-      <input type="date" id="task-due" style="flex:1;">
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <input type="text" id="task-title" placeholder="タスク名" style="flex:2; min-width:170px;">
+      <select id="task-assignee" style="flex:1; min-width:130px;"><option value="">担当者なし</option></select>
+      <input type="date" id="task-due" style="flex:1; min-width:140px;">
     </div>
     <textarea id="task-desc" placeholder="詳細（任意）" rows="2" style="width:100%;"></textarea>
     <button onclick="addTask()">追加する</button>
