@@ -4534,6 +4534,15 @@ def page_staff_errors():
         return redirect('/staff/board')
     return render_template('staff_errors.html')
 
+@app.context_processor
+def _inject_staff_nav_flags():
+    # どのページの部品からでも「管理者かどうか」を使えるように渡す
+    try:
+        flag = staff_is_admin() if session.get('staff_id') else False
+    except Exception:
+        flag = False
+    return dict(staff_nav_is_admin=flag)
+
 @app.route('/staff/board')
 def page_staff_board():
     if not session.get('staff_id'):

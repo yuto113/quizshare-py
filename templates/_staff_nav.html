@@ -1,0 +1,41 @@
+<style>
+/* スタッフページ共通メニュー(この部品1つを全ページで使い回す) */
+.qz-snav { background:#14213d; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+.qz-snav-logo { font-size:0.85rem; letter-spacing:0.2em; color:#fb6f5b; font-weight:700; white-space:nowrap; }
+.qz-snav-links { display:flex; gap:8px 16px; flex-wrap:wrap; justify-content:flex-end; align-items:center; }
+.qz-snav-links a { color:rgba(255,255,255,0.6); font-size:0.8rem; text-decoration:none; white-space:nowrap; }
+.qz-snav-links a:hover { color:white; }
+.qz-snav details { position:relative; }
+.qz-snav summary { color:#FCD34D; font-size:0.8rem; cursor:pointer; list-style:none; white-space:nowrap; }
+.qz-snav summary::-webkit-details-marker { display:none; }
+.qz-snav .qz-snav-menu { position:absolute; right:0; top:26px; background:#1d2b4d; border:1px solid rgba(255,255,255,0.15); border-radius:10px; padding:8px 0; min-width:140px; z-index:50; }
+.qz-snav .qz-snav-menu a { display:block; padding:7px 16px; }
+</style>
+<nav class="qz-snav">
+  <a href="/staff/board" style="text-decoration:none;"><span class="qz-snav-logo">Q'Z STAFF</span></a>
+  <div class="qz-snav-links">
+    <a href="/staff/board">💬 掲示板</a>
+    <a href="/staff/files">📁 ファイル</a>
+    <a href="/staff/calendar">📅 カレンダー</a>
+    <a href="/staff/tasks">✅ タスク</a>
+    <a href="/staff/profile">👤 プロフィール</a>
+    {% if staff_nav_is_admin %}
+    <details>
+      <summary>⚙️ 管理 ▾</summary>
+      <div class="qz-snav-menu">
+        <a href="/staff/hr">👑 人事</a>
+        <a href="/staff/errors">🚨 エラー</a>
+        <a href="/staff/dashboard">📊 統計</a>
+      </div>
+    </details>
+    {% endif %}
+    <a href="/homepage">← Q'zトップへ</a>
+    <a href="#" onclick="qzStaffNavLogout(); return false;">ログアウト</a>
+  </div>
+</nav>
+<script>
+async function qzStaffNavLogout() {
+  try { await fetch('/api/staff/logout', {method: 'POST'}); } catch (e) {}
+  window.location.href = '/staff/login';
+}
+</script>

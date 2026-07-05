@@ -19,7 +19,7 @@ setTimeout(killQzTheme, 800);
 <style>
 .site-header { display: none !important; }
 .qz-staff-nav { background:#14213d; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; }
-.qz-staff-nav a { color:rgba(255,255,255,0.6); font-size:0.8rem; text-decoration:none; }
+.qz-staff-nav a { white-space:nowrap; color:rgba(255,255,255,0.6); font-size:0.8rem; text-decoration:none; }
 .qz-staff-nav a:hover { color:white; }
 .qz-staff-logo { font-size:0.85rem; letter-spacing:0.2em; color:#fb6f5b; font-weight:700; }
 .dash-wrap { max-width:900px; margin:24px auto; padding:0 20px; }
@@ -32,13 +32,7 @@ setTimeout(killQzTheme, 800);
 @media (max-width: 700px) { .stat-grid { grid-template-columns:repeat(2,1fr); } }
 </style>
 
-<nav class="qz-staff-nav">
-  <span class="qz-staff-logo">Q'Z STAFF</span>
-  <div style="display:flex; gap:18px;">
-    <a href="/staff/board">← 掲示板へ</a>
-    <a href="/homepage">Q'zトップへ</a>
-  </div>
-</nav>
+{% include '_staff_nav.html' %}
 
 <div class="dash-wrap">
   <h2 style="color:#14213d;">📊 クイズシェア 統計ダッシュボード</h2>

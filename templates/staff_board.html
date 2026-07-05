@@ -19,7 +19,7 @@ setTimeout(killQzTheme, 800);
 <style>
 .site-header { display: none !important; }
 .qz-staff-nav { background:#14213d; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; }
-.qz-staff-nav a { color:rgba(255,255,255,0.6); font-size:0.8rem; text-decoration:none; }
+.qz-staff-nav a { white-space:nowrap; color:rgba(255,255,255,0.6); font-size:0.8rem; text-decoration:none; }
 .qz-staff-nav a:hover { color:white; }
 .qz-staff-logo { font-size:0.85rem; letter-spacing:0.2em; color:#fb6f5b; font-weight:700; }
 
@@ -100,20 +100,7 @@ setTimeout(killQzTheme, 800);
 .new-ch-box button.submit { width:100%; padding:10px; background:#fb6f5b; color:white; border:none; border-radius:8px; font-weight:700; cursor:pointer; }
 </style>
 
-<nav class="qz-staff-nav">
-  <span class="qz-staff-logo">Q'Z STAFF</span>
-  <div style="display:flex; gap:18px;">
-    <a href="/staff/files">📁 ファイル</a>
-    <a href="/staff/calendar">📅 カレンダー</a>
-    <a href="/staff/tasks">✅ タスク</a>
-    {% if is_admin %}<a href="/staff/hr" style="color:#FCD34D;">👑 人事</a>
-    <a href="/staff/errors" style="color:#FCA5A5;">🚨 エラー</a>{% endif %}
-    <a href="/staff/dashboard">📊 統計</a>
-    <a href="/staff/profile">プロフィール</a>
-    <a href="/homepage">← Q'zトップへ</a>
-    <a href="#" onclick="staffLogout()">ログアウト</a>
-  </div>
-</nav>
+{% include '_staff_nav.html' %}
 
 <div class="app-layout">
   <div class="channel-sidebar">

@@ -5,20 +5,14 @@
 <style>
 .site-header { display: none !important; }
 .qz-staff-nav { background:#14213d; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; }
-.qz-staff-nav a { color:rgba(255,255,255,0.6); font-size:0.8rem; text-decoration:none; }
+.qz-staff-nav a { white-space:nowrap; color:rgba(255,255,255,0.6); font-size:0.8rem; text-decoration:none; }
 .qz-staff-logo { font-size:0.85rem; letter-spacing:0.2em; color:#fb6f5b; font-weight:700; }
 .err-wrap { max-width:860px; margin:24px auto; padding:0 20px; }
 .err-row { background:white; border:1px solid #e3ddd0; border-radius:10px; padding:12px 14px; margin-bottom:10px; font-size:13px; }
 .err-badge { display:inline-block; padding:2px 8px; border-radius:6px; font-size:11px; color:white; margin-right:8px; }
 </style>
 
-<nav class="qz-staff-nav">
-  <span class="qz-staff-logo">Q'Z STAFF</span>
-  <div style="display:flex; gap:18px;">
-    <a href="/staff/board">← 掲示板へ</a>
-    <a href="/staff/hr">👑 人事</a>
-  </div>
-</nav>
+{% include '_staff_nav.html' %}
 
 <div class="err-wrap">
   <div style="display:flex; justify-content:space-between; align-items:center;">
