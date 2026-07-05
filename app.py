@@ -769,7 +769,6 @@ def page_admin_entry(group_id):
     group_info = dict(row) if row else None
     # イベントグループか確認
     event = None
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
     if group_info:
         import sqlite3 as _sq_adm
         _conn_adm = _sq_adm.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
@@ -785,9 +784,38 @@ def page_admin_entry(group_id):
         group_info=group_info,
         logged_in=bool(group_info) and admin_logged_in_for(group_info['id']),
         event=event,
-        admin_pw=admin_pw,
     )
 
+
+# その日最初のアクセスかどうかを覚えておくメモ(メモリ上なので高速)
+_backup_memo = {'date': ''}
+
+@app.before_request
+def _daily_backup_hook():
+    # 1日1回、最初のアクセスのときに自動バックアップを裏側で動かす
+    # (無料プランはScheduled Taskが使えないのでこの方式)
+    import pytz as _p
+    from datetime import datetime as _d
+    today = _d.now(_p.timezone('Asia/Tokyo')).strftime('%Y%m%d')
+    if _backup_memo['date'] == today:
+        return  # 今日はもうチェック済み(ここで即終了するから普段は一瞬)
+    _backup_memo['date'] = today
+    marker = '/home/yuto113/backups/last_backup.txt'
+    try:
+        done = open(marker).read().strip()
+    except Exception:
+        done = ''
+    if done == today:
+        return  # 別のプロセスがもう実行済み
+    try:
+        open(marker, 'w').write(today)
+        # 訪問者を待たせないように、裏側のスレッドで実行する
+        import threading, subprocess
+        threading.Thread(
+            target=lambda: subprocess.run(['python3', '/home/yuto113/auto_backup.py']),
+            daemon=True).start()
+    except Exception:
+        pass  # バックアップに失敗してもサイト自体は止めない
 
 @app.route('/terms')
 def page_terms():
