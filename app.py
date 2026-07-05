@@ -3666,16 +3666,20 @@ def api_event_submit(event_key):
     if existing:
         conn.close()
         return err('この端末からは既に参加済みです', 403)
-    # 回答を記録（ヒント使用で2/3点）
-    answers = data.get('answers', [])
+    # 採点はブラウザの自己申告を一切使わず、サーバーの帳簿から集計する
+    conn.execute('''CREATE TABLE IF NOT EXISTS event_answers (
+        event_id INTEGER, token TEXT, quiz_id TEXT, correct INTEGER,
+        time_ms INTEGER, hint_used INTEGER,
+        UNIQUE(event_id, token, quiz_id))''')
+    recorded = conn.execute('SELECT quiz_id, correct, time_ms, hint_used FROM event_answers WHERE event_id=? AND token=?',
+                            (event_id, ip_hash)).fetchall()
+    if not recorded:
+        conn.close()
+        return err('回答の記録が見つからないよ。もう一度最初から挑戦してね')
     total_correct = 0
     total_time = 0
-    for ans in answers:
-        quiz_id = ans.get('quiz_id')
-        correct = 1 if ans.get('correct') else 0
-        time_ms = int(ans.get('time_ms') or 0)
-        hint_used = 1 if ans.get('hint_used') else 0
-        # ヒント使用時は2/3点（スコアを累積）
+    for quiz_id, correct, time_ms, hint_used in recorded:
+        # ヒント使用時は2/3点(スコアを累積)
         if correct and hint_used:
             total_correct += 2/3
         else:
@@ -3687,7 +3691,7 @@ def api_event_submit(event_key):
     # 参加者登録
     try:
         conn.execute('INSERT INTO event_participants (event_id,nickname,ip_hash,total_correct,total_time_ms,total_questions) VALUES (?,?,?,?,?,?)',
-                     (event_id, nickname, ip_hash, total_correct_rounded, total_time, len(answers)))
+                     (event_id, nickname, ip_hash, total_correct_rounded, total_time, len(recorded)))
         conn.commit()
     except Exception as e:
         conn.close()
@@ -3796,6 +3800,9 @@ def api_event_answer(event_key):
     quiz_id = data.get('quiz_id')
     user_answer = str(data.get('user_answer', ''))[:500]
     time_ms = int(data.get('time_ms') or 0)
+    time_ms = max(0, min(1800000, time_ms))  # 1問30分まで(ありえない値を防ぐ)
+    hint_used = 1 if data.get('hint_used') else 0
+    fp = data.get('fingerprint', '')
 
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
     event = conn.execute('SELECT group_id,start_date FROM events WHERE event_key=? AND is_published=1', (event_key,)).fetchone()
@@ -3832,6 +3839,22 @@ def api_event_answer(event_key):
             row_dict['answers'] = _json.dumps([dec(a) for a in ans_list], ensure_ascii=False)
         except: pass
     is_correct = check_answer(user_answer, row_dict)
+
+    # 採点結果をサーバーの帳簿にも記録する(提出時の自己申告を信じないため)
+    # 同じ問題は最初の1回だけ記録(答えを何度も送って正解を探るズルも防ぐ)
+    import hashlib as _hl
+    token = _hl.sha256(fp.encode()).hexdigest()[:16] if fp else _hl.sha256(client_ip().encode()).hexdigest()[:16]
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    conn.execute('''CREATE TABLE IF NOT EXISTS event_answers (
+        event_id INTEGER, token TEXT, quiz_id TEXT, correct INTEGER,
+        time_ms INTEGER, hint_used INTEGER,
+        UNIQUE(event_id, token, quiz_id))''')
+    ev = conn.execute('SELECT id FROM events WHERE event_key=? AND is_published=1', (event_key,)).fetchone()
+    if ev:
+        conn.execute('INSERT OR IGNORE INTO event_answers (event_id, token, quiz_id, correct, time_ms, hint_used) VALUES (?,?,?,?,?,?)',
+                     (ev[0], token, str(quiz_id), 1 if is_correct else 0, time_ms, hint_used))
+        conn.commit()
+    conn.close()
 
     return ok(correct=is_correct, correct_answer=correct_answer,
               explanation=dec(row_dict.get('explanation') or ''), time_ms=time_ms)

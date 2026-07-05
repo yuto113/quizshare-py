@@ -632,7 +632,7 @@ async function submitAnswer() {
   const r = await fetch('/api/events/' + eventKey + '/answer', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({quiz_id: q.id, user_answer: userAnswer, time_ms: timeMs})
+    body: JSON.stringify({quiz_id: q.id, user_answer: userAnswer, time_ms: timeMs, fingerprint: getFingerprint(), hint_used: hintUsed})
   });
   const data = await r.json();
   const correct = data.correct;
