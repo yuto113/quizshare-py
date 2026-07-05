@@ -4455,6 +4455,85 @@ def page_staff_hr():
         return redirect('/staff/board')
     return render_template('staff_hr.html', my_id=session.get('staff_id'))
 
+def _record_error(source, path, message, detail, user_agent=''):
+    # エラーをDBに記録する(記録自体が失敗してもサイトは止めない)
+    try:
+        import sqlite3 as _sq
+        import pytz as _p
+        from datetime import datetime as _d
+        conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+        conn.execute("""CREATE TABLE IF NOT EXISTS error_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at TEXT, source TEXT, path TEXT,
+            message TEXT, detail TEXT, user_agent TEXT)""")
+        conn.execute('INSERT INTO error_logs (created_at, source, path, message, detail, user_agent) VALUES (?,?,?,?,?,?)',
+                     (_d.now(_p.timezone('Asia/Tokyo')).strftime('%Y-%m-%d %H:%M:%S'),
+                      source, str(path)[:200], str(message)[:300], str(detail)[:2000], str(user_agent)[:200]))
+        # 最新1000件だけ残して古いものは自動で消す
+        conn.execute('DELETE FROM error_logs WHERE id NOT IN (SELECT id FROM error_logs ORDER BY id DESC LIMIT 1000)')
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+def _on_request_exception(sender, exception, **extra):
+    # サーバー側で予期しないエラーが起きたら自動で記録する
+    import traceback
+    try:
+        _record_error('server', request.path, repr(exception),
+                      traceback.format_exc(), request.headers.get('User-Agent', ''))
+    except Exception:
+        pass
+
+from flask import got_request_exception
+got_request_exception.connect(_on_request_exception, app)
+
+@app.route('/api/error_report', methods=['POST'])
+def api_error_report():
+    # ブラウザ側のJavaScriptエラーを受け取って記録する
+    # (いたずら防止で1分に5回まで)
+    if not rate_limit(f'errrep:{client_ip()}', 5):
+        return ok()
+    data = request.get_json(silent=True) or {}
+    _record_error('browser', data.get('page', ''), data.get('message', ''),
+                  data.get('detail', ''), request.headers.get('User-Agent', ''))
+    return ok()
+
+@app.route('/api/staff/errors/list', methods=['GET'])
+def api_staff_errors_list():
+    if not staff_is_admin():
+        return err('管理者だけが見られるよ', 403)
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    conn.execute("""CREATE TABLE IF NOT EXISTS error_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_at TEXT, source TEXT, path TEXT,
+        message TEXT, detail TEXT, user_agent TEXT)""")
+    rows = conn.execute('SELECT id, created_at, source, path, message, detail FROM error_logs ORDER BY id DESC LIMIT 100').fetchall()
+    conn.close()
+    return ok(errors=[{'id': r[0], 'created_at': r[1], 'source': r[2],
+                       'path': r[3], 'message': r[4], 'detail': r[5]} for r in rows])
+
+@app.route('/api/staff/errors/clear', methods=['POST'])
+def api_staff_errors_clear():
+    if not staff_is_admin():
+        return err('管理者だけができるよ', 403)
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    conn.execute('DELETE FROM error_logs')
+    conn.commit()
+    conn.close()
+    return ok(message='全部消したよ')
+
+@app.route('/staff/errors')
+def page_staff_errors():
+    # エラー一覧ページ(管理者だけ)
+    if not session.get('staff_id'):
+        return redirect('/staff/login')
+    if not staff_is_admin():
+        return redirect('/staff/board')
+    return render_template('staff_errors.html')
+
 @app.route('/staff/board')
 def page_staff_board():
     if not session.get('staff_id'):

@@ -209,6 +209,20 @@ async function loadSiteBanner() {
 loadSiteBanner();
 // 30秒ごとに更新
 setInterval(loadSiteBanner, 30000);
+
+// ---- ブラウザ側のエラーを運営に自動報告する仕組み ----
+window.addEventListener('error', function(ev) {
+  try {
+    fetch('/api/error_report', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        page: location.pathname,
+        message: String(ev.message || '').slice(0, 300),
+        detail: (ev.filename || '') + ' 行:' + (ev.lineno || '')
+      })
+    });
+  } catch (e) {}
+});
 </script>
 </body>
 </html>
