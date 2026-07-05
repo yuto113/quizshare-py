@@ -3604,15 +3604,29 @@ def api_publish_event(event_id):
     conn.close()
     return ok(message='更新しました')
 
+@app.route('/api/server_time', methods=['GET'])
+def api_server_time():
+    # サーバーの現在時刻を返す(PCの時計に頼らないため)
+    import time as _time
+    return ok(now_ms=int(_time.time() * 1000))
+
 @app.route('/api/events/<event_key>/quizzes', methods=['GET'])
 def api_event_quizzes(event_key):
     import sqlite3 as _sq
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
-    event = conn.execute('SELECT id,group_id,end_date FROM events WHERE event_key=? AND is_published=1', (event_key,)).fetchone()
+    event = conn.execute('SELECT id,group_id,end_date,start_date FROM events WHERE event_key=? AND is_published=1', (event_key,)).fetchone()
     conn.close()
     if not event:
         return err('イベントが見つからないよ', 404)
-    event_id, group_id, end_date = event
+    event_id, group_id, end_date, start_date = event
+    # 開催前は問題を渡さない(PCの時計をいじるズルを防ぐ。サーバーの時計で判定)
+    if start_date:
+        import pytz as _pytz
+        from datetime import datetime as _dt
+        now = _dt.now(_pytz.timezone('Asia/Tokyo')).replace(tzinfo=None)
+        st = _dt.fromisoformat(start_date.replace('T', ' '))
+        if now < st:
+            return err('まだ開催前だよ。開始時間まで待ってね', 403)
     # グループのクイズを取得
     with get_db() as gconn:
         gcur = make_cursor(gconn)
@@ -3784,10 +3798,19 @@ def api_event_answer(event_key):
     time_ms = int(data.get('time_ms') or 0)
 
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
-    event = conn.execute('SELECT group_id FROM events WHERE event_key=? AND is_published=1', (event_key,)).fetchone()
+    event = conn.execute('SELECT group_id,start_date FROM events WHERE event_key=? AND is_published=1', (event_key,)).fetchone()
     conn.close()
     if not event:
         return err('イベントが見つからないよ', 404)
+    # 開催前は答え合わせもさせない(サーバーの時計で判定)
+    if event[1]:
+        import pytz as _pytz
+        from datetime import datetime as _dt
+        now = _dt.now(_pytz.timezone('Asia/Tokyo')).replace(tzinfo=None)
+        st = _dt.fromisoformat(event[1].replace('T', ' '))
+        if now < st:
+            return err('まだ開催前だよ', 403)
+    event = (event[0],)
 
     with get_db() as gconn:
         gcur = make_cursor(gconn)

@@ -429,6 +429,17 @@ function getFingerprint() {
   }
 }
 const resultDate = '{{ event.result_date or "" }}';
+
+// サーバーの時計とのズレを調べる(PCの時計をいじるズルを防ぐ)
+let serverOffsetMs = 0;
+(async () => {
+  try {
+    const r = await fetch('/api/server_time');
+    const d = await r.json();
+    if (d.ok) serverOffsetMs = d.now_ms - Date.now();
+  } catch (e) {}
+})();
+function getServerNow() { return new Date(Date.now() + serverOffsetMs); }
 let nickname = '';
 let quizzes = [];
 let currentIdx = 0;
@@ -444,7 +455,7 @@ function startCountdown() {
   const resultDate = '{{ event.result_date or "" }}'.replace('T', ' ');
 
   function updateCountdown() {
-    const now = new Date();
+    const now = getServerNow();
     let target = null;
     let label = '';
 
@@ -510,7 +521,7 @@ async function init() {
   // 開始日時チェック
   if ('{{ event.start_date }}') {
     const start = new Date('{{ event.start_date }}'.replace(' ','T'));
-    const now = new Date();
+    const now = getServerNow();
     if (now < start) {
       document.getElementById('nickname-section').style.display = 'none';
       document.getElementById('not-started').style.display = 'block';
@@ -520,7 +531,7 @@ async function init() {
   // 締切チェック
   if ('{{ event.end_date }}') {
     const end = new Date('{{ event.end_date }}'.replace(' ','T'));
-    const now = new Date();
+    const now = getServerNow();
     if (now > end) {
       document.getElementById('nickname-section').style.display = 'none';
       document.getElementById('ended').style.display = 'block';
