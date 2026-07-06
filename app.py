@@ -4783,12 +4783,13 @@ KP_RATE_TEXT = "100KP = 1回年(Q'z社内通貨)"
 
 @app.route('/api/staff/kouan/members', methods=['GET'])
 def api_kouan_members():
-    # 公安メンバーの名簿(タスクの担当者選び用。ゼロだけ)
-    if staff_kouan_role() != 'zero':
+    # 公安メンバーの名簿(担当者選び・送金相手選び用。公安なら誰でも)
+    # ゼロは名簿に出さない(正体保護)
+    if staff_kouan_role() == '':
         return err('権限がないよ', 403)
     import sqlite3 as _sq
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
-    rows = conn.execute("SELECT staff_id, name FROM qz_staff WHERE security_role IS NOT NULL AND security_role != ''").fetchall()
+    rows = conn.execute("SELECT staff_id, name FROM qz_staff WHERE security_role = 'kouan'").fetchall()
     conn.close()
     return ok(members=[{'staff_id': r[0], 'name': dec(r[1] or '')} for r in rows])
 
@@ -4817,6 +4818,41 @@ def api_kouan_grant():
         return ok(message=str(amount) + ' KPを配布したよ')
     return ok(message=str(-amount) + ' KPを回収したよ')
 
+@app.route('/api/staff/kouan/transfer', methods=['POST'])
+def api_kouan_transfer():
+    # 公安メンバー同士でKPをあげる(送金)
+    role = staff_kouan_role()
+    if role == '':
+        return err('権限がないよ', 403)
+    data = request.get_json(silent=True) or {}
+    to_id = str(data.get('to_staff_id') or '').strip()
+    amount = int(data.get('amount') or 0)
+    my_id = session.get('staff_id')
+    if amount <= 0:
+        return err('1KP以上を入力してね')
+    amount = min(1000000, amount)
+    if to_id == my_id:
+        return err('自分にはあげられないよ')
+    conn = _kouan_db()
+    row = conn.execute("SELECT staff_id FROM qz_staff WHERE staff_id=? AND security_role IS NOT NULL AND security_role != ''", (to_id,)).fetchone()
+    if not row:
+        conn.close()
+        return err('その人は公安メンバーじゃないよ')
+    # ゼロ以外は残高チェック(持っている以上はあげられない)
+    if role != 'zero':
+        task_sum = conn.execute("SELECT COALESCE(SUM(reward),0) FROM qz_kouan_tasks WHERE status='done' AND done_by_id=?", (my_id,)).fetchone()[0]
+        grant_sum = conn.execute('SELECT COALESCE(SUM(amount),0) FROM qz_kouan_grants WHERE staff_id=?', (my_id,)).fetchone()[0]
+        if task_sum + grant_sum < amount:
+            conn.close()
+            return err('残高が足りないよ(いま ' + str(task_sum + grant_sum) + ' KP)')
+        conn.execute('INSERT INTO qz_kouan_grants (staff_id, amount, note, created_at) VALUES (?,?,?,?)',
+                     (my_id, -amount, enc('送金(あげた)'), _kouan_now()))
+    conn.execute('INSERT INTO qz_kouan_grants (staff_id, amount, note, created_at) VALUES (?,?,?,?)',
+                 (to_id, amount, enc('プレゼント'), _kouan_now()))
+    conn.commit()
+    conn.close()
+    return ok(message=str(amount) + ' KPをあげたよ')
+
 @app.route('/api/staff/kouan/points', methods=['GET'])
 def api_kouan_points():
     # 公安メンバー全員のKP残高(完了したタスクの報酬の合計)
@@ -4836,7 +4872,9 @@ def api_kouan_points():
     points = [{'staff_id': m[0], 'name': dec(m[1] or ''), 'security_role': m[2],
                'kp': int(sums.get(m[0], 0))} for m in members]
     points.sort(key=lambda p: -p['kp'])
-    return ok(points=points, rate=KP_RATE_TEXT, my_id=session.get('staff_id'))
+    my_id = session.get('staff_id')
+    return ok(points=points, rate=KP_RATE_TEXT, my_id=my_id,
+              my_kp=int(sums.get(my_id, 0)), is_zero=(staff_kouan_role() == 'zero'))
 
 @app.route('/staff/kp')
 def page_staff_kp():

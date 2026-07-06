@@ -25,6 +25,15 @@ body { background:#0d1220 !important; }
 
   <div class="k-box" id="my-kp" style="text-align:center;">読み込み中...</div>
 
+  <div class="k-box" id="transfer-box" style="display:none;">
+    <b class="k-title" style="font-size:0.9rem;">🎁 KPをあげる</b>
+    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
+      <select class="k-input" id="tr-member" style="flex:2; min-width:140px;"></select>
+      <input class="k-input" id="tr-amount" type="number" min="1" placeholder="KP" style="flex:1; min-width:100px;">
+      <button class="k-btn" style="background:#7a5a3d;" onclick="transferKP()">あげる</button>
+    </div>
+  </div>
+
   <div class="k-box" id="grant-box" style="display:none;">
     <b class="k-title" style="font-size:0.9rem;">💸 KP配布(ゼロ専用)</b>
     <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
@@ -49,29 +58,46 @@ async function loadKP() {
   if (data.ok === false || data.ok === undefined) { window.location.href = '/staff/board'; return; }
   document.getElementById('kp-rate').textContent = 'レート: ' + data.rate;
   const rateKp = 100;  // 100KPあたり
-  const me = data.points.find(p => p.staff_id === data.my_id);
-  if (me) {
-    document.getElementById('my-kp').innerHTML =
-      '<div style="color:#6b7799; font-size:12px;">あなたの残高</div>' +
-      '<div style="font-size:2rem; font-weight:900; color:#c8e6a0;">' + Number(me.kp).toLocaleString() + ' KP</div>' +
-      '<div style="color:#9aa7ff; font-size:13px;">= ' + (me.kp / rateKp).toLocaleString() + ' 回年</div>';
+  if (data.is_zero) {
+    document.getElementById('grant-box').style.display = 'block';
   }
+  const myKp = Number(data.my_kp || 0);
+  document.getElementById('my-kp').innerHTML =
+    '<div style="color:#6b7799; font-size:12px;">あなたの残高' + (data.is_zero ? ' (🕶️ 一覧には出ない。本人にだけ見えるよ)' : '') + '</div>' +
+    '<div style="font-size:2rem; font-weight:900; color:#c8e6a0;">' + myKp.toLocaleString() + ' KP</div>' +
+    '<div style="color:#9aa7ff; font-size:13px;">= ' + (myKp / rateKp).toLocaleString() + ' 回年</div>';
   document.getElementById('kp-list').innerHTML = data.points.map((p, i) => `
     <div class="kp-row" style="${p.staff_id === data.my_id ? 'background:rgba(154,167,255,0.08); border-radius:8px; padding-left:8px; padding-right:8px;' : ''}">
       <span>${i === 0 && p.kp > 0 ? '👑 ' : ''}${escP(p.name)}</span>
       <span class="kp-num">${Number(p.kp).toLocaleString()} KP</span>
     </div>`).join('');
 }
-async function loadGrantUI() {
-  // ゼロ専用の名簿APIが成功したときだけ配布フォームを表示する
+async function loadMembersKP() {
+  // 名簿を読み込んで、配布と送金の相手選びに使う
   const r = await fetch('/api/staff/kouan/members');
   const data = await r.json();
   if (data.ok === false || data.ok === undefined) return;
-  document.getElementById('grant-box').style.display = 'block';
-  document.getElementById('gr-member').innerHTML =
-    data.members.map(m => `<option value="${escP(m.staff_id)}">${escP(m.name)}</option>`).join('');
+  const opts = data.members.map(m => `<option value="${escP(m.staff_id)}">${escP(m.name)}</option>`).join('');
+  document.getElementById('gr-member').innerHTML = opts;
+  document.getElementById('tr-member').innerHTML = opts;
+  document.getElementById('transfer-box').style.display = 'block';
 }
-loadGrantUI();
+loadMembersKP();
+
+async function transferKP() {
+  const to_staff_id = document.getElementById('tr-member').value;
+  const amount = Number(document.getElementById('tr-amount').value || 0);
+  if (amount <= 0) { window.toast('1KP以上を入力してね', 'error'); return; }
+  if (confirm(amount + ' KPをあげるよ？(取り消しはできないよ)') === false) return;
+  const r = await fetch('/api/staff/kouan/transfer', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({to_staff_id, amount})
+  });
+  const data = await r.json();
+  window.toast(data.ok ? data.message : (data.error || 'エラー'), data.ok ? 'success' : 'error');
+  document.getElementById('tr-amount').value = '';
+  loadKP();
+}
 
 async function grantKP() {
   const staff_id = document.getElementById('gr-member').value;
