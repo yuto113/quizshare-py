@@ -4912,6 +4912,13 @@ def page_staff_kouan():
         return redirect('/staff/board')
     return render_template('staff_kouan.html', kouan_role=role)
 
+@app.route('/staff/handbook')
+def page_staff_handbook():
+    # 社員ハンドブック(スタッフなら誰でも読める)
+    if not session.get('staff_id'):
+        return redirect('/staff/login')
+    return render_template('staff_handbook.html')
+
 @app.route('/staff/board')
 def page_staff_board():
     if not session.get('staff_id'):

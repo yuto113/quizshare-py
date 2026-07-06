@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}社員ハンドブック - Q'z{% endblock %}
+{% block body_class %}qz-board-page{% endblock %}
+{% block content %}
+<style>
+.site-header { display: none !important; }
+.hb-wrap { max-width:760px; margin:24px auto; padding:0 20px; }
+.hb-box { background:white; border:1px solid #e3ddd0; border-radius:14px; padding:20px 22px; margin-bottom:16px; }
+.hb-box h3 { color:#14213d; margin:0 0 10px; font-size:1.05rem; }
+.hb-box p, .hb-box li { color:#4a4436; font-size:14px; line-height:1.9; }
+</style>
+
+{% include '_staff_nav.html' %}
+
+<div class="hb-wrap">
+  <h2 style="color:#14213d;">📖 Q'z社員ハンドブック</h2>
+  <p style="color:#8a8270; font-size:13px;">ようこそQ'zへ! ここを読めばスタッフエリアの使い方がぜんぶわかるよ。</p>
+
+  <div class="hb-box">
+    <h3>💬 掲示板(社内メール)</h3>
+    <p>Q'zスタッフの連絡はぜんぶここ。チャンネルを選んでメッセージを送ろう。
+    ↩️で返信、絵文字でリアクション、スタンプも使える。
+    🗂️ボタンでファイルを添付できて(5MBまで)、届いたファイルは🗂️リンクを押すと
+    プレビューページで中身が見られる(画像・PDF・Wordもそのまま読めるよ)。
+    メッセージが多いチャンネルは「⬆過去のメッセージを読み込む」でさかのぼれる。</p>
+  </div>
+
+  <div class="hb-box">
+    <h3>📁 ファイル / ✅ タスク / 📅 カレンダー</h3>
+    <p>ファイルページはみんなの共有倉庫。「プレビュー」でその場で中身を確認できる。
+    タスクページには仕事のリストがあって、自分の担当が終わったら状態を更新しよう。
+    カレンダーにはQ'zの予定が載ってるよ。</p>
+  </div>
+
+  <div class="hb-box">
+    <h3>👤 アカウントのきまり</h3>
+    <p>・最初のログインをしたら、プロフィールページで<b>自分だけのパスワードに変えよう</b>。
+    パスワードは管理者にも誰にも教えないこと(聞かれても教えなくていい。それが正しい)。<br>
+    ・新しい仲間を誘うときは、ログイン画面の「入社に応募」から。登録コードが必要だから
+    管理者に直接聞いてね(コードをLINEなどに書くのは禁止。口頭で伝える)。<br>
+    ・応募すると管理者が審査して、承認されたら<b>翌月1日に入社</b>だよ。</p>
+  </div>
+
+  <div class="hb-box">
+    <h3>🚨 困ったとき</h3>
+    <p>・バグを見つけたら → 掲示板で管理者(yuto)に報告。スクショがあると助かる。<br>
+    ・変な投稿やルール違反を見つけたら → これも管理者へ。確認して対応するよ。<br>
+    ・Q'zの利用規約と社内法律はファイルページにあるから、一度読んでおいてね。</p>
+  </div>
+
+  <p style="color:#b8b09e; font-size:12px; text-align:center;">Q'z — みんなで作る、みんなのクイズ会社</p>
+</div>
+{% endblock %}

@@ -18,6 +18,7 @@
     <a href="/staff/files">📁 ファイル</a>
     <a href="/staff/calendar">📅 カレンダー</a>
     <a href="/staff/tasks">✅ タスク</a>
+    <a href="/staff/handbook">📖 ハンドブック</a>
     <a href="/staff/profile">👤 プロフィール</a>
     {% if staff_nav_kouan %}<a href="/staff/kouan" style="color:#9aa7ff;">🕶️ 公安</a>{% endif %}
     {% if staff_nav_is_admin %}
@@ -40,4 +41,28 @@ async function qzStaffNavLogout() {
   try { await fetch('/api/staff/logout', {method: 'POST'}); } catch (e) {}
   window.location.href = '/staff/login';
 }
+
+// ============================================
+// スタッフエリアはサイトテーマの対象外にする仕組み
+// テーマはbodyに「theme-dark」などのクラスを付けて色を塗り替えるので、
+// そのクラスを見つけしだい外し続ける
+// ============================================
+function qzStripTheme() {
+  try {
+    const b = document.body;
+    if (b === null) return;
+    Array.from(b.classList).forEach(c => {
+      if (c.indexOf('theme') !== -1 || c === 'halloween-dark') b.classList.remove(c);
+    });
+    b.style.background = '';  // テーマが直接塗った背景も消す(各ページのCSSに任せる)
+    document.querySelectorAll('.seasonal-emoji').forEach(e => e.remove());
+  } catch (e) {}
+}
+// テーマ機能の関数を乗っ取って、呼ばれても掃除だけするようにする
+window.applyTheme = qzStripTheme;
+window.checkAutoTheme = qzStripTheme;
+qzStripTheme();
+document.addEventListener('DOMContentLoaded', qzStripTheme);
+// テーマ側が後から塗り直してきても、2秒ごとの見張りが掃除する
+setInterval(qzStripTheme, 2000);
 </script>
