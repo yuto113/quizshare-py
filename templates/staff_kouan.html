@@ -41,6 +41,7 @@ body { background:#0d1220 !important; }
     <input class="k-input" id="tk-title" placeholder="タスク名" style="margin-top:8px;">
     <textarea class="k-input" id="tk-detail" rows="2" placeholder="くわしい内容(任意)"></textarea>
     <input class="k-input" id="tk-reward" type="number" min="0" placeholder="報酬(KP)">
+    <select class="k-input" id="tk-assignee"><option value="">担当: 誰でもOK</option></select>
     <button class="k-btn" style="background:#3d4a7a;" onclick="sendTask()">💰 発行する</button>
   </div>
   {% endif %}
@@ -77,8 +78,8 @@ async function loadKouan() {
         <span class="k-reward">報酬 ${Number(t.reward).toLocaleString()} KP</span>
       </div>
       ${t.detail ? `<div style="white-space:pre-wrap; margin-top:6px; font-size:13px; color:#b8c2e0;">${escK(t.detail)}</div>` : ''}
-      <div style="color:#6b7799; font-size:11px; margin-top:6px;">発行: ${t.created_at}${t.status === 'done' ? ' ・ 完了: ' + escK(t.done_by) + ' (' + t.done_at + ')' : ''}</div>
-      ${t.status === 'done' ? '' : `<div style="text-align:right; margin-top:8px;"><button class="k-btn" style="background:#3d7a4a;" onclick="doneTask(${t.id})">✅ 終了</button></div>`}
+      <div style="color:#6b7799; font-size:11px; margin-top:6px;">担当: ${t.assignee ? escK(t.assignee) : '誰でもOK'} ・ 発行: ${t.created_at}${t.status === 'done' ? ' ・ 完了: ' + escK(t.done_by) + ' (' + t.done_at + ')' : ''}</div>
+      ${t.can_done ? `<div style="text-align:right; margin-top:8px;"><button class="k-btn" style="background:#3d7a4a;" onclick="doneTask(${t.id})">✅ 終了</button></div>` : ''}
     </div>`).join('');
 }
 
@@ -102,7 +103,9 @@ async function sendTask() {
   const detail = document.getElementById('tk-detail').value.trim();
   const reward = Number(document.getElementById('tk-reward').value || 0);
   if (title === '') { window.toast('タスク名を書いてね', 'error'); return; }
-  await kPost('/api/staff/kouan/tasks', {title, detail, reward});
+  const assigneeEl = document.getElementById('tk-assignee');
+  const assignee_id = assigneeEl ? assigneeEl.value : '';
+  await kPost('/api/staff/kouan/tasks', {title, detail, reward, assignee_id});
   document.getElementById('tk-title').value = '';
   document.getElementById('tk-detail').value = '';
   document.getElementById('tk-reward').value = '';
@@ -119,6 +122,17 @@ async function kPost(url, body) {
   window.toast(data.ok ? data.message : (data.error || 'エラー'), data.ok ? 'success' : 'error');
   loadKouan();
 }
+
+async function loadMembers() {
+  const sel = document.getElementById('tk-assignee');
+  if (sel === null) return;  // ゼロじゃない人の画面には選択欄が無い
+  const r = await fetch('/api/staff/kouan/members');
+  const data = await r.json();
+  if (data.ok === false || data.ok === undefined) return;
+  sel.innerHTML = '<option value="">担当: 誰でもOK</option>' +
+    data.members.map(m => `<option value="${escK(m.staff_id)}">担当: ${escK(m.name)}</option>`).join('');
+}
+loadMembers();
 
 function escK(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 loadKouan();

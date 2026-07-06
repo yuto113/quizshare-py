@@ -3725,7 +3725,7 @@ def api_event_submit(event_key):
         conn.close()
         return err('既に参加済みです', 403)
     conn.close()
-    return ok(message='回答を記録しました', total_correct=total_correct_rounded, total=len(answers))
+    return ok(message='回答を記録しました', total_correct=total_correct_rounded, total=len(recorded))
 
 @app.route('/api/events/<event_key>/ranking', methods=['GET'])
 def api_event_ranking(event_key):
@@ -4631,6 +4631,9 @@ def _kouan_db():
     conn.execute("""CREATE TABLE IF NOT EXISTS qz_kouan_tasks (
         id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, detail TEXT,
         reward INTEGER, status TEXT, done_by TEXT, created_at TEXT, done_at TEXT)""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS qz_kouan_grants (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, staff_id TEXT, amount INTEGER,
+        note TEXT, created_at TEXT)""")
     return conn
 
 def _kouan_now():
@@ -4648,7 +4651,7 @@ def api_kouan_orders_get():
     for o in orders:
         reps = conn.execute('SELECT staff_name, body, created_at FROM qz_kouan_replies WHERE order_id=? ORDER BY id', (o[0],)).fetchall()
         result.append({'id': o[0], 'title': dec(o[1] or ''), 'body': dec(o[2] or ''),
-                       'created_by': dec(o[3] or ''), 'created_at': o[4],
+                       'created_by': '🕶️ ゼロ', 'created_at': o[4],
                        'replies': [{'staff_name': dec(r[0] or ''), 'body': dec(r[1] or ''), 'created_at': r[2]} for r in reps]})
     conn.close()
     return ok(orders=result)
@@ -4695,12 +4698,20 @@ def api_kouan_tasks_get():
     if staff_kouan_role() == '':
         return err('権限がないよ', 403)
     conn = _kouan_db()
-    rows = conn.execute('SELECT id, title, detail, reward, status, done_by, created_at, done_at FROM qz_kouan_tasks ORDER BY id DESC LIMIT 50').fetchall()
+    rows = conn.execute('SELECT id, title, detail, reward, status, done_by, created_at, done_at, assignee_id FROM qz_kouan_tasks ORDER BY id DESC LIMIT 50').fetchall()
+    names = dict(conn.execute('SELECT staff_id, name FROM qz_staff').fetchall())
     conn.close()
-    return ok(tasks=[{'id': r[0], 'title': dec(r[1] or ''), 'detail': dec(r[2] or ''),
+    my_id = session.get('staff_id')
+    tasks = []
+    for r in rows:
+        assignee_name = dec(names.get(r[8]) or '') if r[8] else ''
+        tasks.append({'id': r[0], 'title': dec(r[1] or ''), 'detail': dec(r[2] or ''),
                       'reward': r[3] or 0, 'status': r[4] or 'open',
                       'done_by': dec(r[5] or '') if r[5] else '',
-                      'created_at': r[6], 'done_at': r[7]} for r in rows])
+                      'created_at': r[6], 'done_at': r[7],
+                      'assignee': assignee_name,
+                      'can_done': (r[4] or 'open') != 'done' and (not r[8] or r[8] == my_id)})
+    return ok(tasks=tasks)
 
 @app.route('/api/staff/kouan/tasks', methods=['POST'])
 def api_kouan_tasks_post():
@@ -4711,11 +4722,18 @@ def api_kouan_tasks_post():
     title = str(data.get('title') or '').strip()[:100]
     detail = str(data.get('detail') or '').strip()[:2000]
     reward = max(0, min(1000000, int(data.get('reward') or 0)))
+    assignee_id = str(data.get('assignee_id') or '').strip()
     if not title:
         return err('タスク名を入力してね')
     conn = _kouan_db()
-    conn.execute('INSERT INTO qz_kouan_tasks (title, detail, reward, status, created_at) VALUES (?,?,?,?,?)',
-                 (enc(title), enc(detail), reward, 'open', _kouan_now()))
+    # 担当者が指定されていたら、公安メンバーかどうか確認する
+    if assignee_id:
+        row = conn.execute("SELECT staff_id FROM qz_staff WHERE staff_id=? AND security_role IS NOT NULL AND security_role != ''", (assignee_id,)).fetchone()
+        if not row:
+            conn.close()
+            return err('その担当者は公安メンバーじゃないよ')
+    conn.execute('INSERT INTO qz_kouan_tasks (title, detail, reward, status, created_at, assignee_id) VALUES (?,?,?,?,?,?)',
+                 (enc(title), enc(detail), reward, 'open', _kouan_now(), assignee_id or None))
     conn.commit()
     conn.close()
     return ok(message='極秘タスクを発行したよ')
@@ -4727,13 +4745,16 @@ def api_kouan_task_done():
     data = request.get_json(silent=True) or {}
     task_id = int(data.get('task_id') or 0)
     conn = _kouan_db()
-    row = conn.execute('SELECT status FROM qz_kouan_tasks WHERE id=?', (task_id,)).fetchone()
+    row = conn.execute('SELECT status, assignee_id FROM qz_kouan_tasks WHERE id=?', (task_id,)).fetchone()
     if not row:
         conn.close()
         return err('タスクが見つからないよ', 404)
     if row[0] == 'done':
         conn.close()
         return err('もう完了済みだよ')
+    if row[1] and row[1] != session.get('staff_id'):
+        conn.close()
+        return err('このタスクの担当者じゃないよ', 403)
     conn.execute('UPDATE qz_kouan_tasks SET status=?, done_by=?, done_by_id=?, done_at=? WHERE id=?',
                  ('done', enc(session.get('staff_name') or ''), session.get('staff_id'), _kouan_now(), task_id))
     conn.commit()
@@ -4760,6 +4781,42 @@ def api_staff_hr_security():
 # KPのレート(ここを変えれば表示が全部変わる)
 KP_RATE_TEXT = "100KP = 1回年(Q'z社内通貨)"
 
+@app.route('/api/staff/kouan/members', methods=['GET'])
+def api_kouan_members():
+    # 公安メンバーの名簿(タスクの担当者選び用。ゼロだけ)
+    if staff_kouan_role() != 'zero':
+        return err('権限がないよ', 403)
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    rows = conn.execute("SELECT staff_id, name FROM qz_staff WHERE security_role IS NOT NULL AND security_role != ''").fetchall()
+    conn.close()
+    return ok(members=[{'staff_id': r[0], 'name': dec(r[1] or '')} for r in rows])
+
+@app.route('/api/staff/kouan/grant', methods=['POST'])
+def api_kouan_grant():
+    # ゼロがKPを直接配布する(マイナスなら回収)
+    if staff_kouan_role() != 'zero':
+        return err('配布できるのはゼロだけだよ', 403)
+    data = request.get_json(silent=True) or {}
+    staff_id = str(data.get('staff_id') or '').strip()
+    amount = int(data.get('amount') or 0)
+    note = str(data.get('note') or '').strip()[:100]
+    if amount == 0:
+        return err('0KPは配布できないよ')
+    amount = max(-1000000, min(1000000, amount))
+    conn = _kouan_db()
+    row = conn.execute("SELECT staff_id FROM qz_staff WHERE staff_id=? AND security_role IS NOT NULL AND security_role != ''", (staff_id,)).fetchone()
+    if not row:
+        conn.close()
+        return err('その人は公安メンバーじゃないよ')
+    conn.execute('INSERT INTO qz_kouan_grants (staff_id, amount, note, created_at) VALUES (?,?,?,?)',
+                 (staff_id, amount, enc(note) if note else None, _kouan_now()))
+    conn.commit()
+    conn.close()
+    if amount > 0:
+        return ok(message=str(amount) + ' KPを配布したよ')
+    return ok(message=str(-amount) + ' KPを回収したよ')
+
 @app.route('/api/staff/kouan/points', methods=['GET'])
 def api_kouan_points():
     # 公安メンバー全員のKP残高(完了したタスクの報酬の合計)
@@ -4767,8 +4824,14 @@ def api_kouan_points():
         return err('権限がないよ', 403)
     import sqlite3 as _sq
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
-    members = conn.execute("SELECT staff_id, name, security_role FROM qz_staff WHERE security_role IS NOT NULL AND security_role != ''").fetchall()
+    members = conn.execute("SELECT staff_id, name, security_role FROM qz_staff WHERE security_role = 'kouan'").fetchall()
     sums = dict(conn.execute("SELECT done_by_id, COALESCE(SUM(reward),0) FROM qz_kouan_tasks WHERE status='done' AND done_by_id IS NOT NULL GROUP BY done_by_id").fetchall())
+    # ゼロから直接配布されたKPも合計する
+    conn.execute('''CREATE TABLE IF NOT EXISTS qz_kouan_grants (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, staff_id TEXT, amount INTEGER,
+        note TEXT, created_at TEXT)''')
+    for sid, total in conn.execute('SELECT staff_id, COALESCE(SUM(amount),0) FROM qz_kouan_grants GROUP BY staff_id').fetchall():
+        sums[sid] = sums.get(sid, 0) + total
     conn.close()
     points = [{'staff_id': m[0], 'name': dec(m[1] or ''), 'security_role': m[2],
                'kp': int(sums.get(m[0], 0))} for m in members]

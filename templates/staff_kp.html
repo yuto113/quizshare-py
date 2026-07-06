@@ -10,6 +10,8 @@ body { background:#0d1220 !important; }
 .k-title { color:#9aa7ff; letter-spacing:0.15em; }
 .kp-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #2a3555; flex-wrap:wrap; gap:6px; }
 .kp-num { font-size:1.1rem; font-weight:900; color:#c8e6a0; }
+.k-btn { padding:7px 14px; border:none; border-radius:8px; cursor:pointer; font-size:13px; color:white; white-space:nowrap; }
+.k-input { padding:9px; border-radius:8px; border:1px solid #2a3555; background:#0d1220; color:#dde3f5; box-sizing:border-box; font-size:14px; }
 </style>
 
 {% include '_staff_nav.html' %}
@@ -22,6 +24,16 @@ body { background:#0d1220 !important; }
   <p id="kp-rate" style="color:#6b7799; font-size:12px;"></p>
 
   <div class="k-box" id="my-kp" style="text-align:center;">読み込み中...</div>
+
+  <div class="k-box" id="grant-box" style="display:none;">
+    <b class="k-title" style="font-size:0.9rem;">💸 KP配布(ゼロ専用)</b>
+    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
+      <select class="k-input" id="gr-member" style="flex:2; min-width:140px;"></select>
+      <input class="k-input" id="gr-amount" type="number" placeholder="KP(マイナスで回収)" style="flex:1; min-width:130px;">
+      <button class="k-btn" style="background:#3d4a7a;" onclick="grantKP()">配布</button>
+    </div>
+    <input class="k-input" id="gr-note" placeholder="メモ(任意)" style="width:100%; margin-top:6px;">
+  </div>
 
   <div class="k-box">
     <b class="k-title" style="font-size:0.9rem;">公安メンバーの残高</b>
@@ -46,10 +58,37 @@ async function loadKP() {
   }
   document.getElementById('kp-list').innerHTML = data.points.map((p, i) => `
     <div class="kp-row" style="${p.staff_id === data.my_id ? 'background:rgba(154,167,255,0.08); border-radius:8px; padding-left:8px; padding-right:8px;' : ''}">
-      <span>${i === 0 && p.kp > 0 ? '👑 ' : ''}${p.security_role === 'zero' ? '🕶️(ゼロ) ' : ''}${escP(p.name)}</span>
+      <span>${i === 0 && p.kp > 0 ? '👑 ' : ''}${escP(p.name)}</span>
       <span class="kp-num">${Number(p.kp).toLocaleString()} KP</span>
     </div>`).join('');
 }
+async function loadGrantUI() {
+  // ゼロ専用の名簿APIが成功したときだけ配布フォームを表示する
+  const r = await fetch('/api/staff/kouan/members');
+  const data = await r.json();
+  if (data.ok === false || data.ok === undefined) return;
+  document.getElementById('grant-box').style.display = 'block';
+  document.getElementById('gr-member').innerHTML =
+    data.members.map(m => `<option value="${escP(m.staff_id)}">${escP(m.name)}</option>`).join('');
+}
+loadGrantUI();
+
+async function grantKP() {
+  const staff_id = document.getElementById('gr-member').value;
+  const amount = Number(document.getElementById('gr-amount').value || 0);
+  const note = document.getElementById('gr-note').value.trim();
+  if (amount === 0) { window.toast('KPの額を入力してね', 'error'); return; }
+  const r = await fetch('/api/staff/kouan/grant', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({staff_id, amount, note})
+  });
+  const data = await r.json();
+  window.toast(data.ok ? data.message : (data.error || 'エラー'), data.ok ? 'success' : 'error');
+  document.getElementById('gr-amount').value = '';
+  document.getElementById('gr-note').value = '';
+  loadKP();
+}
+
 function escP(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 loadKP();
 </script>
