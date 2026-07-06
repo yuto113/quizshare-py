@@ -4805,6 +4805,9 @@ def api_kouan_grant():
     if amount == 0:
         return err('0KPは配布できないよ')
     amount = max(-1000000, min(1000000, amount))
+    # 「self」が来たらゼロ自身への配布とみなす
+    if staff_id == 'self':
+        staff_id = session.get('staff_id')
     conn = _kouan_db()
     row = conn.execute("SELECT staff_id FROM qz_staff WHERE staff_id=? AND security_role IS NOT NULL AND security_role != ''", (staff_id,)).fetchone()
     if not row:

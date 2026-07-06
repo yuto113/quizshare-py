@@ -78,7 +78,8 @@ async function loadMembersKP() {
   const data = await r.json();
   if (data.ok === false || data.ok === undefined) return;
   const opts = data.members.map(m => `<option value="${escP(m.staff_id)}">${escP(m.name)}</option>`).join('');
-  document.getElementById('gr-member').innerHTML = opts;
+  // 配布(ゼロ専用)の選択肢には「自分」も入れる。名前は出さない(正体保護)
+  document.getElementById('gr-member').innerHTML = '<option value="self">🕶️ 自分に配布</option>' + opts;
   document.getElementById('tr-member').innerHTML = opts;
   document.getElementById('transfer-box').style.display = 'block';
 }
