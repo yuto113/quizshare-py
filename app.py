@@ -4254,7 +4254,19 @@ def api_quiz_info(quiz_id):
 
 @app.route('/homepage')
 def page_homepage():
-    return render_template('company.html')
+    # 「数字で見るQ'z」用に本物の統計をDBから取る(失敗しても表示は壊さない)
+    stats = {'quiz_count': 0, 'group_count': 0, 'attempt_count': 0, 'event_count': 0}
+    try:
+        import sqlite3 as _sq
+        conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+        stats['quiz_count'] = conn.execute('SELECT COUNT(*) FROM quizzes').fetchone()[0]
+        stats['group_count'] = conn.execute('SELECT COUNT(*) FROM groups').fetchone()[0]
+        stats['attempt_count'] = conn.execute('SELECT COUNT(*) FROM attempts').fetchone()[0]
+        stats['event_count'] = conn.execute('SELECT COUNT(*) FROM events').fetchone()[0]
+        conn.close()
+    except Exception:
+        pass
+    return render_template('company.html', **stats)
 
 # ===== Q'z 社員システム =====
 

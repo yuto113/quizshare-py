@@ -339,6 +339,38 @@ body.qz-page .site-header {
 </div>
 
 <!-- 会社概要 -->
+<style>
+/* 追加セクション用のスタイル */
+.qz-stats-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:14px; }
+.qz-stat-card { background:white; border:1px solid #e9e2d0; border-radius:16px; padding:22px 12px; text-align:center; }
+.qz-stat-num { font-size:2rem; font-weight:900; color:var(--qz-coral); }
+.qz-stat-label { color:#8a8270; font-size:0.8rem; margin-top:4px; }
+.qz-feature-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:14px; }
+.qz-feature { background:white; border:1px solid #e9e2d0; border-radius:16px; padding:18px; }
+.qz-feature h4 { margin:8px 0 6px; color:#14213d; font-size:0.98rem; }
+.qz-feature p { color:#5b5546; font-size:0.85rem; line-height:1.7; margin:0; }
+.qz-timeline { list-style:none; padding:0; margin:0; border-left:3px solid var(--qz-coral); }
+.qz-timeline li { padding:0 0 18px 18px; position:relative; color:#5b5546; font-size:0.92rem; line-height:1.7; }
+.qz-timeline li::before { content:''; position:absolute; left:-8px; top:6px; width:13px; height:13px; border-radius:50%; background:var(--qz-coral); }
+.qz-timeline b { color:#14213d; }
+.qz-faq details { background:white; border:1px solid #e9e2d0; border-radius:12px; padding:14px 18px; margin-bottom:10px; }
+.qz-faq summary { cursor:pointer; font-weight:700; color:#14213d; font-size:0.95rem; }
+.qz-faq p { color:#5b5546; font-size:0.9rem; line-height:1.8; margin:10px 0 0; }
+</style>
+
+<!-- 数字で見るQ'z -->
+<section class="qz-section">
+  <div class="qz-eyebrow">Numbers</div>
+  <h2>数字で見るQ'z</h2>
+  <div class="qz-stats-grid">
+    <div class="qz-stat-card"><div class="qz-stat-num">{{ "{:,}".format(quiz_count|default(0)) }}</div><div class="qz-stat-label">投稿されたクイズ</div></div>
+    <div class="qz-stat-card"><div class="qz-stat-num">{{ "{:,}".format(attempt_count|default(0)) }}</div><div class="qz-stat-label">解かれた回数</div></div>
+    <div class="qz-stat-card"><div class="qz-stat-num">{{ "{:,}".format(group_count|default(0)) }}</div><div class="qz-stat-label">活動中のグループ</div></div>
+    <div class="qz-stat-card"><div class="qz-stat-num">{{ "{:,}".format(event_count|default(0)) }}</div><div class="qz-stat-label">開催されたイベント</div></div>
+  </div>
+  <p style="color:#b8b09e; font-size:0.75rem; margin-top:10px;">※ このページを開いた時点のリアルタイム集計です。</p>
+</section>
+
 <section class="qz-section">
   <div class="qz-eyebrow">Company</div>
   <h2>会社概要</h2>
@@ -365,6 +397,36 @@ body.qz-page .site-header {
   </div>
 </section>
 
+<!-- サービスの特徴 -->
+<section class="qz-section">
+  <div class="qz-eyebrow">Features</div>
+  <h2>クイズシェアの特徴</h2>
+  <div class="qz-feature-grid">
+    <div class="qz-feature">📝<h4>かんたん投稿</h4><p>選択式・記述式のクイズを画像やヒント、解説つきで投稿できます。別解の登録にも対応し、採点は自動です。</p></div>
+    <div class="qz-feature">⏱️<h4>タイムとランキング</h4><p>解答時間を自動計測。正答率とスピードでグループ内のランキングが作られ、何度でも挑戦できます。</p></div>
+    <div class="qz-feature">⚔️<h4>バトルモード</h4><p>ルームコードを共有するだけで、友達とリアルタイムのクイズ対戦ができます。</p></div>
+    <div class="qz-feature">🎉<h4>イベント開催</h4><p>期間限定の大会を開けます。結果発表の日時予約や、公平性を守る不正対策も備えています。</p></div>
+    <div class="qz-feature">🏫<h4>学校モード</h4><p>先生用の管理機能を備え、クラスでの出題や目標設定、お知らせの配信に使えます。</p></div>
+    <div class="qz-feature">🎨<h4>テーマと図鑑</h4><p>季節のテーマで見た目が変わり、公式ライブラリでは分野別のクイズ図鑑を楽しめます。</p></div>
+  </div>
+</section>
+
+<!-- 安心への取り組み -->
+<section class="qz-section">
+  <div class="qz-eyebrow">Trust &amp; Safety</div>
+  <h2>安心への取り組み</h2>
+  <p style="color:#5b5546; font-size:0.92rem; line-height:1.9; margin:0 0 14px;">
+    クイズシェアは、登録不要で気軽に使える一方で、預かった情報は厳重に扱います。
+    投稿された問題文や答え、作者名はすべて暗号化して保存し、パスワードは復元できない形で管理しています。
+    利用規約に反する疑いのある投稿は、確認が終わるまで公開を一時停止する仕組み(モデレーション)を運用しており、
+    サイトのデータは毎日自動でバックアップされています。エラーの自動監視により、不具合には利用者から報告される前に対応することを目指しています。
+  </p>
+  <div style="display:flex; gap:10px; flex-wrap:wrap;">
+    <a href="/terms" class="qz-btn qz-btn-ghost" style="font-size:0.85rem;">利用規約</a>
+    <a href="/privacy" class="qz-btn qz-btn-ghost" style="font-size:0.85rem;">プライバシーポリシー</a>
+  </div>
+</section>
+
 <!-- チーム -->
 <section class="qz-section">
   <div class="qz-eyebrow">Team</div>
@@ -379,6 +441,43 @@ body.qz-page .site-header {
     <span class="qz-role-pill">開発</span>
     <span class="qz-role-pill">デザイン</span>
     <span class="qz-role-pill">運営サポート</span>
+  </div>
+</section>
+
+<!-- 沿革 -->
+<section class="qz-section">
+  <div class="qz-eyebrow">History</div>
+  <h2>沿革</h2>
+  <ul class="qz-timeline">
+    <li><b>2026年 春</b> — クイズシェアの開発をスタート。グループでクイズを共有する基本機能を公開。</li>
+    <li><b>2026年 5月</b> — 画像つきクイズ、クイズセット、テーマ機能を追加。公式ライブラリの整備を開始。</li>
+    <li><b>2026年 6月</b> — イベント機能とバトルモードを公開。Q'zの社員システムが発足し、チームでの運営体制へ。</li>
+    <li><b>2026年 7月</b> — セキュリティと運営体制を大幅強化。モデレーション制度、自動バックアップ、エラー監視を導入。人事制度(採用・承認)も整備。</li>
+    <li><b>これから</b> — 利用者の声を聞きながら、もっと学びと遊びがつながるサービスへ。</li>
+  </ul>
+</section>
+
+<!-- FAQ -->
+<section class="qz-section">
+  <div class="qz-eyebrow">FAQ</div>
+  <h2>よくある質問</h2>
+  <div class="qz-faq">
+    <details>
+      <summary>クイズシェアは無料で使えますか？</summary>
+      <p>はい、すべての機能を無料で使えます。アカウント登録も不要で、グループの合言葉があればすぐに始められます。</p>
+    </details>
+    <details>
+      <summary>グループはどうやって作りますか？</summary>
+      <p>クイズシェアのトップページから新しいグループを作成できます。グループIDとパスワードを決めて、仲間に共有するだけです。</p>
+    </details>
+    <details>
+      <summary>投稿したクイズは誰でも見られますか？</summary>
+      <p>いいえ。クイズは投稿したグループの中だけで共有されます。データは暗号化して保存されるため、運営者であっても合言葉なしに中身を見ることはできません。</p>
+    </details>
+    <details>
+      <summary>不具合や要望はどこに送ればいいですか？</summary>
+      <p>ページ下部の「フィードバックを送る」からお寄せください。すべてのフィードバックに目を通し、改善の参考にしています。</p>
+    </details>
   </div>
 </section>
 
