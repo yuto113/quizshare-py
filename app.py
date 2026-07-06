@@ -4329,10 +4329,11 @@ def api_staff_hr_list():
         return err('管理者だけが見られるよ', 403)
     import sqlite3 as _sq
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
-    rows = conn.execute('SELECT staff_id, name, role, status, active_from FROM qz_staff ORDER BY id').fetchall()
+    rows = conn.execute('SELECT staff_id, name, role, status, active_from, security_role FROM qz_staff ORDER BY id').fetchall()
     conn.close()
     staff = [{'staff_id': r[0], 'name': dec(r[1]), 'role': r[2] or 'member',
-              'status': r[3] or 'active', 'active_from': r[4]} for r in rows]
+              'status': r[3] or 'active', 'active_from': r[4],
+              'security_role': r[5] or ''} for r in rows]
     return ok(staff=staff)
 
 @app.route('/api/staff/hr/add', methods=['POST'])
@@ -4541,7 +4542,11 @@ def _inject_staff_nav_flags():
         flag = staff_is_admin() if session.get('staff_id') else False
     except Exception:
         flag = False
-    return dict(staff_nav_is_admin=flag)
+    try:
+        kouan = staff_kouan_role()
+    except Exception:
+        kouan = ''
+    return dict(staff_nav_is_admin=flag, staff_nav_kouan=kouan)
 
 @app.route('/api/staff/moderation/list', methods=['GET'])
 def api_staff_moderation_list():
@@ -4601,6 +4606,193 @@ def page_staff_moderation():
     if not staff_is_admin():
         return redirect('/staff/board')
     return render_template('staff_moderation.html')
+
+def staff_kouan_role():
+    # ログイン中スタッフの公安役職('zero'/'kouan'/'')を返す
+    sid = session.get('staff_id')
+    if not sid:
+        return ''
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT security_role FROM qz_staff WHERE staff_id=?', (sid,)).fetchone()
+    conn.close()
+    return (row[0] or '') if row else ''
+
+def _kouan_db():
+    # 公安用のテーブルを用意してDB接続を返す
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    conn.execute("""CREATE TABLE IF NOT EXISTS qz_kouan_orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, body TEXT,
+        created_by TEXT, created_at TEXT)""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS qz_kouan_replies (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER, staff_name TEXT,
+        body TEXT, created_at TEXT)""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS qz_kouan_tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, detail TEXT,
+        reward INTEGER, status TEXT, done_by TEXT, created_at TEXT, done_at TEXT)""")
+    return conn
+
+def _kouan_now():
+    import pytz as _p
+    from datetime import datetime as _d
+    return _d.now(_p.timezone('Asia/Tokyo')).strftime('%Y-%m-%d %H:%M')
+
+@app.route('/api/staff/kouan/orders', methods=['GET'])
+def api_kouan_orders_get():
+    if staff_kouan_role() == '':
+        return err('権限がないよ', 403)
+    conn = _kouan_db()
+    orders = conn.execute('SELECT id, title, body, created_by, created_at FROM qz_kouan_orders ORDER BY id DESC LIMIT 50').fetchall()
+    result = []
+    for o in orders:
+        reps = conn.execute('SELECT staff_name, body, created_at FROM qz_kouan_replies WHERE order_id=? ORDER BY id', (o[0],)).fetchall()
+        result.append({'id': o[0], 'title': dec(o[1] or ''), 'body': dec(o[2] or ''),
+                       'created_by': dec(o[3] or ''), 'created_at': o[4],
+                       'replies': [{'staff_name': dec(r[0] or ''), 'body': dec(r[1] or ''), 'created_at': r[2]} for r in reps]})
+    conn.close()
+    return ok(orders=result)
+
+@app.route('/api/staff/kouan/orders', methods=['POST'])
+def api_kouan_orders_post():
+    # 指令を出せるのはゼロだけ
+    if staff_kouan_role() != 'zero':
+        return err('指令を出せるのはゼロだけだよ', 403)
+    data = request.get_json(silent=True) or {}
+    title = str(data.get('title') or '').strip()[:100]
+    body = str(data.get('body') or '').strip()[:2000]
+    if not title or not body:
+        return err('タイトルと本文を入力してね')
+    conn = _kouan_db()
+    conn.execute('INSERT INTO qz_kouan_orders (title, body, created_by, created_at) VALUES (?,?,?,?)',
+                 (enc(title), enc(body), enc(session.get('staff_name') or ''), _kouan_now()))
+    conn.commit()
+    conn.close()
+    return ok(message='指令を発令したよ')
+
+@app.route('/api/staff/kouan/reply', methods=['POST'])
+def api_kouan_reply():
+    # 公安メンバーは返信のみできる
+    if staff_kouan_role() == '':
+        return err('権限がないよ', 403)
+    data = request.get_json(silent=True) or {}
+    order_id = int(data.get('order_id') or 0)
+    body = str(data.get('body') or '').strip()[:2000]
+    if not body:
+        return err('本文を入力してね')
+    conn = _kouan_db()
+    if not conn.execute('SELECT id FROM qz_kouan_orders WHERE id=?', (order_id,)).fetchone():
+        conn.close()
+        return err('その指令は見つからないよ', 404)
+    conn.execute('INSERT INTO qz_kouan_replies (order_id, staff_name, body, created_at) VALUES (?,?,?,?)',
+                 (order_id, enc(session.get('staff_name') or ''), enc(body), _kouan_now()))
+    conn.commit()
+    conn.close()
+    return ok(message='返信したよ')
+
+@app.route('/api/staff/kouan/tasks', methods=['GET'])
+def api_kouan_tasks_get():
+    if staff_kouan_role() == '':
+        return err('権限がないよ', 403)
+    conn = _kouan_db()
+    rows = conn.execute('SELECT id, title, detail, reward, status, done_by, created_at, done_at FROM qz_kouan_tasks ORDER BY id DESC LIMIT 50').fetchall()
+    conn.close()
+    return ok(tasks=[{'id': r[0], 'title': dec(r[1] or ''), 'detail': dec(r[2] or ''),
+                      'reward': r[3] or 0, 'status': r[4] or 'open',
+                      'done_by': dec(r[5] or '') if r[5] else '',
+                      'created_at': r[6], 'done_at': r[7]} for r in rows])
+
+@app.route('/api/staff/kouan/tasks', methods=['POST'])
+def api_kouan_tasks_post():
+    # タスクを発行できるのはゼロだけ(報酬つき)
+    if staff_kouan_role() != 'zero':
+        return err('タスクを出せるのはゼロだけだよ', 403)
+    data = request.get_json(silent=True) or {}
+    title = str(data.get('title') or '').strip()[:100]
+    detail = str(data.get('detail') or '').strip()[:2000]
+    reward = max(0, min(1000000, int(data.get('reward') or 0)))
+    if not title:
+        return err('タスク名を入力してね')
+    conn = _kouan_db()
+    conn.execute('INSERT INTO qz_kouan_tasks (title, detail, reward, status, created_at) VALUES (?,?,?,?,?)',
+                 (enc(title), enc(detail), reward, 'open', _kouan_now()))
+    conn.commit()
+    conn.close()
+    return ok(message='極秘タスクを発行したよ')
+
+@app.route('/api/staff/kouan/tasks/done', methods=['POST'])
+def api_kouan_task_done():
+    if staff_kouan_role() == '':
+        return err('権限がないよ', 403)
+    data = request.get_json(silent=True) or {}
+    task_id = int(data.get('task_id') or 0)
+    conn = _kouan_db()
+    row = conn.execute('SELECT status FROM qz_kouan_tasks WHERE id=?', (task_id,)).fetchone()
+    if not row:
+        conn.close()
+        return err('タスクが見つからないよ', 404)
+    if row[0] == 'done':
+        conn.close()
+        return err('もう完了済みだよ')
+    conn.execute('UPDATE qz_kouan_tasks SET status=?, done_by=?, done_by_id=?, done_at=? WHERE id=?',
+                 ('done', enc(session.get('staff_name') or ''), session.get('staff_id'), _kouan_now(), task_id))
+    conn.commit()
+    conn.close()
+    return ok(message='任務完了! おつかれさま')
+
+@app.route('/api/staff/hr/security', methods=['POST'])
+def api_staff_hr_security():
+    # 人事: 公安の任命(なし→公安→ゼロ→なし)
+    if not staff_is_admin():
+        return err('管理者だけができるよ', 403)
+    data = request.get_json(silent=True) or {}
+    staff_id = str(data.get('staff_id') or '').strip()
+    sec = data.get('security_role')
+    if sec not in ['', 'kouan', 'zero']:
+        return err('役職の値がおかしいよ')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    conn.execute('UPDATE qz_staff SET security_role=? WHERE staff_id=?', (sec or None, staff_id))
+    conn.commit()
+    conn.close()
+    return ok(message='任命したよ')
+
+# KPのレート(ここを変えれば表示が全部変わる)
+KP_RATE_TEXT = "100KP = 1回年(Q'z社内通貨)"
+
+@app.route('/api/staff/kouan/points', methods=['GET'])
+def api_kouan_points():
+    # 公安メンバー全員のKP残高(完了したタスクの報酬の合計)
+    if staff_kouan_role() == '':
+        return err('権限がないよ', 403)
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    members = conn.execute("SELECT staff_id, name, security_role FROM qz_staff WHERE security_role IS NOT NULL AND security_role != ''").fetchall()
+    sums = dict(conn.execute("SELECT done_by_id, COALESCE(SUM(reward),0) FROM qz_kouan_tasks WHERE status='done' AND done_by_id IS NOT NULL GROUP BY done_by_id").fetchall())
+    conn.close()
+    points = [{'staff_id': m[0], 'name': dec(m[1] or ''), 'security_role': m[2],
+               'kp': int(sums.get(m[0], 0))} for m in members]
+    points.sort(key=lambda p: -p['kp'])
+    return ok(points=points, rate=KP_RATE_TEXT, my_id=session.get('staff_id'))
+
+@app.route('/staff/kp')
+def page_staff_kp():
+    # KP残高ページ(公安メンバーだけ)
+    if not session.get('staff_id'):
+        return redirect('/staff/login')
+    if staff_kouan_role() == '':
+        return redirect('/staff/board')
+    return render_template('staff_kp.html')
+
+@app.route('/staff/kouan')
+def page_staff_kouan():
+    # 公安ページ(任命された人だけ)
+    if not session.get('staff_id'):
+        return redirect('/staff/login')
+    role = staff_kouan_role()
+    if role == '':
+        return redirect('/staff/board')
+    return render_template('staff_kouan.html', kouan_role=role)
 
 @app.route('/staff/board')
 def page_staff_board():

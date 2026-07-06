@@ -19,6 +19,7 @@
     <a href="/staff/calendar">📅 カレンダー</a>
     <a href="/staff/tasks">✅ タスク</a>
     <a href="/staff/profile">👤 プロフィール</a>
+    {% if staff_nav_kouan %}<a href="/staff/kouan" style="color:#9aa7ff;">🕶️ 公安</a>{% endif %}
     {% if staff_nav_is_admin %}
     <details>
       <summary>⚙️ 管理 ▾</summary>

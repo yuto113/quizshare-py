@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}KP残高 - Q'z{% endblock %}
+{% block body_class %}qz-board-page{% endblock %}
+{% block content %}
+<style>
+.site-header { display: none !important; }
+body { background:#0d1220 !important; }
+.k-wrap { max-width:680px; margin:24px auto; padding:0 20px; }
+.k-box { background:#161d33; border:1px solid #2a3555; border-radius:12px; padding:16px; margin-bottom:12px; color:#dde3f5; }
+.k-title { color:#9aa7ff; letter-spacing:0.15em; }
+.kp-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #2a3555; flex-wrap:wrap; gap:6px; }
+.kp-num { font-size:1.1rem; font-weight:900; color:#c8e6a0; }
+</style>
+
+{% include '_staff_nav.html' %}
+
+<div class="k-wrap">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+    <h2 class="k-title" style="margin:0;">💎 KP残高</h2>
+    <a href="/staff/kouan" style="color:#9aa7ff; font-size:13px;">← 公安ページへ</a>
+  </div>
+  <p id="kp-rate" style="color:#6b7799; font-size:12px;"></p>
+
+  <div class="k-box" id="my-kp" style="text-align:center;">読み込み中...</div>
+
+  <div class="k-box">
+    <b class="k-title" style="font-size:0.9rem;">公安メンバーの残高</b>
+    <div id="kp-list" style="margin-top:8px;">読み込み中...</div>
+  </div>
+  <p style="color:#6b7799; font-size:11px;">KPは極秘タスクを✅終了すると、その報酬額ぶん増えるよ。</p>
+</div>
+
+<script>
+async function loadKP() {
+  const r = await fetch('/api/staff/kouan/points');
+  const data = await r.json();
+  if (data.ok === false || data.ok === undefined) { window.location.href = '/staff/board'; return; }
+  document.getElementById('kp-rate').textContent = 'レート: ' + data.rate;
+  const rateKp = 100;  // 100KPあたり
+  const me = data.points.find(p => p.staff_id === data.my_id);
+  if (me) {
+    document.getElementById('my-kp').innerHTML =
+      '<div style="color:#6b7799; font-size:12px;">あなたの残高</div>' +
+      '<div style="font-size:2rem; font-weight:900; color:#c8e6a0;">' + Number(me.kp).toLocaleString() + ' KP</div>' +
+      '<div style="color:#9aa7ff; font-size:13px;">= ' + (me.kp / rateKp).toLocaleString() + ' 回年</div>';
+  }
+  document.getElementById('kp-list').innerHTML = data.points.map((p, i) => `
+    <div class="kp-row" style="${p.staff_id === data.my_id ? 'background:rgba(154,167,255,0.08); border-radius:8px; padding-left:8px; padding-right:8px;' : ''}">
+      <span>${i === 0 && p.kp > 0 ? '👑 ' : ''}${p.security_role === 'zero' ? '🕶️(ゼロ) ' : ''}${escP(p.name)}</span>
+      <span class="kp-num">${Number(p.kp).toLocaleString()} KP</span>
+    </div>`).join('');
+}
+function escP(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+loadKP();
+</script>
+{% endblock %}

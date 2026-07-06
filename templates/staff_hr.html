@@ -84,7 +84,9 @@ async function loadHR() {
       <div class="hr-row">
         <span>${s.role === 'admin' ? '👑 ' : ''}${esc(s.name)} (${esc(s.staff_id)})
           ${s.active_from ? '<span style="color:#8a8270; font-size:12px;"> 入社日: ' + s.active_from + '</span>' : ''}</span>
-        <span>${(s.role === 'admin' || s.staff_id === MY_ID) ? '' : '<button onclick="hrRemove(&quot;' + esc(s.staff_id) + '&quot;)" class="hr-btn" style="background:#8a8270;">🚪 退社</button>'}</span>
+        <span>
+          <button onclick="hrSecurity('${esc(s.staff_id)}', '${s.security_role}')" class="hr-btn" style="background:#3d4a7a; margin-right:4px;">${s.security_role === 'zero' ? '🕶️ ゼロ' : (s.security_role === 'kouan' ? '🕶️ 公安' : '🕶️ 任命')}</button>
+          ${(s.role === 'admin' || s.staff_id === MY_ID) ? '' : '<button onclick="hrRemove(&quot;' + esc(s.staff_id) + '&quot;)" class="hr-btn" style="background:#8a8270;">🚪 退社</button>'}</span>
       </div>`).join('') || '<p style="color:#8a8270; font-size:13px;">いないよ</p>';
 
   document.getElementById('hr-retired').innerHTML = retired.map(s => `
@@ -99,6 +101,20 @@ async function hrDecide(staffId, approve) {
   });
   const data = await r.json();
   window.toast(data.ok ? data.message : (data.error || 'エラー'), data.ok ? 'success' : 'error');
+  loadHR();
+}
+
+async function hrSecurity(staffId, current) {
+  // 押すたびに なし→公安→ゼロ→なし と切り替わる
+  const next = current === '' ? 'kouan' : (current === 'kouan' ? 'zero' : '');
+  const label = next === '' ? '公安から外す' : (next === 'kouan' ? '公安に任命する' : '公安(ゼロ)に任命する');
+  if (confirm(staffId + ' さんを「' + label + '」でいい？') === false) return;
+  const r = await fetch('/api/staff/hr/security', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({staff_id: staffId, security_role: next})
+  });
+  const data = await r.json();
+  window.toast(data.ok ? '任命したよ' : (data.error || 'エラー'), data.ok ? 'success' : 'error');
   loadHR();
 }
 
