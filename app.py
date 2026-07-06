@@ -4745,7 +4745,7 @@ def api_kouan_task_done():
     data = request.get_json(silent=True) or {}
     task_id = int(data.get('task_id') or 0)
     conn = _kouan_db()
-    row = conn.execute('SELECT status, assignee_id FROM qz_kouan_tasks WHERE id=?', (task_id,)).fetchone()
+    row = conn.execute('SELECT status, assignee_id, reward FROM qz_kouan_tasks WHERE id=?', (task_id,)).fetchone()
     if not row:
         conn.close()
         return err('タスクが見つからないよ', 404)
@@ -4755,6 +4755,15 @@ def api_kouan_task_done():
     if row[1] and row[1] != session.get('staff_id'):
         conn.close()
         return err('このタスクの担当者じゃないよ', 403)
+    # 報酬は予算口座から支払う。予算が足りなければ完了できない
+    reward = int(row[2] or 0)
+    budget = conn.execute("SELECT COALESCE(SUM(amount),0) FROM qz_kouan_grants WHERE staff_id='BUDGET'").fetchone()[0]
+    if reward > 0 and budget < reward:
+        conn.close()
+        return err('予算が足りないよ(いま ' + str(budget) + ' KP)。ゼロに予算の補充をお願いしてね')
+    if reward > 0:
+        conn.execute('INSERT INTO qz_kouan_grants (staff_id, amount, note, created_at) VALUES (?,?,?,?)',
+                     ('BUDGET', -reward, enc('タスク報酬の支払い'), _kouan_now()))
     conn.execute('UPDATE qz_kouan_tasks SET status=?, done_by=?, done_by_id=?, done_at=? WHERE id=?',
                  ('done', enc(session.get('staff_name') or ''), session.get('staff_id'), _kouan_now(), task_id))
     conn.commit()
@@ -4809,10 +4818,12 @@ def api_kouan_grant():
     if staff_id == 'self':
         staff_id = session.get('staff_id')
     conn = _kouan_db()
-    row = conn.execute("SELECT staff_id FROM qz_staff WHERE staff_id=? AND security_role IS NOT NULL AND security_role != ''", (staff_id,)).fetchone()
-    if not row:
-        conn.close()
-        return err('その人は公安メンバーじゃないよ')
+    # 予算口座(BUDGET)は人間じゃない仮想口座なので、メンバー確認を飛ばす
+    if staff_id != 'BUDGET':
+        row = conn.execute("SELECT staff_id FROM qz_staff WHERE staff_id=? AND security_role IS NOT NULL AND security_role != ''", (staff_id,)).fetchone()
+        if not row:
+            conn.close()
+            return err('その人は公安メンバーじゃないよ')
     conn.execute('INSERT INTO qz_kouan_grants (staff_id, amount, note, created_at) VALUES (?,?,?,?)',
                  (staff_id, amount, enc(note) if note else None, _kouan_now()))
     conn.commit()
@@ -4871,13 +4882,16 @@ def api_kouan_points():
         note TEXT, created_at TEXT)''')
     for sid, total in conn.execute('SELECT staff_id, COALESCE(SUM(amount),0) FROM qz_kouan_grants GROUP BY staff_id').fetchall():
         sums[sid] = sums.get(sid, 0) + total
+    # 予算口座は人間の残高一覧から取り出して、別枠で返す
+    budget = int(sums.pop('BUDGET', 0))
     conn.close()
     points = [{'staff_id': m[0], 'name': dec(m[1] or ''), 'security_role': m[2],
                'kp': int(sums.get(m[0], 0))} for m in members]
     points.sort(key=lambda p: -p['kp'])
     my_id = session.get('staff_id')
     return ok(points=points, rate=KP_RATE_TEXT, my_id=my_id,
-              my_kp=int(sums.get(my_id, 0)), is_zero=(staff_kouan_role() == 'zero'))
+              my_kp=int(sums.get(my_id, 0)), is_zero=(staff_kouan_role() == 'zero'),
+              budget=budget)
 
 @app.route('/staff/kp')
 def page_staff_kp():
