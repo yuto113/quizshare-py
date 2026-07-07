@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}QZERO - Q'z AI{% endblock %}
+{% block content %}
+<style>
+body { background:#ffffff !important; }
+.site-header { display:none !important; }
+.cb-wrap { max-width:640px; margin:0 auto; padding:16px; min-height:100vh; display:flex; flex-direction:column; }
+.cb-head { text-align:center; padding:16px 0; border-bottom:1px solid #eee; }
+.cb-head h1 { margin:0; font-size:1.5rem; color:#111; letter-spacing:0.15em; }
+.cb-head p { margin:4px 0 0; color:#999; font-size:0.8rem; }
+.cb-log { flex:1; padding:16px 0; overflow-y:auto; }
+.cb-msg { margin-bottom:14px; display:flex; }
+.cb-msg.me { justify-content:flex-end; }
+.cb-bubble { max-width:80%; padding:10px 14px; border-radius:14px; font-size:0.95rem; line-height:1.6; white-space:pre-wrap; }
+.cb-msg.me .cb-bubble { background:#111; color:white; }
+.cb-msg.ai .cb-bubble { background:#f2f2f2; color:#111; }
+.cb-input-row { display:flex; gap:8px; padding:12px 0; border-top:1px solid #eee; }
+.cb-input { flex:1; padding:12px; border:1px solid #ddd; border-radius:10px; font-size:1rem; }
+.cb-send { padding:12px 20px; background:#111; color:white; border:none; border-radius:10px; cursor:pointer; font-size:1rem; }
+.cb-api { margin-top:24px; padding:16px; background:#fafafa; border:1px solid #eee; border-radius:10px; font-size:0.8rem; color:#666; }
+.cb-api pre { background:#111; color:#0f0; padding:12px; border-radius:8px; overflow-x:auto; font-size:0.75rem; }
+</style>
+<script>
+function cbStrip(){try{const b=document.body;Array.from(b.classList).forEach(c=>{if(c.indexOf('theme')!==-1||c==='halloween-dark')b.classList.remove(c);});b.style.background='#ffffff';document.querySelectorAll('.seasonal-emoji').forEach(e=>e.remove());}catch(e){}}
+window.applyTheme=cbStrip;window.checkAutoTheme=cbStrip;setInterval(cbStrip,2000);cbStrip();
+</script>
+
+<div class="cb-wrap">
+  <div class="cb-head">
+    <h1>◉ QZERO</h1>
+    <p>Q'zの自作AI ・ 教科あて &amp; クイズ探し</p>
+  </div>
+  <div class="cb-log" id="cb-log"></div>
+  <div class="cb-input-row">
+    <input class="cb-input" id="cb-input" placeholder="メッセージを入力(例: これ何科? 光合成とは)" onkeydown="if(event.key==='Enter')cbSend()">
+    <button class="cb-send" onclick="cbSend()">送信</button>
+  </div>
+
+  <div class="cb-api">
+    <b>🔌 API(外部サイトからも使えるよ)</b>
+    <pre>POST /qzero/api/predict
+{ "text": "植物が光を受けて養分を作るはたらきは？" }
+
+→ { "ok": true, "subject": "理科", "confidence": 82.3 }</pre>
+  </div>
+</div>
+
+<script>
+function addMsg(who, text) {
+  const log = document.getElementById('cb-log');
+  const div = document.createElement('div');
+  div.className = 'cb-msg ' + who;
+  div.innerHTML = '<div class="cb-bubble"></div>';
+  div.querySelector('.cb-bubble').textContent = text;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+addMsg('ai', 'こんにちは! 私はQZERO、Q\'zの自作AIだよ。問題文を見せてくれたら何の教科か当てるし、「理科のクイズ出して」みたいなお願いもできる。ためしてみて!');
+
+async function cbSend() {
+  const inp = document.getElementById('cb-input');
+  const text = inp.value.trim();
+  if (text === '') return;
+  addMsg('me', text);
+  inp.value = '';
+  try {
+    const r = await fetch('/qzero/api/chat', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({text})
+    });
+    const data = await r.json();
+    addMsg('ai', data.ok ? data.reply : (data.error || 'エラーが起きたよ'));
+  } catch (e) {
+    addMsg('ai', '通信エラーが起きたよ');
+  }
+}
+</script>
+{% endblock %}

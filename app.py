@@ -4252,6 +4252,250 @@ def api_quiz_info(quiz_id):
         images=imgs,
     )
 
+@app.route('/typing')
+def page_typing():
+    # Q'zタイピング(誰でも遊べる)
+    return render_template('typing.html')
+
+def _typing_db():
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    conn.execute("""CREATE TABLE IF NOT EXISTS typing_scores (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, nickname TEXT, score INTEGER,
+        kpm INTEGER, accuracy REAL, created_at TEXT, mode TEXT)""")
+    try:
+        conn.execute('ALTER TABLE typing_scores ADD COLUMN mode TEXT')
+    except Exception:
+        pass
+    conn.execute("""CREATE TABLE IF NOT EXISTS typing_plays (
+        token TEXT PRIMARY KEY, started_at REAL)""")
+    return conn
+
+@app.route('/api/typing/start', methods=['POST'])
+def api_typing_start():
+    # プレイ券を発行(提出時にサーバーが経過時間を検証するため)
+    if not rate_limit(f'typstart:{client_ip()}', 10):
+        return err('少し待ってね')
+    import secrets, time as _t
+    token = secrets.token_hex(16)
+    conn = _typing_db()
+    conn.execute('INSERT INTO typing_plays (token, started_at) VALUES (?,?)', (token, _t.time()))
+    # 古いプレイ券は掃除
+    conn.execute('DELETE FROM typing_plays WHERE started_at < ?', (_t.time() - 3600,))
+    conn.commit()
+    conn.close()
+    return ok(token=token)
+
+@app.route('/api/typing/submit', methods=['POST'])
+def api_typing_submit():
+    if not rate_limit(f'typsub:{client_ip()}', 6):
+        return err('少し待ってね')
+    data = request.get_json(silent=True) or {}
+    token = str(data.get('token') or '')
+    nickname = str(data.get('nickname') or '').strip()[:12] or 'ななしさん'
+    score = int(data.get('score') or 0)
+    kpm = int(data.get('kpm') or 0)
+    accuracy = float(data.get('accuracy') or 0)
+    mode = data.get('mode')
+    if mode not in ['easy', 'normal', 'hard']:
+        mode = 'normal'
+    import time as _t
+    conn = _typing_db()
+    row = conn.execute('SELECT started_at FROM typing_plays WHERE token=?', (token,)).fetchone()
+    if not row:
+        conn.close()
+        return err('プレイ券がないよ。最初から遊んでね')
+    elapsed = _t.time() - row[0]
+    # 60秒ゲームなのに速すぎ/遅すぎる提出は不正とみなす
+    if elapsed < 55 or elapsed > 300:
+        conn.close()
+        return err('プレイ時間がおかしいよ')
+    # 物理的にありえない数値は弾く(世界記録でもKPM900くらい)
+    if kpm > 900 or score > 3000 or accuracy > 100:
+        conn.close()
+        return err('記録がおかしいよ')
+    conn.execute('DELETE FROM typing_plays WHERE token=?', (token,))  # 使い捨て
+    import pytz as _p
+    from datetime import datetime as _d
+    conn.execute('INSERT INTO typing_scores (nickname, score, kpm, accuracy, created_at, mode) VALUES (?,?,?,?,?,?)',
+                 (enc(nickname), score, kpm, round(accuracy, 1),
+                  _d.now(_p.timezone('Asia/Tokyo')).strftime('%Y-%m-%d %H:%M'), mode))
+    conn.commit()
+    conn.close()
+    return ok(message='記録したよ!')
+
+@app.route('/api/typing/ranking', methods=['GET'])
+def api_typing_ranking():
+    conn = _typing_db()
+    mode = request.args.get('mode')
+    if mode not in ['easy', 'normal', 'hard']:
+        mode = 'normal'
+    rows = conn.execute("SELECT nickname, score, kpm, accuracy, created_at FROM typing_scores WHERE COALESCE(mode,'normal')=? ORDER BY score DESC, kpm DESC LIMIT 20", (mode,)).fetchall()
+    conn.close()
+    return ok(ranking=[{'nickname': dec(r[0] or ''), 'score': r[1], 'kpm': r[2],
+                        'accuracy': r[3], 'created_at': str(r[4] or '')[:10]} for r in rows])
+
+import re as _re_qzero
+from qz_qzero import brain as qzero_brain
+
+def _qzero_db():
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    conn.execute("""CREATE TABLE IF NOT EXISTS qzero_unknown (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, question TEXT, created_at TEXT)""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS qzero_memory (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, question TEXT, answer TEXT, created_at TEXT)""")
+    return conn
+
+@app.route('/staff/qzero-school')
+def page_qzero_school():
+    # QZERO教室(管理者だけ)
+    if not session.get('staff_id'):
+        return redirect('/staff/login')
+    if not staff_is_admin():
+        return redirect('/staff/board')
+    return render_template('qzero_school.html')
+
+@app.route('/api/qzero/school/list', methods=['GET'])
+def api_qzero_school_list():
+    if not staff_is_admin():
+        return err('管理者だけだよ', 403)
+    conn = _qzero_db()
+    unknown = [{'id': r[0], 'question': r[1], 'created_at': r[2]} for r in
+               conn.execute('SELECT id, question, created_at FROM qzero_unknown ORDER BY id DESC LIMIT 100').fetchall()]
+    memory = [{'id': r[0], 'question': r[1], 'answer': dec(r[2]), 'created_at': r[3]} for r in
+              conn.execute('SELECT id, question, answer, created_at FROM qzero_memory ORDER BY id DESC LIMIT 100').fetchall()]
+    conn.close()
+    return ok(unknown=unknown, memory=memory)
+
+@app.route('/api/qzero/school/teach', methods=['POST'])
+def api_qzero_school_teach():
+    # 「この質問にはこう答えて」を教え込む
+    if not staff_is_admin():
+        return err('管理者だけだよ', 403)
+    data = request.get_json(silent=True) or {}
+    question = str(data.get('question') or '').strip()[:300]
+    answer = str(data.get('answer') or '').strip()[:1000]
+    unknown_id = data.get('unknown_id')
+    if not question or not answer:
+        return err('質問と答えの両方を入れてね')
+    import pytz as _p
+    from datetime import datetime as _d
+    conn = _qzero_db()
+    conn.execute('INSERT INTO qzero_memory (question, answer, created_at) VALUES (?,?,?)',
+                 (question, enc(answer), _d.now(_p.timezone('Asia/Tokyo')).strftime('%Y-%m-%d %H:%M')))
+    # 教え終わった「わからなかった質問」は一覧から消す
+    if unknown_id:
+        conn.execute('DELETE FROM qzero_unknown WHERE id=?', (unknown_id,))
+    conn.commit()
+    conn.close()
+    return ok(message='QZEROが1つ賢くなったよ!')
+
+@app.route('/api/qzero/school/forget', methods=['POST'])
+def api_qzero_school_forget():
+    # 覚えた答えが間違ってたとき、忘れさせる
+    if not staff_is_admin():
+        return err('管理者だけだよ', 403)
+    data = request.get_json(silent=True) or {}
+    conn = _qzero_db()
+    conn.execute('DELETE FROM qzero_memory WHERE id=?', (int(data.get('id') or 0),))
+    conn.commit()
+    conn.close()
+    return ok(message='忘れさせたよ')
+
+@app.route('/api/qzero/school/dismiss', methods=['POST'])
+def api_qzero_school_dismiss():
+    # 教えずに、わからない質問リストから消すだけ
+    if not staff_is_admin():
+        return err('管理者だけだよ', 403)
+    data = request.get_json(silent=True) or {}
+    conn = _qzero_db()
+    conn.execute('DELETE FROM qzero_unknown WHERE id=?', (int(data.get('id') or 0),))
+    conn.commit()
+    conn.close()
+    return ok(message='消したよ')
+
+@app.route('/qzero')
+def page_qzero():
+    return render_template('qzero.html')
+
+@app.route('/qzero/api/predict', methods=['POST'])
+def api_qzero_predict():
+    # 教科あてAPI(外部サイトからも使える。これがCerebroの本体機能)
+    if not rate_limit(f'qzero:{client_ip()}', 30):
+        return err('少し待ってね')
+    data = request.get_json(silent=True) or {}
+    text = str(data.get('text') or '').strip()[:500]
+    if not text:
+        return err('textを入れてね')
+    try:
+        result = qzero_brain.predict_subject(text)
+    except Exception as e:
+        return err('予測に失敗したよ: ' + str(e)[:80])
+    return ok(**result)
+
+@app.route('/qzero/api/chat', methods=['POST'])
+def api_qzero_chat():
+    # チャットAPI: 意図を読んで返事をする
+    if not rate_limit(f'qzerochat:{client_ip()}', 30):
+        return err('少し待ってね')
+    data = request.get_json(silent=True) or {}
+    text = str(data.get('text') or '').strip()[:500]
+    if not text:
+        return err('メッセージを入れてね')
+    # まず「教わったこと」を思い出す(教科あてより優先)
+    conn = _qzero_db()
+    mems = [{'question': r[0], 'answer': dec(r[1])} for r in
+            conn.execute('SELECT question, answer FROM qzero_memory').fetchall()]
+    conn.close()
+    hit = qzero_brain.match_memory(text, mems)
+    if hit:
+        return ok(reply=hit['answer'], intent='learned')
+
+    intent = qzero_brain.detect_intent(text)
+
+    if intent == 'greeting':
+        return ok(reply='こんにちは! 私はQZERO、Q\'zの自作AIだよ。クイズの教科を当てたり、クイズを探したりできる。何か問題文を見せてくれたら、何の教科か当ててみせるよ!', intent=intent)
+
+    if intent == 'about':
+        return ok(reply='私はQZERO。6331問のクイズで勉強した、Q\'z専用のAIだよ。\n・問題文を見せると「何の教科か」を当てる(正確率80%!)\n・「理科のクイズ出して」みたいに言うと、クイズを探す\nまだQ\'zの中のことが得意分野。これからもっと賢くなっていくよ。', intent=intent)
+
+    if intent == 'find_quiz':
+        topic = qzero_brain.strip_command(text)
+        with get_db() as conn:
+            cur = make_cursor(conn)
+            cur.execute(q('SELECT question, answer, tags FROM quizzes ORDER BY RANDOM() LIMIT 200'))
+            rows = [dict(r) for r in cur.fetchall()]
+        hits = []
+        for r in rows:
+            question = dec(r.get('question') or '')
+            tags = dec(r.get('tags') or '')
+            if topic and (topic in question or topic in tags):
+                hits.append((question, dec(r.get('answer') or '')))
+            if len(hits) >= 3:
+                break
+        if hits:
+            lines = '\n'.join(['・' + h[0] + ' (答え: ' + h[1] + ')' for h in hits])
+            return ok(reply='「' + topic + '」に関するクイズを見つけたよ!\n' + lines, intent=intent)
+        return ok(reply='「' + topic + '」のクイズは見つからなかった…。別の言葉で試してみて。クイズシェア本体にはもっとたくさんあるよ!', intent=intent)
+
+    if intent == 'classify':
+        # 「何科?」の前後にある問題文を教科判定にかける
+        body = re.sub(r'(これ|この問題|は)?(何科|なにか|なんか|教科|ジャンル|\?|？|。)', '', text).strip()
+        target = body or text
+        result = qzero_brain.predict_subject(target)
+        return ok(reply='それは「' + result['subject'] + '」だと思う! (確信度 ' + str(result['confidence']) + '%)', intent=intent, detail=result)
+
+    # わからない → 正直に言って、質問を記録する(Cerebroを育てる教材になる)
+    import pytz as _p
+    from datetime import datetime as _d
+    conn = _qzero_db()
+    conn.execute('INSERT INTO qzero_unknown (question, created_at) VALUES (?,?)',
+                 (text, _d.now(_p.timezone('Asia/Tokyo')).strftime('%Y-%m-%d %H:%M')))
+    conn.commit()
+    conn.close()
+    return ok(reply='ごめん、それはまだ答えられない…。でも今の質問は記録したよ。こうやって少しずつ賢くなっていくんだ。今は「問題文の教科当て」と「クイズ探し」が得意だよ!', intent='unknown')
+
 @app.route('/homepage')
 def page_homepage():
     # 「数字で見るQ'z」用に本物の統計をDBから取る(失敗しても表示は壊さない)

@@ -303,6 +303,26 @@ body.qz-page .site-header {
 
 {% block content %}
 
+<script>
+// このページはサイトテーマの対象外(会社の公式ページは常に同じ見た目)
+function qzHpStripTheme() {
+  try {
+    const b = document.body;
+    if (b === null) return;
+    Array.from(b.classList).forEach(c => {
+      if (c.indexOf('theme') !== -1 || c === 'halloween-dark') b.classList.remove(c);
+    });
+    b.style.background = '';
+    document.querySelectorAll('.seasonal-emoji').forEach(e => e.remove());
+  } catch (e) {}
+}
+window.applyTheme = qzHpStripTheme;
+window.checkAutoTheme = qzHpStripTheme;
+qzHpStripTheme();
+document.addEventListener('DOMContentLoaded', qzHpStripTheme);
+setInterval(qzHpStripTheme, 2000);
+</script>
+
 <nav class="qz-nav">
   <div class="qz-nav-logo">Q'Z</div>
   <div style="display:flex; gap:20px; align-items:center;">

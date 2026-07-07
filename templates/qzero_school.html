@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}QZERO教室{% endblock %}
+{% block body_class %}qz-board-page{% endblock %}
+{% block content %}
+<style>
+.site-header { display:none !important; }
+.qs-wrap { max-width:760px; margin:24px auto; padding:0 20px; }
+.qs-box { background:white; border:1px solid #e3ddd0; border-radius:12px; padding:14px 16px; margin-bottom:12px; }
+.qs-q { color:#14213d; font-weight:700; font-size:14px; }
+.qs-btn { padding:6px 12px; border:none; border-radius:8px; cursor:pointer; font-size:12px; color:white; }
+.qs-input { width:100%; padding:9px; border:1px solid #e3ddd0; border-radius:8px; box-sizing:border-box; font-size:14px; margin-top:6px; }
+</style>
+{% include '_staff_nav.html' %}
+<div class="qs-wrap">
+  <h2 style="color:#14213d;">📝 QZERO教室</h2>
+  <p style="color:#8a8270; font-size:13px;">QZEROが答えられなかった質問に「こう答えて」を教えると、次から答えられるようになるよ。先生は君だ!</p>
+
+  <h3 style="color:#fb6f5b; font-size:1rem;">❓ 答えられなかった質問</h3>
+  <div id="qs-unknown">読み込み中...</div>
+
+  <h3 style="color:#2a9d8f; font-size:1rem; margin-top:24px;">🧠 覚えたこと</h3>
+  <div id="qs-memory"></div>
+</div>
+
+<script>
+async function loadSchool() {
+  const r = await fetch('/api/qzero/school/list');
+  const data = await r.json();
+  if (data.ok === false || data.ok === undefined) { window.location.href='/staff/board'; return; }
+
+  document.getElementById('qs-unknown').innerHTML = data.unknown.length === 0
+    ? '<p style="color:#8a8270; font-size:13px;">今はないよ。QZEROは順調!</p>'
+    : data.unknown.map(u => `
+      <div class="qs-box">
+        <div class="qs-q">Q: ${escS(u.question)}</div>
+        <div style="color:#b8b09e; font-size:11px;">${u.created_at}</div>
+        <input class="qs-input" id="ans-${u.id}" placeholder="この質問への答えを教える">
+        <div style="text-align:right; margin-top:8px;">
+          <button class="qs-btn" style="background:#8a8270;" onclick="dismiss(${u.id})">消す</button>
+          <button class="qs-btn" style="background:#2a9d8f;" onclick="teach(${u.id}, '${escAttrS(u.question)}')">教える</button>
+        </div>
+      </div>`).join('');
+
+  document.getElementById('qs-memory').innerHTML = data.memory.length === 0
+    ? '<p style="color:#8a8270; font-size:13px;">まだ何も覚えてないよ。</p>'
+    : data.memory.map(m => `
+      <div class="qs-box">
+        <div class="qs-q">Q: ${escS(m.question)}</div>
+        <div style="color:#4a4436; font-size:14px; margin-top:4px;">A: ${escS(m.answer)}</div>
+        <div style="text-align:right; margin-top:6px;">
+          <button class="qs-btn" style="background:#e76f51;" onclick="forget(${m.id})">忘れさせる</button>
+        </div>
+      </div>`).join('');
+}
+
+async function teach(unknownId, question) {
+  const answer = document.getElementById('ans-' + unknownId).value.trim();
+  if (answer === '') { window.toast('答えを入力してね', 'error'); return; }
+  const r = await fetch('/api/qzero/school/teach', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({question, answer, unknown_id: unknownId})
+  });
+  const data = await r.json();
+  window.toast(data.ok ? data.message : (data.error||'エラー'), data.ok?'success':'error');
+  loadSchool();
+}
+async function forget(id) {
+  if (!confirm('この記憶を忘れさせる？')) return;
+  await fetch('/api/qzero/school/forget', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id})});
+  loadSchool();
+}
+async function dismiss(id) {
+  await fetch('/api/qzero/school/dismiss', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id})});
+  loadSchool();
+}
+function escS(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function escAttrS(s){return String(s||'').replace(/\\/g,'').replace(/'/g,'').replace(/"/g,'');}
+loadSchool();
+</script>
+{% endblock %}

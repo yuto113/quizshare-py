@@ -1,0 +1,350 @@
+{% extends "base.html" %}
+{% block title %}Q'zタイピング{% endblock %}
+{% block content %}
+<style>
+.tp-wrap { max-width:720px; margin:24px auto; padding:0 16px; }
+.tp-card { background:white; border:1px solid #e9e2d0; border-radius:16px; padding:24px; margin-bottom:16px; }
+.tp-word { font-size:2rem; font-weight:900; color:#14213d; text-align:center; min-height:52px; }
+.tp-kana { text-align:center; color:#8a8270; font-size:1rem; }
+.tp-romaji { text-align:center; font-family:monospace; font-size:1.4rem; letter-spacing:2px; min-height:34px; }
+.tp-done { color:#2a9d8f; font-weight:700; }
+.tp-rest { color:#b8b09e; }
+.tp-hud { display:flex; justify-content:space-around; text-align:center; flex-wrap:wrap; gap:8px; }
+.tp-hud b { font-size:1.5rem; color:#fb6f5b; display:block; }
+.tp-hud span { color:#8a8270; font-size:0.75rem; }
+.tp-btn { padding:12px 28px; background:#fb6f5b; color:white; border:none; border-radius:12px; font-size:1.05rem; font-weight:700; cursor:pointer; }
+.tp-input { padding:10px; border:1px solid #e9e2d0; border-radius:10px; font-size:1rem; }
+.tp-mode { padding:9px 18px; border:2px solid #e9e2d0; background:white; border-radius:10px; cursor:pointer; font-size:0.95rem; color:#8a8270; }
+.tp-mode.on { border-color:#fb6f5b; color:#fb6f5b; font-weight:700; }
+.tp-tab { padding:6px 14px; border:none; background:#f0ece2; border-radius:8px; cursor:pointer; font-size:0.85rem; color:#8a8270; }
+.tp-tab.on { background:#fb6f5b; color:white; font-weight:700; }
+.tp-rank-row { display:flex; justify-content:space-between; padding:8px 4px; border-bottom:1px solid #f0ece2; font-size:14px; color:#4a4436; flex-wrap:wrap; gap:4px; }
+</style>
+<script>
+function tpStrip() { try { const b=document.body; Array.from(b.classList).forEach(c => { if (c.indexOf('theme') !== -1 || c === 'halloween-dark') b.classList.remove(c); }); b.style.background=''; document.querySelectorAll('.seasonal-emoji').forEach(e => e.remove()); } catch(e) {} }
+window.applyTheme = tpStrip; window.checkAutoTheme = tpStrip; setInterval(tpStrip, 2000); tpStrip();
+</script>
+
+<div class="tp-wrap">
+  <h2 style="color:#14213d; text-align:center;">⌨️ Q'zタイピング</h2>
+  <p style="color:#8a8270; text-align:center; font-size:13px;">60秒でどれだけ打てるかな？打ち方はどの流儀でもOK(si/shi、ji/zi、nn/n、伸ばし棒は「-」)</p>
+
+  <div class="tp-card" id="tp-start-card" style="text-align:center;">
+    <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-bottom:14px;">
+      <button class="tp-mode" data-mode="easy" onclick="setMode('easy')">🌱 かんたん</button>
+      <button class="tp-mode on" data-mode="normal" onclick="setMode('normal')">🌿 ふつう</button>
+      <button class="tp-mode" data-mode="hard" onclick="setMode('hard')">🌳 むずかしい</button>
+    </div>
+    <input class="tp-input" id="tp-nickname" placeholder="ニックネーム(12文字まで)" maxlength="12" style="margin-bottom:14px; width:70%;"><br>
+    <button class="tp-btn" onclick="startGame()">スタート!</button>
+  </div>
+
+  <div class="tp-card" id="tp-game-card" style="display:none;">
+    <div class="tp-hud">
+      <div><b id="tp-time">60</b><span>のこり秒</span></div>
+      <div><b id="tp-score">0</b><span>スコア</span></div>
+      <div><b id="tp-miss">0</b><span>ミス</span></div>
+    </div>
+    <hr style="border:none; border-top:1px solid #f0ece2; margin:16px 0;">
+    <div class="tp-word" id="tp-word">-</div>
+    <div class="tp-kana" id="tp-kana">-</div>
+    <div class="tp-romaji"><span class="tp-done" id="tp-done"></span><span class="tp-rest" id="tp-rest"></span></div>
+  </div>
+
+  <div class="tp-card" id="tp-result-card" style="display:none; text-align:center;">
+    <h3 style="color:#14213d;">🎉 けっか</h3>
+    <div class="tp-hud">
+      <div><b id="tp-r-score">0</b><span>スコア</span></div>
+      <div><b id="tp-r-kpm">0</b><span>KPM</span></div>
+      <div><b id="tp-r-acc">0%</b><span>正確率</span></div>
+    </div>
+    <p id="tp-r-msg" style="color:#8a8270; font-size:13px;"></p>
+    <button class="tp-btn" onclick="location.reload()">もう一回!</button>
+  </div>
+
+  <div class="tp-card">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <h3 style="color:#14213d; margin:0;">🏆 ランキング TOP20</h3>
+      <div style="display:flex; gap:6px;">
+        <button class="tp-tab" data-mode="easy" onclick="loadRanking('easy')">かんたん</button>
+        <button class="tp-tab on" data-mode="normal" onclick="loadRanking('normal')">ふつう</button>
+        <button class="tp-tab" data-mode="hard" onclick="loadRanking('hard')">むずかしい</button>
+      </div>
+    </div>
+    <div id="tp-ranking" style="margin-top:10px;">読み込み中...</div>
+  </div>
+</div>
+
+<script>
+// ============================================
+// お題の単語(難易度べつ)。伸ばし棒「ー」は「-」キーで打つ
+// ============================================
+const WORDS = {
+easy: [
+  ['ねこ','ねこ'],['いぬ','いぬ'],['うみ','うみ'],['そら','そら'],['やま','やま'],
+  ['かわ','かわ'],['ほし','ほし'],['つき','つき'],['はな','はな'],['とり','とり'],
+  ['さかな','さかな'],['くも','くも'],['あめ','あめ'],['ゆき','ゆき'],['かぜ','かぜ'],
+  ['みず','みず'],['ひかり','ひかり'],['こおり','こおり'],['くるま','くるま'],['でんわ','でんわ'],
+  ['りんご','りんご'],['みかん','みかん'],['ぱん','ぱん'],['けーき','けーき'],['たまご','たまご'],
+  ['ごはん','ごはん'],['おちゃ','おちゃ'],['いちご','いちご'],['ぶどう','ぶどう'],['もも','もも'],
+  ['いす','いす'],['つくえ','つくえ'],['まど','まど'],['どあ','どあ'],['かべ','かべ'],
+  ['ゆか','ゆか'],['てんき','てんき'],['あさ','あさ'],['ひる','ひる'],['よる','よる'],
+  ['はる','はる'],['なつ','なつ'],['あき','あき'],['ふゆ','ふゆ'],['ちず','ちず'],
+  ['ぼうし','ぼうし'],['くつ','くつ'],['かばん','かばん'],['ぼーる','ぼーる'],['えほん','えほん'],
+  ['てがみ','てがみ'],['きって','きって'],['はさみ','はさみ'],['のり','のり'],['いと','いと'],
+  ['あか','あか'],['あお','あお'],['きいろ','きいろ'],['みどり','みどり'],['しろ','しろ'],
+],
+normal: [
+  ['くいず','くいず'],['がっこう','がっこう'],['せんせい','せんせい'],['ともだち','ともだち'],
+  ['きょうしつ','きょうしつ'],['えんぴつ','えんぴつ'],['としょかん','としょかん'],['さんすう','さんすう'],
+  ['りかじっけん','りかじっけん'],['しゃかいか','しゃかいか'],['おんがくしつ','おんがくしつ'],['たいいくかん','たいいくかん'],
+  ['きゅうしょく','きゅうしょく'],['なつやすみ','なつやすみ'],['うんどうかい','うんどうかい'],['ぶんかさい','ぶんかさい'],
+  ['でんしゃ','でんしゃ'],['じてんしゃ','じてんしゃ'],['しんかんせん','しんかんせん'],['ひこうき','ひこうき'],
+  ['どうぶつえん','どうぶつえん'],['すいぞくかん','すいぞくかん'],['らーめん','らーめん'],['かれーらいす','かれーらいす'],
+  ['おにぎり','おにぎり'],['たこやき','たこやき'],['ちょこれーと','ちょこれーと'],['はんばーぐ','はんばーぐ'],
+  ['さっかー','さっかー'],['やきゅう','やきゅう'],['ばすけっとぼーる','ばすけっとぼーる'],['すいえい','すいえい'],
+  ['ぼうけん','ぼうけん'],['たからばこ','たからばこ'],['まほうつかい','まほうつかい'],['きょうりゅう','きょうりゅう'],
+  ['げーむせんたー','げーむせんたー'],['ゆうえんち','ゆうえんち'],['はなびたいかい','はなびたいかい'],['おまつり','おまつり'],
+  ['としょいいん','としょいいん'],['ほけんしつ','ほけんしつ'],['しょくいんしつ','しょくいんしつ'],['こうていあそび','こうていあそび'],
+  ['きゅうしょくとうばん','きゅうしょくとうばん'],['そうじじかん','そうじじかん'],['あさのかい','あさのかい'],['きらきらぼし','きらきらぼし'],
+  ['たいそうふく','たいそうふく'],['うわばき','うわばき'],['らんどせる','らんどせる'],['ふでばこ','ふでばこ'],
+  ['けしごむ','けしごむ'],['じょうぎ','じょうぎ'],['ものさし','ものさし'],['のーと','のーと'],
+  ['しゅくだい','しゅくだい'],['てすと','てすと'],['はっぴょう','はっぴょう'],['ぐるーぷ','ぐるーぷ'],
+  ['としょかんカード','としょかんかーど'],['きゅうしょくばん','きゅうしょくばん'],['ずこうしつ','ずこうしつ'],['りかしつ','りかしつ'],
+  ['おんせん','おんせん'],['きっぷ','きっぷ'],['しんごう','しんごう'],['こうさてん','こうさてん'],
+  ['えき','えき'],['くうこう','くうこう'],['びょういん','びょういん'],['ゆうびんきょく','ゆうびんきょく'],
+  ['こうえん','こうえん'],['としょかんいん','としょかんいん'],['けいさつしょ','けいさつしょ'],['しょうぼうしょ','しょうぼうしょ'],
+  ['すーぱー','すーぱー'],['こんびに','こんびに'],['ぱんや','ぱんや'],['はなや','はなや'],
+  ['ほんや','ほんや'],['やおや','やおや'],['さかなや','さかなや'],['にくや','にくや'],
+],
+hard: [
+  ['ぷろぐらみんぐげんご','ぷろぐらみんぐげんご'],['こんぴゅーたーさいえんす','こんぴゅーたーさいえんす'],
+  ['いんたーねっとつうしん','いんたーねっとつうしん'],['すーぱーこんぴゅーたー','すーぱーこんぴゅーたー'],
+  ['じんこうちのう','じんこうちのう'],['きかいがくしゅう','きかいがくしゅう'],
+  ['でーたべーすせっけい','でーたべーすせっけい'],['あんごうかつうしん','あんごうかつうしん'],
+  ['せきゅりてぃたいさく','せきゅりていたいさく'],['ばっくあっぷたいせい','ばっくあっぷたいせい'],
+  ['きょうりゅうはくぶつかん','きょうりゅうはくぶつかん'],['けつぁるこあとるす','けつあるこあとるす'],
+  ['しんりんよくこうか','しんりんよくこうか'],['うちゅうすてーしょん','うちゅうすてーしょん'],
+  ['しょうぼうじどうしゃ','しょうぼうじどうしゃ'],['きゅうきゅうきゅうめいし','きゅうきゅうきゅうめいし'],
+  ['こきゅうきないか','こきゅうきないか'],['けんこうしんだん','けんこうしんだん'],
+  ['ちょうしんき','ちょうしんき'],['よぼうせっしゅ','よぼうせっしゅ'],
+  ['とどうふけんちょうしょざいち','とどうふけんちょうしょざいち'],['せかいいさんとうろく','せかいいさんとうろく'],
+  ['しゅんかしゅうとう','しゅんかしゅうとう'],['じゃっかんじゅうにさい','じゃっかんじゅうにさい'],
+  ['ちゅうがっこうにゅうがくしき','ちゅうがっこうにゅうがくしき'],['ぎんがてつどうのよる','ぎんがてつどうのよる'],
+  ['ぜんこくたいかいしゅつじょう','ぜんこくたいかいしゅつじょう'],['ぷれぜんてーしょん','ぷれぜんてーしょん'],
+  ['あるごりずむのきほん','あるごりずむのきほん'],['おぶじぇくとしこう','おぶじぇくとしこう'],
+  ['にゅうりょくとしゅつりょく','にゅうりょくとしゅつりょく'],['へんすうとかんすう','へんすうとかんすう'],
+  ['じょうけんぶんき','じょうけんぶんき'],['くりかえししょり','くりかえししょり'],
+  ['はいれつとりすと','はいれつとりすと'],['もじれつのけつごう','もじれつのけつごう'],
+  ['こきゅうきかんしぜんそく','こきゅうきかんしぜんそく'],['はいえんのちりょう','はいえんのちりょう'],
+  ['ぜんそくのはっさく','ぜんそくのほっさ'],['さんそぼうわど','さんそぼうわど'],
+  ['ちょうおんぱけんさ','ちょうおんぱけんさ'],['れんとげんさつえい','れんとげんさつえい'],
+  ['けつあつそくてい','けつあつそくてい'],['たいおんけいそくてい','たいおんけいそくてい'],
+  ['めんえきりょくこうじょう','めんえきりょくこうじょう'],['びょうげんたいたいさく','びょうげんたいたいさく'],
+  ['にほんこくけんぽう','にほんこくけんぽう'],['さんけんぶんりつ','さんけんぶんりつ'],
+  ['こうごうせいのしくみ','こうごうせいのしくみ'],['みつどとしつりょう','みつどとしつりょう'],
+  ['えいようそのはたらき','えいようそのはたらき'],['じりきこうせい','じりきこうせい'],
+  ['たいへいようこうき','たいへいようこうき'],['にほんれっとうのちけい','にほんれっとうのちけい'],
+  ['せかいのくにぐに','せかいのくにぐに'],['じんこうみつどのへんか','じんこうみつどのへんか'],
+  ['でんとうこうげいひん','でんとうこうげいひん'],['さんぎょうかくめい','さんぎょうかくめい'],
+],
+};
+
+// ============================================
+// ローマ字判定エンジン
+// ============================================
+const KANA = {
+  'あ':['a'],'い':['i','yi'],'う':['u','wu'],'え':['e'],'お':['o'],
+  'か':['ka','ca'],'き':['ki'],'く':['ku','cu'],'け':['ke'],'こ':['ko','co'],
+  'さ':['sa'],'し':['si','shi','ci'],'す':['su'],'せ':['se','ce'],'そ':['so'],
+  'た':['ta'],'ち':['ti','chi'],'つ':['tu','tsu'],'て':['te'],'と':['to'],
+  'な':['na'],'に':['ni'],'ぬ':['nu'],'ね':['ne'],'の':['no'],
+  'は':['ha'],'ひ':['hi'],'ふ':['fu','hu'],'へ':['he'],'ほ':['ho'],
+  'ま':['ma'],'み':['mi'],'む':['mu'],'め':['me'],'も':['mo'],
+  'や':['ya'],'ゆ':['yu'],'よ':['yo'],
+  'ら':['ra'],'り':['ri'],'る':['ru'],'れ':['re'],'ろ':['ro'],
+  'わ':['wa'],'を':['wo'],'ー':['-'],
+  'が':['ga'],'ぎ':['gi'],'ぐ':['gu'],'げ':['ge'],'ご':['go'],
+  'ざ':['za'],'じ':['zi','ji'],'ず':['zu'],'ぜ':['ze'],'ぞ':['zo'],
+  'だ':['da'],'ぢ':['di'],'づ':['du'],'で':['de'],'ど':['do'],
+  'ば':['ba'],'び':['bi'],'ぶ':['bu'],'べ':['be'],'ぼ':['bo'],
+  'ぱ':['pa'],'ぴ':['pi'],'ぷ':['pu'],'ぺ':['pe'],'ぽ':['po'],
+  'ふぁ':['fa'],'ふぃ':['fi'],'ふぇ':['fe'],'ふぉ':['fo'],
+  'てぃ':['thi','texi','teli'],'でぃ':['dhi','dexi','deli'],
+  'きゃ':['kya'],'きゅ':['kyu'],'きょ':['kyo'],
+  'しゃ':['sya','sha'],'しゅ':['syu','shu'],'しょ':['syo','sho'],
+  'ちゃ':['tya','cha'],'ちゅ':['tyu','chu'],'ちょ':['tyo','cho'],
+  'にゃ':['nya'],'にゅ':['nyu'],'にょ':['nyo'],
+  'ひゃ':['hya'],'ひゅ':['hyu'],'ひょ':['hyo'],
+  'みゃ':['mya'],'みゅ':['myu'],'みょ':['myo'],
+  'りゃ':['rya'],'りゅ':['ryu'],'りょ':['ryo'],
+  'ぎゃ':['gya'],'ぎゅ':['gyu'],'ぎょ':['gyo'],
+  'じゃ':['zya','ja','jya'],'じゅ':['zyu','ju','jyu'],'じょ':['zyo','jo','jyo'],
+  'びゃ':['bya'],'びゅ':['byu'],'びょ':['byo'],
+  'ぴゃ':['pya'],'ぴゅ':['pyu'],'ぴょ':['pyo'],
+  'ぁ':['xa','la'],'ぃ':['xi','li'],'ぅ':['xu','lu'],'ぇ':['xe','le'],'ぉ':['xo','lo'],
+};
+
+function tokenize(kana) {
+  const units = [];
+  let i = 0;
+  while (i < kana.length) {
+    const two = kana.slice(i, i + 2);
+    if (KANA[two]) { units.push(two); i += 2; continue; }
+    units.push(kana[i]); i += 1;
+  }
+  return units;
+}
+
+function altsFor(units, idx) {
+  const u = units[idx];
+  if (u === 'っ') {
+    const alts = [];
+    if (idx + 1 < units.length) {
+      const heads = new Set();
+      altsFor(units, idx + 1).forEach(a => { if ('aiueon-'.indexOf(a[0]) === -1) heads.add(a[0]); });
+      heads.forEach(h => alts.push(h));
+    }
+    alts.push('ltu', 'xtu');
+    return alts;
+  }
+  if (u === 'ん') {
+    const alts = [];
+    // 単語の最後の「ん」はnn必須。文中の「ん」は次がaiueony以外ならnでもOK
+    if (idx + 1 < units.length) {
+      const ok = altsFor(units, idx + 1).every(a => 'aiueony'.indexOf(a[0]) === -1);
+      if (ok) alts.push('n');
+    }
+    alts.push('nn', 'xn');
+    return alts;
+  }
+  return KANA[u] || [u];
+}
+
+// ============================================
+// ゲーム本体
+// ============================================
+let units = [], unitIdx = 0, unitAlts = [], typed = '', doneStr = '', carryNext = '';
+let score = 0, miss = 0, keys = 0, timeLeft = 60, timerId = null, playToken = '';
+let MODE = 'normal';
+
+function setMode(m) {
+  MODE = m;
+  document.querySelectorAll('.tp-mode').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
+}
+
+function pickWord() {
+  const list = WORDS[MODE];
+  const w = list[Math.floor(Math.random() * list.length)];
+  document.getElementById('tp-word').textContent = w[0];
+  document.getElementById('tp-kana').textContent = w[1];
+  units = tokenize(w[1]);
+  unitIdx = 0; typed = ''; doneStr = ''; carryNext = '';
+  unitAlts = altsFor(units, 0);
+  renderRomaji();
+}
+
+function renderRomaji() {
+  // 打ち終わった部分は「実際に打った文字」をそのまま表示する
+  // (zの例が出ていてもjで打てば、j側で表示される)
+  let rest = (unitAlts[0] || '').slice(typed.length);
+  for (let i = unitIdx + 1; i < units.length; i++) rest += altsFor(units, i)[0];
+  document.getElementById('tp-done').textContent = doneStr + typed;
+  document.getElementById('tp-rest').textContent = rest;
+}
+
+function onKey(e) {
+  if (timerId === null) return;
+  const ch = e.key.toLowerCase();
+  if (ch.length !== 1 || 'abcdefghijklmnopqrstuvwxyz-'.indexOf(ch) === -1) return;
+  e.preventDefault();
+  keys += 1;
+  const next = typed + ch;
+  const match = unitAlts.filter(a => a.startsWith(next));
+  if (match.length === 0) {
+    miss += 1;
+    document.getElementById('tp-miss').textContent = miss;
+    return;
+  }
+  typed = next;
+  unitAlts = match;
+  const finished = unitAlts.find(a => a === typed);
+  if (finished !== undefined) {
+    doneStr += typed;
+    // 「っ」を子音1文字(kkのk側)で打った場合は、次の単位をその子音縛りにする
+    carryNext = (units[unitIdx] === 'っ' && finished.length === 1) ? finished : '';
+    unitIdx += 1;
+    if (unitIdx >= units.length) {
+      score += units.length * 10;
+      document.getElementById('tp-score').textContent = score;
+      pickWord();
+      return;
+    }
+    typed = '';
+    unitAlts = altsFor(units, unitIdx);
+    if (carryNext !== '') {
+      unitAlts = unitAlts.filter(a => a.startsWith(carryNext));
+    }
+  }
+  renderRomaji();
+}
+
+async function startGame() {
+  const r = await fetch('/api/typing/start', {method: 'POST'});
+  const data = await r.json();
+  if (data.ok === false || data.ok === undefined) { window.toast(data.error || 'エラー', 'error'); return; }
+  playToken = data.token;
+  score = 0; miss = 0; keys = 0; timeLeft = 60;
+  document.getElementById('tp-start-card').style.display = 'none';
+  document.getElementById('tp-game-card').style.display = 'block';
+  document.getElementById('tp-score').textContent = '0';
+  document.getElementById('tp-miss').textContent = '0';
+  document.getElementById('tp-time').textContent = '60';
+  pickWord();
+  timerId = setInterval(() => {
+    timeLeft -= 1;
+    document.getElementById('tp-time').textContent = timeLeft;
+    if (timeLeft <= 0) endGame();
+  }, 1000);
+}
+
+async function endGame() {
+  clearInterval(timerId);
+  timerId = null;
+  const kpm = keys;
+  const accuracy = keys === 0 ? 0 : Math.round((keys - miss) / keys * 1000) / 10;
+  document.getElementById('tp-game-card').style.display = 'none';
+  document.getElementById('tp-result-card').style.display = 'block';
+  document.getElementById('tp-r-score').textContent = score;
+  document.getElementById('tp-r-kpm').textContent = kpm;
+  document.getElementById('tp-r-acc').textContent = accuracy + '%';
+  const nickname = document.getElementById('tp-nickname').value.trim();
+  const r = await fetch('/api/typing/submit', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({token: playToken, nickname, score, kpm, accuracy, mode: MODE})
+  });
+  const data = await r.json();
+  document.getElementById('tp-r-msg').textContent = data.ok ? 'ランキングに記録したよ!' : (data.error || '記録できなかったよ');
+  loadRanking(MODE);
+}
+
+async function loadRanking(mode) {
+  mode = mode || 'normal';
+  document.querySelectorAll('.tp-tab').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
+  const r = await fetch('/api/typing/ranking?mode=' + mode);
+  const data = await r.json();
+  if (data.ok === false || data.ok === undefined) return;
+  document.getElementById('tp-ranking').innerHTML = data.ranking.length === 0
+    ? '<p style="color:#8a8270; font-size:13px;">まだ記録がないよ。1位になるチャンス!</p>'
+    : data.ranking.map((s, i) => `
+      <div class="tp-rank-row">
+        <span>${i === 0 ? '👑' : (i + 1) + '位'} ${escT(s.nickname)}</span>
+        <span><b style="color:#fb6f5b;">${s.score}</b> <span style="color:#b8b09e; font-size:12px;">KPM ${s.kpm} / ${s.accuracy}% / ${s.created_at}</span></span>
+      </div>`).join('');
+}
+
+function escT(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+document.addEventListener('keydown', onKey);
+loadRanking('normal');
+</script>
+{% endblock %}
