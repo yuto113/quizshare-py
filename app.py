@@ -4345,6 +4345,10 @@ def _qzero_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT, question TEXT, created_at TEXT)""")
     conn.execute("""CREATE TABLE IF NOT EXISTS qzero_memory (
         id INTEGER PRIMARY KEY AUTOINCREMENT, question TEXT, answer TEXT, created_at TEXT)""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS qzero_users (
+        user_id TEXT PRIMARY KEY, password_hash TEXT, nickname TEXT, created_at TEXT)""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS qzero_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, owner TEXT, role TEXT, text TEXT, created_at TEXT)""")
     return conn
 
 @app.route('/staff/qzero-school')
@@ -4414,6 +4418,127 @@ def api_qzero_school_dismiss():
     conn.commit()
     conn.close()
     return ok(message='消したよ')
+
+def _qzero_current():
+    # 今ログインしているQZEROユーザーを返す(なければNone)
+    return session.get('qzero_user')
+
+@app.route('/api/qzero/register', methods=['POST'])
+def api_qzero_register():
+    # QZERO独自アカウントの新規登録
+    if not rate_limit(f'qzreg:{client_ip()}', 5):
+        return err('少し待ってね')
+    import re as _re
+    data = request.get_json(silent=True) or {}
+    user_id = str(data.get('user_id') or '').strip()
+    nickname = str(data.get('nickname') or '').strip()
+    password = str(data.get('password') or '')
+    if not _re.fullmatch(r'[A-Za-z0-9_]{3,20}', user_id):
+        return err('IDは半角英数字と_で3〜20文字にしてね')
+    if not nickname or len(nickname) > 20:
+        return err('ニックネームは1〜20文字にしてね')
+    if len(password) < 6:
+        return err('パスワードは6文字以上にしてね')
+    conn = _qzero_db()
+    if conn.execute('SELECT user_id FROM qzero_users WHERE user_id=?', (user_id,)).fetchone():
+        conn.close()
+        return err('そのIDはもう使われているよ')
+    import pytz as _p
+    from datetime import datetime as _d
+    # hash_passwordがscrypt+一人別saltでパスワードを守る(戻せない一方通行)
+    conn.execute('INSERT INTO qzero_users (user_id, password_hash, nickname, created_at) VALUES (?,?,?,?)',
+                 (user_id, hash_password(password), enc(nickname),
+                  _d.now(_p.timezone('Asia/Tokyo')).strftime('%Y-%m-%d %H:%M')))
+    conn.commit()
+    conn.close()
+    session['qzero_user'] = 'u:' + user_id
+    session['qzero_nick'] = nickname
+    return ok(nickname=nickname)
+
+@app.route('/api/qzero/login', methods=['POST'])
+def api_qzero_login():
+    # QZERO独自アカウントでログイン
+    if not rate_limit(f'qzlogin:{client_ip()}', 10):
+        return err('少し待ってね')
+    data = request.get_json(silent=True) or {}
+    user_id = str(data.get('user_id') or '').strip()
+    password = str(data.get('password') or '')
+    conn = _qzero_db()
+    row = conn.execute('SELECT password_hash, nickname FROM qzero_users WHERE user_id=?', (user_id,)).fetchone()
+    conn.close()
+    if not row or not verify_password(password, row[0]):
+        return err('IDまたはパスワードが違うよ', 401)
+    session['qzero_user'] = 'u:' + user_id
+    session['qzero_nick'] = dec(row[1])
+    return ok(nickname=dec(row[1]))
+
+@app.route('/api/qzero/staff-login', methods=['POST'])
+def api_qzero_staff_login():
+    # 社員ID/PWでもQZEROにログインできる(右上の社員ログイン用)
+    if not rate_limit(f'qzstaff:{client_ip()}', 10):
+        return err('少し待ってね')
+    data = request.get_json(silent=True) or {}
+    staff_id = str(data.get('staff_id') or '').strip()
+    password = str(data.get('password') or '')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT password_hash, name, status FROM qz_staff WHERE staff_id=?', (staff_id,)).fetchone()
+    conn.close()
+    if not row or not verify_password(password, row[0]):
+        return err('IDまたはパスワードが違うよ', 401)
+    if (row[2] or 'active') != 'active':
+        return err('このアカウントは今使えないよ', 403)
+    session['qzero_user'] = 's:' + staff_id
+    session['qzero_nick'] = dec(row[1]) + '(社員)'
+    return ok(nickname=session['qzero_nick'])
+
+@app.route('/api/qzero/logout', methods=['POST'])
+def api_qzero_logout():
+    session.pop('qzero_user', None)
+    session.pop('qzero_nick', None)
+    return ok()
+
+@app.route('/api/qzero/me', methods=['GET'])
+def api_qzero_me():
+    # 今ログインしてるか、ニックネームは何かを返す
+    u = _qzero_current()
+    if not u:
+        return ok(logged_in=False)
+    return ok(logged_in=True, nickname=session.get('qzero_nick', ''))
+
+@app.route('/api/qzero/history/save', methods=['POST'])
+def api_qzero_history_save():
+    # 会話の1往復を暗号化して保存(ログイン時だけ)
+    u = _qzero_current()
+    if not u:
+        return ok(saved=False)  # 未ログインは保存しない(エラーにはしない)
+    data = request.get_json(silent=True) or {}
+    role = data.get('role')
+    text = str(data.get('text') or '')[:2000]
+    if role not in ('me', 'ai') or not text:
+        return err('保存する内容がおかしいよ')
+    import pytz as _p
+    from datetime import datetime as _d
+    conn = _qzero_db()
+    conn.execute('INSERT INTO qzero_history (owner, role, text, created_at) VALUES (?,?,?,?)',
+                 (u, role, enc(text), _d.now(_p.timezone('Asia/Tokyo')).strftime('%Y-%m-%d %H:%M')))
+    # 1人あたり最新500件だけ残す
+    conn.execute("""DELETE FROM qzero_history WHERE owner=? AND id NOT IN
+                    (SELECT id FROM qzero_history WHERE owner=? ORDER BY id DESC LIMIT 500)""", (u, u))
+    conn.commit()
+    conn.close()
+    return ok(saved=True)
+
+@app.route('/api/qzero/history', methods=['GET'])
+def api_qzero_history():
+    # 自分の会話履歴だけを取り出す(本人しか読めない)
+    u = _qzero_current()
+    if not u:
+        return ok(history=[])
+    conn = _qzero_db()
+    rows = conn.execute('SELECT role, text, created_at FROM qzero_history WHERE owner=? ORDER BY id ASC LIMIT 500', (u,)).fetchall()
+    conn.close()
+    return ok(history=[{'role': r[0], 'text': dec(r[1]), 'created_at': r[2]} for r in rows])
 
 @app.route('/qzero')
 def page_qzero():

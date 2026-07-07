@@ -26,9 +26,21 @@ window.applyTheme=cbStrip;window.checkAutoTheme=cbStrip;setInterval(cbStrip,2000
 </script>
 
 <div class="cb-wrap">
-  <div class="cb-head">
+  <div class="cb-head" style="position:relative;">
     <h1>◉ QZERO</h1>
     <p>Q'zの自作AI ・ 教科あて &amp; クイズ探し</p>
+    <div id="cb-account" style="position:absolute; right:0; top:16px; font-size:0.8rem;"></div>
+  </div>
+  <div id="cb-login-panel" style="display:none; border:1px solid #eee; border-radius:10px; padding:14px; margin:10px 0;">
+    <div style="display:flex; gap:8px; margin-bottom:8px;">
+      <button id="tab-login" class="cb-send" style="flex:1; background:#111;" onclick="showTab('login')">ログイン</button>
+      <button id="tab-reg" class="cb-send" style="flex:1; background:#ccc; color:#333;" onclick="showTab('reg')">新規登録</button>
+      <button id="tab-staff" class="cb-send" style="flex:1; background:#ccc; color:#333;" onclick="showTab('staff')">社員ログイン</button>
+    </div>
+    <input class="cb-input" id="acc-id" placeholder="ユーザーID" style="margin-bottom:6px;">
+    <input class="cb-input" id="acc-nick" placeholder="ニックネーム(登録時のみ)" style="margin-bottom:6px; display:none;">
+    <input class="cb-input" id="acc-pw" type="password" placeholder="パスワード" style="margin-bottom:8px;">
+    <button class="cb-send" style="width:100%;" id="acc-submit" onclick="accSubmit()">ログイン</button>
   </div>
   <div class="cb-log" id="cb-log"></div>
   <div class="cb-input-row">
@@ -46,7 +58,7 @@ window.applyTheme=cbStrip;window.checkAutoTheme=cbStrip;setInterval(cbStrip,2000
 </div>
 
 <script>
-function addMsg(who, text) {
+function addMsg(who, text, skipSave) {
   const log = document.getElementById('cb-log');
   const div = document.createElement('div');
   div.className = 'cb-msg ' + who;
@@ -54,8 +66,80 @@ function addMsg(who, text) {
   div.querySelector('.cb-bubble').textContent = text;
   log.appendChild(div);
   log.scrollTop = log.scrollHeight;
+  // 履歴に保存(復元時や初回あいさつはskipSave=trueで保存しない)
+  if (!skipSave) saveHistory(who === 'me' ? 'me' : 'ai', text);
 }
-addMsg('ai', 'こんにちは! 私はQZERO、Q\'zの自作AIだよ。問題文を見せてくれたら何の教科か当てるし、「理科のクイズ出して」みたいなお願いもできる。ためしてみて!');
+let accTab = 'login';
+function showTab(t) {
+  accTab = t;
+  document.getElementById('tab-login').style.background = t==='login'?'#111':'#ccc';
+  document.getElementById('tab-login').style.color = t==='login'?'#fff':'#333';
+  document.getElementById('tab-reg').style.background = t==='reg'?'#111':'#ccc';
+  document.getElementById('tab-reg').style.color = t==='reg'?'#fff':'#333';
+  document.getElementById('tab-staff').style.background = t==='staff'?'#111':'#ccc';
+  document.getElementById('tab-staff').style.color = t==='staff'?'#fff':'#333';
+  document.getElementById('acc-nick').style.display = t==='reg' ? 'block' : 'none';
+  document.getElementById('acc-id').placeholder = t==='staff' ? '社員ID' : 'ユーザーID';
+  document.getElementById('acc-submit').textContent = t==='reg' ? '登録する' : 'ログイン';
+}
+function togglePanel() {
+  const p = document.getElementById('cb-login-panel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+async function accSubmit() {
+  const id = document.getElementById('acc-id').value.trim();
+  const pw = document.getElementById('acc-pw').value;
+  const nick = document.getElementById('acc-nick').value.trim();
+  let url, body;
+  if (accTab === 'reg') { url='/api/qzero/register'; body={user_id:id, nickname:nick, password:pw}; }
+  else if (accTab === 'staff') { url='/api/qzero/staff-login'; body={staff_id:id, password:pw}; }
+  else { url='/api/qzero/login'; body={user_id:id, password:pw}; }
+  const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  const data = await r.json();
+  if (data.ok) {
+    document.getElementById('cb-login-panel').style.display='none';
+    document.getElementById('acc-pw').value='';
+    refreshAccount();
+    loadHistory();
+  } else {
+    window.toast(data.error || 'エラー', 'error');
+  }
+}
+async function qzLogout() {
+  await fetch('/api/qzero/logout', {method:'POST'});
+  refreshAccount();
+  document.getElementById('cb-log').innerHTML = '';
+  greet();
+}
+async function refreshAccount() {
+  const r = await fetch('/api/qzero/me');
+  const data = await r.json();
+  const box = document.getElementById('cb-account');
+  if (data.logged_in) {
+    // 名前の中の記号を安全な形に変えてから表示する(escTに頼らず自前で処理)
+    const safeNick = String(data.nickname || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    box.innerHTML = '👤 ' + safeNick + ' <a href="#" onclick="qzLogout();return false;" style="color:#999;">ログアウト</a>';
+  } else {
+    box.innerHTML = '<a href="#" onclick="togglePanel();return false;" style="color:#111; font-weight:700;">ログイン</a>';
+  }
+}
+async function loadHistory() {
+  const r = await fetch('/api/qzero/history');
+  const data = await r.json();
+  if (data.ok && data.history && data.history.length > 0) {
+    document.getElementById('cb-log').innerHTML = '';
+    data.history.forEach(h => addMsg(h.role === 'me' ? 'me' : 'ai', h.text, true));
+  }
+}
+async function saveHistory(role, text) {
+  try { await fetch('/api/qzero/history/save', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({role, text})}); } catch(e) {}
+}
+function greet() {
+  addMsg('ai', 'こんにちは! 私はQZERO、Q\'zの自作AIだよ。ログインすると会話が残せるよ。問題文を見せてくれたら教科を当てるし、天気やクイズ探しもできる!', true);
+}
+greet();
+refreshAccount();
+loadHistory();
 
 // ---- 天気機能(ブラウザ側でOpen-Meteoから取得) ----
 const WEATHER_CODES = {
@@ -65,22 +149,38 @@ const WEATHER_CODES = {
   80:'にわか雨', 81:'にわか雨', 82:'激しいにわか雨', 95:'雷雨', 96:'雷雨(ひょう)', 99:'激しい雷雨'
 };
 
+let weatherDays = 1;  // 何日先まで表示するか
 function looksLikeWeather(t) {
-  return /天気|てんき|気温|きおん|weather|暑い|寒い|雨|晴れ|くもり|雪/.test(t);
+  // 「週間/明日/あさって」なら表示日数を増やす
+  if (/週間|しゅうかん|これから|今週|一週間/.test(t)) weatherDays = 7;
+  else if (/あさって|明後日/.test(t)) weatherDays = 3;
+  else if (/明日|あした|あす/.test(t)) weatherDays = 2;
+  else weatherDays = 1;
+  return /天気|てんき|気温|きおん|weather|暑い|寒い|雨|晴れ|くもり|雪|予報/.test(t);
 }
 
 async function fetchWeather(lat, lon, placeName) {
-  // Open-Meteoから今日の天気を取る(登録不要・無料)
+  // Open-Meteoから今日〜6日先までの天気を取る(登録不要・無料)
   const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
-    '&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=Asia%2FTokyo&forecast_days=1';
+    '&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=Asia%2FTokyo&forecast_days=7';
   const r = await fetch(url);
   const d = await r.json();
   const nowTemp = Math.round(d.current.temperature_2m);
-  const code = d.current.weather_code;
-  const hi = Math.round(d.daily.temperature_2m_max[0]);
-  const lo = Math.round(d.daily.temperature_2m_min[0]);
-  const desc = WEATHER_CODES[code] || '不明';
-  return placeName + 'の天気は「' + desc + '」。いまの気温は' + nowTemp + '度、今日の最高' + hi + '度・最低' + lo + '度だよ。';
+  const desc = WEATHER_CODES[d.current.weather_code] || '不明';
+  // 何日先まで表示するかは、聞かれ方で変える(週間/明日/今日)
+  let days = weatherDays;
+  const labels = ['今日', '明日', 'あさって'];
+  const weekdays = ['日','月','火','水','木','金','土'];
+  let lines = placeName + 'の天気だよ。いまは「' + desc + '」、気温' + nowTemp + '度。\n';
+  for (let i = 0; i < days && i < d.daily.time.length; i++) {
+    const dt = new Date(d.daily.time[i]);
+    const label = labels[i] || ((dt.getMonth() + 1) + '/' + dt.getDate() + '(' + weekdays[dt.getDay()] + ')');
+    const dcode = WEATHER_CODES[d.daily.weather_code[i]] || '不明';
+    const hi = Math.round(d.daily.temperature_2m_max[i]);
+    const lo = Math.round(d.daily.temperature_2m_min[i]);
+    lines += '・' + label + ': ' + dcode + ' (' + hi + '/' + lo + '度)\n';
+  }
+  return lines.trim();
 }
 
 async function geocode(place) {
