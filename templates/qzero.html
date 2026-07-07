@@ -92,6 +92,7 @@ window.applyTheme=cbStrip;window.checkAutoTheme=cbStrip;setInterval(cbStrip,2000
 <script>
 let currentThread = null;
 let weatherDays = 1, awaitingPlace = false;
+let lastTopic = null;  // 直前の話題を覚えておく('weather'など)。流れを読むために使う
 
 // ===== 表示 =====
 function addMsg(who, text, skipSave) {
@@ -188,6 +189,13 @@ async function fetchWeather(lat,lon,placeName){
   for(let i=0;i<weatherDays&&i<d.daily.time.length;i++){const dt=new Date(d.daily.time[i]);const label=labels[i]||((dt.getMonth()+1)+'/'+dt.getDate()+'('+wd[dt.getDay()]+')');lines+='・'+label+': '+(WEATHER_CODES[d.daily.weather_code[i]]||'不明')+' ('+Math.round(d.daily.temperature_2m_max[i])+'/'+Math.round(d.daily.temperature_2m_min[i])+'度)\n';}
   return lines.trim();
 }
+function isLikelyPlace(t){
+  // 短くて、天気ワードを含まず、地名っぽい入力か(「じゃあ大阪は?」「東京」など)
+  const cleaned=t.replace(/^(じゃあ|では|それなら|あと|次は|つぎは)/,'').replace(/(は|の天気|は？|は\?|？|\?)$/,'').trim();
+  if(cleaned.length<2||cleaned.length>10)return false;
+  if(/天気|てんき|気温|クイズ|何科|こんにち|ありがと/.test(t))return false;  // 他の意図は除外
+  return true;
+}
 async function geocode(place){const d=await(await fetch('https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(place)+'&count=1&language=ja')).json();if(d.results&&d.results.length>0){const g=d.results[0];return{lat:g.latitude,lon:g.longitude,name:g.name};}return null;}
 async function handleWeather(text){
   const cleaned=text.replace(/の?(天気|てんき|気温|きおん|weather|をおしえて|教えて|は|？|\?)/g,'').trim();
@@ -201,10 +209,19 @@ async function cbSend(){
   const inp=document.getElementById('cb-input');const text=inp.value.trim();if(text==='')return;
   addMsg('me',text);inp.value='';
   if(awaitingPlace){awaitingPlace=false;const geo=await geocode(text.replace(/の天気.*$/,'').trim());if(geo){try{addMsg('ai',await fetchWeather(geo.lat,geo.lon,geo.name));}catch(e){addMsg('ai','取得失敗');}}else addMsg('ai','その地名が見つからなかった…');return;}
-  if(looksLikeWeather(text)){try{await handleWeather(text);}catch(e){addMsg('ai','天気の取得に失敗したよ');}return;}
+  if(looksLikeWeather(text)){lastTopic='weather';try{await handleWeather(text);}catch(e){addMsg('ai','天気の取得に失敗したよ');}return;}
+
+  // ★流れを読む: 直前が天気の話で、今回が地名っぽいだけの短い入力なら「その場所の天気」と判断
+  if(lastTopic==='weather' && isLikelyPlace(text)){
+    const place=text.replace(/^(じゃあ|では|それなら|あと|次は|つぎは)/,'').replace(/(は|の天気|は？|は\?|？|\?)$/,'').trim();
+    const geo=await geocode(place);
+    if(geo){try{addMsg('ai',await fetchWeather(geo.lat,geo.lon,geo.name));}catch(e){addMsg('ai','天気の取得に失敗したよ');}return;}
+  }
   try{
     const r=await fetch('/qzero/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
-    const data=await r.json();addMsg('ai',data.ok?data.reply:(data.error||'エラー'));
+    const data=await r.json();
+    lastTopic=(data.intent==='classify')?'classify':null;  // 話題を更新(天気モードから抜ける)
+    addMsg('ai',data.ok?data.reply:(data.error||'エラー'));
   }catch(e){addMsg('ai','通信エラーが起きたよ');}
 }
 
