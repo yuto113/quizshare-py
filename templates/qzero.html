@@ -2,268 +2,215 @@
 {% block title %}QZERO - Q'z AI{% endblock %}
 {% block content %}
 <style>
-body { background:#ffffff !important; }
+body { background:#ffffff !important; margin:0; }
 .site-header { display:none !important; }
-.cb-wrap { max-width:640px; margin:0 auto; padding:16px; min-height:100vh; display:flex; flex-direction:column; }
-.cb-head { text-align:center; padding:16px 0; border-bottom:1px solid #eee; }
-.cb-head h1 { margin:0; font-size:1.5rem; color:#111; letter-spacing:0.15em; }
-.cb-head p { margin:4px 0 0; color:#999; font-size:0.8rem; }
-.cb-log { flex:1; padding:16px 0; overflow-y:auto; }
-.cb-msg { margin-bottom:14px; display:flex; }
-.cb-msg.me { justify-content:flex-end; }
-.cb-bubble { max-width:80%; padding:10px 14px; border-radius:14px; font-size:0.95rem; line-height:1.6; white-space:pre-wrap; }
-.cb-msg.me .cb-bubble { background:#111; color:white; }
-.cb-msg.ai .cb-bubble { background:#f2f2f2; color:#111; }
-.cb-input-row { display:flex; gap:8px; padding:12px 0; border-top:1px solid #eee; }
-.cb-input { flex:1; padding:12px; border:1px solid #ddd; border-radius:10px; font-size:1rem; }
-.cb-send { padding:12px 20px; background:#111; color:white; border:none; border-radius:10px; cursor:pointer; font-size:1rem; }
-.cb-api { margin-top:24px; padding:16px; background:#fafafa; border:1px solid #eee; border-radius:10px; font-size:0.8rem; color:#666; }
-.cb-api pre { background:#111; color:#0f0; padding:12px; border-radius:8px; overflow-x:auto; font-size:0.75rem; }
+#qz-app { display:flex; height:100vh; font-family:sans-serif; }
+
+/* サイドバー */
+#qz-side { width:260px; background:#f7f6f3; border-right:1px solid #e8e5df; display:flex; flex-direction:column; flex-shrink:0; }
+#qz-side .qz-logo { padding:16px; font-weight:800; letter-spacing:0.15em; color:#111; border-bottom:1px solid #e8e5df; }
+#qz-new { margin:12px; padding:10px; background:#111; color:white; border:none; border-radius:10px; cursor:pointer; font-size:0.9rem; }
+#qz-threads { flex:1; overflow-y:auto; padding:0 8px; }
+.qz-thread { padding:10px 12px; border-radius:8px; cursor:pointer; font-size:0.85rem; color:#444; display:flex; justify-content:space-between; align-items:center; margin-bottom:2px; }
+.qz-thread:hover { background:#ecece7; }
+.qz-thread.on { background:#e4e2db; font-weight:700; }
+.qz-thread .del { color:#bbb; font-size:0.8rem; opacity:0; }
+.qz-thread:hover .del { opacity:1; }
+.qz-side-foot { padding:12px; border-top:1px solid #e8e5df; font-size:0.8rem; }
+
+/* メイン */
+#qz-main { flex:1; display:flex; flex-direction:column; min-width:0; }
+#qz-head { padding:14px 20px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center; }
+#qz-head h1 { margin:0; font-size:1.1rem; letter-spacing:0.15em; color:#111; }
+#qz-log { flex:1; overflow-y:auto; padding:24px; max-width:760px; margin:0 auto; width:100%; box-sizing:border-box; }
+.cb-msg { margin-bottom:20px; }
+.cb-msg .who { font-size:0.75rem; color:#999; margin-bottom:4px; }
+.cb-bubble { font-size:0.98rem; line-height:1.7; white-space:pre-wrap; color:#1a1a1a; }
+.cb-msg.me .cb-bubble { background:#f4f4f2; padding:12px 16px; border-radius:12px; }
+#qz-input-area { border-top:1px solid #eee; padding:16px; max-width:760px; margin:0 auto; width:100%; box-sizing:border-box; }
+#qz-input-row { display:flex; gap:8px; }
+#cb-input { flex:1; padding:12px; border:1px solid #ddd; border-radius:10px; font-size:1rem; }
+#cb-send { padding:12px 20px; background:#111; color:white; border:none; border-radius:10px; cursor:pointer; }
+
+/* ログインパネル */
+#cb-login-panel { position:fixed; inset:0; background:rgba(0,0,0,0.4); display:none; align-items:center; justify-content:center; z-index:100; }
+#cb-login-inner { background:white; border-radius:14px; padding:24px; width:90%; max-width:360px; }
+#cb-login-inner input { width:100%; padding:11px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; margin-bottom:8px; }
+.cb-tabs { display:flex; gap:6px; margin-bottom:12px; }
+.cb-tabs button { flex:1; padding:8px; border:none; border-radius:8px; cursor:pointer; font-size:0.8rem; }
+#qz-menu-btn { display:none; background:none; border:none; font-size:1.4rem; cursor:pointer; }
+@media (max-width:720px) {
+  #qz-side { position:fixed; left:-260px; top:0; bottom:0; z-index:50; transition:left 0.2s; }
+  #qz-side.open { left:0; }
+  #qz-menu-btn { display:block; }
+}
 </style>
 <script>
 function cbStrip(){try{const b=document.body;Array.from(b.classList).forEach(c=>{if(c.indexOf('theme')!==-1||c==='halloween-dark')b.classList.remove(c);});b.style.background='#ffffff';document.querySelectorAll('.seasonal-emoji').forEach(e=>e.remove());}catch(e){}}
 window.applyTheme=cbStrip;window.checkAutoTheme=cbStrip;setInterval(cbStrip,2000);cbStrip();
 </script>
 
-<div class="cb-wrap">
-  <div class="cb-head" style="position:relative;">
-    <h1>◉ QZERO</h1>
-    <p>Q'zの自作AI ・ 教科あて &amp; クイズ探し</p>
-    <div id="cb-account" style="position:absolute; right:0; top:16px; font-size:0.8rem;"></div>
+<div id="qz-app">
+  <div id="qz-side">
+    <div class="qz-logo">◉ QZERO</div>
+    <button id="qz-new" onclick="newThread()">+ 新しいチャット</button>
+    <div id="qz-threads"></div>
+    <div class="qz-side-foot" id="qz-account"></div>
   </div>
-  <div id="cb-login-panel" style="display:none; border:1px solid #eee; border-radius:10px; padding:14px; margin:10px 0;">
-    <div style="display:flex; gap:8px; margin-bottom:8px;">
-      <button id="tab-login" class="cb-send" style="flex:1; background:#111;" onclick="showTab('login')">ログイン</button>
-      <button id="tab-reg" class="cb-send" style="flex:1; background:#ccc; color:#333;" onclick="showTab('reg')">新規登録</button>
-      <button id="tab-staff" class="cb-send" style="flex:1; background:#ccc; color:#333;" onclick="showTab('staff')">社員ログイン</button>
+
+  <div id="qz-main">
+    <div id="qz-head">
+      <button id="qz-menu-btn" onclick="document.getElementById('qz-side').classList.toggle('open')">☰</button>
+      <h1>QZERO</h1>
+      <span style="font-size:0.75rem; color:#bbb;">Q'z 自作AI</span>
     </div>
-    <input class="cb-input" id="acc-id" placeholder="ユーザーID" style="margin-bottom:6px;">
-    <input class="cb-input" id="acc-nick" placeholder="ニックネーム(登録時のみ)" style="margin-bottom:6px; display:none;">
-    <input class="cb-input" id="acc-pw" type="password" placeholder="パスワード" style="margin-bottom:8px;">
-    <button class="cb-send" style="width:100%;" id="acc-submit" onclick="accSubmit()">ログイン</button>
+    <div id="qz-log"></div>
+    <div id="qz-input-area">
+      <div id="qz-input-row">
+        <input id="cb-input" placeholder="メッセージを入力(例: これ何科? 光合成)" onkeydown="if(event.key==='Enter')cbSend()">
+        <button id="cb-send" onclick="cbSend()">送信</button>
+      </div>
+    </div>
   </div>
-  <div class="cb-log" id="cb-log"></div>
-  <div class="cb-input-row">
-    <input class="cb-input" id="cb-input" placeholder="メッセージを入力(例: これ何科? 光合成とは)" onkeydown="if(event.key==='Enter')cbSend()">
-    <button class="cb-send" onclick="cbSend()">送信</button>
-  </div>
+</div>
 
-  <div class="cb-api">
-    <b>🔌 API(外部サイトからも使えるよ)</b>
-    <pre>POST /qzero/api/predict
-{ "text": "植物が光を受けて養分を作るはたらきは？" }
-
-→ { "ok": true, "subject": "理科", "confidence": 82.3 }</pre>
+<div id="cb-login-panel">
+  <div id="cb-login-inner">
+    <div class="cb-tabs">
+      <button id="tab-login" onclick="showTab('login')">ログイン</button>
+      <button id="tab-reg" onclick="showTab('reg')">新規登録</button>
+      <button id="tab-staff" onclick="showTab('staff')">社員</button>
+    </div>
+    <input id="acc-id" placeholder="ユーザーID">
+    <input id="acc-nick" placeholder="ニックネーム(登録時のみ)" style="display:none;">
+    <input id="acc-pw" type="password" placeholder="パスワード">
+    <button id="acc-submit" onclick="accSubmit()" style="width:100%; padding:12px; background:#111; color:white; border:none; border-radius:8px; cursor:pointer;">ログイン</button>
+    <p style="text-align:center; margin:10px 0 0;"><a href="#" onclick="closePanel();return false;" style="color:#999; font-size:0.8rem;">閉じる</a></p>
   </div>
 </div>
 
 <script>
+let currentThread = null;
+let weatherDays = 1, awaitingPlace = false;
+
+// ===== 表示 =====
 function addMsg(who, text, skipSave) {
-  const log = document.getElementById('cb-log');
+  const log = document.getElementById('qz-log');
   const div = document.createElement('div');
   div.className = 'cb-msg ' + who;
-  div.innerHTML = '<div class="cb-bubble"></div>';
+  div.innerHTML = '<div class="who"></div><div class="cb-bubble"></div>';
+  div.querySelector('.who').textContent = who === 'me' ? 'あなた' : 'QZERO';
   div.querySelector('.cb-bubble').textContent = text;
   log.appendChild(div);
   log.scrollTop = log.scrollHeight;
-  // 履歴に保存(復元時や初回あいさつはskipSave=trueで保存しない)
   if (!skipSave) saveHistory(who === 'me' ? 'me' : 'ai', text);
 }
-let accTab = 'login';
-function showTab(t) {
-  accTab = t;
-  document.getElementById('tab-login').style.background = t==='login'?'#111':'#ccc';
-  document.getElementById('tab-login').style.color = t==='login'?'#fff':'#333';
-  document.getElementById('tab-reg').style.background = t==='reg'?'#111':'#ccc';
-  document.getElementById('tab-reg').style.color = t==='reg'?'#fff':'#333';
-  document.getElementById('tab-staff').style.background = t==='staff'?'#111':'#ccc';
-  document.getElementById('tab-staff').style.color = t==='staff'?'#fff':'#333';
-  document.getElementById('acc-nick').style.display = t==='reg' ? 'block' : 'none';
-  document.getElementById('acc-id').placeholder = t==='staff' ? '社員ID' : 'ユーザーID';
-  document.getElementById('acc-submit').textContent = t==='reg' ? '登録する' : 'ログイン';
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ===== アカウント =====
+let accTab='login';
+function showTab(t){accTab=t;
+  ['login','reg','staff'].forEach(x=>{const b=document.getElementById('tab-'+x);b.style.background=x===t?'#111':'#eee';b.style.color=x===t?'#fff':'#333';});
+  document.getElementById('acc-nick').style.display=t==='reg'?'block':'none';
+  document.getElementById('acc-id').placeholder=t==='staff'?'社員ID':'ユーザーID';
+  document.getElementById('acc-submit').textContent=t==='reg'?'登録する':'ログイン';
 }
-function togglePanel() {
-  const p = document.getElementById('cb-login-panel');
-  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+function openPanel(){document.getElementById('cb-login-panel').style.display='flex';showTab('login');}
+function closePanel(){document.getElementById('cb-login-panel').style.display='none';}
+async function accSubmit(){
+  const id=document.getElementById('acc-id').value.trim(),pw=document.getElementById('acc-pw').value,nick=document.getElementById('acc-nick').value.trim();
+  let url,body;
+  if(accTab==='reg'){url='/api/qzero/register';body={user_id:id,nickname:nick,password:pw};}
+  else if(accTab==='staff'){url='/api/qzero/staff-login';body={staff_id:id,password:pw};}
+  else{url='/api/qzero/login';body={user_id:id,password:pw};}
+  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const data=await r.json();
+  if(data.ok){closePanel();document.getElementById('acc-pw').value='';refreshAccount();loadThreads();}
+  else window.toast(data.error||'エラー','error');
 }
-async function accSubmit() {
-  const id = document.getElementById('acc-id').value.trim();
-  const pw = document.getElementById('acc-pw').value;
-  const nick = document.getElementById('acc-nick').value.trim();
-  let url, body;
-  if (accTab === 'reg') { url='/api/qzero/register'; body={user_id:id, nickname:nick, password:pw}; }
-  else if (accTab === 'staff') { url='/api/qzero/staff-login'; body={staff_id:id, password:pw}; }
-  else { url='/api/qzero/login'; body={user_id:id, password:pw}; }
-  const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-  const data = await r.json();
-  if (data.ok) {
-    document.getElementById('cb-login-panel').style.display='none';
-    document.getElementById('acc-pw').value='';
-    refreshAccount();
-    loadHistory();
-  } else {
-    window.toast(data.error || 'エラー', 'error');
-  }
+async function qzLogout(){await fetch('/api/qzero/logout',{method:'POST'});location.reload();}
+async function refreshAccount(){
+  const r=await fetch('/api/qzero/me');const data=await r.json();
+  const box=document.getElementById('qz-account');
+  if(data.logged_in){box.innerHTML='👤 '+esc(data.nickname)+'<br><a href="#" onclick="qzLogout();return false;" style="color:#999;">ログアウト</a>';}
+  else{box.innerHTML='<a href="#" onclick="openPanel();return false;" style="color:#111;font-weight:700;">ログインして会話を保存</a>';}
 }
-async function qzLogout() {
-  await fetch('/api/qzero/logout', {method:'POST'});
-  refreshAccount();
-  document.getElementById('cb-log').innerHTML = '';
+
+// ===== スレッド =====
+async function loadThreads(){
+  const r=await fetch('/api/qzero/threads');const data=await r.json();
+  const box=document.getElementById('qz-threads');
+  if(!data.threads||data.threads.length===0){box.innerHTML='';return;}
+  box.innerHTML=data.threads.map(t=>`
+    <div class="qz-thread ${t.thread_id===currentThread?'on':''}" onclick="openThread(${t.thread_id})">
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(t.title)}</span>
+      <span class="del" onclick="event.stopPropagation();delThread(${t.thread_id})">🗑</span>
+    </div>`).join('');
+}
+async function openThread(tid){
+  currentThread=tid;
+  const r=await fetch('/api/qzero/threads/'+tid);const data=await r.json();
+  document.getElementById('qz-log').innerHTML='';
+  if(data.ok&&data.history)data.history.forEach(h=>addMsg(h.role==='me'?'me':'ai',h.text,true));
+  loadThreads();
+  document.getElementById('qz-side').classList.remove('open');
+}
+function newThread(){
+  currentThread=null;
+  document.getElementById('qz-log').innerHTML='';
   greet();
+  loadThreads();
+  document.getElementById('qz-side').classList.remove('open');
 }
-async function refreshAccount() {
-  const r = await fetch('/api/qzero/me');
-  const data = await r.json();
-  const box = document.getElementById('cb-account');
-  if (data.logged_in) {
-    // 名前の中の記号を安全な形に変えてから表示する(escTに頼らず自前で処理)
-    const safeNick = String(data.nickname || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    box.innerHTML = '👤 ' + safeNick + ' <a href="#" onclick="qzLogout();return false;" style="color:#999;">ログアウト</a>';
-  } else {
-    box.innerHTML = '<a href="#" onclick="togglePanel();return false;" style="color:#111; font-weight:700;">ログイン</a>';
-  }
+async function delThread(tid){
+  if(!confirm('この会話を消す？'))return;
+  await fetch('/api/qzero/threads/'+tid+'/delete',{method:'POST'});
+  if(currentThread===tid)newThread();
+  loadThreads();
 }
-async function loadHistory() {
-  const r = await fetch('/api/qzero/history');
-  const data = await r.json();
-  if (data.ok && data.history && data.history.length > 0) {
-    document.getElementById('cb-log').innerHTML = '';
-    data.history.forEach(h => addMsg(h.role === 'me' ? 'me' : 'ai', h.text, true));
-  }
+async function saveHistory(role,text){
+  try{
+    const r=await fetch('/api/qzero/history/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role,text,thread_id:currentThread})});
+    const d=await r.json();
+    if(d.ok&&d.thread_id){const isNew=(currentThread===null);currentThread=d.thread_id;if(isNew)loadThreads();}
+  }catch(e){}
 }
-async function saveHistory(role, text) {
-  try { await fetch('/api/qzero/history/save', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({role, text})}); } catch(e) {}
-}
-function greet() {
-  addMsg('ai', 'こんにちは! 私はQZERO、Q\'zの自作AIだよ。ログインすると会話が残せるよ。問題文を見せてくれたら教科を当てるし、天気やクイズ探しもできる!', true);
-}
-greet();
-refreshAccount();
-loadHistory();
+function greet(){addMsg('ai','こんにちは! 私はQZERO、Q\'zの自作AIだよ。ログインすると会話がサイドバーに残せるよ。教科あて・天気・クイズ探しができる!',true);}
 
-// ---- 天気機能(ブラウザ側でOpen-Meteoから取得) ----
-const WEATHER_CODES = {
-  0:'快晴', 1:'晴れ', 2:'晴れときどき曇り', 3:'曇り',
-  45:'霧', 48:'霧', 51:'弱い霧雨', 53:'霧雨', 55:'強い霧雨',
-  61:'弱い雨', 63:'雨', 65:'強い雨', 71:'弱い雪', 73:'雪', 75:'強い雪',
-  80:'にわか雨', 81:'にわか雨', 82:'激しいにわか雨', 95:'雷雨', 96:'雷雨(ひょう)', 99:'激しい雷雨'
-};
-
-let weatherDays = 1;  // 何日先まで表示するか
-function looksLikeWeather(t) {
-  // 「週間/明日/あさって」なら表示日数を増やす
-  if (/週間|しゅうかん|これから|今週|一週間/.test(t)) weatherDays = 7;
-  else if (/あさって|明後日/.test(t)) weatherDays = 3;
-  else if (/明日|あした|あす/.test(t)) weatherDays = 2;
-  else weatherDays = 1;
-  return /天気|てんき|気温|きおん|weather|暑い|寒い|雨|晴れ|くもり|雪|予報/.test(t);
-}
-
-async function fetchWeather(lat, lon, placeName) {
-  // Open-Meteoから今日〜6日先までの天気を取る(登録不要・無料)
-  const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
-    '&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=Asia%2FTokyo&forecast_days=7';
-  const r = await fetch(url);
-  const d = await r.json();
-  const nowTemp = Math.round(d.current.temperature_2m);
-  const desc = WEATHER_CODES[d.current.weather_code] || '不明';
-  // 何日先まで表示するかは、聞かれ方で変える(週間/明日/今日)
-  let days = weatherDays;
-  const labels = ['今日', '明日', 'あさって'];
-  const weekdays = ['日','月','火','水','木','金','土'];
-  let lines = placeName + 'の天気だよ。いまは「' + desc + '」、気温' + nowTemp + '度。\n';
-  for (let i = 0; i < days && i < d.daily.time.length; i++) {
-    const dt = new Date(d.daily.time[i]);
-    const label = labels[i] || ((dt.getMonth() + 1) + '/' + dt.getDate() + '(' + weekdays[dt.getDay()] + ')');
-    const dcode = WEATHER_CODES[d.daily.weather_code[i]] || '不明';
-    const hi = Math.round(d.daily.temperature_2m_max[i]);
-    const lo = Math.round(d.daily.temperature_2m_min[i]);
-    lines += '・' + label + ': ' + dcode + ' (' + hi + '/' + lo + '度)\n';
-  }
+// ===== 天気(前と同じ) =====
+const WEATHER_CODES={0:'快晴',1:'晴れ',2:'晴れときどき曇り',3:'曇り',45:'霧',48:'霧',51:'弱い霧雨',53:'霧雨',55:'強い霧雨',61:'弱い雨',63:'雨',65:'強い雨',71:'弱い雪',73:'雪',75:'強い雪',80:'にわか雨',81:'にわか雨',82:'激しいにわか雨',95:'雷雨',96:'雷雨(ひょう)',99:'激しい雷雨'};
+function looksLikeWeather(t){if(/週間|しゅうかん|これから|今週|一週間/.test(t))weatherDays=7;else if(/あさって|明後日/.test(t))weatherDays=3;else if(/明日|あした|あす/.test(t))weatherDays=2;else weatherDays=1;return /天気|てんき|気温|きおん|weather|暑い|寒い|雨|晴れ|くもり|雪|予報/.test(t);}
+async function fetchWeather(lat,lon,placeName){
+  const url='https://api.open-meteo.com/v1/forecast?latitude='+lat+'&longitude='+lon+'&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=Asia%2FTokyo&forecast_days=7';
+  const d=await(await fetch(url)).json();
+  const desc=WEATHER_CODES[d.current.weather_code]||'不明';const labels=['今日','明日','あさって'];const wd=['日','月','火','水','木','金','土'];
+  let lines=placeName+'の天気だよ。いまは「'+desc+'」、気温'+Math.round(d.current.temperature_2m)+'度。\n';
+  for(let i=0;i<weatherDays&&i<d.daily.time.length;i++){const dt=new Date(d.daily.time[i]);const label=labels[i]||((dt.getMonth()+1)+'/'+dt.getDate()+'('+wd[dt.getDay()]+')');lines+='・'+label+': '+(WEATHER_CODES[d.daily.weather_code[i]]||'不明')+' ('+Math.round(d.daily.temperature_2m_max[i])+'/'+Math.round(d.daily.temperature_2m_min[i])+'度)\n';}
   return lines.trim();
 }
-
-async function geocode(place) {
-  // 地名→緯度経度(Open-Meteoのジオコーディング)
-  const url = 'https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(place) + '&count=1&language=ja';
-  const r = await fetch(url);
-  const d = await r.json();
-  if (d.results && d.results.length > 0) {
-    const g = d.results[0];
-    return {lat: g.latitude, lon: g.longitude, name: g.name};
-  }
-  return null;
+async function geocode(place){const d=await(await fetch('https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(place)+'&count=1&language=ja')).json();if(d.results&&d.results.length>0){const g=d.results[0];return{lat:g.latitude,lon:g.longitude,name:g.name};}return null;}
+async function handleWeather(text){
+  const cleaned=text.replace(/の?(天気|てんき|気温|きおん|weather|をおしえて|教えて|は|？|\?)/g,'').trim();
+  if(cleaned.length>=2){const geo=await geocode(cleaned);if(geo){addMsg('ai',await fetchWeather(geo.lat,geo.lon,geo.name));return;}}
+  if(navigator.geolocation){addMsg('ai','位置情報を確認するね…(許可を押してね)');navigator.geolocation.getCurrentPosition(async(pos)=>{try{addMsg('ai',await fetchWeather(pos.coords.latitude,pos.coords.longitude,'現在地'));}catch(e){addMsg('ai','天気の取得に失敗したよ');}},()=>{awaitingPlace=true;addMsg('ai','どこの天気が知りたい？ 地名を教えてね。');});}
+  else{awaitingPlace=true;addMsg('ai','どこの天気が知りたい？ 地名を教えてね。');}
 }
 
-let awaitingPlace = false;  // 「どこの天気?」と聞いた後の状態
-
-async function handleWeather(text) {
-  // 地名が含まれていそうなら、その場所の天気を調べる
-  const cleaned = text.replace(/の?(天気|てんき|気温|きおん|weather|をおしえて|教えて|は|？|\?)/g, '').trim();
-  if (cleaned.length >= 2) {
-    const geo = await geocode(cleaned);
-    if (geo) {
-      addMsg('ai', await fetchWeather(geo.lat, geo.lon, geo.name));
-      return;
-    }
-  }
-  // 地名がなければ現在地を試す
-  if (navigator.geolocation) {
-    addMsg('ai', '位置情報を確認するね…(ブラウザの許可を押してね)');
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          addMsg('ai', await fetchWeather(pos.coords.latitude, pos.coords.longitude, '現在地'));
-        } catch (e) { addMsg('ai', '天気の取得に失敗したよ'); }
-      },
-      () => {
-        awaitingPlace = true;
-        addMsg('ai', 'どこの天気が知りたい？ 地名(例: 東京、大阪)を教えてね。');
-      }
-    );
-  } else {
-    awaitingPlace = true;
-    addMsg('ai', 'どこの天気が知りたい？ 地名を教えてね。');
-  }
+// ===== 送信 =====
+async function cbSend(){
+  const inp=document.getElementById('cb-input');const text=inp.value.trim();if(text==='')return;
+  addMsg('me',text);inp.value='';
+  if(awaitingPlace){awaitingPlace=false;const geo=await geocode(text.replace(/の天気.*$/,'').trim());if(geo){try{addMsg('ai',await fetchWeather(geo.lat,geo.lon,geo.name));}catch(e){addMsg('ai','取得失敗');}}else addMsg('ai','その地名が見つからなかった…');return;}
+  if(looksLikeWeather(text)){try{await handleWeather(text);}catch(e){addMsg('ai','天気の取得に失敗したよ');}return;}
+  try{
+    const r=await fetch('/qzero/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+    const data=await r.json();addMsg('ai',data.ok?data.reply:(data.error||'エラー'));
+  }catch(e){addMsg('ai','通信エラーが起きたよ');}
 }
 
-async function cbSend() {
-  const inp = document.getElementById('cb-input');
-  const text = inp.value.trim();
-  if (text === '') return;
-  addMsg('me', text);
-  inp.value = '';
-
-  // 「どこの天気?」と聞いた直後なら、入力を地名として扱う
-  if (awaitingPlace) {
-    awaitingPlace = false;
-    const geo = await geocode(text.replace(/の天気.*$/, '').trim());
-    if (geo) {
-      try { addMsg('ai', await fetchWeather(geo.lat, geo.lon, geo.name)); }
-      catch (e) { addMsg('ai', '天気の取得に失敗したよ'); }
-    } else {
-      addMsg('ai', 'その地名が見つからなかった…。別の言い方で試してみて。');
-    }
-    return;
-  }
-
-  // 天気っぽい質問なら、QZEROサーバーより先に天気機能で答える
-  if (looksLikeWeather(text)) {
-    try { await handleWeather(text); }
-    catch (e) { addMsg('ai', '天気の取得に失敗したよ'); }
-    return;
-  }
-
-  try {
-    const r = await fetch('/qzero/api/chat', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({text})
-    });
-    const data = await r.json();
-    addMsg('ai', data.ok ? data.reply : (data.error || 'エラーが起きたよ'));
-  } catch (e) {
-    addMsg('ai', '通信エラーが起きたよ');
-  }
-}
+// ===== 起動 =====
+greet();
+refreshAccount();
+loadThreads();
 </script>
 {% endblock %}
