@@ -4349,6 +4349,13 @@ def _qzero_db():
         user_id TEXT PRIMARY KEY, password_hash TEXT, nickname TEXT, created_at TEXT)""")
     conn.execute("""CREATE TABLE IF NOT EXISTS qzero_history (
         id INTEGER PRIMARY KEY AUTOINCREMENT, owner TEXT, role TEXT, text TEXT, created_at TEXT)""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS qzero_threads (
+        thread_id INTEGER PRIMARY KEY AUTOINCREMENT, owner TEXT, title TEXT, created_at TEXT, updated_at TEXT)""")
+    # 古いhistoryにthread_id列がなければ足す
+    try:
+        conn.execute('ALTER TABLE qzero_history ADD COLUMN thread_id INTEGER')
+    except Exception:
+        pass
     return conn
 
 @app.route('/staff/qzero-school')
@@ -4506,6 +4513,65 @@ def api_qzero_me():
         return ok(logged_in=False)
     return ok(logged_in=True, nickname=session.get('qzero_nick', ''))
 
+@app.route('/api/qzero/threads', methods=['GET'])
+def api_qzero_threads():
+    # 自分のスレッド一覧(新しい順)
+    u = _qzero_current()
+    if not u:
+        return ok(threads=[])
+    conn = _qzero_db()
+    rows = conn.execute('SELECT thread_id, title, updated_at FROM qzero_threads WHERE owner=? ORDER BY updated_at DESC', (u,)).fetchall()
+    conn.close()
+    return ok(threads=[{'thread_id': r[0], 'title': dec(r[1]) if r[1] else '新しい会話', 'updated_at': r[2]} for r in rows])
+
+@app.route('/api/qzero/threads/new', methods=['POST'])
+def api_qzero_thread_new():
+    # 新しいスレッドを作る
+    u = _qzero_current()
+    if not u:
+        return err('ログインしてね', 401)
+    import pytz as _p
+    from datetime import datetime as _d
+    now = _d.now(_p.timezone('Asia/Tokyo')).strftime('%Y-%m-%d %H:%M')
+    conn = _qzero_db()
+    cur = conn.execute('INSERT INTO qzero_threads (owner, title, created_at, updated_at) VALUES (?,?,?,?)',
+                       (u, None, now, now))
+    tid = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return ok(thread_id=tid)
+
+@app.route('/api/qzero/threads/<int:thread_id>', methods=['GET'])
+def api_qzero_thread_get(thread_id):
+    # そのスレッドの会話を取り出す(本人のスレッドだけ)
+    u = _qzero_current()
+    if not u:
+        return err('ログインしてね', 401)
+    conn = _qzero_db()
+    own = conn.execute('SELECT owner FROM qzero_threads WHERE thread_id=?', (thread_id,)).fetchone()
+    if not own or own[0] != u:
+        conn.close()
+        return err('その会話は見られないよ', 403)
+    rows = conn.execute('SELECT role, text, created_at FROM qzero_history WHERE thread_id=? ORDER BY id ASC', (thread_id,)).fetchall()
+    conn.close()
+    return ok(history=[{'role': r[0], 'text': dec(r[1]), 'created_at': r[2]} for r in rows])
+
+@app.route('/api/qzero/threads/<int:thread_id>/delete', methods=['POST'])
+def api_qzero_thread_delete(thread_id):
+    u = _qzero_current()
+    if not u:
+        return err('ログインしてね', 401)
+    conn = _qzero_db()
+    own = conn.execute('SELECT owner FROM qzero_threads WHERE thread_id=?', (thread_id,)).fetchone()
+    if not own or own[0] != u:
+        conn.close()
+        return err('その会話は消せないよ', 403)
+    conn.execute('DELETE FROM qzero_history WHERE thread_id=?', (thread_id,))
+    conn.execute('DELETE FROM qzero_threads WHERE thread_id=?', (thread_id,))
+    conn.commit()
+    conn.close()
+    return ok(message='消したよ')
+
 @app.route('/api/qzero/history/save', methods=['POST'])
 def api_qzero_history_save():
     # 会話の1往復を暗号化して保存(ログイン時だけ)
@@ -4515,19 +4581,33 @@ def api_qzero_history_save():
     data = request.get_json(silent=True) or {}
     role = data.get('role')
     text = str(data.get('text') or '')[:2000]
+    thread_id = data.get('thread_id')
     if role not in ('me', 'ai') or not text:
         return err('保存する内容がおかしいよ')
     import pytz as _p
     from datetime import datetime as _d
+    now = _d.now(_p.timezone('Asia/Tokyo')).strftime('%Y-%m-%d %H:%M')
     conn = _qzero_db()
-    conn.execute('INSERT INTO qzero_history (owner, role, text, created_at) VALUES (?,?,?,?)',
-                 (u, role, enc(text), _d.now(_p.timezone('Asia/Tokyo')).strftime('%Y-%m-%d %H:%M')))
-    # 1人あたり最新500件だけ残す
-    conn.execute("""DELETE FROM qzero_history WHERE owner=? AND id NOT IN
-                    (SELECT id FROM qzero_history WHERE owner=? ORDER BY id DESC LIMIT 500)""", (u, u))
+    # スレッドが指定されてなければ新規作成
+    if not thread_id:
+        cur = conn.execute('INSERT INTO qzero_threads (owner, title, created_at, updated_at) VALUES (?,?,?,?)', (u, None, now, now))
+        thread_id = cur.lastrowid
+    else:
+        # 本人のスレッドか確認
+        own = conn.execute('SELECT owner, title FROM qzero_threads WHERE thread_id=?', (thread_id,)).fetchone()
+        if not own or own[0] != u:
+            conn.close()
+            return err('そのスレッドには保存できないよ', 403)
+    conn.execute('INSERT INTO qzero_history (owner, role, text, created_at, thread_id) VALUES (?,?,?,?,?)',
+                 (u, role, enc(text), now, thread_id))
+    # 最初のユーザー発言をスレッドのタイトルにする(未設定なら)
+    cur2 = conn.execute('SELECT title FROM qzero_threads WHERE thread_id=?', (thread_id,)).fetchone()
+    if role == 'me' and (not cur2 or not cur2[0]):
+        conn.execute('UPDATE qzero_threads SET title=? WHERE thread_id=?', (enc(text[:30]), thread_id))
+    conn.execute('UPDATE qzero_threads SET updated_at=? WHERE thread_id=?', (now, thread_id))
     conn.commit()
     conn.close()
-    return ok(saved=True)
+    return ok(saved=True, thread_id=thread_id)
 
 @app.route('/api/qzero/history', methods=['GET'])
 def api_qzero_history():
