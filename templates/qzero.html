@@ -57,12 +57,103 @@ function addMsg(who, text) {
 }
 addMsg('ai', 'こんにちは! 私はQZERO、Q\'zの自作AIだよ。問題文を見せてくれたら何の教科か当てるし、「理科のクイズ出して」みたいなお願いもできる。ためしてみて!');
 
+// ---- 天気機能(ブラウザ側でOpen-Meteoから取得) ----
+const WEATHER_CODES = {
+  0:'快晴', 1:'晴れ', 2:'晴れときどき曇り', 3:'曇り',
+  45:'霧', 48:'霧', 51:'弱い霧雨', 53:'霧雨', 55:'強い霧雨',
+  61:'弱い雨', 63:'雨', 65:'強い雨', 71:'弱い雪', 73:'雪', 75:'強い雪',
+  80:'にわか雨', 81:'にわか雨', 82:'激しいにわか雨', 95:'雷雨', 96:'雷雨(ひょう)', 99:'激しい雷雨'
+};
+
+function looksLikeWeather(t) {
+  return /天気|てんき|気温|きおん|weather|暑い|寒い|雨|晴れ|くもり|雪/.test(t);
+}
+
+async function fetchWeather(lat, lon, placeName) {
+  // Open-Meteoから今日の天気を取る(登録不要・無料)
+  const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
+    '&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=Asia%2FTokyo&forecast_days=1';
+  const r = await fetch(url);
+  const d = await r.json();
+  const nowTemp = Math.round(d.current.temperature_2m);
+  const code = d.current.weather_code;
+  const hi = Math.round(d.daily.temperature_2m_max[0]);
+  const lo = Math.round(d.daily.temperature_2m_min[0]);
+  const desc = WEATHER_CODES[code] || '不明';
+  return placeName + 'の天気は「' + desc + '」。いまの気温は' + nowTemp + '度、今日の最高' + hi + '度・最低' + lo + '度だよ。';
+}
+
+async function geocode(place) {
+  // 地名→緯度経度(Open-Meteoのジオコーディング)
+  const url = 'https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(place) + '&count=1&language=ja';
+  const r = await fetch(url);
+  const d = await r.json();
+  if (d.results && d.results.length > 0) {
+    const g = d.results[0];
+    return {lat: g.latitude, lon: g.longitude, name: g.name};
+  }
+  return null;
+}
+
+let awaitingPlace = false;  // 「どこの天気?」と聞いた後の状態
+
+async function handleWeather(text) {
+  // 地名が含まれていそうなら、その場所の天気を調べる
+  const cleaned = text.replace(/の?(天気|てんき|気温|きおん|weather|をおしえて|教えて|は|？|\?)/g, '').trim();
+  if (cleaned.length >= 2) {
+    const geo = await geocode(cleaned);
+    if (geo) {
+      addMsg('ai', await fetchWeather(geo.lat, geo.lon, geo.name));
+      return;
+    }
+  }
+  // 地名がなければ現在地を試す
+  if (navigator.geolocation) {
+    addMsg('ai', '位置情報を確認するね…(ブラウザの許可を押してね)');
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          addMsg('ai', await fetchWeather(pos.coords.latitude, pos.coords.longitude, '現在地'));
+        } catch (e) { addMsg('ai', '天気の取得に失敗したよ'); }
+      },
+      () => {
+        awaitingPlace = true;
+        addMsg('ai', 'どこの天気が知りたい？ 地名(例: 東京、大阪)を教えてね。');
+      }
+    );
+  } else {
+    awaitingPlace = true;
+    addMsg('ai', 'どこの天気が知りたい？ 地名を教えてね。');
+  }
+}
+
 async function cbSend() {
   const inp = document.getElementById('cb-input');
   const text = inp.value.trim();
   if (text === '') return;
   addMsg('me', text);
   inp.value = '';
+
+  // 「どこの天気?」と聞いた直後なら、入力を地名として扱う
+  if (awaitingPlace) {
+    awaitingPlace = false;
+    const geo = await geocode(text.replace(/の天気.*$/, '').trim());
+    if (geo) {
+      try { addMsg('ai', await fetchWeather(geo.lat, geo.lon, geo.name)); }
+      catch (e) { addMsg('ai', '天気の取得に失敗したよ'); }
+    } else {
+      addMsg('ai', 'その地名が見つからなかった…。別の言い方で試してみて。');
+    }
+    return;
+  }
+
+  // 天気っぽい質問なら、QZEROサーバーより先に天気機能で答える
+  if (looksLikeWeather(text)) {
+    try { await handleWeather(text); }
+    catch (e) { addMsg('ai', '天気の取得に失敗したよ'); }
+    return;
+  }
+
   try {
     const r = await fetch('/qzero/api/chat', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
