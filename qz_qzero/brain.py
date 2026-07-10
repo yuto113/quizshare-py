@@ -69,6 +69,23 @@ def similarity(a, b):
     common = len(wa & wb)
     return common / max(len(wa), len(wb))
 
+def match_pattern(text, patterns, threshold=0.5):
+    # 会話パターン(こう来たら・こう返す)の中から、今の入力に合うものを探す
+    # 判定は「文の似てる度」と「キーワードが含まれるか」の合わせ技
+    best, best_score = None, 0.0
+    for p in patterns:
+        trigger = p['trigger']
+        # (A) 似てる度
+        sim = similarity(text, trigger)
+        # (B) キーワード: triggerの言葉がそのままtextに入っていたら加点
+        kw = 1.0 if (len(trigger) >= 2 and trigger in text) else 0.0
+        score = max(sim, kw)
+        if score > best_score:
+            best_score, best = score, p
+    if best and best_score >= threshold:
+        return best
+    return None
+
 def match_memory(text, memories, threshold=0.6):
     # 覚えた質問の中から、今の質問に一番にてるものを探す
     # threshold(しきい値)以上ならヒット。きびしめ=0.6

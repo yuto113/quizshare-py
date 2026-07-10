@@ -4351,12 +4351,60 @@ def _qzero_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT, owner TEXT, role TEXT, text TEXT, created_at TEXT)""")
     conn.execute("""CREATE TABLE IF NOT EXISTS qzero_threads (
         thread_id INTEGER PRIMARY KEY AUTOINCREMENT, owner TEXT, title TEXT, created_at TEXT, updated_at TEXT)""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS qzero_patterns (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, trigger TEXT, reply TEXT, created_at TEXT)""")
     # 古いhistoryにthread_id列がなければ足す
     try:
         conn.execute('ALTER TABLE qzero_history ADD COLUMN thread_id INTEGER')
     except Exception:
         pass
     return conn
+
+@app.route('/api/qzero/patterns/list', methods=['GET'])
+def api_qzero_patterns_list():
+    if not staff_is_admin():
+        return err('管理者だけだよ', 403)
+    conn = _qzero_db()
+    rows = conn.execute('SELECT id, trigger, reply, created_at FROM qzero_patterns ORDER BY id DESC LIMIT 200').fetchall()
+    conn.close()
+    return ok(patterns=[{'id': r[0], 'trigger': r[1], 'reply': dec(r[2]), 'created_at': r[3]} for r in rows])
+
+@app.route('/api/qzero/patterns/add', methods=['POST'])
+def api_qzero_patterns_add():
+    if not staff_is_admin():
+        return err('管理者だけだよ', 403)
+    data = request.get_json(silent=True) or {}
+    trigger = str(data.get('trigger') or '').strip()[:200]
+    reply = str(data.get('reply') or '').strip()[:1000]
+    if not trigger or not reply:
+        return err('「こう来たら」と「こう返す」の両方を入れてね')
+    import pytz as _p
+    from datetime import datetime as _d
+    conn = _qzero_db()
+    conn.execute('INSERT INTO qzero_patterns (trigger, reply, created_at) VALUES (?,?,?)',
+                 (trigger, enc(reply), _d.now(_p.timezone('Asia/Tokyo')).strftime('%Y-%m-%d %H:%M')))
+    conn.commit()
+    conn.close()
+    return ok(message='QZEROが新しい返し方を覚えたよ!')
+
+@app.route('/api/qzero/patterns/delete', methods=['POST'])
+def api_qzero_patterns_delete():
+    if not staff_is_admin():
+        return err('管理者だけだよ', 403)
+    data = request.get_json(silent=True) or {}
+    conn = _qzero_db()
+    conn.execute('DELETE FROM qzero_patterns WHERE id=?', (int(data.get('id') or 0),))
+    conn.commit()
+    conn.close()
+    return ok(message='忘れさせたよ')
+
+@app.route('/staff/qzero-patterns')
+def page_qzero_patterns():
+    if not session.get('staff_id'):
+        return redirect('/staff/login')
+    if not staff_is_admin():
+        return redirect('/staff/board')
+    return render_template('qzero_patterns.html')
 
 @app.route('/staff/qzero-school')
 def page_qzero_school():
@@ -4657,6 +4705,15 @@ def api_qzero_chat():
     if hit:
         return ok(reply=hit['answer'], intent='learned')
 
+    # 次に「会話パターン(こう来たら・こう返す)」を確認する
+    conn = _qzero_db()
+    pats = [{'trigger': r[0], 'reply': dec(r[1])} for r in
+            conn.execute('SELECT trigger, reply FROM qzero_patterns').fetchall()]
+    conn.close()
+    phit = qzero_brain.match_pattern(text, pats)
+    if phit:
+        return ok(reply=phit['reply'], intent='pattern')
+
     intent = qzero_brain.detect_intent(text)
 
     if intent == 'greeting':
@@ -4686,7 +4743,7 @@ def api_qzero_chat():
 
     if intent == 'classify':
         # 「何科?」の前後にある問題文を教科判定にかける
-        body = re.sub(r'(これ|この問題|は)?(何科|なにか|なんか|教科|ジャンル|\?|？|。)', '', text).strip()
+        body = _re_qzero.sub(r'(これ|この問題|は)?(何科|なにか|なんか|教科|ジャンル|\?|？|。)', '', text).strip()
         target = body or text
         result = qzero_brain.predict_subject(target)
         return ok(reply='それは「' + result['subject'] + '」だと思う! (確信度 ' + str(result['confidence']) + '%)', intent=intent, detail=result)

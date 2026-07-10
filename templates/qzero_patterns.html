@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}QZERO会話パターン{% endblock %}
+{% block body_class %}qz-board-page{% endblock %}
+{% block content %}
+<style>
+.site-header { display:none !important; }
+.qp-wrap { max-width:720px; margin:24px auto; padding:0 20px; }
+.qp-box { background:white; border:1px solid #e3ddd0; border-radius:12px; padding:14px 16px; margin-bottom:12px; }
+.qp-input { width:100%; padding:9px; border:1px solid #e3ddd0; border-radius:8px; box-sizing:border-box; font-size:14px; margin-top:6px; }
+.qp-btn { padding:7px 14px; border:none; border-radius:8px; cursor:pointer; font-size:13px; color:white; }
+.qp-arrow { color:#8a8270; text-align:center; font-size:18px; margin:4px 0; }
+</style>
+{% include '_staff_nav.html' %}
+<div class="qp-wrap">
+  <h2 style="color:#14213d;">💬 QZERO会話パターン</h2>
+  <p style="color:#8a8270; font-size:13px;">「こう来たら、こう返す」を教えると、QZEROが似た言葉に反応できるようになるよ。会話の引き出しがどんどん増える!</p>
+
+  <div class="qp-box" style="background:#fef9f0;">
+    <b style="color:#14213d; font-size:14px;">＋ 新しい返し方を教える</b>
+    <input class="qp-input" id="qp-trigger" placeholder="こう来たら (例: つかれた)">
+    <div class="qp-arrow">↓</div>
+    <input class="qp-input" id="qp-reply" placeholder="こう返す (例: おつかれさま！ゆっくり休んでね)">
+    <div style="text-align:right; margin-top:10px;">
+      <button class="qp-btn" style="background:#2a9d8f;" onclick="addPattern()">覚えさせる</button>
+    </div>
+  </div>
+
+  <h3 style="color:#14213d; font-size:1rem;">覚えた返し方</h3>
+  <div id="qp-list">読み込み中...</div>
+</div>
+
+<script>
+async function loadPatterns() {
+  const r = await fetch('/api/qzero/patterns/list');
+  const data = await r.json();
+  if (data.ok === false || data.ok === undefined) { window.location.href='/staff/board'; return; }
+  document.getElementById('qp-list').innerHTML = data.patterns.length === 0
+    ? '<p style="color:#8a8270; font-size:13px;">まだ何も覚えてないよ。上から教えてあげて!</p>'
+    : data.patterns.map(p => `
+      <div class="qp-box">
+        <div style="color:#14213d; font-weight:700; font-size:14px;">🗣️ ${escP(p.trigger)}</div>
+        <div class="qp-arrow" style="text-align:left;">↓</div>
+        <div style="color:#4a4436; font-size:14px;">🤖 ${escP(p.reply)}</div>
+        <div style="text-align:right; margin-top:6px;">
+          <button class="qp-btn" style="background:#e76f51;" onclick="delPattern(${p.id})">忘れさせる</button>
+        </div>
+      </div>`).join('');
+}
+async function addPattern() {
+  const trigger = document.getElementById('qp-trigger').value.trim();
+  const reply = document.getElementById('qp-reply').value.trim();
+  if (!trigger || !reply) { window.toast('両方入力してね', 'error'); return; }
+  const r = await fetch('/api/qzero/patterns/add', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({trigger, reply})});
+  const data = await r.json();
+  window.toast(data.ok ? data.message : (data.error||'エラー'), data.ok?'success':'error');
+  if (data.ok) { document.getElementById('qp-trigger').value=''; document.getElementById('qp-reply').value=''; loadPatterns(); }
+}
+async function delPattern(id) {
+  if (!confirm('この返し方を忘れさせる？')) return;
+  await fetch('/api/qzero/patterns/delete', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id})});
+  loadPatterns();
+}
+function escP(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+loadPatterns();
+</script>
+{% endblock %}

@@ -62,7 +62,20 @@ window.applyTheme=cbStrip;window.checkAutoTheme=cbStrip;setInterval(cbStrip,2000
     <div id="qz-head">
       <button id="qz-menu-btn" onclick="document.getElementById('qz-side').classList.toggle('open')">☰</button>
       <h1>QZERO</h1>
-      <span style="font-size:0.75rem; color:#bbb;">Q'z 自作AI</span>
+      <div style="position:relative;">
+        <button id="qz-mode-btn" onclick="toggleModeMenu()" style="background:none; border:1px solid #ddd; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:0.85rem; color:#333;">Core ▾</button>
+        <div id="qz-mode-menu" style="display:none; position:absolute; right:0; top:36px; background:white; border:1px solid #ddd; border-radius:10px; box-shadow:0 4px 12px rgba(0,0,0,0.08); min-width:230px; z-index:60;">
+          <div onclick="setAiMode('search')" style="padding:10px 14px; cursor:pointer;">
+            <b style="font-size:0.85rem;">Search</b><br><span style="font-size:0.72rem; color:#999;">インターネットから調べて答える(天気など)</span>
+          </div>
+          <div onclick="setAiMode('core')" style="padding:10px 14px; cursor:pointer;">
+            <b style="font-size:0.85rem;">Core</b><br><span style="font-size:0.72rem; color:#999;">クイズとAI自身の知識で答える</span>
+          </div>
+          <div onclick="window.toast('Miniは準備中だよ。おたのしみに!','success')" style="padding:10px 14px; cursor:pointer; opacity:0.5;">
+            <b style="font-size:0.85rem;">Mini</b><br><span style="font-size:0.72rem; color:#999;">自作AIが文章を作る(準備中)</span>
+          </div>
+        </div>
+      </div>
     </div>
     <div id="qz-log"></div>
     <div id="qz-input-area">
@@ -92,6 +105,26 @@ window.applyTheme=cbStrip;window.checkAutoTheme=cbStrip;setInterval(cbStrip,2000
 <script>
 let currentThread = null;
 let weatherDays = 1, awaitingPlace = false;
+let aiMode = 'core';  // いまの答え方モード
+
+function toggleModeMenu() {
+  const m = document.getElementById('qz-mode-menu');
+  m.style.display = m.style.display === 'none' ? 'block' : 'none';
+}
+function setAiMode(mode) {
+  aiMode = mode;
+  document.getElementById('qz-mode-btn').textContent = (mode === 'search' ? 'Search' : 'Core') + ' ▾';
+  document.getElementById('qz-mode-menu').style.display = 'none';
+  const msg = mode === 'search'
+    ? 'Searchモードだよ。インターネットから調べて答える(いまは天気と場所が得意。情報源はだんだん増えていくよ)'
+    : 'Coreモードだよ。クイズ6331問とAI自身の知識で答える!';
+  addMsg('ai', msg, true);
+}
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('qz-mode-menu');
+  const btn = document.getElementById('qz-mode-btn');
+  if (menu && btn && !menu.contains(e.target) && !btn.contains(e.target)) menu.style.display = 'none';
+});
 let lastTopic = null;  // 直前の話題を覚えておく('weather'など)。流れを読むために使う
 
 // ===== 表示 =====
@@ -196,8 +229,45 @@ function isLikelyPlace(t){
   if(/天気|てんき|気温|クイズ|何科|こんにち|ありがと/.test(t))return false;  // 他の意図は除外
   return true;
 }
+async function searchWikipedia(query){
+  // Wikipediaの公式API(無料・登録不要)で調べる
+  // まずキーワードでページを探す
+  const q = query.replace(/(って何|とは|について|おしえて|教えて|調べて|って誰|とは何|？|\?)/g,'').trim();
+  if(q.length < 1) return null;
+  const searchUrl = 'https://ja.wikipedia.org/w/api.php?action=query&list=search&srsearch=' +
+    encodeURIComponent(q) + '&srlimit=1&format=json&origin=*';
+  const sr = await (await fetch(searchUrl)).json();
+  if(!sr.query || !sr.query.search || sr.query.search.length === 0) return null;
+  const hit = sr.query.search[0];
+  const title = hit.title;
+  // ★暴走ガード: 検索語とタイトルにつながりがあるかチェック
+  // 「検索語の一部がタイトルに入ってる」or「タイトルが検索語に入ってる」でなければ不採用
+  const qNorm = q.toLowerCase();
+  const tNorm = title.toLowerCase();
+  let related = tNorm.includes(qNorm) || qNorm.includes(tNorm);
+  if(!related){
+    // 2文字ずつに刻んで、共通のかけらがあるかも見る(ゆるめの救済)
+    let common = 0;
+    for(let i = 0; i < qNorm.length - 1; i++){
+      if(tNorm.includes(qNorm.slice(i, i + 2))) common++;
+    }
+    related = common >= 2;
+  }
+  if(!related) return null;
+  // 見つかったページの要約(最初の部分)を取る
+  const sumUrl = 'https://ja.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(title);
+  const sm = await (await fetch(sumUrl)).json();
+  if(!sm.extract) return null;
+  // 長すぎたら3文くらいに切る
+  let text = sm.extract;
+  const sentences = text.split('。');
+  if(sentences.length > 3) text = sentences.slice(0,3).join('。') + '。';
+  return {title: title, text: text};
+}
+
 async function geocode(place){const d=await(await fetch('https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(place)+'&count=1&language=ja')).json();if(d.results&&d.results.length>0){const g=d.results[0];return{lat:g.latitude,lon:g.longitude,name:g.name};}return null;}
 async function handleWeather(text){
+  lastTopic='weather';  // 天気の話に入った(現在地でも地名でも、これで続きを読める)
   const cleaned=text.replace(/の?(天気|てんき|気温|きおん|weather|をおしえて|教えて|は|？|\?)/g,'').trim();
   if(cleaned.length>=2){const geo=await geocode(cleaned);if(geo){addMsg('ai',await fetchWeather(geo.lat,geo.lon,geo.name));return;}}
   if(navigator.geolocation){addMsg('ai','位置情報を確認するね…(許可を押してね)');navigator.geolocation.getCurrentPosition(async(pos)=>{try{addMsg('ai',await fetchWeather(pos.coords.latitude,pos.coords.longitude,'現在地'));}catch(e){addMsg('ai','天気の取得に失敗したよ');}},()=>{awaitingPlace=true;addMsg('ai','どこの天気が知りたい？ 地名を教えてね。');});}
@@ -209,13 +279,38 @@ async function cbSend(){
   const inp=document.getElementById('cb-input');const text=inp.value.trim();if(text==='')return;
   addMsg('me',text);inp.value='';
   if(awaitingPlace){awaitingPlace=false;const geo=await geocode(text.replace(/の天気.*$/,'').trim());if(geo){try{addMsg('ai',await fetchWeather(geo.lat,geo.lon,geo.name));}catch(e){addMsg('ai','取得失敗');}}else addMsg('ai','その地名が見つからなかった…');return;}
+  // Searchモード: 天気っぽければ天気、それ以外はWikipediaで調べる
+  if(aiMode==='search'){
+    if(looksLikeWeather(text)){
+      lastTopic='weather';
+      try{await handleWeather(text);}catch(e){addMsg('ai','天気の取得に失敗したよ');}
+      return;
+    }
+    if(lastTopic==='weather' && isLikelyPlace(text)){
+      const place=text.replace(/^(じゃあ|では|それなら|あと|次は|つぎは)/,'').replace(/(は|の天気|は？|は\?|？|\?)$/,'').trim();
+      const geo=await geocode(place);
+      if(geo){try{addMsg('ai',await fetchWeather(geo.lat,geo.lon,geo.name));}catch(e){addMsg('ai','天気の取得に失敗したよ');}return;}
+    }
+    lastTopic=null;
+    addMsg('ai','しらべてるよ…', true);
+    try{
+      const wiki=await searchWikipedia(text);
+      if(wiki){
+        addMsg('ai','「'+wiki.title+'」について調べたよ。\n\n'+wiki.text+'\n\n(出典: Wikipedia)');
+      }else{
+        addMsg('ai','ごめん、それについては見つからなかった…。別の言葉で試してみて。');
+      }
+    }catch(e){addMsg('ai','調べるのに失敗したよ。もう一度試してみて。');}
+    return;
+  }
   if(looksLikeWeather(text)){lastTopic='weather';try{await handleWeather(text);}catch(e){addMsg('ai','天気の取得に失敗したよ');}return;}
 
-  // ★流れを読む: 直前が天気の話で、今回が地名っぽいだけの短い入力なら「その場所の天気」と判断
+  // ★流れを読む: 直前が天気の話で、今回が地名っぽい短い入力なら「その場所の天気」と判断
   if(lastTopic==='weather' && isLikelyPlace(text)){
     const place=text.replace(/^(じゃあ|では|それなら|あと|次は|つぎは)/,'').replace(/(は|の天気|は？|は\?|？|\?)$/,'').trim();
     const geo=await geocode(place);
     if(geo){try{addMsg('ai',await fetchWeather(geo.lat,geo.lon,geo.name));}catch(e){addMsg('ai','天気の取得に失敗したよ');}return;}
+    else{addMsg('ai','「'+place+'」の場所が見つからなかった…。別の言い方で試してみて。');return;}
   }
   try{
     const r=await fetch('/qzero/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
