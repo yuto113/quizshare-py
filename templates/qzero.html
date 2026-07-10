@@ -246,12 +246,14 @@ async function searchWikipedia(query){
   const tNorm = title.toLowerCase();
   let related = tNorm.includes(qNorm) || qNorm.includes(tNorm);
   if(!related){
-    // 2文字ずつに刻んで、共通のかけらがあるかも見る(ゆるめの救済)
+    // 2文字ずつに刻んで、共通のかけらの「割合」で判定(半分以上でないと不採用)
     let common = 0;
+    let total = 0;
     for(let i = 0; i < qNorm.length - 1; i++){
+      total++;
       if(tNorm.includes(qNorm.slice(i, i + 2))) common++;
     }
-    related = common >= 2;
+    related = total > 0 && (common / total) >= 0.5;
   }
   if(!related) return null;
   // 見つかったページの要約(最初の部分)を取る
