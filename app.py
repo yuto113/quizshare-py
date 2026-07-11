@@ -4703,6 +4703,36 @@ QZERO_GUIDE_STAFF = [
      'url': '/staff/board', 'howto': '掲示板のKPメニューから残高を確認したり、社員どうしで送りあえるよ。'},
 ]
 
+def _qzero_mini_allowed():
+    # Miniを使えるのは、QZEROに社員ログインしていてIDがyutoの人だけ(ベータテスト)
+    return (session.get('qzero_user') or '') == 's:yuto'
+
+@app.route('/api/qzero/mini/status', methods=['GET'])
+def api_qzero_mini_status():
+    return ok(allowed=_qzero_mini_allowed())
+
+@app.route('/api/qzero/mini', methods=['POST'])
+def api_qzero_mini():
+    if not _qzero_mini_allowed():
+        return err('Miniは準備中だよ(ベータテスト中)', 403)
+    if not rate_limit(f'qzmini:{client_ip()}', 20):
+        return err('少し待ってね')
+    from qz_qzero import mini as qzero_mini
+    data = request.get_json(silent=True) or {}
+    text = str(data.get('text') or '').strip()[:100]
+    try:
+        result = qzero_mini.generate(text)
+    except Exception as e:
+        return err('生成に失敗したよ: ' + str(e)[:60])
+    if not result['ok']:
+        vocab = ' '.join(qzero_mini.vocabulary())
+        if result.get('unknown'):
+            return ok(generated=False,
+                      reply='ごめん、「' + ' '.join(result['unknown']) + '」はまだ知らない言葉なんだ。\n\n私が知ってる32語はこれだよ:\n' + vocab + '\n\nこの言葉で「ねこ が」みたいに書き出しをくれたら、続きを作るよ!')
+        return ok(generated=False,
+                  reply='「ねこ が」みたいに、単語をスペースで区切った短い書き出しをちょうだい(4語まで)。\n\n使える言葉:\n' + vocab)
+    return ok(generated=True, reply='続きを作ったよ:\n\n「' + result['text'] + '」\n\n(私の脳みそはDIM14・正解率83%の自作トランスフォーマーだよ)')
+
 @app.route('/api/qzero/guide', methods=['POST'])
 def api_qzero_guide():
     # Guideモード: やりたいことに合うページを探して、使い方つきで案内
