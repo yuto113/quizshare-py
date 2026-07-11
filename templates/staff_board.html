@@ -571,6 +571,70 @@ function startReply(msgId, name, body) {
   document.getElementById('reply-preview-area').style.display = 'flex';
   document.getElementById('reply-preview-text').textContent = name + ': ' + (body || '(スタンプ/画像)').substring(0,40);
   document.getElementById('msg-body').focus();
+
+// ===== 暗号化システム =====
+window.selectedCipherKey = null;
+window.myCipherKeys = [];
+
+window.decryptMsg = async function(id) {
+  // 🔓ボタン: サーバーに権限を確認して、OKなら平文をもらう
+  const r = await fetch('/api/staff/cipher/decrypt', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({message_id: id})
+  });
+  const data = await r.json();
+  const box = document.getElementById('cipher-' + id);
+  if (data.ok) {
+    box.style.background = '#eaf7f0';
+    box.style.color = '#1a5c3a';
+    box.innerHTML = '🔓 ' + String(data.plain||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + ' <span style="font-size:11px; color:#8a8270;">(復号ずみ)</span>';
+  } else {
+    window.toast(data.error || '復号できないよ', 'error');
+  }
+};
+
+async function setupCipherUI() {
+  // 自分が使えるキーがあれば、入力欄の上に🔐ボタンを出す
+  try {
+    const r = await fetch('/api/staff/cipher/mykeys');
+    const data = await r.json();
+    if (!data.ok || !data.keys || data.keys.length === 0) return;
+    window.myCipherKeys = data.keys;
+    const ta = document.getElementById('msg-body');
+    if (!ta) return;
+    const bar = document.createElement('div');
+    bar.id = 'cipher-bar';
+    bar.style.cssText = 'padding:4px 0; font-size:12px;';
+    bar.innerHTML = '<button id="cipher-toggle" onclick="toggleCipher()" style="padding:4px 12px; border:1px solid #e3ddd0; border-radius:8px; background:white; cursor:pointer; font-size:12px;">🔐 暗号化: OFF</button>';
+    ta.parentNode.insertBefore(bar, ta);
+  } catch (e) {}
+}
+
+window.toggleCipher = function() {
+  const btn = document.getElementById('cipher-toggle');
+  if (window.selectedCipherKey === null) {
+    // キーが複数あれば選ばせる
+    if (window.myCipherKeys.length === 1) {
+      window.selectedCipherKey = window.myCipherKeys[0].id;
+      btn.textContent = '🔐 暗号化: ' + window.myCipherKeys[0].name;
+    } else {
+      const names = window.myCipherKeys.map((k, i) => (i+1) + '=' + k.name).join(' / ');
+      const pick = prompt('どのキーで暗号化する? 番号を入れてね\n' + names);
+      const idx = parseInt(pick) - 1;
+      if (isNaN(idx) || !window.myCipherKeys[idx]) return;
+      window.selectedCipherKey = window.myCipherKeys[idx].id;
+      btn.textContent = '🔐 暗号化: ' + window.myCipherKeys[idx].name;
+    }
+    btn.style.background = '#1a1a2e';
+    btn.style.color = '#7de3a0';
+  } else {
+    window.selectedCipherKey = null;
+    btn.textContent = '🔐 暗号化: OFF';
+    btn.style.background = 'white';
+    btn.style.color = '';
+  }
+};
+setupCipherUI();
 }
 function cancelReply() {
   replyToId = null;
@@ -831,7 +895,7 @@ async function loadMessages() {
           <div class="chat-bubble">
             ${m.reply_preview ? `<div style="border-left:3px solid #fb6f5b; padding-left:8px; margin-bottom:6px; opacity:0.75; font-size:12px;">${esc(m.reply_preview.staff_name)}: ${esc(m.reply_preview.body)}</div>` : ''}
             ${m.title ? `<div class="title">${esc(m.title)}</div>` : ''}
-            ${m.body ? `<div class="body">${esc(m.body)}</div>` : ''}
+            ${m.is_cipher ? `<div class="body" id="cipher-${m.id}" style="font-family:monospace; background:#1a1a2e; color:#7de3a0; padding:8px 12px; border-radius:8px; font-size:13px;">🔐 [${esc(m.cipher_key_name||'暗号')}] Xk9#mQ2$vB7&...(暗号文) <button onclick="decryptMsg(${m.id})" style="margin-left:8px; padding:2px 10px; border:none; border-radius:6px; background:#2a9d8f; color:white; cursor:pointer; font-size:12px;">🔓 復号</button></div>` : (m.body ? `<div class="body">${esc(m.body)}</div>` : '')}
             ${m.has_image ? `<img class="chat-image" src="/api/staff/messages/${m.id}/blob?kind=image" onclick="window.open(this.src)">` : ''}
             ${m.has_file ? `<a href="/staff/file/${m.id}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:#f1ece0;color:#14213d;border-radius:10px;padding:8px 12px;text-decoration:none;margin-top:4px;font-size:13px;">🗂️ ${esc(m.file_name||'ファイル')}</a>` : ''}
             ${m.stamp_id ? `<img class="chat-stamp-img" src="/static/stamps/${m.stamp_id}.svg">` : ''}
@@ -940,7 +1004,7 @@ async function postMessage() {
   if (!body && !pendingImage && !pendingFile) { return; }
   const r = await fetch('/api/staff/messages', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({title: '', body, image_data: pendingImage, channel_id: currentChannelId, file_data: pendingFile, file_name: pendingFileName, reply_to: replyToId})
+    body: JSON.stringify({title: '', body, image_data: pendingImage, channel_id: currentChannelId, file_data: pendingFile, file_name: pendingFileName, reply_to: replyToId, cipher_key_id: selectedCipherKey})
   });
   const data = await r.json();
   if (data.ok) {

@@ -5437,6 +5437,271 @@ def page_staff_handbook():
         return redirect('/staff/login')
     return render_template('staff_handbook.html')
 
+def _cipher_db():
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    conn.execute("""CREATE TABLE IF NOT EXISTS qz_cipher_keys (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, key_name TEXT, created_at TEXT)""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS qz_cipher_members (
+        key_id INTEGER, staff_id TEXT, UNIQUE(key_id, staff_id))""")
+    return conn
+
+def _my_cipher_keys():
+    # 自分が使えるキーの一覧を返す
+    sid = session.get('staff_id')
+    if not sid:
+        return []
+    conn = _cipher_db()
+    rows = conn.execute("""SELECT k.id, k.key_name FROM qz_cipher_keys k
+                           JOIN qz_cipher_members m ON k.id = m.key_id
+                           WHERE m.staff_id = ? OR m.staff_id = '*'""", (sid,)).fetchall()
+    conn.close()
+    # 重複を除いて返す
+    seen = {}
+    for r in rows:
+        seen[r[0]] = r[1]
+    return [{'id': k, 'name': v} for k, v in seen.items()]
+
+@app.route('/api/staff/cipher/keys', methods=['GET'])
+def api_cipher_keys():
+    # 人事用: 全キーとメンバー一覧(管理者だけ)
+    if not staff_is_admin():
+        return err('管理者だけだよ', 403)
+    conn = _cipher_db()
+    keys = conn.execute('SELECT id, key_name, created_at FROM qz_cipher_keys ORDER BY id').fetchall()
+    result = []
+    for k in keys:
+        mems = [r[0] for r in conn.execute('SELECT staff_id FROM qz_cipher_members WHERE key_id=?', (k[0],)).fetchall()]
+        result.append({'id': k[0], 'name': k[1], 'created_at': k[2], 'members': mems})
+    conn.close()
+    return ok(keys=result)
+
+@app.route('/api/staff/cipher/keys/new', methods=['POST'])
+def api_cipher_key_new():
+    if not staff_is_admin():
+        return err('管理者だけだよ', 403)
+    data = request.get_json(silent=True) or {}
+    name = str(data.get('name') or '').strip()[:30]
+    if not name:
+        return err('キーの名前を入れてね')
+    import pytz as _p
+    from datetime import datetime as _d
+    conn = _cipher_db()
+    conn.execute('INSERT INTO qz_cipher_keys (key_name, created_at) VALUES (?,?)',
+                 (name, _d.now(_p.timezone('Asia/Tokyo')).strftime('%Y-%m-%d')))
+    conn.commit()
+    conn.close()
+    return ok(message='キー「' + name + '」を発行したよ')
+
+@app.route('/api/staff/cipher/keys/member', methods=['POST'])
+def api_cipher_key_member():
+    # キーの「使える人」を追加/削除(staff_id='*'で全員)
+    if not staff_is_admin():
+        return err('管理者だけだよ', 403)
+    data = request.get_json(silent=True) or {}
+    key_id = int(data.get('key_id') or 0)
+    staff_id = str(data.get('staff_id') or '').strip()
+    action = data.get('action')
+    if not staff_id:
+        return err('社員IDを入れてね')
+    conn = _cipher_db()
+    if not conn.execute('SELECT id FROM qz_cipher_keys WHERE id=?', (key_id,)).fetchone():
+        conn.close()
+        return err('そのキーは無いよ', 404)
+    if action == 'add':
+        # 「*」以外は実在スタッフか確認
+        if staff_id != '*':
+            row = conn.execute('SELECT staff_id FROM qz_staff WHERE staff_id=?', (staff_id,)).fetchone()
+            if not row:
+                conn.close()
+                return err('その社員IDは見つからないよ')
+        conn.execute('INSERT OR IGNORE INTO qz_cipher_members (key_id, staff_id) VALUES (?,?)', (key_id, staff_id))
+        msg = '追加したよ'
+    elif action == 'remove':
+        conn.execute('DELETE FROM qz_cipher_members WHERE key_id=? AND staff_id=?', (key_id, staff_id))
+        msg = '外したよ'
+    elif action == 'delete_key':
+        conn.execute('DELETE FROM qz_cipher_members WHERE key_id=?', (key_id,))
+        conn.execute('DELETE FROM qz_cipher_keys WHERE id=?', (key_id,))
+        msg = 'キーを削除したよ(過去の暗号文は読めなくなる)'
+    else:
+        conn.close()
+        return err('actionがおかしいよ')
+    conn.commit()
+    conn.close()
+    return ok(message=msg)
+
+@app.route('/api/staff/cipher/mykeys', methods=['GET'])
+def api_cipher_mykeys():
+    # 自分が使えるキー一覧(掲示板の🔐ボタン用)
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    return ok(keys=_my_cipher_keys())
+
+@app.route('/staff/cipher')
+def page_staff_cipher():
+    # 暗号ツールページ(スタッフなら誰でも開ける)
+    if not session.get('staff_id'):
+        return redirect('/staff/login')
+    return render_template('staff_cipher.html')
+
+@app.route('/api/staff/cipher/encode', methods=['POST'])
+def api_cipher_encode():
+    # 文章をキーで暗号化して、貼り付け可能な暗号文にする
+    sid = session.get('staff_id')
+    if not sid:
+        return err('ログインしてね', 401)
+    data = request.get_json(silent=True) or {}
+    key_id = int(data.get('key_id') or 0)
+    text = str(data.get('text') or '').strip()[:2000]
+    if not text:
+        return err('文章を入れてね')
+    my_keys = [k['id'] for k in _my_cipher_keys()]
+    if key_id not in my_keys:
+        return err('そのキーを使う権限がないよ', 403)
+    # キーID+暗号本文をまとめて暗号化し、「QZ暗号」形式の文字列にする
+    import base64 as _b64
+    payload = str(key_id) + '|' + text
+    token = enc(payload)  # サーバーの暗号技術(Fernet)で本当に暗号化
+    code = 'QZ-ANGO:' + _b64.urlsafe_b64encode(token.encode()).decode()
+    conn = _cipher_db()
+    kname = conn.execute('SELECT key_name FROM qz_cipher_keys WHERE id=?', (key_id,)).fetchone()
+    conn.close()
+    return ok(code=code, key_name=kname[0] if kname else '')
+
+@app.route('/api/staff/cipher/decode', methods=['POST'])
+def api_cipher_decode():
+    # 暗号文を貼り付け→権限があれば解読
+    sid = session.get('staff_id')
+    if not sid:
+        return err('ログインしてね', 401)
+    data = request.get_json(silent=True) or {}
+    code = str(data.get('code') or '').strip()
+    if not code.startswith('QZ-ANGO:'):
+        return err('これはQZ暗号の形式じゃないみたい(QZ-ANGO:で始まるやつを貼ってね)')
+    import base64 as _b64
+    try:
+        token = _b64.urlsafe_b64decode(code[8:].encode()).decode()
+        payload = dec(token)
+        key_id_str, text = payload.split('|', 1)
+        key_id = int(key_id_str)
+    except Exception:
+        return err('暗号文がこわれているみたい')
+    # 権限チェック: このキーの使える人か?
+    conn = _cipher_db()
+    allowed = conn.execute("""SELECT 1 FROM qz_cipher_members
+                              WHERE key_id=? AND (staff_id=? OR staff_id='*')""",
+                           (key_id, sid)).fetchone()
+    kname = conn.execute('SELECT key_name FROM qz_cipher_keys WHERE id=?', (key_id,)).fetchone()
+    conn.close()
+    if not allowed:
+        return err('このキー(' + (kname[0] if kname else '?') + ')を解読する権限がないよ', 403)
+    return ok(text=text, key_name=kname[0] if kname else '')
+
+@app.route('/api/staff/list-simple', methods=['GET'])
+def api_staff_list_simple():
+    # プルダウン用: 社員のIDと名前の一覧(管理者だけ)
+    if not staff_is_admin():
+        return err('管理者だけだよ', 403)
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    rows = conn.execute("SELECT staff_id, name FROM qz_staff WHERE COALESCE(status,'active')='active' ORDER BY staff_id").fetchall()
+    conn.close()
+    return ok(staff=[{'id': r[0], 'name': dec(r[1] or '')} for r in rows])
+
+def _cipher_mail_db():
+    conn = _cipher_db()
+    conn.execute("""CREATE TABLE IF NOT EXISTS qz_cipher_mails (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, from_id TEXT, to_id TEXT,
+        code TEXT, created_at TEXT, read_flag INTEGER DEFAULT 0)""")
+    return conn
+
+@app.route('/api/staff/cipher/mail/send', methods=['POST'])
+def api_cipher_mail_send():
+    # 暗号文を社内メールとして送る
+    sid = session.get('staff_id')
+    if not sid:
+        return err('ログインしてね', 401)
+    if not rate_limit(f'cmail:{client_ip()}', 10):
+        return err('少し待ってね')
+    data = request.get_json(silent=True) or {}
+    to_id = str(data.get('to_id') or '').strip()
+    code = str(data.get('code') or '').strip()
+    if not to_id:
+        return err('宛先を選んでね')
+    if not code.startswith('QZ-ANGO:') or len(code) > 8000:
+        return err('先に文章を暗号化してね(QZ-ANGO:の暗号文だけ送れるよ)')
+    conn = _cipher_mail_db()
+    row = conn.execute("SELECT staff_id FROM qz_staff WHERE staff_id=? AND COALESCE(status,'active')='active'", (to_id,)).fetchone()
+    if not row:
+        conn.close()
+        return err('その宛先は見つからないよ')
+    import pytz as _p
+    from datetime import datetime as _d
+    conn.execute('INSERT INTO qz_cipher_mails (from_id, to_id, code, created_at) VALUES (?,?,?,?)',
+                 (sid, to_id, code, _d.now(_p.timezone('Asia/Tokyo')).strftime('%Y-%m-%d %H:%M')))
+    conn.commit()
+    conn.close()
+    return ok(message='暗号メールを送ったよ📮')
+
+@app.route('/api/staff/cipher/mail/inbox', methods=['GET'])
+def api_cipher_mail_inbox():
+    # 自分宛の暗号メール一覧(暗号文のまま返す=解読は権限チェック付きの別API)
+    sid = session.get('staff_id')
+    if not sid:
+        return err('ログインしてね', 401)
+    conn = _cipher_mail_db()
+    rows = conn.execute('SELECT id, from_id, code, created_at, read_flag FROM qz_cipher_mails WHERE to_id=? ORDER BY id DESC LIMIT 50', (sid,)).fetchall()
+    conn.execute('UPDATE qz_cipher_mails SET read_flag=1 WHERE to_id=?', (sid,))
+    conn.commit()
+    conn.close()
+    return ok(mails=[{'id': r[0], 'from_id': r[1], 'code': r[2], 'created_at': r[3], 'unread': r[4] == 0} for r in rows])
+
+@app.route('/api/staff/cipher/mail/delete', methods=['POST'])
+def api_cipher_mail_delete():
+    sid = session.get('staff_id')
+    if not sid:
+        return err('ログインしてね', 401)
+    data = request.get_json(silent=True) or {}
+    conn = _cipher_mail_db()
+    conn.execute('DELETE FROM qz_cipher_mails WHERE id=? AND to_id=?', (int(data.get('id') or 0), sid))
+    conn.commit()
+    conn.close()
+    return ok(message='消したよ')
+
+@app.route('/api/staff/list-for-mail', methods=['GET'])
+def api_staff_list_for_mail():
+    # 宛先プルダウン用(一般スタッフも使える。IDと名前だけ)
+    if not session.get('staff_id'):
+        return err('ログインしてね', 401)
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    rows = conn.execute("SELECT staff_id, name FROM qz_staff WHERE COALESCE(status,'active')='active' ORDER BY staff_id").fetchall()
+    conn.close()
+    me = session.get('staff_id')
+    return ok(staff=[{'id': r[0], 'name': dec(r[1] or '')} for r in rows if r[0] != me])
+
+@app.route('/api/staff/cipher/decrypt', methods=['POST'])
+def api_cipher_decrypt():
+    # 🔓復号: そのキーの使える人だけが平文を受け取れる
+    sid = session.get('staff_id')
+    if not sid:
+        return err('ログインしてね', 401)
+    data = request.get_json(silent=True) or {}
+    message_id = int(data.get('message_id') or 0)
+    conn = _cipher_db()
+    row = conn.execute('SELECT body, cipher_key_id FROM qz_messages WHERE id=?', (message_id,)).fetchone()
+    if not row or not row[1]:
+        conn.close()
+        return err('その暗号文は見つからないよ', 404)
+    allowed = conn.execute("""SELECT 1 FROM qz_cipher_members
+                              WHERE key_id=? AND (staff_id=? OR staff_id='*')""",
+                           (row[1], sid)).fetchone()
+    conn.close()
+    if not allowed:
+        return err('このキーを使う権限がないよ', 403)
+    return ok(plain=dec(row[0]))
+
 @app.route('/staff/board')
 def page_staff_board():
     if not session.get('staff_id'):
@@ -5483,10 +5748,24 @@ def api_staff_messages_get():
         marks = ','.join(['?'] * len(reply_ids))
         for rid, rname, rbody in conn.execute('SELECT id, staff_name, body FROM qz_messages WHERE id IN (' + marks + ')', reply_ids).fetchall():
             reply_map[rid] = {'staff_name': dec(rname or ''), 'body': (dec(rbody or '') or '')[:60]}
+    # 暗号メッセージの情報をまとめて取る(本文はブラウザに渡さない=覗いても読めない)
+    cipher_map = {}
+    if ids:
+        marks = ','.join(['?'] * len(ids))
+        for mid, ckey in conn.execute('SELECT id, cipher_key_id FROM qz_messages WHERE id IN (' + marks + ') AND cipher_key_id IS NOT NULL', ids).fetchall():
+            cipher_map[mid] = ckey
+    cipher_names = {}
+    if cipher_map:
+        for kid, kname in conn.execute('SELECT id, key_name FROM qz_cipher_keys').fetchall():
+            cipher_names[kid] = kname
     messages = []
     for r in rows:
+        is_cipher = r[0] in cipher_map
         messages.append({
-            'id': r[0], 'staff_name': dec(r[1]), 'title': dec(r[2]), 'body': dec(r[3]),
+            'id': r[0], 'staff_name': dec(r[1]), 'title': dec(r[2]),
+            'body': '' if is_cipher else dec(r[3]),
+            'is_cipher': is_cipher,
+            'cipher_key_name': cipher_names.get(cipher_map.get(r[0]), '暗号') if is_cipher else None,
             'created_at': r[4], 'stamp_id': r[5],
             'is_system': bool(r[6]),
             'reply_preview': reply_map.get(r[7]) if r[7] else None,
@@ -5515,14 +5794,22 @@ def api_staff_messages_post():
     if file_data and len(file_data) > 8_000_000:
         return err('ファイルが大きすぎるよ(5MBまで)')
     reply_to = data.get('reply_to')
+    cipher_key_id = data.get('cipher_key_id')  # 暗号キー(なければ普通の投稿)
+    if cipher_key_id:
+        my_keys = [k['id'] for k in _my_cipher_keys()]
+        if int(cipher_key_id) not in my_keys:
+            return err('そのキーで送る権限がないよ', 403)
+        cipher_key_id = int(cipher_key_id)
+    else:
+        cipher_key_id = None
     import sqlite3 as _sq
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
     channel_id = data.get('channel_id', 1)
     import pytz as _pytz_jst
     from datetime import datetime as _dt_jst
     _jst_now_str = _dt_jst.now(_pytz_jst.timezone('Asia/Tokyo')).strftime('%Y-%m-%d %H:%M:%S')
-    conn.execute('INSERT INTO qz_messages (staff_id, staff_name, title, body, image_data, stamp_id, channel_id, file_data, file_name, reply_to, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-                 (session.get('staff_id'), enc(session.get('staff_name')), enc(title), enc(body), image_data, stamp_id, channel_id, file_data, enc(file_name) if file_name else None, reply_to, _jst_now_str))
+    conn.execute('INSERT INTO qz_messages (staff_id, staff_name, title, body, image_data, stamp_id, channel_id, file_data, file_name, reply_to, created_at, cipher_key_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+                 (session.get('staff_id'), enc(session.get('staff_name')), enc(title), enc(body), image_data, stamp_id, channel_id, file_data, enc(file_name) if file_name else None, reply_to, _jst_now_str, cipher_key_id))
     conn.commit()
     conn.close()
     return ok(message='投稿しました')

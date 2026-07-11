@@ -33,6 +33,80 @@ setTimeout(killQzTheme, 800);
 <div class="hr-wrap">
   <h2 style="color:#14213d;">👑 人事管理</h2>
 
+  <div style="background:white; border:1px solid #e3ddd0; border-radius:12px; padding:16px; margin-bottom:14px;">
+    <style>
+    /* 🔐キー管理のスマホ対応 */
+    @media (max-width: 600px) {
+      #ck-list > div { padding:10px 8px !important; }
+      #ck-list div[style*="display:flex"] { flex-wrap: wrap; gap:6px !important; }
+      #ck-list select { width:100% !important; flex-basis:100% !important; }
+      #ck-list button { flex-shrink:0; }
+      #ck-list span[style*="background:#f0ece2"] { display:inline-block; margin-bottom:4px; }
+      #ck-name { font-size:16px !important; }
+    }
+    </style>
+    <h3 style="margin:0 0 10px; color:#1a1a2e; font-size:1rem;">🔐 暗号キー管理</h3>
+    <p style="color:#8a8270; font-size:12px; margin:0 0 10px;">キーを発行して「使える人」を登録すると、その人は掲示板で暗号メッセージを送受信できるよ。「*」で全員に許可。</p>
+    <div style="display:flex; gap:8px; margin-bottom:12px;">
+      <input id="ck-name" placeholder="新しいキーの名前(例: 公安キー)" style="flex:1; padding:8px; border:1px solid #e3ddd0; border-radius:8px; font-size:13px;">
+      <button onclick="newCipherKey()" style="padding:8px 16px; border:none; border-radius:8px; background:#1a1a2e; color:#7de3a0; cursor:pointer; font-size:13px;">発行</button>
+    </div>
+    <div id="ck-list">読み込み中...</div>
+  </div>
+
+  <script>
+  async function loadCipherKeys() {
+    const r = await fetch('/api/staff/cipher/keys');
+    const data = await r.json();
+    if (!data.ok) { document.getElementById('ck-list').innerHTML = ''; return; }
+    document.getElementById('ck-list').innerHTML = data.keys.length === 0
+      ? '<p style="color:#8a8270; font-size:12px;">まだキーが無いよ。</p>'
+      : data.keys.map(k => `
+        <div style="border:1px solid #f0ece2; border-radius:10px; padding:10px 12px; margin-bottom:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <b style="font-size:14px; color:#14213d;">🔑 ${escC(k.name)}</b>
+            <button onclick="cipherMember(${k.id}, '', 'delete_key')" style="padding:3px 10px; border:none; border-radius:6px; background:#e76f51; color:white; cursor:pointer; font-size:11px;">キー削除</button>
+          </div>
+          <div style="margin-top:6px; font-size:12px; color:#4a4436;">
+            使える人: ${k.members.length === 0 ? '<span style="color:#b8b09e;">まだいない</span>' : k.members.map(m => `<span style="background:#f0ece2; border-radius:6px; padding:2px 8px; margin-right:4px;">${m === '*' ? '🌍全員' : escC(m)} <a href="#" onclick="cipherMember(${k.id}, '${escC(m)}', 'remove');return false;" style="color:#e76f51; text-decoration:none;">×</a></span>`).join('')}
+          </div>
+          <div style="display:flex; gap:6px; margin-top:8px;">
+            <select id="ck-add-${k.id}" style="flex:1; padding:6px; border:1px solid #e3ddd0; border-radius:6px; font-size:12px; background:white;">
+              <option value="*">🌍 全員</option>
+              ${window.staffOptions || ''}
+            </select>
+            <button onclick="cipherMember(${k.id}, document.getElementById('ck-add-${k.id}').value, 'add')" style="padding:6px 12px; border:none; border-radius:6px; background:#2a9d8f; color:white; cursor:pointer; font-size:12px;">追加</button>
+          </div>
+        </div>`).join('');
+  }
+  async function newCipherKey() {
+    const name = document.getElementById('ck-name').value.trim();
+    if (!name) { window.toast('キーの名前を入れてね', 'error'); return; }
+    const r = await fetch('/api/staff/cipher/keys/new', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name})});
+    const data = await r.json();
+    window.toast(data.ok ? data.message : (data.error||'エラー'), data.ok?'success':'error');
+    if (data.ok) { document.getElementById('ck-name').value=''; loadCipherKeys(); }
+  }
+  async function cipherMember(keyId, staffId, action) {
+    if (action === 'delete_key' && !confirm('このキーを削除する？過去の暗号文は誰も読めなくなるよ')) return;
+    if (action === 'add' && !staffId) { window.toast('社員IDを入れてね', 'error'); return; }
+    const r = await fetch('/api/staff/cipher/keys/member', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({key_id: keyId, staff_id: staffId, action})});
+    const data = await r.json();
+    window.toast(data.ok ? data.message : (data.error||'エラー'), data.ok?'success':'error');
+    if (data.ok) loadCipherKeys();
+  }
+  function escC(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'');}
+  async function loadStaffOptions() {
+    const r = await fetch('/api/staff/list-simple');
+    const data = await r.json();
+    if (data.ok && data.staff) {
+      window.staffOptions = data.staff.map(s => `<option value="${escC(s.id)}">${escC(s.id)} (${escC(s.name)})</option>`).join('');
+    }
+    loadCipherKeys();
+  }
+  loadStaffOptions();
+  </script>
+
   <div class="hr-box">
     <h3 style="margin:0 0 10px; color:#fb6f5b; font-size:1rem;">📥 承認待ちの応募</h3>
     <div id="hr-pending">読み込み中...</div>

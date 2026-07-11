@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}暗号ツール{% endblock %}
+{% block body_class %}qz-board-page{% endblock %}
+{% block content %}
+<style>
+.site-header { display:none !important; }
+.cp-wrap { max-width:680px; margin:24px auto; padding:0 16px; }
+.cp-card { background:white; border:1px solid #e3ddd0; border-radius:14px; padding:18px; margin-bottom:14px; }
+.cp-ta { width:100%; min-height:90px; padding:10px; border:1px solid #e3ddd0; border-radius:10px; box-sizing:border-box; font-size:14px; resize:vertical; }
+.cp-code { font-family:monospace; background:#1a1a2e; color:#7de3a0; padding:12px; border-radius:10px; font-size:12px; word-break:break-all; }
+.cp-btn { padding:10px 20px; border:none; border-radius:10px; cursor:pointer; font-size:14px; font-weight:700; color:white; }
+.cp-sel { padding:9px; border:1px solid #e3ddd0; border-radius:10px; font-size:14px; background:white; min-width:0; max-width:100%; }
+/* スマホ対応: 狭い画面では横並びを縦に */
+@media (max-width: 600px) {
+  .cp-wrap { padding:0 10px; margin:12px auto; }
+  .cp-card { padding:14px 12px; }
+  .cp-card > div[style*="display:flex"] { flex-wrap: wrap; }
+  .cp-sel { width:100%; flex-basis:100%; }
+  .cp-btn { width:100%; margin-top:6px; }
+  .cp-code { font-size:10px; }
+}
+</style>
+{% include '_staff_nav.html' %}
+<div class="cp-wrap">
+  <h2 style="color:#14213d;">🔐 暗号ツール</h2>
+  <p style="color:#8a8270; font-size:13px;">文章を暗号化してコピーし、掲示板やメールに貼って送ろう。受け取った暗号文はここで解読できる(キーの権限がある人だけ)。</p>
+
+  <div class="cp-card">
+    <h3 style="margin:0 0 10px; color:#1a1a2e; font-size:1rem;">🔒 暗号化する</h3>
+    <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center;">
+      <span style="font-size:13px; color:#4a4436;">キー:</span>
+      <select id="enc-key" class="cp-sel" style="flex:1;"></select>
+    </div>
+    <textarea id="enc-text" class="cp-ta" placeholder="暗号化したい文章"></textarea>
+    <div style="text-align:right; margin-top:8px;">
+      <button class="cp-btn" style="background:#1a1a2e;" onclick="doEncode()">🔒 暗号化</button>
+    </div>
+    <div id="enc-result" style="display:none; margin-top:10px;">
+      <div class="cp-code" id="enc-code"></div>
+      <div style="display:flex; gap:8px; margin-top:8px; justify-content:flex-end;">
+        <button class="cp-btn" style="background:#2a9d8f;" onclick="copyCode()">📋 コピー</button>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="cp-card">
+    <h3 style="margin:0 0 10px; color:#fb6f5b; font-size:1rem;">📮 暗号メールを送る</h3>
+    <p style="color:#8a8270; font-size:12px; margin:0 0 8px;">上で暗号化した文を、社内の相手に直接送れるよ。</p>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <span style="font-size:13px; color:#4a4436;">宛先:</span>
+      <select id="mail-to" class="cp-sel" style="flex:1;"></select>
+      <button class="cp-btn" style="background:#fb6f5b;" onclick="sendCipherMail()">📮 送信</button>
+    </div>
+  </div>
+
+  <div class="cp-card">
+    <h3 style="margin:0 0 10px; color:#14213d; font-size:1rem;">📥 受信箱</h3>
+    <div id="mail-inbox">読み込み中...</div>
+  </div>
+
+  <div class="cp-card">
+    <h3 style="margin:0 0 10px; color:#2a9d8f; font-size:1rem;">🔓 解読する</h3>
+    <textarea id="dec-text" class="cp-ta" placeholder="受け取った暗号文(QZ-ANGO:...)を貼り付け"></textarea>
+    <div style="text-align:right; margin-top:8px;">
+      <button class="cp-btn" style="background:#2a9d8f;" onclick="doDecode()">🔓 解読</button>
+    </div>
+    <div id="dec-result" style="display:none; margin-top:10px; background:#eaf7f0; border-radius:10px; padding:12px; color:#1a5c3a; font-size:14px; white-space:pre-wrap;"></div>
+  </div>
+</div>
+
+<script>
+let lastCode = '';
+async function loadMyKeys() {
+  const r = await fetch('/api/staff/cipher/mykeys');
+  const data = await r.json();
+  const sel = document.getElementById('enc-key');
+  if (!data.ok || !data.keys || data.keys.length === 0) {
+    sel.innerHTML = '<option value="">使えるキーがないよ(人事に相談)</option>';
+    return;
+  }
+  sel.innerHTML = data.keys.map(k => `<option value="${k.id}">🔑 ${escX(k.name)}</option>`).join('');
+}
+async function doEncode() {
+  const keyId = document.getElementById('enc-key').value;
+  const text = document.getElementById('enc-text').value.trim();
+  if (!keyId) { window.toast('使えるキーがないよ', 'error'); return; }
+  if (!text) { window.toast('文章を入れてね', 'error'); return; }
+  const r = await fetch('/api/staff/cipher/encode', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({key_id: keyId, text})});
+  const data = await r.json();
+  if (!data.ok) { window.toast(data.error||'エラー', 'error'); return; }
+  lastCode = data.code;
+  document.getElementById('enc-code').textContent = data.code;
+  document.getElementById('enc-result').style.display = 'block';
+}
+function copyCode() {
+  navigator.clipboard.writeText(lastCode).then(() => window.toast('コピーしたよ!掲示板やメールに貼ってね', 'success'));
+}
+function mailCode() {
+  location.href = 'mailto:?subject=' + encodeURIComponent('暗号メッセージ') + '&body=' + encodeURIComponent(lastCode);
+}
+async function doDecode() {
+  const code = document.getElementById('dec-text').value.trim();
+  if (!code) { window.toast('暗号文を貼ってね', 'error'); return; }
+  const r = await fetch('/api/staff/cipher/decode', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({code})});
+  const data = await r.json();
+  const box = document.getElementById('dec-result');
+  if (!data.ok) { window.toast(data.error||'解読できないよ', 'error'); box.style.display='none'; return; }
+  box.textContent = '🔑 ' + data.key_name + ' の暗号\n\n' + data.text;
+  box.style.display = 'block';
+}
+function escX(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+async function loadMailTo() {
+  const r = await fetch('/api/staff/list-for-mail');
+  const data = await r.json();
+  const sel = document.getElementById('mail-to');
+  if (!data.ok || !data.staff || data.staff.length === 0) {
+    sel.innerHTML = '<option value="">送れる相手がいないよ</option>';
+    return;
+  }
+  sel.innerHTML = data.staff.map(s => `<option value="${escX(s.id)}">${escX(s.id)} (${escX(s.name)})</option>`).join('');
+}
+async function sendCipherMail() {
+  if (!lastCode) { window.toast('先に上の欄で文章を暗号化してね', 'error'); return; }
+  const toId = document.getElementById('mail-to').value;
+  if (!toId) { window.toast('宛先を選んでね', 'error'); return; }
+  const r = await fetch('/api/staff/cipher/mail/send', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({to_id: toId, code: lastCode})});
+  const data = await r.json();
+  window.toast(data.ok ? data.message : (data.error||'エラー'), data.ok?'success':'error');
+}
+async function loadInbox() {
+  const r = await fetch('/api/staff/cipher/mail/inbox');
+  const data = await r.json();
+  const box = document.getElementById('mail-inbox');
+  if (!data.ok) { box.innerHTML=''; return; }
+  box.innerHTML = data.mails.length === 0
+    ? '<p style="color:#8a8270; font-size:12px;">暗号メールはまだ無いよ。</p>'
+    : data.mails.map(m => `
+      <div style="border:1px solid #f0ece2; border-radius:10px; padding:10px 12px; margin-bottom:8px; ${m.unread ? 'background:#fef9f0;' : ''}">
+        <div style="display:flex; justify-content:space-between; font-size:12px; color:#8a8270;">
+          <span>${m.unread ? '🆕 ' : ''}From: <b style="color:#14213d;">${escX(m.from_id)}</b></span>
+          <span>${escX(m.created_at)}</span>
+        </div>
+        <div class="cp-code" style="margin-top:6px; font-size:11px;" id="mailcode-${m.id}">${escX(m.code.substring(0, 60))}...</div>
+        <div id="mailplain-${m.id}" style="display:none; margin-top:6px; background:#eaf7f0; border-radius:8px; padding:10px; color:#1a5c3a; font-size:13px; white-space:pre-wrap;"></div>
+        <div style="text-align:right; margin-top:6px;">
+          <button class="cp-btn" style="background:#8a8270; padding:5px 12px; font-size:12px;" onclick="delMail(${m.id})">削除</button>
+          <button class="cp-btn" style="background:#2a9d8f; padding:5px 12px; font-size:12px;" onclick="openMail(${m.id}, this)">🔓 解読</button>
+        </div>
+      </div>`).join('');
+}
+window.mailCodes = {};
+async function openMail(id, btn) {
+  // 受信箱の暗号文をその場で解読(権限はサーバーが確認)
+  const codeEl = document.getElementById('mailcode-' + id);
+  // 全文が要るので受信箱データから引く(短縮表示のため)
+  const r0 = await fetch('/api/staff/cipher/mail/inbox');
+  const d0 = await r0.json();
+  const mail = (d0.mails || []).find(m => m.id === id);
+  if (!mail) return;
+  const r = await fetch('/api/staff/cipher/decode', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({code: mail.code})});
+  const data = await r.json();
+  if (!data.ok) { window.toast(data.error||'解読できないよ', 'error'); return; }
+  const plain = document.getElementById('mailplain-' + id);
+  plain.textContent = '🔑 ' + data.key_name + '\n\n' + data.text;
+  plain.style.display = 'block';
+}
+async function delMail(id) {
+  await fetch('/api/staff/cipher/mail/delete', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id})});
+  loadInbox();
+}
+loadMyKeys();
+loadMailTo();
+loadInbox();
+</script>
+{% endblock %}
