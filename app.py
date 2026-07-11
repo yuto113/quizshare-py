@@ -4668,6 +4668,79 @@ def api_qzero_history():
     conn.close()
     return ok(history=[{'role': r[0], 'text': dec(r[1]), 'created_at': r[2]} for r in rows])
 
+# Guideモードの案内リスト(公開ページ)
+QZERO_GUIDE_PUBLIC = [
+    {'keywords': ['クイズ', '作', '投稿', '問題'], 'name': 'クイズ投稿',
+     'url': '/', 'howto': 'トップページでグループに入ってから「クイズを作る」ボタンを押してね。問題文・答え・ヒントを入れて、画像も付けられるよ。'},
+    {'keywords': ['クイズ', '解', '挑戦', '遊'], 'name': 'クイズに挑戦',
+     'url': '/', 'howto': 'グループの合言葉で入ると、みんなのクイズに挑戦できるよ。正解するとランキングにのるんだ。'},
+    {'keywords': ['タイピング', 'タイプ', 'キーボード', '打つ'], 'name': "Q'zタイピング",
+     'url': '/typing', 'howto': '難易度を選んでスタート!60秒でどれだけ打てるかチャレンジ。ローマ字はsi/shiどっちの打ち方でもOKだよ。'},
+    {'keywords': ['ライブラリ', '図鑑', '公式', '教科'], 'name': '公式ライブラリ',
+     'url': '/library', 'howto': '教科や学年べつに公式クイズがそろってるよ。好きな分野を選んで挑戦してみて。'},
+    {'keywords': ['イベント', '大会', 'コンテスト'], 'name': 'イベント',
+     'url': '/', 'howto': 'グループのイベントに参加すると、期間限定の大会で競えるよ。結果発表もお楽しみに。'},
+    {'keywords': ['バトル', '対戦', 'たいせん'], 'name': 'バトルモード',
+     'url': '/', 'howto': 'ルームコードを友達と共有すると、リアルタイムでクイズ対戦ができるよ。'},
+    {'keywords': ['会社', 'Qz', '運営', 'ホームページ', 'について'], 'name': '会社ホームページ',
+     'url': '/homepage', 'howto': '運営会社の紹介ページだよ。サービスの歴史や数字も見られる。'},
+    {'keywords': ['規約', 'ルール', 'プライバシー', '利用'], 'name': '利用規約',
+     'url': '/terms', 'howto': 'サービスを使うときの約束ごとが書いてあるよ。'},
+    {'keywords': ['天気', 'てんき'], 'name': 'QZERO Searchモード',
+     'url': '/qzero', 'howto': '右上のモードをSearchに切り替えて「東京の天気」みたいに聞くと、天気や調べものに答えるよ。'},
+    {'keywords': ['フィードバック', '要望', 'バグ', '不具合', '報告'], 'name': 'フィードバック',
+     'url': '/', 'howto': 'ページの下のほうにある「フィードバックを送る」から、気づいたことを送ってね。全部読んでるよ。'},
+]
+# 社員ログイン中だけ案内する社内ページ(公安は秘密なので載せない)
+QZERO_GUIDE_STAFF = [
+    {'keywords': ['掲示板', 'メッセージ', 'チャット', '連絡'], 'name': '社内掲示板',
+     'url': '/staff/board', 'howto': 'チャンネルを選んでメッセージを送れるよ。画像・ファイル・スタンプ・返信も使える。'},
+    {'keywords': ['暗号', 'ひみつ', '秘密'], 'name': '暗号ツール',
+     'url': '/staff/cipher', 'howto': 'キーを選んで文章を暗号化→コピーして掲示板に貼ったり、暗号メールで直接送れるよ。受信箱で解読もできる。'},
+    {'keywords': ['ハンドブック', 'マニュアル', 'ルール', '社員'], 'name': '社員ハンドブック',
+     'url': '/staff/handbook', 'howto': '社員としての心がまえやルールがまとまってるよ。困ったらまずここを見てね。'},
+    {'keywords': ['給料', 'KP', 'ポイント', '残高'], 'name': 'KP(社内ポイント)',
+     'url': '/staff/board', 'howto': '掲示板のKPメニューから残高を確認したり、社員どうしで送りあえるよ。'},
+]
+
+@app.route('/api/qzero/guide', methods=['POST'])
+def api_qzero_guide():
+    # Guideモード: やりたいことに合うページを探して、使い方つきで案内
+    if not rate_limit(f'qzguide:{client_ip()}', 30):
+        return err('少し待ってね')
+    data = request.get_json(silent=True) or {}
+    text = str(data.get('text') or '').strip()[:300]
+    if not text:
+        return err('やりたいことを教えてね')
+    guides = list(QZERO_GUIDE_PUBLIC)
+    # 社内ページの案内は「QZEROに社員としてログイン中」の人だけ
+    # (掲示板などのスタッフセッションがあっても、QZERO未ログインなら案内しない)
+    qz_user = session.get('qzero_user') or ''
+    if qz_user.startswith('s:'):
+        guides += QZERO_GUIDE_STAFF
+    # キーワードの「一致率」でいちばん合うものを選ぶ(何%のキーワードが含まれてたか)
+    best, best_rate = None, 0.0
+    for g in guides:
+        hit = sum(1 for kw in g['keywords'] if kw.lower() in text.lower())
+        rate = hit / len(g['keywords'])
+        if rate > best_rate:
+            best_rate, best = rate, g
+    pct = round(best_rate * 100)
+    if not best or pct < 20:
+        return ok(found=False,
+                  reply='見つからないなぁ…。「クイズを作りたい」「タイピングしたい」みたいに言ってみて!')
+    # 一致率で返事の自信を変える(AIが自信の度合いを正直に伝える)
+    if pct >= 80:
+        opening = 'それならこれだね!「' + best['name'] + '」だよ。'
+    elif pct >= 60:
+        opening = '「' + best['name'] + '」…これであってる？'
+    elif pct >= 40:
+        opening = 'これかな？「' + best['name'] + '」かも。'
+    else:
+        opening = 'それはないかもだけど、似ているページならあるよ!!「' + best['name'] + '」はどう？'
+    return ok(found=True, name=best['name'], url=best['url'], howto=best['howto'], confidence=pct,
+              reply=opening + '\n\n📖 使い方: ' + best['howto'])
+
 @app.route('/qzero')
 def page_qzero():
     return render_template('qzero.html')

@@ -71,6 +71,9 @@ window.applyTheme=cbStrip;window.checkAutoTheme=cbStrip;setInterval(cbStrip,2000
           <div onclick="setAiMode('core')" style="padding:10px 14px; cursor:pointer;">
             <b style="font-size:0.85rem;">Core</b><br><span style="font-size:0.72rem; color:#999;">クイズとAI自身の知識で答える</span>
           </div>
+          <div onclick="setAiMode('guide')" style="padding:10px 14px; cursor:pointer;">
+            <b style="font-size:0.85rem;">Guide</b><br><span style="font-size:0.72rem; color:#999;">やりたいことに合うページを案内する</span>
+          </div>
           <div onclick="window.toast('Miniは準備中だよ。おたのしみに!','success')" style="padding:10px 14px; cursor:pointer; opacity:0.5;">
             <b style="font-size:0.85rem;">Mini</b><br><span style="font-size:0.72rem; color:#999;">自作AIが文章を作る(準備中)</span>
           </div>
@@ -113,12 +116,15 @@ function toggleModeMenu() {
 }
 function setAiMode(mode) {
   aiMode = mode;
-  document.getElementById('qz-mode-btn').textContent = (mode === 'search' ? 'Search' : 'Core') + ' ▾';
+  const label = mode === 'search' ? 'Search' : (mode === 'guide' ? 'Guide' : 'Core');
+  document.getElementById('qz-mode-btn').textContent = label + ' ▾';
   document.getElementById('qz-mode-menu').style.display = 'none';
-  const msg = mode === 'search'
-    ? 'Searchモードだよ。インターネットから調べて答える(いまは天気と場所が得意。情報源はだんだん増えていくよ)'
-    : 'Coreモードだよ。クイズ6331問とAI自身の知識で答える!';
-  addMsg('ai', msg, true);
+  const msgs = {
+    search: 'Searchモードだよ。インターネットから調べて答える(いまは天気と場所が得意。情報源はだんだん増えていくよ)',
+    guide: 'Guideモードだよ。「クイズを作りたい」「タイピングしたい」みたいに、やりたいことを教えて。ぴったりのページと使い方を案内するよ!',
+    core: 'Coreモードだよ。クイズ6331問とAI自身の知識で答える!'
+  };
+  addMsg('ai', msgs[mode] || msgs.core, true);
 }
 document.addEventListener('click', (e) => {
   const menu = document.getElementById('qz-mode-menu');
@@ -281,6 +287,28 @@ async function cbSend(){
   const inp=document.getElementById('cb-input');const text=inp.value.trim();if(text==='')return;
   addMsg('me',text);inp.value='';
   if(awaitingPlace){awaitingPlace=false;const geo=await geocode(text.replace(/の天気.*$/,'').trim());if(geo){try{addMsg('ai',await fetchWeather(geo.lat,geo.lon,geo.name));}catch(e){addMsg('ai','取得失敗');}}else addMsg('ai','その地名が見つからなかった…');return;}
+  // Guideモード: やりたいことに合うページを案内
+  if(aiMode==='guide'){
+    try{
+      const r=await fetch('/api/qzero/guide',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+      const data=await r.json();
+      if(data.ok && data.found){
+        addMsg('ai', data.reply);
+        // リンクボタンを最後のメッセージに付ける
+        const log=document.getElementById('qz-log');
+        const last=log.lastElementChild.querySelector('.cb-bubble');
+        const a=document.createElement('a');
+        a.href=data.url;
+        a.textContent='➡️ ' + data.name + ' を開く';
+        a.style.cssText='display:inline-block; margin-top:8px; padding:8px 14px; background:#111; color:white; border-radius:8px; text-decoration:none; font-size:0.85rem;';
+        last.appendChild(document.createElement('br'));
+        last.appendChild(a);
+      } else {
+        addMsg('ai', data.reply || data.error || '見つからなかったよ');
+      }
+    }catch(e){addMsg('ai','案内に失敗したよ');}
+    return;
+  }
   // Searchモード: 天気っぽければ天気、それ以外はWikipediaで調べる
   if(aiMode==='search'){
     if(looksLikeWeather(text)){
