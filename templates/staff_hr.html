@@ -47,9 +47,9 @@ setTimeout(killQzTheme, 800);
     </style>
     <h3 style="margin:0 0 10px; color:#1a1a2e; font-size:1rem;">🔐 暗号キー管理</h3>
     <p style="color:#8a8270; font-size:12px; margin:0 0 10px;">キーを発行して「使える人」を登録すると、その人は掲示板で暗号メッセージを送受信できるよ。「*」で全員に許可。</p>
-    <div style="display:flex; gap:8px; margin-bottom:12px;">
-      <input id="ck-name" placeholder="新しいキーの名前(例: 公安キー)" style="flex:1; padding:8px; border:1px solid #e3ddd0; border-radius:8px; font-size:13px;">
-      <button onclick="newCipherKey()" style="padding:8px 16px; border:none; border-radius:8px; background:#1a1a2e; color:#7de3a0; cursor:pointer; font-size:13px;">発行</button>
+    <div class="ck-new-row" style="display:flex; gap:8px; margin-bottom:12px;">
+      <input id="ck-name" placeholder="新しいキーの名前(例: 公安キー)" style="flex:1; min-width:0; padding:8px; border:1px solid #e3ddd0; border-radius:8px; font-size:13px;">
+      <button onclick="newCipherKey()" style="padding:8px 16px; border:none; border-radius:8px; background:#1a1a2e; color:#7de3a0; cursor:pointer; font-size:13px; flex-shrink:0;">発行</button>
     </div>
     <div id="ck-list">読み込み中...</div>
   </div>
