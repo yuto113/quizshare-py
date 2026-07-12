@@ -4721,18 +4721,19 @@ def api_qzero_mini():
     data = request.get_json(silent=True) or {}
     text = str(data.get('text') or '').strip()[:100]
     try:
-        result = qzero_mini.generate(text)
+        version = (request.get_json(silent=True) or {}).get('version')
+        result = qzero_mini.generate(text, version)
     except Exception as e:
         return err('生成に失敗したよ: ' + str(e)[:60])
     if not result['ok']:
-        vocab = ' '.join(qzero_mini.vocabulary())
+        vocab = ' '.join(qzero_mini.vocabulary(version))
         if result.get('unknown'):
-            n_vocab = len(qzero_mini.vocabulary())
+            n_vocab = len(qzero_mini.vocabulary(version))
             return ok(generated=False,
                       reply='ごめん、「' + ' '.join(result['unknown']) + '」はまだ知らない言葉なんだ。\n\n私が知ってる' + str(n_vocab) + '語はこれだよ:\n' + vocab + '\n\nこの言葉で「ねこが」みたいに書き出しをくれたら、続きを作るよ!')
         return ok(generated=False,
                   reply='「ねこ が」みたいに、単語をスペースで区切った短い書き出しをちょうだい(4語まで)。\n\n使える言葉:\n' + vocab)
-    inf = qzero_mini.info()
+    inf = qzero_mini.info(version)
     return ok(generated=True, reply='続きを作ったよ:\n\n「' + result['text'] + '」\n\n(語彙' + str(inf['vocab']) + '語・DIM' + str(inf['dim']) + 'の自作トランスフォーマー。まだ勉強中だから、へんな文もあるよ)')
 
 @app.route('/api/qzero/guide', methods=['POST'])

@@ -5,15 +5,27 @@
 import json, math, os, random
 
 BRAIN_PATH = os.environ.get('QZERO_MINI_BRAIN', '/home/yuto113/qzero_mini_brain.json')
-_b = None
 
-def _load():
-    global _b
-    if _b is None:
-        with open(BRAIN_PATH, encoding='utf-8') as f:
-            _b = json.load(f)
-        _b['w2i'] = {w: i for i, w in enumerate(_b['words'])}
-    return _b
+# 選べる世代の台帳(新しい世代を作ったらここに1行足す)
+BRAINS = {
+    '5':   BRAIN_PATH,
+    '4.1': '/home/yuto113/backups/qzero_mini_brain_v41.json',
+    '3':   '/home/yuto113/backups/qzero_mini_brain_v3.json',
+}
+DEFAULT_VERSION = '5'
+_cache = {}
+
+def _load(version=None):
+    v = version if version in BRAINS else DEFAULT_VERSION
+    if v not in _cache:
+        with open(BRAINS[v], encoding='utf-8') as f:
+            b = json.load(f)
+        b['w2i'] = {w: i for i, w in enumerate(b['words'])}
+        _cache[v] = b
+    return _cache[v]
+
+def versions():
+    return [v for v in BRAINS if os.path.exists(BRAINS[v])]
 
 def _softmax(xs):
     m = max(xs)
@@ -36,11 +48,11 @@ def _forward(ctx, b):
     cv = [sum(at[t] * vs[t][d] for t in range(n)) for d in range(DIM)]
     return _softmax(_mv(b['Wo'], cv, DIM))
 
-def vocabulary():
-    return [w for w in _load()['words'] if w != 'おわり']
+def vocabulary(version=None):
+    return [w for w in _load(version)['words'] if w != 'おわり']
 
-def info():
-    b = _load()
+def info(version=None):
+    b = _load(version)
     return {'dim': b['DIM'], 'vocab': len(b['words'])}
 
 def tokenize(text):
@@ -62,9 +74,9 @@ def tokenize(text):
             rest = rest[1:]
     return tokens
 
-def generate(start_text):
+def generate(start_text, version=None):
     # 「ねこ が」でも「ねこが」でもOK: スペースがあればそれで、なければ自動区切り
-    b = _load()
+    b = _load(version)
     if ' ' in start_text.strip() or '　' in start_text.strip():
         tokens = [t for t in start_text.replace('　', ' ').split() if t]
     else:

@@ -30,6 +30,8 @@ body { background:#ffffff !important; margin:0; }
 #qz-input-area { border-top:1px solid #eee; padding:16px; max-width:760px; margin:0 auto; width:100%; box-sizing:border-box; }
 #qz-input-row { display:flex; gap:8px; }
 #cb-input { flex:1; padding:12px; border:1px solid #ddd; border-radius:10px; font-size:1rem; }
+#qz-mode-btn { padding:8px 14px; background:transparent; color:#555; border:1px solid #e3e3e3; border-radius:999px; cursor:pointer; font-size:0.85rem; white-space:nowrap; align-self:center; }
+#qz-mode-btn:hover { background:#f5f5f5; }
 #cb-send { padding:12px 20px; background:#111; color:white; border:none; border-radius:10px; cursor:pointer; }
 
 /* ログインパネル */
@@ -63,8 +65,16 @@ window.applyTheme=cbStrip;window.checkAutoTheme=cbStrip;setInterval(cbStrip,2000
       <button id="qz-menu-btn" onclick="document.getElementById('qz-side').classList.toggle('open')">☰</button>
       <h1>QZERO</h1>
       <div style="position:relative;">
-        <button id="qz-mode-btn" onclick="toggleModeMenu()" style="background:none; border:1px solid #ddd; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:0.85rem; color:#333;">Core ▾</button>
-        <div id="qz-mode-menu" style="display:none; position:absolute; right:0; top:36px; background:white; border:1px solid #ddd; border-radius:10px; box-shadow:0 4px 12px rgba(0,0,0,0.08); min-width:230px; z-index:60;">
+        
+        
+      </div>
+    </div>
+    <div id="qz-log"></div>
+    <div id="qz-input-area">
+      <div id="qz-input-row">
+        <div style="position:relative; align-self:center;">
+          <button id="qz-mode-btn" onclick="toggleModeMenu()">Core 2 ∨</button>
+          <div id="qz-mode-menu" style="display:none; position:absolute; left:0; bottom:110%; background:white; border:1px solid #ddd; border-radius:10px; box-shadow:0 4px 12px rgba(0,0,0,0.08); min-width:230px; z-index:60;">
           <div onclick="setAiMode('search')" style="padding:10px 14px; cursor:pointer;">
             <b style="font-size:0.85rem;">Search</b><br><span style="font-size:0.72rem; color:#999;">インターネットから調べて答える(天気など)</span>
           </div>
@@ -78,11 +88,7 @@ window.applyTheme=cbStrip;window.checkAutoTheme=cbStrip;setInterval(cbStrip,2000
             <b style="font-size:0.85rem;">Mini</b><br><span style="font-size:0.72rem; color:#999;" id="qz-mini-desc">自作AIが文章を作る(準備中)</span>
           </div>
         </div>
-      </div>
-    </div>
-    <div id="qz-log"></div>
-    <div id="qz-input-area">
-      <div id="qz-input-row">
+        </div>
         <input id="cb-input" placeholder="メッセージを入力(例: これ何科? 光合成)" onkeydown="if(event.key==='Enter')cbSend()">
         <button id="cb-send" onclick="cbSend()">送信</button>
       </div>
@@ -124,6 +130,20 @@ async function unlockMini() {
       item.style.opacity = '1';
       item.onclick = () => setAiMode('mini');
       document.getElementById('qz-mini-desc').textContent = '自作トランスフォーマーが文章を作る(β)';
+      const verRow = document.createElement('div');
+      verRow.style.cssText = 'padding:6px 14px; font-size:0.75rem; color:#888;';
+      verRow.innerHTML = 'Miniの世代: ' + ['5','4.1','3'].map(v =>
+        '<span class="qz-mini-ver" data-v="' + v + '" style="cursor:pointer; margin-right:10px; padding:2px 8px; border-radius:999px; border:1px solid #ddd;">' + v + '</span>').join('');
+      item.parentNode.insertBefore(verRow, item.nextSibling);
+      verRow.querySelectorAll('.qz-mini-ver').forEach(el => {
+        el.onclick = (e) => {
+          e.stopPropagation();
+          window.qzMiniVer = el.dataset.v;
+          verRow.querySelectorAll('.qz-mini-ver').forEach(x => x.style.background = '');
+          el.style.background = '#eee';
+          setAiMode('mini');
+        };
+      });
     }
   } catch (e) {}
 }
@@ -131,8 +151,9 @@ unlockMini();
 
 function setAiMode(mode) {
   aiMode = mode;
+  const QZ_VERSIONS = { core: 2, search: 1, guide: 1, mini: (window.qzMiniVer || 5) };
   const label = mode === 'search' ? 'Search' : (mode === 'guide' ? 'Guide' : (mode === 'mini' ? 'Mini' : 'Core'));
-  document.getElementById('qz-mode-btn').textContent = label + ' ▾';
+  document.getElementById('qz-mode-btn').textContent = label + ' ' + QZ_VERSIONS[mode] + ' ∨';
   document.getElementById('qz-mode-menu').style.display = 'none';
   const msgs = {
     search: 'Searchモードだよ。インターネットから調べて答える(いまは天気と場所が得意。情報源はだんだん増えていくよ)',
@@ -306,7 +327,7 @@ async function cbSend(){
   // Miniモード: 自作トランスフォーマーで文章生成
   if(aiMode==='mini'){
     try{
-      const r=await fetch('/api/qzero/mini',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+      const r=await fetch('/api/qzero/mini',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text, version: String(window.qzMiniVer || 5)})});
       const data=await r.json();
       addMsg('ai', data.ok ? data.reply : (data.error||'エラーだよ'));
     }catch(e){addMsg('ai','生成に失敗したよ');}
