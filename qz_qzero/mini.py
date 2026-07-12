@@ -2,7 +2,7 @@
 # QZERO Mini: 自作トランスフォーマーの文章生成
 # 学習済みの脳みそ(qzero_mini_brain.json)を読み込んで動く
 # ============================================
-import json, math, os
+import json, math, os, random
 
 BRAIN_PATH = os.environ.get('QZERO_MINI_BRAIN', '/home/yuto113/qzero_mini_brain.json')
 _b = None
@@ -37,7 +37,7 @@ def _forward(ctx, b):
     return _softmax(_mv(b['Wo'], cv, DIM))
 
 def vocabulary():
-    return list(_load()['words'])
+    return [w for w in _load()['words'] if w != 'おわり']
 
 def info():
     b = _load()
@@ -78,7 +78,11 @@ def generate(start_text):
     result = list(tokens)
     for _ in range(b['MAXLEN'] - len(ctx)):
         out = _forward(ctx, b)
-        nxt = out.index(max(out))
+        # 温度サンプリング: 上位3候補から確率に応じたくじ引きで選ぶ
+        # (確率を2乗して1位を有利にしつつ、2位3位にもチャンスを残す)
+        top = sorted(range(len(out)), key=lambda i: -out[i])[:3]
+        ws = [out[i] ** 2 for i in top]
+        nxt = random.choices(top, weights=ws)[0]
         w = b['words'][nxt]
         if w == 'おわり':
             break  # 文のおわりを自分で判断できるようになった!
