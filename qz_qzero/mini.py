@@ -39,10 +39,36 @@ def _forward(ctx, b):
 def vocabulary():
     return list(_load()['words'])
 
-def generate(start_text):
-    # 「ねこ が」みたいな書き出しから、続きを紡ぐ
+def info():
     b = _load()
-    tokens = [t for t in start_text.split() if t]
+    return {'dim': b['DIM'], 'vocab': len(b['words'])}
+
+def tokenize(text):
+    # 「ねこが」みたいなスペースなし入力を、知ってる単語で自動で区切る
+    # 長い単語から先に探す(「にんじん」を「に」で切らないため)
+    b = _load()
+    words_sorted = sorted(b['words'], key=len, reverse=True)
+    tokens = []
+    rest = text.replace(' ', '').replace('　', '')
+    while rest:
+        for w in words_sorted:
+            if rest.startswith(w):
+                tokens.append(w)
+                rest = rest[len(w):]
+                break
+        else:
+            # どの単語にも当てはまらない → 1文字だけ「知らない言葉」として取り出す
+            tokens.append(rest[0])
+            rest = rest[1:]
+    return tokens
+
+def generate(start_text):
+    # 「ねこ が」でも「ねこが」でもOK: スペースがあればそれで、なければ自動区切り
+    b = _load()
+    if ' ' in start_text.strip() or '　' in start_text.strip():
+        tokens = [t for t in start_text.replace('　', ' ').split() if t]
+    else:
+        tokens = tokenize(start_text)
     unknown = [t for t in tokens if t not in b['w2i']]
     if unknown:
         return {'ok': False, 'unknown': unknown}
@@ -53,7 +79,10 @@ def generate(start_text):
     for _ in range(b['MAXLEN'] - len(ctx)):
         out = _forward(ctx, b)
         nxt = out.index(max(out))
-        result.append(b['words'][nxt])
+        w = b['words'][nxt]
+        if w == 'おわり':
+            break  # 文のおわりを自分で判断できるようになった!
+        result.append(w)
         ctx.append(nxt)
         if len(ctx) >= b['MAXLEN']:
             break
