@@ -8,11 +8,12 @@ BRAIN_PATH = os.environ.get('QZERO_MINI_BRAIN', '/home/yuto113/qzero_mini_brain.
 
 # 選べる世代の台帳(新しい世代を作ったらここに1行足す)
 BRAINS = {
-    '5':   BRAIN_PATH,
+    '6':   '/home/yuto113/qzero_mini_brain_v6.json',
+    '5':   '/home/yuto113/qzero_mini_brain_v5.json',
     '4.1': '/home/yuto113/backups/qzero_mini_brain_v41.json',
     '3':   '/home/yuto113/backups/qzero_mini_brain_v3.json',
 }
-DEFAULT_VERSION = '5'
+DEFAULT_VERSION = '6'
 _cache = {}
 
 def _load(version=None):
@@ -40,6 +41,8 @@ def _forward(ctx, b):
     DIM = b['DIM']
     n = len(ctx)
     xs = [[b['emb'][ctx[t]][d] + b['pos'][t][d] for d in range(DIM)] for t in range(n)]
+    if 'layers' in b:
+        return _forward_v6(xs, b)
     q = _mv(b['Wq'], xs[-1], DIM)
     ks = [_mv(b['Wk'], x, DIM) for x in xs]
     vs = [_mv(b['Wv'], x, DIM) for x in xs]
@@ -47,6 +50,31 @@ def _forward(ctx, b):
     at = _softmax(sc)
     cv = [sum(at[t] * vs[t][d] for t in range(n)) for d in range(DIM)]
     return _softmax(_mv(b['Wo'], cv, DIM))
+
+def _attend_v6(xs, W, DIM, HEADS):
+    # マルチヘッド注意(最後の位置ぶんだけ計算)
+    HD = DIM // HEADS
+    n = len(xs)
+    q = _mv(W['Wq'], xs[-1], DIM)
+    ks = [_mv(W['Wk'], x, DIM) for x in xs]
+    vs = [_mv(W['Wv'], x, DIM) for x in xs]
+    ctx_vec = [0.0] * DIM
+    for h in range(HEADS):
+        lo, hi = h * HD, (h + 1) * HD
+        sc = [sum(q[d] * k[d] for d in range(lo, hi)) / math.sqrt(HD) for k in ks]
+        at = _softmax(sc)
+        for d in range(lo, hi):
+            ctx_vec[d] = sum(at[t] * vs[t][d] for t in range(n))
+    return _mv(W['Wp'], ctx_vec, DIM)
+
+def _forward_v6(xs, b):
+    DIM, HEADS = b['DIM'], b['HEADS']
+    X = [list(x) for x in xs]
+    for L in b['layers']:
+        h = _attend_v6(X, L, DIM, HEADS)
+        X[-1] = [X[-1][d] + h[d] for d in range(DIM)]   # 残差接続
+    return _softmax(_mv(b['Wo'], X[-1], DIM))
+
 
 def vocabulary(version=None):
     return [w for w in _load(version)['words'] if w != 'おわり']

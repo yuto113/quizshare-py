@@ -5864,6 +5864,12 @@ def api_staff_messages_get():
     if cipher_map:
         for kid, kname in conn.execute('SELECT id, key_name FROM qz_cipher_keys').fetchall():
             cipher_names[kid] = kname
+    # 既読情報を取得
+    read_map = {}
+    if ids:
+        _rm = ','.join(['?'] * len(ids))
+        for _mid, _sn in conn.execute(f'SELECT message_id, staff_name FROM qz_message_reads WHERE message_id IN ({_rm})', ids).fetchall():
+            read_map.setdefault(_mid, []).append(_sn)
     messages = []
     for r in rows:
         is_cipher = r[0] in cipher_map
@@ -5877,6 +5883,7 @@ def api_staff_messages_get():
             'reply_preview': reply_map.get(r[7]) if r[7] else None,
             'has_image': bool(r[8]), 'has_file': bool(r[9]),
             'file_name': dec(r[10]) if r[10] else None,
+            'read_by': read_map.get(r[0], []),
             'reactions': reactions_map.get(r[0], {}),
         })
     conn.close()

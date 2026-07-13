@@ -132,7 +132,7 @@ async function unlockMini() {
       document.getElementById('qz-mini-desc').textContent = '自作トランスフォーマーが文章を作る(β)';
       const verRow = document.createElement('div');
       verRow.style.cssText = 'padding:6px 14px; font-size:0.75rem; color:#888;';
-      verRow.innerHTML = 'Miniの世代: ' + ['5','4.1','3'].map(v =>
+      verRow.innerHTML = 'Miniの世代: ' + ['6','5','4.1','3'].map(v =>
         '<span class="qz-mini-ver" data-v="' + v + '" style="cursor:pointer; margin-right:10px; padding:2px 8px; border-radius:999px; border:1px solid #ddd;">' + v + '</span>').join('');
       item.parentNode.insertBefore(verRow, item.nextSibling);
       verRow.querySelectorAll('.qz-mini-ver').forEach(el => {
@@ -151,7 +151,7 @@ unlockMini();
 
 function setAiMode(mode) {
   aiMode = mode;
-  const QZ_VERSIONS = { core: 2, search: 1, guide: 1, mini: (window.qzMiniVer || 5) };
+  const QZ_VERSIONS = { core: 2, search: 1, guide: 1, mini: (window.qzMiniVer || 6) };
   const label = mode === 'search' ? 'Search' : (mode === 'guide' ? 'Guide' : (mode === 'mini' ? 'Mini' : 'Core'));
   document.getElementById('qz-mode-btn').textContent = label + ' ' + QZ_VERSIONS[mode] + ' ∨';
   document.getElementById('qz-mode-menu').style.display = 'none';
@@ -327,7 +327,7 @@ async function cbSend(){
   // Miniモード: 自作トランスフォーマーで文章生成
   if(aiMode==='mini'){
     try{
-      const r=await fetch('/api/qzero/mini',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text, version: String(window.qzMiniVer || 5)})});
+      const r=await fetch('/api/qzero/mini',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text, version: String(window.qzMiniVer || 6)})});
       const data=await r.json();
       addMsg('ai', data.ok ? data.reply : (data.error||'エラーだよ'));
     }catch(e){addMsg('ai','生成に失敗したよ');}
