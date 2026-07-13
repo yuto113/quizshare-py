@@ -1,8 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Q'z - クイズシェアを運営する会社{% endblock %}
+{% block title %}QZERO - ゼロからの再スタート{% endblock %}
 {% block head_extra %}
 <script>
-// Q'zページではテーマシステムを完全無効化
 function killQzTheme() {
   document.body.style.background = '';
   document.querySelectorAll('.seasonal-emoji').forEach(e => e.remove());
@@ -11,290 +10,199 @@ window.applyTheme = function() { killQzTheme(); };
 window.checkAutoTheme = function() { killQzTheme(); };
 window.spawnSeasonalEmojis = function() { killQzTheme(); };
 document.addEventListener('DOMContentLoaded', killQzTheme);
-// app.js側のDOMContentLoadedより後に実行されるよう少し遅らせて再実行
 setTimeout(killQzTheme, 50);
 setTimeout(killQzTheme, 300);
 setTimeout(killQzTheme, 800);
+setInterval(killQzTheme, 2000);
 </script>
 <style>
 :root {
-  --qz-ink: #14213d;
-  --qz-paper: #fdfbf6;
-  --qz-coral: #fb6f5b;
-  --qz-teal: #2a9d8f;
-  --qz-gold: #e9c46a;
-  --qz-line: #e3ddd0;
+  --z-black: #0b0b0d;
+  --z-white: #ffffff;
+  --z-ink: #14213d;
+  --z-gray: #6b6b70;
+  --z-line: #e6e6e8;
+  --z-coral: #fb6f5b;
 }
 
 body.qz-page, .qz-page {
-  background: var(--qz-paper) !important;
+  background: var(--z-white) !important;
   background-image: none !important;
-  color: var(--qz-ink);
-  font-family: 'Hiragino Sans', 'Noto Sans JP', sans-serif;
-  min-height: 100vh;
+  color: var(--z-ink);
+  font-family: -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  margin: 0;
 }
 body.qz-page::before, body.qz-page::after,
-.qz-page .bg-decoration, .qz-page .floating-icon, .qz-page header img {
+.qz-page .bg-decoration, .qz-page .floating-icon,
+.qz-page header img, .qz-page .site-header {
   display: none !important;
 }
-body.qz-page .site-header {
-  display: none !important;
-}
 
-/* Q'z独自ヘッダー */
-.qz-nav {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  background: rgba(253,251,246,0.92);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--qz-line);
-  padding: 18px 32px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+/* ===== スクロール出現アニメーション ===== */
+.z-reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 1s cubic-bezier(.2,.7,.2,1), transform 1s cubic-bezier(.2,.7,.2,1);
 }
-.qz-nav-logo {
-  font-weight: 700;
-  letter-spacing: 0.25em;
-  font-size: 0.95rem;
-  color: var(--qz-ink);
-}
-.qz-nav-link {
-  font-size: 0.85rem;
-  color: var(--qz-ink);
-  text-decoration: none;
-  font-weight: 600;
-  border-bottom: 1px solid var(--qz-ink);
-  padding-bottom: 2px;
-}
+.z-reveal.on { opacity: 1; transform: none; }
+.z-reveal.d1 { transition-delay: .1s; }
+.z-reveal.d2 { transition-delay: .22s; }
+.z-reveal.d3 { transition-delay: .34s; }
+.z-reveal.d4 { transition-delay: .46s; }
 
-.qz-display {
-  font-family: 'Georgia', 'Hiragino Mincho ProN', serif;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+.z-line-grow {
+  width: 0;
+  height: 1px;
+  background: var(--z-coral);
+  transition: width 1.4s cubic-bezier(.2,.7,.2,1);
 }
+.z-line-grow.on { width: 56px; }
 
-/* ヒーロー */
-.qz-hero {
-  padding: 90px 24px 70px;
-  text-align: center;
-  position: relative;
-  overflow: hidden;
+/* ===== ナビ ===== */
+.z-nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 20px 40px;
+  mix-blend-mode: difference;
 }
-.qz-hero::before {
-  content: '';
-  position: absolute;
-  top: -100px; right: -100px;
-  width: 320px; height: 320px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(251,111,91,0.12), transparent 70%);
-}
-.qz-hero::after {
-  content: '';
-  position: absolute;
-  bottom: -150px; left: -120px;
-  width: 380px; height: 380px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(42,157,143,0.1), transparent 70%);
-}
-.qz-logo-mark {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 2px;
-  font-size: 1.1rem;
-  letter-spacing: 0.3em;
-  color: var(--qz-coral);
-  font-weight: 700;
-  margin-bottom: 28px;
-  text-transform: uppercase;
-}
-.qz-hero h1 {
-  font-size: clamp(2.4rem, 7vw, 4.2rem);
-  margin: 0 0 24px;
-  line-height: 1.25;
-  position: relative;
-  z-index: 1;
-}
-.qz-hero h1 .accent { color: var(--qz-coral); }
-.qz-hero p.lead {
-  font-size: 1.05rem;
-  color: #5b5546;
-  max-width: 540px;
-  margin: 0 auto 36px;
-  line-height: 1.9;
-  position: relative;
-  z-index: 1;
-}
-.qz-cta-row {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  flex-wrap: wrap;
-  position: relative;
-  z-index: 1;
-}
-.qz-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 14px 28px;
-  border-radius: 999px;
-  font-weight: 700;
-  font-size: 0.95rem;
-  text-decoration: none;
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-.qz-btn-primary {
-  background: var(--qz-ink);
-  color: var(--qz-paper);
-}
-.qz-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(20,33,61,0.25); }
-.qz-btn-ghost {
-  border: 1.5px solid var(--qz-ink);
-  color: var(--qz-ink);
-}
-.qz-btn-ghost:hover { background: var(--qz-ink); color: var(--qz-paper); }
+.z-nav a, .z-nav span { color: #fff; text-decoration: none; }
+.z-nav-logo { font-size: 13px; letter-spacing: .34em; font-weight: 500; }
+.z-nav-links { display: flex; gap: 24px; font-size: 12px; letter-spacing: .06em; }
 
-/* 三本柱（学ぶ・作る・つながる） */
-.qz-pillars {
-  max-width: 980px;
-  margin: 0 auto;
-  padding: 20px 24px 80px;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0;
-  border-top: 1px solid var(--qz-line);
-}
-.qz-pillar {
-  padding: 44px 28px;
-  border-right: 1px solid var(--qz-line);
+/* ===== オープニング(黒画面) ===== */
+.z-open {
+  min-height: 100vh;
+  background: var(--z-black);
+  color: #fff;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 0 40px;
   position: relative;
 }
-.qz-pillar:last-child { border-right: none; }
-.qz-pillar-word {
-  font-family: 'Hiragino Mincho ProN', serif;
-  font-size: 2.4rem;
-  font-weight: 700;
-  margin-bottom: 14px;
-  display: block;
+.z-open-label {
+  font-size: 11px; letter-spacing: .4em; color: #6a6a70;
+  margin: 0 0 40px;
 }
-.qz-pillar:nth-child(1) .qz-pillar-word { color: var(--qz-coral); }
-.qz-pillar:nth-child(2) .qz-pillar-word { color: var(--qz-teal); }
-.qz-pillar:nth-child(3) .qz-pillar-word { color: var(--qz-gold); }
-.qz-pillar p {
-  font-size: 0.9rem;
-  color: #5b5546;
-  line-height: 1.8;
-  margin: 0;
+.z-open h1 {
+  font-size: clamp(38px, 8vw, 90px);
+  font-weight: 400;
+  line-height: 1.3;
+  letter-spacing: .02em;
+  margin: 0 0 44px;
+  color: #fff;
 }
-
-/* セクション共通 */
-.qz-section {
-  max-width: 880px;
-  margin: 0 auto;
-  padding: 64px 24px;
-  border-top: 1px solid var(--qz-line);
+.z-open h1 em { font-style: normal; color: var(--z-coral); }
+.z-open-sub {
+  font-size: 14px; line-height: 2.3; color: #8e8e95;
+  margin: 0; max-width: 30em;
 }
-.qz-eyebrow {
-  font-size: 0.78rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--qz-coral);
-  font-weight: 700;
-  margin-bottom: 14px;
-}
-.qz-section h2 {
-  font-size: 1.9rem;
-  margin: 0 0 28px;
+.z-scroll-hint {
+  position: absolute; bottom: 40px; left: 40px;
+  font-size: 10px; letter-spacing: .3em; color: #4a4a52;
 }
 
-/* 会社情報テーブル */
-.qz-info-table {
-  display: grid;
-  grid-template-columns: 140px 1fr;
-  gap: 18px 24px;
+/* ===== セクション ===== */
+.z-sec {
+  max-width: 940px; margin: 0 auto;
+  padding: 130px 40px;
+  border-top: 1px solid var(--z-line);
 }
-.qz-info-table dt {
-  font-size: 0.85rem;
-  color: #8a8270;
-  font-weight: 700;
-  padding-top: 2px;
+.z-sec:first-of-type { border-top: none; }
+.z-num {
+  font-size: 11px; letter-spacing: .3em; color: #b4b4ba;
+  margin: 0 0 20px;
 }
-.qz-info-table dd {
-  margin: 0;
-  font-size: 0.98rem;
-  line-height: 1.8;
+.z-h2 {
+  font-size: clamp(24px, 3.4vw, 36px);
+  font-weight: 400; line-height: 1.5; letter-spacing: .01em;
+  margin: 0 0 40px; color: var(--z-ink);
 }
-
-/* 事業内容カード */
-.qz-business-card {
-  background: white;
-  border: 1px solid var(--qz-line);
-  border-radius: 18px;
-  padding: 36px;
-  display: flex;
-  gap: 28px;
-  align-items: center;
-}
-.qz-business-icon {
-  width: 64px; height: 64px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, var(--qz-coral), var(--qz-gold));
-  display: flex; align-items: center; justify-content: center;
-  font-size: 28px;
-  flex-shrink: 0;
-}
-.qz-business-card h3 { margin: 0 0 8px; font-size: 1.2rem; }
-.qz-business-card p { margin: 0; color: #5b5546; font-size: 0.92rem; line-height: 1.8; }
-
-/* チーム */
-.qz-team-stat {
-  display: flex;
-  align-items: baseline;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-.qz-team-num {
-  font-family: 'Hiragino Mincho ProN', serif;
-  font-size: 4rem;
-  font-weight: 700;
-  color: var(--qz-ink);
-  line-height: 1;
-}
-.qz-team-unit { font-size: 1rem; color: #8a8270; }
-.qz-team-roles {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 8px;
-}
-.qz-role-pill {
-  padding: 8px 16px;
-  border-radius: 999px;
-  background: #f1ece0;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: #5b5546;
+.z-body {
+  font-size: 15px; line-height: 2.3; color: var(--z-gray);
+  margin: 0; max-width: 34em;
 }
 
-/* フッターCTA */
-.qz-footer-cta {
-  background: var(--qz-ink);
-  color: var(--qz-paper);
-  text-align: center;
-  padding: 70px 24px;
-}
-.qz-footer-cta h2 { font-size: 1.8rem; margin: 0 0 16px; }
-.qz-footer-cta p { color: rgba(253,251,246,0.7); margin: 0 0 32px; }
+/* 三本柱 */
+.z-pillars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--z-line); margin-top: 20px; }
+.z-pillar { background: #fff; padding: 40px 28px 44px; }
+.z-pillar-t { font-size: 17px; font-weight: 500; margin: 0 0 16px; letter-spacing: .1em; color: var(--z-ink); }
+.z-pillar p { font-size: 13px; line-height: 2.1; color: var(--z-gray); margin: 0; }
 
-@media (max-width: 720px) {
-  .qz-pillars { grid-template-columns: 1fr; }
-  .qz-pillar { border-right: none; border-bottom: 1px solid var(--qz-line); }
-  .qz-pillar:last-child { border-bottom: none; }
-  .qz-info-table { grid-template-columns: 1fr; }
-  .qz-info-table dt { padding-top: 0; }
-  .qz-business-card { flex-direction: column; text-align: center; }
+/* 数字 */
+.z-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--z-line); }
+.z-stat { background: #fff; padding: 32px 16px; }
+.z-stat-n { font-size: 34px; font-weight: 400; color: var(--z-ink); letter-spacing: -.01em; }
+.z-stat-l { font-size: 11px; color: #a0a0a6; margin-top: 8px; letter-spacing: .08em; }
+
+/* 会社情報 */
+.z-dl { display: grid; grid-template-columns: 160px 1fr; gap: 0; }
+.z-dl dt, .z-dl dd {
+  padding: 20px 0; border-bottom: 1px solid var(--z-line); margin: 0;
+}
+.z-dl dt { font-size: 12px; color: #a0a0a6; letter-spacing: .1em; }
+.z-dl dd { font-size: 14px; line-height: 1.9; color: var(--z-ink); }
+
+/* 特徴リスト */
+.z-feats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 40px; }
+.z-feat { padding: 26px 0; border-bottom: 1px solid var(--z-line); }
+.z-feat h4 { font-size: 14px; font-weight: 500; margin: 0 0 8px; color: var(--z-ink); letter-spacing: .04em; }
+.z-feat p { font-size: 12px; line-height: 2; color: var(--z-gray); margin: 0; }
+
+/* 沿革 */
+.z-time { list-style: none; padding: 0; margin: 0; position: relative; }
+.z-time::before {
+  content: ''; position: absolute; left: 3px; top: 8px;
+  width: 1px; height: 0; background: var(--z-line);
+  transition: height 2s cubic-bezier(.2,.7,.2,1);
+}
+.z-time.on::before { height: calc(100% - 16px); }
+.z-time li {
+  position: relative; padding: 0 0 34px 32px;
+  font-size: 13px; line-height: 2.1; color: var(--z-gray);
+}
+.z-time li::before {
+  content: ''; position: absolute; left: 0; top: 10px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #d6d6da;
+}
+.z-time li.mark::before { background: var(--z-coral); }
+.z-time b { color: var(--z-ink); font-weight: 500; display: block; font-size: 13px; letter-spacing: .04em; }
+.z-time li.mark b { color: var(--z-coral); }
+
+/* FAQ */
+.z-faq details { border-bottom: 1px solid var(--z-line); padding: 20px 0; }
+.z-faq summary { cursor: pointer; font-size: 14px; color: var(--z-ink); list-style: none; }
+.z-faq summary::-webkit-details-marker { display: none; }
+.z-faq summary::before { content: '+ '; color: var(--z-coral); }
+.z-faq details[open] summary::before { content: '− '; }
+.z-faq p { font-size: 13px; line-height: 2.1; color: var(--z-gray); margin: 14px 0 0; }
+
+/* リンク・ボタン */
+.z-link {
+  display: inline-block; font-size: 13px; letter-spacing: .06em;
+  color: var(--z-ink); text-decoration: none;
+  border-bottom: 1px solid var(--z-ink); padding-bottom: 4px;
+  margin-right: 28px; transition: opacity .2s;
+}
+.z-link:hover { opacity: .5; }
+.z-link.on-black { color: #fff; border-color: #fff; }
+
+/* フッター */
+.z-foot {
+  background: var(--z-black); color: #fff;
+  padding: 120px 40px;
+}
+.z-foot-in { max-width: 940px; margin: 0 auto; }
+.z-foot h2 { font-size: clamp(22px, 3vw, 32px); font-weight: 400; margin: 0 0 20px; color: #fff; }
+.z-foot p { font-size: 14px; line-height: 2.1; color: #8e8e95; margin: 0 0 36px; max-width: 30em; }
+
+@media (max-width: 760px) {
+  .z-pillars, .z-stats, .z-feats { grid-template-columns: 1fr; }
+  .z-dl { grid-template-columns: 1fr; }
+  .z-dl dt { padding-bottom: 4px; border-bottom: none; }
+  .z-sec { padding: 80px 24px; }
+  .z-open, .z-foot { padding-left: 24px; padding-right: 24px; }
+  .z-nav { padding: 16px 24px; }
+  .z-nav-links { gap: 14px; }
 }
 </style>
 {% endblock %}
@@ -303,209 +211,190 @@ body.qz-page .site-header {
 
 {% block content %}
 
-<script>
-// このページはサイトテーマの対象外(会社の公式ページは常に同じ見た目)
-function qzHpStripTheme() {
-  try {
-    const b = document.body;
-    if (b === null) return;
-    Array.from(b.classList).forEach(c => {
-      if (c.indexOf('theme') !== -1 || c === 'halloween-dark') b.classList.remove(c);
-    });
-    b.style.background = '';
-    document.querySelectorAll('.seasonal-emoji').forEach(e => e.remove());
-  } catch (e) {}
-}
-window.applyTheme = qzHpStripTheme;
-window.checkAutoTheme = qzHpStripTheme;
-qzHpStripTheme();
-document.addEventListener('DOMContentLoaded', qzHpStripTheme);
-setInterval(qzHpStripTheme, 2000);
-</script>
-
-<nav class="qz-nav">
-  <div class="qz-nav-logo">Q'Z</div>
-  <div style="display:flex; gap:20px; align-items:center;">
-    <a href="/staff/login" class="qz-nav-link" style="border-bottom:none; color:#8a8270;">社員ログイン</a>
-    <a href="{{ url_for('page_home') }}" class="qz-nav-link">クイズシェアへ →</a>
+<nav class="z-nav">
+  <span class="z-nav-logo">QZERO</span>
+  <div class="z-nav-links">
+    <a href="/staff/login">STAFF</a>
+    <a href="{{ url_for('page_home') }}">QUIZSHARE</a>
   </div>
 </nav>
 
-<!-- ヒーロー -->
-<section class="qz-hero">
-  <div class="qz-logo-mark">Q'Z</div>
-  <h1 class="qz-display">学ぶ、作る、<br><span class="accent">つながる</span>クイズ体験。</h1>
-  <p class="lead">Q'zは、だれもがクイズを通じて学び、表現し、つながれる場所をつくっています。一問のクイズには、誰かの好奇心や得意なことが詰まっています。私たちが運営する「クイズシェア」は、そんな小さな知識のかけらを、グループの仲間や教室の生徒、イベントの参加者へと届けるための場所です。これからも、学ぶことと遊ぶことの境界をなくしていくサービスをつくっていきます。</p>
-  <div class="qz-cta-row">
-    <a href="{{ url_for('page_home') }}" class="qz-btn qz-btn-primary">クイズシェアを見る →</a>
-    <a href="/feedback" class="qz-btn qz-btn-ghost">お問い合わせ</a>
-  </div>
+<section class="z-open">
+  <div class="z-line-grow z-reveal" style="margin-bottom:36px;"></div>
+  <p class="z-open-label z-reveal d1">QZERO</p>
+  <h1 class="z-reveal d2">ゼロからの、<br><em>再スタート</em>。</h1>
+  <p class="z-open-sub z-reveal d3">
+    Q&#39;zは解散した。残ったのは、はじめの4人だけ。<br>
+    名前も、色も、体制も、すべてを白紙に戻して、<br>
+    もう一度ここから作りはじめる。
+  </p>
+  <div class="z-scroll-hint z-reveal d4">SCROLL</div>
 </section>
 
-<!-- 三本柱 -->
-<div class="qz-pillars">
-  <div class="qz-pillar">
-    <span class="qz-pillar-word">学ぶ</span>
-    <p>クイズに答えるたび、新しい知識が一つ増える。正解か不正解かよりも、考えるその時間そのものに価値があると考えています。教科の勉強から好きな趣味の知識まで、学びの入り口はどこにでもあります。</p>
+<section class="z-sec">
+  <p class="z-num z-reveal">00 — NAME</p>
+  <h2 class="z-h2 z-reveal d1">社名の由来</h2>
+  <p class="z-body z-reveal d2">スパイとして入り込んだ者たちによって、Q&#39;zは内側から壊された。信頼も、体制も、積み上げてきたものも、ほとんど残らなかった。</p>
+  <p class="z-body z-reveal d3" style="margin-top:28px;">それでも、やめるという選択はしなかった。もう一度Q&#39;zを建て直す。ただし、前と同じようにではなく——<b style="color:var(--z-ink); font-weight:500;">Q&#39;zを、ゼロから。</b></p>
+  <div class="z-reveal d4" style="margin-top:56px; padding:36px 0; border-top:1px solid var(--z-line); border-bottom:1px solid var(--z-line);">
+    <p style="font-size:clamp(22px, 3.6vw, 34px); font-weight:400; letter-spacing:.06em; color:var(--z-ink); margin:0;">
+      Q&#39;z <span style="color:#b4b4ba;">+</span> <span style="color:var(--z-coral);">ZERO</span> <span style="color:#b4b4ba;">=</span> QZERO
+    </p>
   </div>
-  <div class="qz-pillar">
-    <span class="qz-pillar-word">作る</span>
-    <p>クイズを作ることは、自分の好きなことを誰かに伝えること。問題と答えを考えるだけで、誰でも一人の「先生」になれます。むずかしい操作を覚えなくても、思いついたその場でクイズが形になります。</p>
-  </div>
-  <div class="qz-pillar">
-    <span class="qz-pillar-word">つながる</span>
-    <p>グループでクイズを出し合い、イベントで競い合う。教室、部活、家族、オンラインの友人。クイズという共通の話題があれば、初めて話す相手とでも自然に会話が生まれます。</p>
-  </div>
-</div>
-
-<!-- 会社概要 -->
-<style>
-/* 追加セクション用のスタイル */
-.qz-stats-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:14px; }
-.qz-stat-card { background:white; border:1px solid #e9e2d0; border-radius:16px; padding:22px 12px; text-align:center; }
-.qz-stat-num { font-size:2rem; font-weight:900; color:var(--qz-coral); }
-.qz-stat-label { color:#8a8270; font-size:0.8rem; margin-top:4px; }
-.qz-feature-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:14px; }
-.qz-feature { background:white; border:1px solid #e9e2d0; border-radius:16px; padding:18px; }
-.qz-feature h4 { margin:8px 0 6px; color:#14213d; font-size:0.98rem; }
-.qz-feature p { color:#5b5546; font-size:0.85rem; line-height:1.7; margin:0; }
-.qz-timeline { list-style:none; padding:0; margin:0; border-left:3px solid var(--qz-coral); }
-.qz-timeline li { padding:0 0 18px 18px; position:relative; color:#5b5546; font-size:0.92rem; line-height:1.7; }
-.qz-timeline li::before { content:''; position:absolute; left:-8px; top:6px; width:13px; height:13px; border-radius:50%; background:var(--qz-coral); }
-.qz-timeline b { color:#14213d; }
-.qz-faq details { background:white; border:1px solid #e9e2d0; border-radius:12px; padding:14px 18px; margin-bottom:10px; }
-.qz-faq summary { cursor:pointer; font-weight:700; color:#14213d; font-size:0.95rem; }
-.qz-faq p { color:#5b5546; font-size:0.9rem; line-height:1.8; margin:10px 0 0; }
-</style>
-
-<!-- 数字で見るQ'z -->
-<section class="qz-section">
-  <div class="qz-eyebrow">Numbers</div>
-  <h2>数字で見るQ'z</h2>
-  <div class="qz-stats-grid">
-    <div class="qz-stat-card"><div class="qz-stat-num">{{ "{:,}".format(quiz_count|default(0)) }}</div><div class="qz-stat-label">投稿されたクイズ</div></div>
-    <div class="qz-stat-card"><div class="qz-stat-num">{{ "{:,}".format(attempt_count|default(0)) }}</div><div class="qz-stat-label">解かれた回数</div></div>
-    <div class="qz-stat-card"><div class="qz-stat-num">{{ "{:,}".format(group_count|default(0)) }}</div><div class="qz-stat-label">活動中のグループ</div></div>
-    <div class="qz-stat-card"><div class="qz-stat-num">{{ "{:,}".format(event_count|default(0)) }}</div><div class="qz-stat-label">開催されたイベント</div></div>
-  </div>
-  <p style="color:#b8b09e; font-size:0.75rem; margin-top:10px;">※ このページを開いた時点のリアルタイム集計です。</p>
+  <p class="z-body z-reveal d4" style="margin-top:36px;">失ったものは戻らない。だから、ゼロから積み直す。この名前は、その決意そのものです。</p>
 </section>
 
-<section class="qz-section">
-  <div class="qz-eyebrow">Company</div>
-  <h2>会社概要</h2>
-  <dl class="qz-info-table">
-    <dt>会社名</dt>
-    <dd>Q'z（キュウゼット）</dd>
-    <dt>事業内容</dt>
-    <dd>クイズ共有プラットフォーム「クイズシェア」の企画・開発・運営</dd>
-    <dt>運営サービス</dt>
-    <dd>クイズシェア（<a href="{{ url_for('page_home') }}" style="color:var(--qz-coral); font-weight:700;">yuto113.pythonanywhere.com</a>）</dd>
-  </dl>
-</section>
-
-<!-- 事業内容 -->
-<section class="qz-section">
-  <div class="qz-eyebrow">Business</div>
-  <h2>事業内容</h2>
-  <div class="qz-business-card">
-    <div class="qz-business-icon">🎯</div>
-    <div>
-      <h3>クイズシェア</h3>
-      <p>グループでクイズを作って共有し、出題・採点・ランキングまでを一つにまとめたWebサービスです。クイズの作成や採点、結果の集計といった作業を自動化することで、出題する側も答える側も、本来楽しむべき部分に集中できるようにしています。学校の授業や友人同士の遊び、公式イベントの開催、対戦形式のクイズバトルなど、用途に応じてさまざまな形で使われています。今後も、利用してくれる人たちの声を聞きながら機能を増やしていく予定です。</p>
+<section class="z-sec">
+  <p class="z-num z-reveal">01 — ABOUT</p>
+  <h2 class="z-h2 z-reveal d1">学ぶ、作る、つながる。</h2>
+  <p class="z-body z-reveal d2">QZEROは、だれもがクイズを通じて学び、表現し、つながれる場所をつくっています。一問のクイズには、誰かの好奇心や得意なことが詰まっています。私たちが運営する「クイズシェア」は、そんな小さな知識のかけらを、グループの仲間や教室の生徒、イベントの参加者へと届けるための場所です。</p>
+  <div class="z-pillars z-reveal d3">
+    <div class="z-pillar">
+      <p class="z-pillar-t">学ぶ</p>
+      <p>クイズに答えるたび、新しい知識が一つ増える。正解か不正解かよりも、考えるその時間そのものに価値があると考えています。</p>
+    </div>
+    <div class="z-pillar">
+      <p class="z-pillar-t">作る</p>
+      <p>クイズを作ることは、自分の好きなことを誰かに伝えること。問題と答えを考えるだけで、誰でも一人の「先生」になれます。</p>
+    </div>
+    <div class="z-pillar">
+      <p class="z-pillar-t">つながる</p>
+      <p>教室、部活、家族、オンラインの友人。クイズという共通の話題があれば、初めて話す相手とでも自然に会話が生まれます。</p>
     </div>
   </div>
 </section>
 
-<!-- サービスの特徴 -->
-<section class="qz-section">
-  <div class="qz-eyebrow">Features</div>
-  <h2>クイズシェアの特徴</h2>
-  <div class="qz-feature-grid">
-    <div class="qz-feature">📝<h4>かんたん投稿</h4><p>選択式・記述式のクイズを画像やヒント、解説つきで投稿できます。別解の登録にも対応し、採点は自動です。</p></div>
-    <div class="qz-feature">⏱️<h4>タイムとランキング</h4><p>解答時間を自動計測。正答率とスピードでグループ内のランキングが作られ、何度でも挑戦できます。</p></div>
-    <div class="qz-feature">⚔️<h4>バトルモード</h4><p>ルームコードを共有するだけで、友達とリアルタイムのクイズ対戦ができます。</p></div>
-    <div class="qz-feature">🎉<h4>イベント開催</h4><p>期間限定の大会を開けます。結果発表の日時予約や、公平性を守る不正対策も備えています。</p></div>
-    <div class="qz-feature">🏫<h4>学校モード</h4><p>先生用の管理機能を備え、クラスでの出題や目標設定、お知らせの配信に使えます。</p></div>
-    <div class="qz-feature">🎨<h4>テーマと図鑑</h4><p>季節のテーマで見た目が変わり、公式ライブラリでは分野別のクイズ図鑑を楽しめます。</p></div>
+<section class="z-sec">
+  <p class="z-num z-reveal">02 — NUMBERS</p>
+  <h2 class="z-h2 z-reveal d1">数字で見るQZERO</h2>
+  <div class="z-stats z-reveal d2">
+    <div class="z-stat"><div class="z-stat-n z-count" data-to="{{ quiz_count|default(0) }}">0</div><div class="z-stat-l">投稿されたクイズ</div></div>
+    <div class="z-stat"><div class="z-stat-n z-count" data-to="{{ attempt_count|default(0) }}">0</div><div class="z-stat-l">解かれた回数</div></div>
+    <div class="z-stat"><div class="z-stat-n z-count" data-to="{{ group_count|default(0) }}">0</div><div class="z-stat-l">活動中のグループ</div></div>
+    <div class="z-stat"><div class="z-stat-n z-count" data-to="{{ event_count|default(0) }}">0</div><div class="z-stat-l">開催されたイベント</div></div>
   </div>
 </section>
 
-<!-- 安心への取り組み -->
-<section class="qz-section">
-  <div class="qz-eyebrow">Trust &amp; Safety</div>
-  <h2>安心への取り組み</h2>
-  <p style="color:#5b5546; font-size:0.92rem; line-height:1.9; margin:0 0 14px;">
-    クイズシェアは、登録不要で気軽に使える一方で、預かった情報は厳重に扱います。
-    投稿された問題文や答え、作者名はすべて暗号化して保存し、パスワードは復元できない形で管理しています。
-    利用規約に反する疑いのある投稿は、確認が終わるまで公開を一時停止する仕組み(モデレーション)を運用しており、
-    サイトのデータは毎日自動でバックアップされています。エラーの自動監視により、不具合には利用者から報告される前に対応することを目指しています。
-  </p>
-  <div style="display:flex; gap:10px; flex-wrap:wrap;">
-    <a href="/terms" class="qz-btn qz-btn-ghost" style="font-size:0.85rem;">利用規約</a>
-    <a href="/privacy" class="qz-btn qz-btn-ghost" style="font-size:0.85rem;">プライバシーポリシー</a>
+<section class="z-sec">
+  <p class="z-num z-reveal">03 — COMPANY</p>
+  <h2 class="z-h2 z-reveal d1">会社概要</h2>
+  <dl class="z-dl z-reveal d2">
+    <dt>会社名</dt>
+    <dd>QZERO</dd>
+    <dt>事業内容</dt>
+    <dd>クイズ共有プラットフォーム「クイズシェア」の企画・開発・運営</dd>
+    <dt>運営サービス</dt>
+    <dd>
+      <a href="{{ url_for('page_home') }}" class="z-link" style="margin:0;">クイズシェア</a>
+      <span style="display:block; margin-top:12px; color:var(--z-gray); font-size:13px;">QZEROタイピング<span style="color:#b4b4ba; font-size:11px; margin-left:8px;">旧 Q&#39;zタイピング</span></span>
+      <span style="display:block; margin-top:8px; color:var(--z-gray); font-size:13px;">QZERO (AI)<span style="color:var(--z-coral); font-size:11px; margin-left:8px;">開発中</span></span>
+    </dd>
+    <dt>チーム</dt>
+    <dd>4名(企画・開発・デザイン・運営サポート)</dd>
+  </dl>
+</section>
+
+<section class="z-sec">
+  <p class="z-num z-reveal">04 — FEATURES</p>
+  <h2 class="z-h2 z-reveal d1">クイズシェアの特徴</h2>
+  <div class="z-feats z-reveal d2">
+    <div class="z-feat"><h4>かんたん投稿</h4><p>選択式・記述式のクイズを画像やヒント、解説つきで投稿できます。別解の登録にも対応し、採点は自動です。</p></div>
+    <div class="z-feat"><h4>タイムとランキング</h4><p>解答時間を自動計測。正答率とスピードでグループ内のランキングが作られます。</p></div>
+    <div class="z-feat"><h4>バトルモード</h4><p>ルームコードを共有するだけで、友達とリアルタイムのクイズ対戦ができます。</p></div>
+    <div class="z-feat"><h4>イベント開催</h4><p>期間限定の大会を開けます。結果発表の予約や、公平性を守る不正対策も備えています。</p></div>
+    <div class="z-feat"><h4>学校モード</h4><p>先生用の管理機能を備え、クラスでの出題や目標設定、お知らせの配信に使えます。</p></div>
+    <div class="z-feat"><h4>QZERO AI</h4><p>クイズの検索や案内に加え、自作のトランスフォーマーが動く実験モードを搭載しています。</p></div>
   </div>
 </section>
 
-<!-- チーム -->
-<section class="qz-section">
-  <div class="qz-eyebrow">Team</div>
-  <h2>チーム</h2>
-  <div class="qz-team-stat">
-    <span class="qz-team-num">4</span>
-    <span class="qz-team-unit">人のメンバーで運営しています</span>
-  </div>
-  <p style="color:#5b5546; font-size:0.92rem; line-height:1.8; margin:0 0 16px;">企画、開発、デザインなど、それぞれの役割を持ったメンバーがクイズシェアを支えています。日々ユーザーからのフィードバックに目を通し、小さな不具合の修正から新機能の開発まで、地道な改善を積み重ねています。決して大きな組織ではありませんが、一つのサービスに本気で向き合うチームです。</p>
-  <div class="qz-team-roles">
-    <span class="qz-role-pill">企画</span>
-    <span class="qz-role-pill">開発</span>
-    <span class="qz-role-pill">デザイン</span>
-    <span class="qz-role-pill">運営サポート</span>
+<section class="z-sec">
+  <p class="z-num z-reveal">05 — TRUST</p>
+  <h2 class="z-h2 z-reveal d1">安心への取り組み</h2>
+  <p class="z-body z-reveal d2">投稿された問題文や答え、作者名はすべて暗号化して保存し、パスワードは復元できない形で管理しています。利用規約に反する疑いのある投稿は、確認が終わるまで公開を一時停止する仕組みを運用しており、データは毎日自動でバックアップされています。エラーの自動監視により、不具合には報告される前に対応することを目指しています。</p>
+  <div class="z-reveal d3" style="margin-top:36px;">
+    <a href="/terms" class="z-link">利用規約</a>
+    <a href="/privacy" class="z-link">プライバシーポリシー</a>
   </div>
 </section>
 
-<!-- 沿革 -->
-<section class="qz-section">
-  <div class="qz-eyebrow">History</div>
-  <h2>沿革</h2>
-  <ul class="qz-timeline">
-    <li><b>2026年 春</b> — クイズシェアの開発をスタート。グループでクイズを共有する基本機能を公開。</li>
-    <li><b>2026年 5月</b> — 画像つきクイズ、クイズセット、テーマ機能を追加。公式ライブラリの整備を開始。</li>
-    <li><b>2026年 6月</b> — イベント機能とバトルモードを公開。Q'zの社員システムが発足し、チームでの運営体制へ。</li>
-    <li><b>2026年 7月</b> — セキュリティと運営体制を大幅強化。モデレーション制度、自動バックアップ、エラー監視を導入。人事制度(採用・承認)も整備。</li>
-    <li><b>これから</b> — 利用者の声を聞きながら、もっと学びと遊びがつながるサービスへ。</li>
+<span id="history"></span>
+<section class="z-sec">
+  <p class="z-num z-reveal">06 — HISTORY</p>
+  <h2 class="z-h2 z-reveal d1">これまでの歩み</h2>
+  <ul class="z-time z-reveal d2">
+    <li><b>2026年 春</b>クイズシェアの開発をスタート。グループでクイズを共有する基本機能を公開。</li>
+    <li><b>2026年 5月</b>画像つきクイズ、クイズセット、テーマ機能を追加。公式ライブラリの整備を開始。</li>
+    <li><b>2026年 6月</b>イベント機能とバトルモードを公開。Q&#39;zの社員システムが発足し、チームでの運営体制へ。</li>
+    <li><b>2026年 7月</b>セキュリティと運営体制を大幅強化。モデレーション制度、自動バックアップ、エラー監視を導入。人事制度(採用・承認)も整備。</li>
+    <li><b>2026年 7月(後半)</b>スパイ行為をはじめとする複数の問題が発覚し、Q&#39;zは解散。すべての体制を停止した。</li>
+    <li class="mark"><b>QZERO 始動</b>創業メンバー4人が再集結。名前も、色も、体制も白紙に戻し、ゼロから作り直す。「ゼロからの再スタート」</li>
+    <li><b>これから</b>利用者の声を聞きながら、もっと学びと遊びがつながるサービスへ。</li>
   </ul>
 </section>
 
-<!-- FAQ -->
-<section class="qz-section">
-  <div class="qz-eyebrow">FAQ</div>
-  <h2>よくある質問</h2>
-  <div class="qz-faq">
+<section class="z-sec">
+  <p class="z-num z-reveal">07 — FAQ</p>
+  <h2 class="z-h2 z-reveal d1">よくある質問</h2>
+  <div class="z-faq z-reveal d2">
     <details>
-      <summary>クイズシェアは無料で使えますか？</summary>
+      <summary>クイズシェアは無料で使えますか</summary>
       <p>はい、すべての機能を無料で使えます。アカウント登録も不要で、グループの合言葉があればすぐに始められます。</p>
     </details>
     <details>
-      <summary>グループはどうやって作りますか？</summary>
+      <summary>グループはどうやって作りますか</summary>
       <p>クイズシェアのトップページから新しいグループを作成できます。グループIDとパスワードを決めて、仲間に共有するだけです。</p>
     </details>
     <details>
-      <summary>投稿したクイズは誰でも見られますか？</summary>
+      <summary>投稿したクイズは誰でも見られますか</summary>
       <p>いいえ。クイズは投稿したグループの中だけで共有されます。データは暗号化して保存されるため、運営者であっても合言葉なしに中身を見ることはできません。</p>
     </details>
     <details>
-      <summary>不具合や要望はどこに送ればいいですか？</summary>
-      <p>ページ下部の「フィードバックを送る」からお寄せください。すべてのフィードバックに目を通し、改善の参考にしています。</p>
+      <summary>Q&#39;zとQZEROはどう違いますか</summary>
+      <p>Q&#39;zは解散しました。QZEROは、創業メンバー4人がゼロから作り直した新しい体制です。サービスであるクイズシェアはそのまま続きます。</p>
     </details>
   </div>
 </section>
 
-<!-- フッターCTA -->
-<div class="qz-footer-cta">
-  <h2>ご意見・ご質問はこちらから</h2>
-  <p>クイズシェアについてのご意見やご質問、不具合の報告などお気軽にお寄せください。</p>
-  <a href="/feedback" class="qz-btn qz-btn-primary" style="background:var(--qz-coral);">フィードバックを送る</a>
+<div class="z-foot">
+  <div class="z-foot-in">
+    <div class="z-line-grow z-reveal" style="margin-bottom:32px;"></div>
+    <h2 class="z-reveal d1">ここから、また。</h2>
+    <p class="z-reveal d2">ご意見やご質問、不具合の報告などお気軽にお寄せください。すべてに目を通しています。</p>
+    <div class="z-reveal d3">
+      <a href="/feedback" class="z-link on-black">フィードバックを送る</a>
+      <a href="{{ url_for('page_home') }}" class="z-link on-black">クイズシェアへ</a>
+    </div>
+  </div>
 </div>
+
+<script>
+(function() {
+  var io = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (!e.isIntersecting) return;
+      e.target.classList.add('on');
+      if (e.target.classList.contains('z-count')) countUp(e.target);
+      io.unobserve(e.target);
+    });
+  }, { threshold: 0.15, rootMargin: '0px 0px -60px 0px' });
+
+  document.querySelectorAll('.z-reveal, .z-time, .z-count').forEach(function(el) {
+    io.observe(el);
+  });
+
+  function countUp(el) {
+    var to = parseInt(el.dataset.to || '0', 10);
+    if (!to) { el.textContent = '0'; return; }
+    var start = performance.now(), dur = 1600;
+    function step(now) {
+      var t = Math.min((now - start) / dur, 1);
+      var eased = 1 - Math.pow(1 - t, 3);
+      el.textContent = Math.round(to * eased).toLocaleString();
+      if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+})();
+</script>
 
 {% endblock %}

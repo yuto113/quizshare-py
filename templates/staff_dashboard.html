@@ -1,6 +1,7 @@
 {% extends "base.html" %}
-{% block title %}統計ダッシュボード - Q'z{% endblock %}
+{% block title %}統計ダッシュボード - QZERO{% endblock %}
 {% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='qzero_staff.css') }}">
 <script>
 function killQzTheme() {
   document.body.style.background = '#fdfbf6';

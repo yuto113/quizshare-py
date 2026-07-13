@@ -4254,7 +4254,7 @@ def api_quiz_info(quiz_id):
 
 @app.route('/typing')
 def page_typing():
-    # Q'zタイピング(誰でも遊べる)
+    # QZEROタイピング(誰でも遊べる)
     return render_template('typing.html')
 
 def _typing_db():
@@ -4674,7 +4674,7 @@ QZERO_GUIDE_PUBLIC = [
      'url': '/', 'howto': 'トップページでグループに入ってから「クイズを作る」ボタンを押してね。問題文・答え・ヒントを入れて、画像も付けられるよ。'},
     {'keywords': ['クイズ', '解', '挑戦', '遊'], 'name': 'クイズに挑戦',
      'url': '/', 'howto': 'グループの合言葉で入ると、みんなのクイズに挑戦できるよ。正解するとランキングにのるんだ。'},
-    {'keywords': ['タイピング', 'タイプ', 'キーボード', '打つ'], 'name': "Q'zタイピング",
+    {'keywords': ['タイピング', 'タイプ', 'キーボード', '打つ'], 'name': "QZEROタイピング",
      'url': '/typing', 'howto': '難易度を選んでスタート!60秒でどれだけ打てるかチャレンジ。ローマ字はsi/shiどっちの打ち方でもOKだよ。'},
     {'keywords': ['ライブラリ', '図鑑', '公式', '教科'], 'name': '公式ライブラリ',
      'url': '/library', 'howto': '教科や学年べつに公式クイズがそろってるよ。好きな分野を選んで挑戦してみて。'},
@@ -4866,7 +4866,7 @@ def api_qzero_chat():
 
 @app.route('/homepage')
 def page_homepage():
-    # 「数字で見るQ'z」用に本物の統計をDBから取る(失敗しても表示は壊さない)
+    # 「数字で見るQZERO」用に本物の統計をDBから取る(失敗しても表示は壊さない)
     stats = {'quiz_count': 0, 'group_count': 0, 'attempt_count': 0, 'event_count': 0}
     try:
         import sqlite3 as _sq
@@ -4880,7 +4880,7 @@ def page_homepage():
         pass
     return render_template('company.html', **stats)
 
-# ===== Q'z 社員システム =====
+# ===== QZERO 社員システム =====
 
 @app.route('/staff/login')
 def page_staff_login():
@@ -5412,7 +5412,7 @@ def api_staff_hr_security():
     return ok(message='任命したよ')
 
 # KPのレート(ここを変えれば表示が全部変わる)
-KP_RATE_TEXT = "100KP = 1回年(Q'z社内通貨)"
+KP_RATE_TEXT = "100KP = 1回年(QZERO社内通貨)"
 
 @app.route('/api/staff/kouan/members', methods=['GET'])
 def api_kouan_members():

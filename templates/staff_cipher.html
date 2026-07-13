@@ -1,4 +1,7 @@
 {% extends "base.html" %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='qzero_staff.css') }}">
+{% endblock %}
 {% block title %}暗号ツール{% endblock %}
 {% block body_class %}qz-board-page{% endblock %}
 {% block content %}

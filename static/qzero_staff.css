@@ -1,0 +1,87 @@
+/* ==========================================
+   QZERO Staff Design — ゼロからの再スタート
+   色を変えたいときはここだけ直せばOK
+   ========================================== */
+:root {
+  --qs-ink: #14213d;
+  --qs-bg: #ffffff;
+  --qs-soft: #fafafa;
+  --qs-line: #e6e6e8;
+  --qs-gray: #6b6b70;
+  --qs-mute: #a0a0a6;
+  --qs-coral: #fb6f5b;
+}
+
+body { background: var(--qs-bg) !important; color: var(--qs-ink);
+  font-family: -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif; }
+
+/* 見出し */
+h1, h2, h3, h4 { color: var(--qs-ink) !important; font-weight: 500 !important;
+  letter-spacing: .02em; }
+h2 { font-size: 1.35rem !important; }
+
+/* カード・箱の類を全部フラットに */
+.card, .box, .panel, .section, .staff-card, .item,
+[class*="card"], [class*="box"], [class*="panel"] {
+  background: var(--qs-bg) !important;
+  border: 1px solid var(--qs-line) !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+}
+
+/* ボタン */
+button, .btn, input[type="submit"], a.button {
+  border-radius: 4px !important;
+  box-shadow: none !important;
+  font-weight: 500 !important;
+  letter-spacing: .03em;
+  transition: opacity .15s;
+}
+button:hover, .btn:hover { opacity: .75; }
+button:not(.btn-ghost):not([class*="danger"]):not([class*="red"]) {
+  background: var(--qs-ink) !important;
+  color: #fff !important;
+  border: 1px solid var(--qs-ink) !important;
+}
+
+/* 入力欄 */
+input, textarea, select {
+  border: 1px solid var(--qs-line) !important;
+  border-radius: 4px !important;
+  background: var(--qs-bg) !important;
+  color: var(--qs-ink) !important;
+  box-shadow: none !important;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--qs-ink) !important;
+  outline: none !important;
+}
+
+/* テーブル */
+table { border-collapse: collapse !important; }
+th, td { border-bottom: 1px solid var(--qs-line) !important;
+  padding: 12px 10px !important; }
+th { font-size: .75rem !important; letter-spacing: .1em; color: var(--qs-mute) !important;
+  font-weight: 500 !important; background: transparent !important; }
+td { font-size: .88rem !important; }
+
+/* リンク */
+a { color: var(--qs-ink); }
+a:hover { opacity: .6; }
+
+/* スタッフバッジ(全ページ共通の帰属表示) */
+.qs-brand {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 0 20px; margin-bottom: 24px;
+  border-bottom: 1px solid var(--qs-line);
+  font-size: 11px; letter-spacing: .3em; color: var(--qs-mute);
+}
+.qs-brand::before {
+  content: ''; width: 20px; height: 1px; background: var(--qs-coral);
+}
+
+/* 旧Q'z時代の装飾を消す */
+[style*="linear-gradient"], [style*="radial-gradient"] {
+  background-image: none !important;
+}
+.seasonal-emoji { display: none !important; }

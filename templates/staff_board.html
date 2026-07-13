@@ -1,6 +1,7 @@
 {% extends "base.html" %}
-{% block title %}社内掲示板 - Q'z{% endblock %}
+{% block title %}社内掲示板 - QZERO{% endblock %}
 {% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='qzero_staff.css') }}">
 <script>
 function killQzTheme() {
   document.body.style.background = '#fdfbf6';
@@ -116,7 +117,7 @@ setTimeout(killQzTheme, 800);
       <div style="display:flex; align-items:center;">
         <button class="mobile-back-btn" onclick="backToChannelList()">←</button>
         <div>
-          <div class="ttl">Q'Z Internal</div>
+          <div class="ttl">QZERO Internal</div>
           <div style="font-size:1.05rem; font-weight:700;" id="current-channel-name">会話を選択してください</div>
         </div>
       </div>
