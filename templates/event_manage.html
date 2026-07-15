@@ -46,6 +46,23 @@
             style="width:100%; padding:12px; border:2px solid #e5e7eb; border-radius:10px; font-size:15px; box-sizing:border-box;">
         </div>
         <button onclick="saveSchedule()" style="padding:14px; background:#667eea; color:white; border:none; border-radius:10px; font-weight:900; cursor:pointer; font-size:16px;">💾 日程を保存</button>
+    <div style="margin-top:20px; padding:16px; background:#f9fafb; border-radius:10px; border:1px solid #e5e7eb;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <div style="font-size:14px; font-weight:900; color:#374151;">🔒 IP制限</div>
+          <div style="font-size:12px; color:#9CA3AF; margin-top:4px;">同じネットワーク(IPアドレス)からの複数回答を防ぐ</div>
+        </div>
+        <label style="position:relative; display:inline-block; width:50px; height:28px; cursor:pointer;">
+          <input type="checkbox" id="ip-restrict-toggle" onchange="toggleIpRestrict(this.checked)"
+            style="opacity:0; width:0; height:0;"
+            {{ 'checked' if event.ip_restrict else '' }}>
+          <span style="position:absolute; top:0; left:0; right:0; bottom:0; background:#ccc; border-radius:28px; transition:.3s;"></span>
+          <span id="ip-slider" style="position:absolute; top:2px; left:2px; width:24px; height:24px; background:white; border-radius:50%; transition:.3s; box-shadow:0 1px 3px rgba(0,0,0,0.2);"></span>
+        </label>
+      </div>
+      <div id="ip-status" style="font-size:12px; margin-top:8px; color:#667eea;"></div>
+    </div>
+
       </div>
     </div>
   </div>
@@ -185,5 +202,27 @@ async function loadResults() {
 function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 loadQuizzes();
+
+async function toggleIpRestrict(enabled) {
+  var slider = document.getElementById('ip-slider');
+  var input = document.getElementById('ip-restrict-toggle');
+  slider.style.left = enabled ? '24px' : '2px';
+  input.parentElement.querySelector('span').style.background = enabled ? '#667eea' : '#ccc';
+  var r = await fetch('/api/event/ip_restrict', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({event_id: {{ event.id }}, enabled: enabled})
+  });
+  var d = await r.json();
+  document.getElementById('ip-status').textContent = d.ok ? d.message : (d.error || 'エラー');
+  setTimeout(function(){ document.getElementById('ip-status').textContent = ''; }, 3000);
+}
+// 初期状態のスライダー
+(function(){
+  var cb = document.getElementById('ip-restrict-toggle');
+  if (cb && cb.checked) {
+    document.getElementById('ip-slider').style.left = '24px';
+    cb.parentElement.querySelector('span').style.background = '#667eea';
+  }
+})();
 </script>
 {% endblock %}

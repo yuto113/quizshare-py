@@ -2,130 +2,126 @@
 {% block head_extra %}
 <link rel="stylesheet" href="{{ url_for('static', filename='qzero_staff.css') }}">
 {% endblock %}
-{% block title %}KP残高 - QZERO{% endblock %}
+{% block title %}回年バンク - QZERO{% endblock %}
 {% block body_class %}qz-board-page{% endblock %}
 {% block content %}
 <style>
 .site-header { display: none !important; }
-body { background:#0d1220 !important; }
-.k-wrap { max-width:680px; margin:24px auto; padding:0 20px; }
-.k-box { background:#161d33; border:1px solid #2a3555; border-radius:12px; padding:16px; margin-bottom:12px; color:#dde3f5; }
-.k-title { color:#9aa7ff; letter-spacing:0.15em; }
-.kp-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #2a3555; flex-wrap:wrap; gap:6px; }
-.kp-num { font-size:1.1rem; font-weight:900; color:#c8e6a0; }
-.k-btn { padding:7px 14px; border:none; border-radius:8px; cursor:pointer; font-size:13px; color:white; white-space:nowrap; }
-.k-input { padding:9px; border-radius:8px; border:1px solid #2a3555; background:#0d1220; color:#dde3f5; box-sizing:border-box; font-size:14px; }
+body { background: #f5f5f7 !important; font-family: -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif; }
+.kb-wrap { max-width: 680px; margin: 0 auto; padding: 24px 20px 60px; }
+.kb-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; }
+.kb-head h1 { font-size: 13px; letter-spacing: .3em; color: #a0a0a6; font-weight: 500; margin: 0; }
+.kb-back { font-size: 12px; color: #a0a0a6; text-decoration: none; }
+.kb-back:hover { color: #14213d; }
+.kb-balance-card {
+  background: linear-gradient(135deg, #14213d, #1e3054);
+  border-radius: 16px; padding: 36px 28px; color: #fff; margin-bottom: 20px;
+  position: relative; overflow: hidden;
+}
+.kb-balance-card::after {
+  content: ''; position: absolute; top: -40px; right: -40px;
+  width: 120px; height: 120px; border-radius: 50%;
+  background: rgba(251,111,91,0.15);
+}
+.kb-balance-label { font-size: 12px; color: rgba(255,255,255,.55); letter-spacing: .15em; margin: 0 0 12px; }
+.kb-balance-num { font-size: 42px; font-weight: 300; margin: 0 0 6px; letter-spacing: -.02em; }
+.kb-balance-num span { font-size: 18px; font-weight: 400; margin-left: 4px; color: rgba(255,255,255,.7); }
+.kb-balance-rate { font-size: 13px; color: rgba(255,255,255,.45); margin: 0; }
+.kb-actions { display: flex; gap: 10px; margin-bottom: 24px; }
+.kb-act {
+  flex: 1; padding: 14px; background: #fff; border: 1px solid #e6e6e8;
+  border-radius: 12px; text-align: center; cursor: pointer;
+  font-size: 13px; color: #14213d; font-weight: 500; transition: background .15s;
+}
+.kb-act:hover { background: #f0f0f2; }
+.kb-act-icon { font-size: 20px; display: block; margin-bottom: 4px; }
+.kb-card {
+  background: #fff; border: 1px solid #e6e6e8;
+  border-radius: 12px; padding: 20px; margin-bottom: 14px;
+}
+.kb-card-title { font-size: 11px; letter-spacing: .2em; color: #a0a0a6; font-weight: 500; margin: 0 0 16px; }
+.kb-budget-row { display: flex; justify-content: space-between; align-items: center; }
+.kb-budget-num { font-size: 22px; font-weight: 400; color: #14213d; }
+.kb-budget-num small { font-size: 13px; color: #a0a0a6; margin-left: 4px; }
+.kb-member {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 0; border-bottom: 1px solid #f0f0f2;
+}
+.kb-member:last-child { border-bottom: none; }
+.kb-member-name { font-size: 14px; color: #14213d; }
+.kb-member-kp { font-size: 15px; font-weight: 500; color: #14213d; }
+.kb-crown { color: #fb6f5b; margin-right: 4px; }
+.kb-me { background: rgba(251,111,91,0.06); border-radius: 8px; margin: 0 -12px; padding: 14px 12px; }
+.kb-form { display: none; }
+.kb-form.open { display: block; }
+.kb-input {
+  width: 100%; padding: 12px; border: 1px solid #e6e6e8;
+  border-radius: 8px; background: #fafafa; color: #14213d;
+  font-size: 14px; box-sizing: border-box; margin-bottom: 10px;
+}
+.kb-input:focus { border-color: #14213d; outline: none; background: #fff; }
+.kb-select { width: 100%; padding: 12px; border: 1px solid #e6e6e8; border-radius: 8px; background: #fafafa; color: #14213d; font-size: 14px; box-sizing: border-box; margin-bottom: 10px; }
+.kb-submit {
+  width: 100%; padding: 13px; border: none; border-radius: 8px;
+  background: #14213d; color: #fff; font-size: 14px; font-weight: 500;
+  cursor: pointer; letter-spacing: .04em; transition: opacity .15s;
+}
+.kb-submit:hover { opacity: .8; }
+.kb-submit.coral { background: #fb6f5b; }
+.kb-rate { text-align: center; font-size: 11px; color: #c0c0c4; margin-top: 20px; letter-spacing: .06em; }
 </style>
-
 {% include '_staff_nav.html' %}
-
-<div class="k-wrap">
-  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-    <h2 class="k-title" style="margin:0;">💎 KP残高</h2>
-    <a href="/staff/kouan" style="color:#9aa7ff; font-size:13px;">← 公安ページへ</a>
+<div class="kb-wrap">
+  <div class="kb-head">
+    <h1>回年 BANK</h1>
+    <a href="/staff/board" class="kb-back">← スタッフトップ</a>
   </div>
-  <p id="kp-rate" style="color:#6b7799; font-size:12px;"></p>
-
-  <div class="k-box" id="my-kp" style="text-align:center;">読み込み中...</div>
-
-  <div class="k-box" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
-    <b class="k-title" style="font-size:0.9rem;">📊 公安予算</b>
-    <span class="kp-num" id="kp-budget">-</span>
+  <div class="kb-balance-card">
+    <p class="kb-balance-label">YOUR BALANCE</p>
+    <p class="kb-balance-num" id="kb-my-kp">0<span>回年</span></p>
+    <p class="kb-balance-rate" id="kb-my-rate">= 0 回年</p>
   </div>
-
-  <div class="k-box" id="transfer-box" style="display:none;">
-    <b class="k-title" style="font-size:0.9rem;">🎁 KPをあげる</b>
-    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
-      <select class="k-input" id="tr-member" style="flex:2; min-width:140px;"></select>
-      <input class="k-input" id="tr-amount" type="number" min="1" placeholder="KP" style="flex:1; min-width:100px;">
-      <button class="k-btn" style="background:#7a5a3d;" onclick="transferKP()">あげる</button>
+  <div class="kb-actions">
+    <div class="kb-act" onclick="toggleForm('transfer')"><span class="kb-act-icon">↗</span>送金</div>
+    <div class="kb-act" id="kb-grant-btn" style="display:none;" onclick="toggleForm('grant')"><span class="kb-act-icon">💎</span>配布</div>
+  </div>
+  <div class="kb-card kb-form" id="form-transfer">
+    <p class="kb-card-title">SEND</p>
+    <select class="kb-select" id="tr-member"></select>
+    <input class="kb-input" id="tr-amount" type="number" min="1" placeholder="送金額 (回年)">
+    <button class="kb-submit" onclick="transferKP()">送金する</button>
+  </div>
+  <div class="kb-card kb-form" id="form-grant">
+    <p class="kb-card-title">GRANT</p>
+    <select class="kb-select" id="gr-member"></select>
+    <input class="kb-input" id="gr-amount" type="number" placeholder="配布額 (マイナスで回収)">
+    <input class="kb-input" id="gr-note" placeholder="メモ (任意)">
+    <button class="kb-submit coral" onclick="grantKP()">配布する</button>
+  </div>
+  <div class="kb-card">
+    <p class="kb-card-title">BUDGET</p>
+    <div class="kb-budget-row">
+      <span style="font-size:13px; color:#a0a0a6;">全体予算</span>
+      <span class="kb-budget-num" id="kb-budget">0<small>回年</small></span>
     </div>
   </div>
-
-  <div class="k-box" id="grant-box" style="display:none;">
-    <b class="k-title" style="font-size:0.9rem;">💸 KP配布(ゼロ専用)</b>
-    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
-      <select class="k-input" id="gr-member" style="flex:2; min-width:140px;"></select>
-      <input class="k-input" id="gr-amount" type="number" placeholder="KP(マイナスで回収)" style="flex:1; min-width:130px;">
-      <button class="k-btn" style="background:#3d4a7a;" onclick="grantKP()">配布</button>
-    </div>
-    <input class="k-input" id="gr-note" placeholder="メモ(任意)" style="width:100%; margin-top:6px;">
+  <div class="kb-card">
+    <p class="kb-card-title">MEMBERS</p>
+    <div id="kb-list"><div style="text-align:center; padding:20px; color:#c0c0c4;">読み込み中...</div></div>
   </div>
-
-  <div class="k-box">
-    <b class="k-title" style="font-size:0.9rem;">公安メンバーの残高</b>
-    <div id="kp-list" style="margin-top:8px;">読み込み中...</div>
-  </div>
-  <p style="color:#6b7799; font-size:11px;">KPは極秘タスクを✅終了すると、その報酬額ぶん増えるよ。</p>
+  <p class="kb-rate" id="kb-rate-text"></p>
 </div>
-
 <script>
-async function loadKP() {
-  const r = await fetch('/api/staff/kouan/points');
-  const data = await r.json();
-  if (data.ok === false || data.ok === undefined) { window.location.href = '/staff/board'; return; }
-  document.getElementById('kp-rate').textContent = 'レート: ' + data.rate;
-  document.getElementById('kp-budget').textContent = Number(data.budget || 0).toLocaleString() + ' KP';
-  const rateKp = 100;  // 100KPあたり
-  if (data.is_zero) {
-    document.getElementById('grant-box').style.display = 'block';
-  }
-  const myKp = Number(data.my_kp || 0);
-  document.getElementById('my-kp').innerHTML =
-    '<div style="color:#6b7799; font-size:12px;">あなたの残高' + (data.is_zero ? ' (🕶️ 一覧には出ない。本人にだけ見えるよ)' : '') + '</div>' +
-    '<div style="font-size:2rem; font-weight:900; color:#c8e6a0;">' + myKp.toLocaleString() + ' KP</div>' +
-    '<div style="color:#9aa7ff; font-size:13px;">= ' + (myKp / rateKp).toLocaleString() + ' 回年</div>';
-  document.getElementById('kp-list').innerHTML = data.points.map((p, i) => `
-    <div class="kp-row" style="${p.staff_id === data.my_id ? 'background:rgba(154,167,255,0.08); border-radius:8px; padding-left:8px; padding-right:8px;' : ''}">
-      <span>${i === 0 && p.kp > 0 ? '👑 ' : ''}${escP(p.name)}</span>
-      <span class="kp-num">${Number(p.kp).toLocaleString()} KP</span>
-    </div>`).join('');
-}
-async function loadMembersKP() {
-  // 名簿を読み込んで、配布と送金の相手選びに使う
-  const r = await fetch('/api/staff/kouan/members');
-  const data = await r.json();
-  if (data.ok === false || data.ok === undefined) return;
-  const opts = data.members.map(m => `<option value="${escP(m.staff_id)}">${escP(m.name)}</option>`).join('');
-  // 配布(ゼロ専用)の選択肢には「自分」も入れる。名前は出さない(正体保護)
-  document.getElementById('gr-member').innerHTML = '<option value="BUDGET">📊 予算口座に入金</option><option value="self">🕶️ 自分に配布</option>' + opts;
-  document.getElementById('tr-member').innerHTML = opts;
-  document.getElementById('transfer-box').style.display = 'block';
-}
-loadMembersKP();
-
-async function transferKP() {
-  const to_staff_id = document.getElementById('tr-member').value;
-  const amount = Number(document.getElementById('tr-amount').value || 0);
-  if (amount <= 0) { window.toast('1KP以上を入力してね', 'error'); return; }
-  if (confirm(amount + ' KPをあげるよ？(取り消しはできないよ)') === false) return;
-  const r = await fetch('/api/staff/kouan/transfer', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({to_staff_id, amount})
-  });
-  const data = await r.json();
-  window.toast(data.ok ? data.message : (data.error || 'エラー'), data.ok ? 'success' : 'error');
-  document.getElementById('tr-amount').value = '';
-  loadKP();
-}
-
-async function grantKP() {
-  const staff_id = document.getElementById('gr-member').value;
-  const amount = Number(document.getElementById('gr-amount').value || 0);
-  const note = document.getElementById('gr-note').value.trim();
-  if (amount === 0) { window.toast('KPの額を入力してね', 'error'); return; }
-  const r = await fetch('/api/staff/kouan/grant', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({staff_id, amount, note})
-  });
-  const data = await r.json();
-  window.toast(data.ok ? data.message : (data.error || 'エラー'), data.ok ? 'success' : 'error');
-  document.getElementById('gr-amount').value = '';
-  document.getElementById('gr-note').value = '';
-  loadKP();
-}
-
-function escP(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-loadKP();
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function countUp(el,to,suffix){var start=performance.now(),dur=1200;function step(now){var t=Math.min((now-start)/dur,1);var eased=1-Math.pow(1-t,3);el.innerHTML=Math.round(to*eased).toLocaleString()+(suffix||'');if(t<1)requestAnimationFrame(step)}requestAnimationFrame(step)}
+function toggleForm(n){document.getElementById('form-'+n).classList.toggle('open')}
+async function loadKP(){var r=await fetch('/api/staff/kouan/points');var d=await r.json();if(d.ok===false||d.ok===undefined){window.location.href='/staff/board';return}
+document.getElementById('kb-rate-text').textContent=d.rate||'';var my=Number(d.my_kp||0);countUp(document.getElementById('kb-my-kp'),my,'<span>回年</span>');document.getElementById('kb-my-rate').textContent='= '+(my/100).toLocaleString()+' 回年';
+countUp(document.getElementById('kb-budget'),Number(d.budget||0),'<small>回年</small>');if(d.is_zero)document.getElementById('kb-grant-btn').style.display='';
+document.getElementById('kb-list').innerHTML=d.points.map(function(p,i){var isMe=p.staff_id===d.my_id;return'<div class="kb-member'+(isMe?' kb-me':'')+'"><span class="kb-member-name">'+(i===0&&p.kp>0?'<span class="kb-crown">●</span>':'')+esc(p.name)+(isMe?' <span style="font-size:11px;color:#fb6f5b;">YOU</span>':'')+'</span><span class="kb-member-kp">'+Number(p.kp).toLocaleString()+' 回年</span></div>'}).join('')}
+async function loadMembers(){var r=await fetch('/api/staff/kouan/members');var d=await r.json();if(d.ok===false||d.ok===undefined)return;var o=d.members.map(function(m){return'<option value="'+esc(m.staff_id)+'">'+esc(m.name)+'</option>'}).join('');document.getElementById('gr-member').innerHTML='<option value="BUDGET">予算口座に入金</option><option value="self">自分に配布</option>'+o;document.getElementById('tr-member').innerHTML=o}
+async function transferKP(){var to=document.getElementById('tr-member').value;var a=Number(document.getElementById('tr-amount').value||0);if(a<=0){window.toast&&window.toast('1回年以上を入力してね','error');return}if(!confirm(a+' 回年を送金します。よろしいですか？'))return;var r=await fetch('/api/staff/kouan/transfer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to_staff_id:to,amount:a})});var d=await r.json();window.toast&&window.toast(d.ok?d.message:(d.error||'エラー'),d.ok?'success':'error');document.getElementById('tr-amount').value='';document.getElementById('form-transfer').classList.remove('open');loadKP()}
+async function grantKP(){var sid=document.getElementById('gr-member').value;var a=Number(document.getElementById('gr-amount').value||0);var note=document.getElementById('gr-note').value.trim();if(a===0){window.toast&&window.toast('金額を入力してね','error');return}var r=await fetch('/api/staff/kouan/grant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({staff_id:sid,amount:a,note:note})});var d=await r.json();window.toast&&window.toast(d.ok?d.message:(d.error||'エラー'),d.ok?'success':'error');document.getElementById('gr-amount').value='';document.getElementById('gr-note').value='';document.getElementById('form-grant').classList.remove('open');loadKP()}
+loadKP();loadMembers();
 </script>
 {% endblock %}

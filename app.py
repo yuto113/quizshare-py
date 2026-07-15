@@ -772,12 +772,12 @@ def page_admin_entry(group_id):
     if group_info:
         import sqlite3 as _sq_adm
         _conn_adm = _sq_adm.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
-        ev_row = _conn_adm.execute('SELECT id,event_key,title,start_date,end_date,result_date FROM events WHERE group_id=?',
+        ev_row = _conn_adm.execute('SELECT id,event_key,title,start_date,end_date,result_date,ip_restrict FROM events WHERE group_id=?',
                                     (str(group_info['id']),)).fetchone()
         _conn_adm.close()
         if ev_row:
             event = {'id':ev_row[0],'event_key':ev_row[1],'title':ev_row[2],
-                     'start_date':ev_row[3],'end_date':ev_row[4],'result_date':ev_row[5]}
+                     'start_date':ev_row[3],'end_date':ev_row[4],'result_date':ev_row[5],'ip_restrict':bool(ev_row[6]) if len(ev_row)>6 else False}
     return render_template(
         'admin.html',
         group_id=group_id,
@@ -3587,9 +3587,9 @@ def api_get_events():
         return err('管理者パスワードが違うよ', 403)
     import sqlite3 as _sq
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
-    rows = conn.execute('SELECT id,event_key,title,description,start_date,end_date,result_date,group_id,is_published,created_at FROM events ORDER BY id DESC').fetchall()
+    rows = conn.execute('SELECT id,event_key,title,description,start_date,end_date,result_date,group_id,is_published,created_at,ip_restrict FROM events ORDER BY id DESC').fetchall()
     conn.close()
-    return ok(events=[{'id':r[0],'event_key':r[1],'title':r[2],'description':r[3],'start_date':r[4],'end_date':r[5],'result_date':r[6],'group_id':r[7],'is_published':bool(r[8]),'created_at':r[9]} for r in rows])
+    return ok(events=[{'id':r[0],'event_key':r[1],'title':r[2],'description':r[3],'start_date':r[4],'end_date':r[5],'result_date':r[6],'group_id':r[7],'is_published':bool(r[8]),'created_at':r[9],'ip_restrict':bool(r[10]) if len(r)>10 else False} for r in rows])
 
 @app.route('/api/events', methods=['POST'])
 def api_create_event():
@@ -3713,7 +3713,15 @@ def api_event_submit(event_key):
         else:
             total_correct += correct
         total_time += time_ms
-        conn.execute('INSERT INTO event_attempts (event_id,nickname,ip_hash,quiz_id,correct,time_ms) VALUES (?,?,?,?,?,?)',
+            # IP制限チェック
+    _ip_ev = client_ip()
+    _ev_row_ip = conn.execute('SELECT ip_restrict FROM events WHERE event_key=?', (event_key,)).fetchone()
+    if _ev_row_ip and _ev_row_ip[0]:
+        _ip_hash_ev = __import__('hashlib').sha256(_ip_ev.encode()).hexdigest()[:16]
+        _dup = conn.execute('SELECT COUNT(*) FROM event_submissions WHERE event_key=? AND ip_hash=?', (event_key, _ip_hash_ev)).fetchone()
+        if _dup and _dup[0] > 0:
+            return err('このネットワークからは既に回答されています(IP制限が有効です)')
+    conn.execute('INSERT INTO event_attempts (event_id,nickname,ip_hash,quiz_id,correct,time_ms) VALUES (?,?,?,?,?,?)',
                      (event_id, nickname, ip_hash, quiz_id, correct, time_ms))
     total_correct_rounded = round(total_correct * 100) / 100
     # 参加者登録
@@ -3770,6 +3778,20 @@ def api_event_check_ip(event_key):
     existing = conn.execute('SELECT nickname FROM event_participants WHERE event_id=? AND ip_hash=?', (event[0], combined)).fetchone()
     conn.close()
     return ok(already_participated=bool(existing), nickname=existing[0] if existing else None)
+
+
+@app.route('/api/event/ip_restrict', methods=['POST'])
+def api_event_ip_restrict():
+    data = request.get_json(silent=True) or {}
+    event_id = data.get('event_id')
+    enabled = data.get('enabled', False)
+    if not event_id:
+        return err('event_idが必要')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    conn.execute('UPDATE events SET ip_restrict=? WHERE id=?', (1 if enabled else 0, event_id))
+    conn.commit(); conn.close()
+    return jsonify(ok=True, message='IP制限を' + ('有効' if enabled else '無効') + 'にしたよ')
 
 @app.route('/api/events/<int:event_id>/schedule', methods=['POST'])
 def api_update_event_schedule(event_id):

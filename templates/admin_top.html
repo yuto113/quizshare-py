@@ -323,8 +323,25 @@ async function loadEvents() {
         style="width:100%; padding:8px; background:#667eea; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:13px;">
         💾 日程を保存
       </button>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding:10px 12px; background:rgba(255,255,255,0.04); border-radius:8px;">
+        <div>
+          <span style="font-size:13px; font-weight:bold;">🔒 IP制限</span>
+          <span style="font-size:11px; color:#9CA3AF; margin-left:6px;">同じIPからの複数回答を防ぐ</span>
+        </div>
+        <button onclick="toggleIpRestrict(${e.id}, ${e.ip_restrict})" style="padding:5px 12px; background:${e.ip_restrict ? 'rgba(16,185,129,0.2)' : 'rgba(100,100,100,0.2)'}; color:${e.ip_restrict ? '#34d399' : '#9CA3AF'}; border:1px solid ${e.ip_restrict ? 'rgba(16,185,129,0.3)' : 'rgba(100,100,100,0.3)'}; border-radius:6px; cursor:pointer; font-size:11px; font-weight:bold;">${e.ip_restrict ? 'ON' : 'OFF'}</button>
+      </div>
     </div>
   `).join('');
+}
+
+async function toggleIpRestrict(eventId, current) {
+  var r = await fetch("/api/event/ip_restrict", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({event_id: eventId, enabled: !current})
+  });
+  var d = await r.json();
+  if (d.ok) { await loadEvents(); }
+  else { alert(d.error || "エラー"); }
 }
 
 async function toggleEventPublish(eventId, current) {
