@@ -8,12 +8,13 @@ BRAIN_PATH = os.environ.get('QZERO_MINI_BRAIN', '/home/yuto113/qzero_mini_brain.
 
 # 選べる世代の台帳(新しい世代を作ったらここに1行足す)
 BRAINS = {
+    '7':   BRAIN_PATH,
     '6':   '/home/yuto113/qzero_mini_brain_v6.json',
     '5':   '/home/yuto113/qzero_mini_brain_v5.json',
     '4.1': '/home/yuto113/backups/qzero_mini_brain_v41.json',
     '3':   '/home/yuto113/backups/qzero_mini_brain_v3.json',
 }
-DEFAULT_VERSION = '6'
+DEFAULT_VERSION = '7'
 _cache = {}
 
 def _load(version=None):
@@ -72,7 +73,13 @@ def _forward_v6(xs, b):
     X = [list(x) for x in xs]
     for L in b['layers']:
         h = _attend_v6(X, L, DIM, HEADS)
-        X[-1] = [X[-1][d] + h[d] for d in range(DIM)]   # 残差接続
+        X[-1] = [X[-1][d] + h[d] for d in range(DIM)]   # 残差接続(attention)
+        # FFN(v7以降)
+        if 'W1' in L:
+            DM = len(X[-1])
+            ffn_h = [max(0, sum(L['W1'][j][d] * X[-1][d] for d in range(DM)) + L['b1'][j]) for j in range(len(L['W1']))]
+            ffn_o = [sum(L['W2'][d][j] * ffn_h[j] for j in range(len(ffn_h))) + L['b2'][d] for d in range(DM)]
+            X[-1] = [X[-1][d] + ffn_o[d] for d in range(DM)]   # 残差接続(FFN)
     return _softmax(_mv(b['Wo'], X[-1], DIM))
 
 
