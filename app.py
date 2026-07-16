@@ -634,6 +634,21 @@ def err(message: str, status: int = 400):
 # 8. HTMLページのルーティング(どのURLで何を表示するか)
 # ====================================================================
 
+
+@app.route('/chat/<mode>/<url_key>')
+@app.route('/qzero/chat/<mode>/<url_key>')
+def page_chat_url(mode, url_key):
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT thread_id, owner FROM qzero_threads WHERE url_key=?', (url_key,)).fetchone()
+    conn.close()
+    if not row:
+        return redirect('/qzero/')
+    user = session.get('qzero_user', '')
+    if row[1] and row[1] != user:
+        return redirect('/qzero/')
+    return render_template('qzero.html', open_thread_id=row[0], open_mode=mode)
+
 @app.route('/')
 def page_home():
     # トップページ。ログイン済みならグループへ、まだならエントリー画面へ。
@@ -3106,7 +3121,7 @@ def api_teacher_register_first():
     count = conn2.execute('SELECT COUNT(*) FROM teachers WHERE group_id=?', (group_uuid,)).fetchone()[0]
     pw_hash = hash_teacher_password(password)
     try:
-        conn2.execute('INSERT INTO teachers (group_id, teacher_num, name, password_hash) VALUES (?,?,?,?)',
+        conn2.execute('INSERT INTO teachers (group_id, teacher_num, name, password_hash) VALUES (?, ?, ?, ?, ?, ?)',
                       (group_uuid, count+1, name, pw_hash))
         conn2.commit()
     except Exception as e:
@@ -4590,9 +4605,9 @@ def api_qzero_threads():
     if not u:
         return ok(threads=[])
     conn = _qzero_db()
-    rows = conn.execute('SELECT thread_id, title, updated_at FROM qzero_threads WHERE owner=? ORDER BY updated_at DESC', (u,)).fetchall()
+    rows = conn.execute('SELECT thread_id, title, updated_at, url_key, mode FROM qzero_threads WHERE owner=? ORDER BY updated_at DESC', (u,)).fetchall()
     conn.close()
-    return ok(threads=[{'thread_id': r[0], 'title': dec(r[1]) if r[1] else '新しい会話', 'updated_at': r[2]} for r in rows])
+    return ok(threads=[{'thread_id': r[0], 'title': dec(r[1]) if r[1] else '新しい会話', 'updated_at': r[2], 'url_key': r[3] if len(r)>3 else '', 'mode': r[4] if len(r)>4 else 'core'} for r in rows])
 
 @app.route('/api/qzero/threads/new', methods=['POST'])
 def api_qzero_thread_new():
@@ -4604,12 +4619,13 @@ def api_qzero_thread_new():
     from datetime import datetime as _d
     now = _d.now(_p.timezone('Asia/Tokyo')).strftime('%Y-%m-%d %H:%M')
     conn = _qzero_db()
-    cur = conn.execute('INSERT INTO qzero_threads (owner, title, created_at, updated_at) VALUES (?,?,?,?)',
+    cur = conn.execute('INSERT INTO qzero_threads (owner, title, created_at, updated_at, url_key, mode) VALUES (?,?,?,?)',
                        (u, None, now, now))
     tid = cur.lastrowid
     conn.commit()
+    _uk = conn.execute('SELECT url_key FROM qzero_threads WHERE thread_id=?', (tid,)).fetchone()
     conn.close()
-    return ok(thread_id=tid)
+    return ok(thread_id=tid, url_key=_uk[0] if _uk else '')
 
 @app.route('/api/qzero/threads/<int:thread_id>', methods=['GET'])
 def api_qzero_thread_get(thread_id):
@@ -5434,6 +5450,84 @@ def api_staff_hr_security():
     return ok(message='任命したよ')
 
 # KPのレート(ここを変えれば表示が全部変わる)
+
+# ===== LINE連携 =====
+import hashlib, hmac, base64
+import urllib.request as _line_req
+
+def line_send_to_group(text):
+    token = os.environ.get('LINE_CHANNEL_TOKEN', '')
+    group_id = os.environ.get('LINE_GROUP_ID', '')
+    if not token or not group_id:
+        return
+    try:
+        body = json.dumps({'to': group_id, 'messages': [{'type': 'text', 'text': text}]}).encode()
+        req = _line_req.Request('https://api.line.me/v2/bot/message/push', data=body,
+            headers={'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token})
+        _line_req.urlopen(req, timeout=5)
+    except Exception as e:
+        print('[LINE送信エラー]', e)
+
+@app.route('/api/line/webhook', methods=['POST'])
+def api_line_webhook():
+    if not rate_limit('line_webhook:' + request.remote_addr, 30):
+        return 'rate limited', 429
+    secret = os.environ.get('LINE_CHANNEL_SECRET', '')
+    body = request.get_data(as_text=True)
+    sig = request.headers.get('X-Line-Signature', '')
+    if secret:
+        digest = hmac.new(secret.encode(), body.encode(), hashlib.sha256).digest()
+        if sig != base64.b64encode(digest).decode():
+            return 'bad sig', 403
+    data = request.get_json(silent=True) or {}
+    for event in data.get('events', []):
+        if event.get('type') != 'message' or event.get('message', {}).get('type') != 'text':
+            continue
+        text = event['message']['text']
+        source = event.get('source', {})
+        if source.get('type') == 'group' and not os.environ.get('LINE_GROUP_ID'):
+            gid = source['groupId']
+            os.environ['LINE_GROUP_ID'] = gid
+            with open('/home/yuto113/.line_env', 'a') as f:
+                f.write('LINE_GROUP_ID=' + gid + '\n')
+        user_id = source.get('userId', '')
+        display_name = 'LINEメンバー'
+        if user_id:
+            token = os.environ.get('LINE_CHANNEL_TOKEN', '')
+            try:
+                if source.get('type') == 'group':
+                    profile_url = 'https://api.line.me/v2/bot/group/' + source['groupId'] + '/member/' + user_id + '/profile'
+                else:
+                    profile_url = 'https://api.line.me/v2/bot/profile/' + user_id
+                prof_req = _line_req.Request(profile_url, headers={'Authorization': 'Bearer ' + token})
+                prof_data = json.loads(_line_req.urlopen(prof_req, timeout=5).read())
+                display_name = prof_data.get('displayName', 'LINEメンバー')
+            except Exception:
+                display_name = 'LINEさん#' + user_id[-4:]
+        # 登録済みの名前を優先
+        try:
+            import sqlite3 as _sq_nm
+            _nc = _sq_nm.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+            _nrow = _nc.execute('SELECT name FROM qz_line_names WHERE user_id=?', (user_id[:8],)).fetchone()
+            _nc.close()
+            if _nrow:
+                display_name = _nrow[0]
+        except Exception:
+            pass
+        import sqlite3 as _sq_line
+        conn = _sq_line.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+        from datetime import datetime, timezone, timedelta
+        _jst = timezone(timedelta(hours=9))
+        _now = datetime.now(_jst).strftime('%Y-%m-%d %H:%M:%S')
+        conn.execute('INSERT INTO qz_messages (staff_id, staff_name, title, body, channel_id, created_at) VALUES (?,?,?,?,?,?)',
+            ('line_' + user_id[:8], display_name + '(LINE)', '', text, '22', _now))
+        conn.commit()
+        conn.close()
+    return 'OK', 200
+
+
+
+
 KP_RATE_TEXT = "100KP = 1回年(QZERO社内通貨)"
 
 @app.route('/api/staff/kouan/members', methods=['GET'])
@@ -5915,6 +6009,8 @@ def api_staff_messages_get():
 def api_staff_messages_post():
     if not session.get('staff_id'):
         return err('ログインしてね', 401)
+    if not rate_limit('board_post:' + session.get('staff_id',''), 20):
+        return err('投稿が速すぎるよ。少し待ってね')
     data = request.get_json(silent=True) or {}
     title = (data.get('title') or '').strip()
     body = (data.get('body') or '').strip()
@@ -5946,6 +6042,12 @@ def api_staff_messages_post():
     conn.execute('INSERT INTO qz_messages (staff_id, staff_name, title, body, image_data, stamp_id, channel_id, file_data, file_name, reply_to, created_at, cipher_key_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
                  (session.get('staff_id'), enc(session.get('staff_name')), enc(title), enc(body), image_data, stamp_id, channel_id, file_data, enc(file_name) if file_name else None, reply_to, _jst_now_str, cipher_key_id))
     conn.commit()
+    # LINE転送(チャンネル22の投稿をLINEグループへ)
+    if str(channel_id) == '22':
+        try:
+            line_send_to_group(session.get('staff_name', '') + ': ' + (body or title or '(スタンプ)'))
+        except Exception as _e:
+            print('[LINE転送エラー]', _e)
     conn.close()
     return ok(message='投稿しました')
 
@@ -6210,6 +6312,8 @@ def api_staff_channel_leave():
         return err('ログインしてね', 401)
     data = request.get_json(silent=True) or {}
     channel_id = data.get('channel_id')
+    if str(channel_id) == '22':
+        return err('このチャンネルからは退出できないよ(LINE連携チャンネル)')
     my_id = session.get('staff_id')
     my_name = session.get('staff_name')
     import sqlite3 as _sq, json as _json

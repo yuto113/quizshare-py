@@ -32,6 +32,46 @@ body { background:#ffffff !important; margin:0; }
 #cb-input { flex:1; padding:12px; border:1px solid #ddd; border-radius:10px; font-size:1rem; }
 #qz-mode-btn { padding:8px 14px; background:transparent; color:#555; border:1px solid #e3e3e3; border-radius:999px; cursor:pointer; font-size:0.85rem; white-space:nowrap; align-self:center; }
 #qz-mode-btn:hover { background:#f5f5f5; }
+
+/* 世代セレクタ(Claude風ドロップダウン) */
+#qz-ver-menu {
+  display: none;
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  background: #fff;
+  border: 1px solid #e6e6e8;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+  min-width: 180px;
+  z-index: 70;
+  padding: 6px 0;
+  font-size: 14px;
+}
+#qz-ver-menu.open { display: block; }
+.qz-ver-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  cursor: pointer;
+  color: #14213d;
+  transition: background .1s;
+}
+.qz-ver-item:hover { background: #f5f5f7; }
+.qz-ver-item.active { font-weight: 600; }
+.qz-ver-check { color: #14213d; font-size: 16px; width: 20px; text-align: right; }
+.qz-ver-sep {
+  height: 1px;
+  background: #e6e6e8;
+  margin: 4px 12px;
+}
+.qz-ver-label {
+  padding: 6px 16px 4px;
+  font-size: 11px;
+  color: #a0a0a6;
+  letter-spacing: .06em;
+}
 #cb-send { padding:12px 20px; background:#111; color:white; border:none; border-radius:10px; cursor:pointer; }
 
 /* ログインパネル */
@@ -46,6 +86,7 @@ body { background:#ffffff !important; margin:0; }
   #qz-side.open { left:0; }
   #qz-menu-btn { display:block; }
 }
+#site-banner, .site-banner, .banner, [class*='banner'] { display: none !important; }
 </style>
 <script>
 function cbStrip(){try{const b=document.body;Array.from(b.classList).forEach(c=>{if(c.indexOf('theme')!==-1||c==='halloween-dark')b.classList.remove(c);});b.style.background='#ffffff';document.querySelectorAll('.seasonal-emoji').forEach(e=>e.remove());}catch(e){}}
@@ -74,6 +115,18 @@ window.applyTheme=cbStrip;window.checkAutoTheme=cbStrip;setInterval(cbStrip,2000
       <div id="qz-input-row">
         <div style="position:relative; align-self:center;">
           <button id="qz-mode-btn" onclick="toggleModeMenu()">Core 2 ∨</button>
+          <div id="qz-ver-menu">
+            <div class="qz-ver-item" onclick="document.getElementById('qz-ver-menu').classList.remove('open'); toggleModeMenu();" style="color:#a0a0a6; font-size:13px;">← モード選択に戻る</div>
+            <div class="qz-ver-sep"></div>
+            <div class="qz-ver-label">モデル</div>
+            <div class="qz-ver-item" data-ver="7" onclick="pickVer('7')"><span>Mini 7</span><span class="qz-ver-check"></span></div>
+            <div class="qz-ver-sep"></div>
+            <div class="qz-ver-label">旧バージョン</div>
+            <div class="qz-ver-item" data-ver="6" onclick="pickVer('6')"><span>Mini 6</span><span class="qz-ver-check"></span></div>
+            <div class="qz-ver-item" data-ver="5" onclick="pickVer('5')"><span>Mini 5</span><span class="qz-ver-check"></span></div>
+            <div class="qz-ver-item" data-ver="4.1" onclick="pickVer('4.1')"><span>Mini 4.1</span><span class="qz-ver-check"></span></div>
+            <div class="qz-ver-item" data-ver="3" onclick="pickVer('3')"><span>Mini 3</span><span class="qz-ver-check"></span></div>
+          </div>
           <div id="qz-mode-menu" style="display:none; position:absolute; left:0; bottom:110%; background:white; border:1px solid #ddd; border-radius:10px; box-shadow:0 4px 12px rgba(0,0,0,0.08); min-width:230px; z-index:60;">
           <div onclick="setAiMode('search')" style="padding:10px 14px; cursor:pointer;">
             <b style="font-size:0.85rem;">Search</b><br><span style="font-size:0.72rem; color:#999;">インターネットから調べて答える(天気など)</span>
@@ -116,6 +169,38 @@ let currentThread = null;
 let weatherDays = 1, awaitingPlace = false;
 let aiMode = 'core';  // いまの答え方モード
 
+function pickVer(v) {
+  window.qzMiniVer = v;
+  document.getElementById('qz-ver-menu').classList.remove('open');
+  // チェックマーク更新
+  document.querySelectorAll('.qz-ver-item').forEach(function(el) {
+    var ck = el.querySelector('.qz-ver-check'); if (ck) ck.textContent = el.dataset.ver === v ? '✓' : '';
+    el.classList.toggle('active', el.dataset.ver === v);
+  });
+  // ボタン表示を更新(モード切替メッセージは出さない)
+  document.getElementById('qz-mode-btn').textContent = 'Mini ' + v + ' ∨';
+}
+
+// Miniモード選択時に世代メニューを表示
+function showVerMenu() {
+  var m = document.getElementById('qz-ver-menu');
+  m.classList.toggle('open');
+  // 現在の世代にチェック
+  var cur = String(window.qzMiniVer || 7);
+  document.querySelectorAll('.qz-ver-item').forEach(function(el) {
+    var ck2 = el.querySelector('.qz-ver-check'); if (ck2) ck2.textContent = el.dataset.ver === cur ? '✓' : '';
+    el.classList.toggle('active', el.dataset.ver === cur);
+  });
+}
+
+// 外クリックで閉じる
+document.addEventListener('click', function(e) {
+  var vm = document.getElementById('qz-ver-menu');
+  if (vm && !vm.contains(e.target) && e.target.id !== 'qz-mode-btn') {
+    vm.classList.remove('open');
+  }
+});
+
 function toggleModeMenu() {
   const m = document.getElementById('qz-mode-menu');
   m.style.display = m.style.display === 'none' ? 'block' : 'none';
@@ -130,20 +215,7 @@ async function unlockMini() {
       item.style.opacity = '1';
       item.onclick = () => setAiMode('mini');
       document.getElementById('qz-mini-desc').textContent = '自作トランスフォーマーが文章を作る(β)';
-      const verRow = document.createElement('div');
-      verRow.style.cssText = 'padding:6px 14px; font-size:0.75rem; color:#888;';
-      verRow.innerHTML = 'Miniの世代: ' + ['7','6','5','4.1','3'].map(v =>
-        '<span class="qz-mini-ver" data-v="' + v + '" style="cursor:pointer; margin-right:10px; padding:2px 8px; border-radius:999px; border:1px solid #ddd;">' + v + '</span>').join('');
-      item.parentNode.insertBefore(verRow, item.nextSibling);
-      verRow.querySelectorAll('.qz-mini-ver').forEach(el => {
-        el.onclick = (e) => {
-          e.stopPropagation();
-          window.qzMiniVer = el.dataset.v;
-          verRow.querySelectorAll('.qz-mini-ver').forEach(x => x.style.background = '');
-          el.style.background = '#eee';
-          setAiMode('mini');
-        };
-      });
+
     }
   } catch (e) {}
 }
@@ -153,7 +225,15 @@ function setAiMode(mode) {
   aiMode = mode;
   const QZ_VERSIONS = { core: 2, search: 1, guide: 1, mini: (window.qzMiniVer || 7) };
   const label = mode === 'search' ? 'Search' : (mode === 'guide' ? 'Guide' : (mode === 'mini' ? 'Mini' : 'Core'));
-  document.getElementById('qz-mode-btn').textContent = label + ' ' + QZ_VERSIONS[mode] + ' ∨';
+  document.getElementById('qz-mode-btn').textContent = label + ' ' + (mode === 'mini' ? (window.qzMiniVer || 7) : QZ_VERSIONS[mode]) + ' ∨';
+  // Miniモードならボタンにクリックで世代メニューを開く機能を付ける
+  var btn = document.getElementById('qz-mode-btn');
+  if (mode === 'mini') {
+    btn.onclick = function(e) { e.stopPropagation(); showVerMenu(); };
+  } else {
+    btn.onclick = function() { toggleModeMenu(); };
+    document.getElementById('qz-ver-menu').classList.remove('open');
+  }
   document.getElementById('qz-mode-menu').style.display = 'none';
   const msgs = {
     search: 'Searchモードだよ。インターネットから調べて答える(いまは天気と場所が得意。情報源はだんだん増えていくよ)',
@@ -219,20 +299,22 @@ async function loadThreads(){
   const box=document.getElementById('qz-threads');
   if(!data.threads||data.threads.length===0){box.innerHTML='';return;}
   box.innerHTML=data.threads.map(t=>`
-    <div class="qz-thread ${t.thread_id===currentThread?'on':''}" onclick="openThread(${t.thread_id})">
+    <div class="qz-thread ${t.thread_id===currentThread?'on':''}" onclick="openThread(${t.thread_id}, '${t.url_key||''}', '${t.mode||'core'}')">
       <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(t.title)}</span>
       <span class="del" onclick="event.stopPropagation();delThread(${t.thread_id})">🗑</span>
     </div>`).join('');
 }
-async function openThread(tid){
+async function openThread(tid, urlKey, mode){
   currentThread=tid;
   const r=await fetch('/api/qzero/threads/'+tid);const data=await r.json();
   document.getElementById('qz-log').innerHTML='';
   if(data.ok&&data.history)data.history.forEach(h=>addMsg(h.role==='me'?'me':'ai',h.text,true));
+  if(urlKey) history.pushState(null, '', '/qzero/chat/' + (mode||'core') + '/' + urlKey);
   loadThreads();
   document.getElementById('qz-side').classList.remove('open');
 }
 function newThread(){
+  history.pushState(null, '', '/qzero/');
   currentThread=null;
   document.getElementById('qz-log').innerHTML='';
   greet();
@@ -247,12 +329,12 @@ async function delThread(tid){
 }
 async function saveHistory(role,text){
   try{
-    const r=await fetch('/api/qzero/history/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role,text,thread_id:currentThread})});
+    const r=await fetch('/api/qzero/history/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role,text,thread_id:currentThread,mode:document.getElementById('qz-mode-btn').textContent.split(' ')[0].toLowerCase()})});
     const d=await r.json();
     if(d.ok&&d.thread_id){const isNew=(currentThread===null);currentThread=d.thread_id;if(isNew)loadThreads();}
   }catch(e){}
 }
-function greet(){addMsg('ai','こんにちは! 私はQZERO、Q\'zの自作AIだよ。ログインすると会話がサイドバーに残せるよ。教科あて・天気・クイズ探しができる!',true);}
+function greet(){addMsg('ai','こんにちは! 私はQZERO。教科あて、天気、クイズ探しができるよ。',true);}
 
 // ===== 天気(前と同じ) =====
 const WEATHER_CODES={0:'快晴',1:'晴れ',2:'晴れときどき曇り',3:'曇り',45:'霧',48:'霧',51:'弱い霧雨',53:'霧雨',55:'強い霧雨',61:'弱い雨',63:'雨',65:'強い雨',71:'弱い雪',73:'雪',75:'強い雪',80:'にわか雨',81:'にわか雨',82:'激しいにわか雨',95:'雷雨',96:'雷雨(ひょう)',99:'激しい雷雨'};
@@ -400,5 +482,17 @@ async function cbSend(){
 greet();
 refreshAccount();
 loadThreads();
+
+// URLからスレッドを開く
+(function(){
+  var openTid = {{ open_thread_id|default(0) }};
+  var openMode = '{{ open_mode|default("") }}';
+  if (openTid) {
+    if (openMode === 'mini') { setAiMode('mini'); }
+    else if (openMode === 'search') { setAiMode('search'); }
+    else if (openMode === 'guide') { setAiMode('guide'); }
+    openThread(openTid);
+  }
+})();
 </script>
 {% endblock %}
