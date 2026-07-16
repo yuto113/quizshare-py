@@ -119,9 +119,10 @@ window.applyTheme=cbStrip;window.checkAutoTheme=cbStrip;setInterval(cbStrip,2000
             <div class="qz-ver-item" onclick="document.getElementById('qz-ver-menu').classList.remove('open'); toggleModeMenu();" style="color:#a0a0a6; font-size:13px;">← モード選択に戻る</div>
             <div class="qz-ver-sep"></div>
             <div class="qz-ver-label">モデル</div>
-            <div class="qz-ver-item" data-ver="7" onclick="pickVer('7')"><span>Mini 7</span><span class="qz-ver-check"></span></div>
+            <div class="qz-ver-item" data-ver="8" onclick="pickVer('8')"><span>Mini 8</span><span class="qz-ver-check"></span></div>
             <div class="qz-ver-sep"></div>
             <div class="qz-ver-label">旧バージョン</div>
+            <div class="qz-ver-item" data-ver="7" onclick="pickVer('7')"><span>Mini 7</span><span class="qz-ver-check"></span></div>
             <div class="qz-ver-item" data-ver="6" onclick="pickVer('6')"><span>Mini 6</span><span class="qz-ver-check"></span></div>
             <div class="qz-ver-item" data-ver="5" onclick="pickVer('5')"><span>Mini 5</span><span class="qz-ver-check"></span></div>
             <div class="qz-ver-item" data-ver="4.1" onclick="pickVer('4.1')"><span>Mini 4.1</span><span class="qz-ver-check"></span></div>
@@ -186,7 +187,7 @@ function showVerMenu() {
   var m = document.getElementById('qz-ver-menu');
   m.classList.toggle('open');
   // 現在の世代にチェック
-  var cur = String(window.qzMiniVer || 7);
+  var cur = String(window.qzMiniVer || 8);
   document.querySelectorAll('.qz-ver-item').forEach(function(el) {
     var ck2 = el.querySelector('.qz-ver-check'); if (ck2) ck2.textContent = el.dataset.ver === cur ? '✓' : '';
     el.classList.toggle('active', el.dataset.ver === cur);
@@ -223,9 +224,9 @@ unlockMini();
 
 function setAiMode(mode) {
   aiMode = mode;
-  const QZ_VERSIONS = { core: 2, search: 1, guide: 1, mini: (window.qzMiniVer || 7) };
+  const QZ_VERSIONS = { core: 2, search: 1, guide: 1, mini: (window.qzMiniVer || 8) };
   const label = mode === 'search' ? 'Search' : (mode === 'guide' ? 'Guide' : (mode === 'mini' ? 'Mini' : 'Core'));
-  document.getElementById('qz-mode-btn').textContent = label + ' ' + (mode === 'mini' ? (window.qzMiniVer || 7) : QZ_VERSIONS[mode]) + ' ∨';
+  document.getElementById('qz-mode-btn').textContent = label + ' ' + (mode === 'mini' ? (window.qzMiniVer || 8) : QZ_VERSIONS[mode]) + ' ∨';
   // Miniモードならボタンにクリックで世代メニューを開く機能を付ける
   var btn = document.getElementById('qz-mode-btn');
   if (mode === 'mini') {
@@ -409,7 +410,7 @@ async function cbSend(){
   // Miniモード: 自作トランスフォーマーで文章生成
   if(aiMode==='mini'){
     try{
-      const r=await fetch('/api/qzero/mini',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text, version: String(window.qzMiniVer || 7)})});
+      const r=await fetch('/api/qzero/mini',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text, version: String(window.qzMiniVer || 8)})});
       const data=await r.json();
       addMsg('ai', data.ok ? data.reply : (data.error||'エラーだよ'));
     }catch(e){addMsg('ai','生成に失敗したよ');}
