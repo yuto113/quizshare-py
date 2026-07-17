@@ -7052,3 +7052,24 @@ def api_group_ai_usage():
         has_admin_key=has_admin_key,
         ai_provider=row[3] if row else 'cloudflare',
     )
+
+import shutil
+
+# ===== 1日1回の自動DBバックアップ =====
+# アクセスが来たとき、今日の分がまだ無ければDBをコピーする
+# 古いバックアップは14日分だけ残して削除する
+import glob as _glob
+
+@app.before_request
+def daily_db_backup():
+    try:
+        _bk = '/home/yuto113/backups/db'
+        _today = datetime.date.today().strftime('%Y%m%d')
+        _dst = _bk + '/quizshare_' + _today + '.db'
+        if not os.path.exists(_dst):  # 今日の分がまだ無いときだけ動く
+            os.makedirs(_bk, exist_ok=True)
+            shutil.copy('/home/yuto113/quizshare.db', _dst)
+            for _old in sorted(_glob.glob(_bk + '/quizshare_*.db'))[:-14]:
+                os.remove(_old)  # 14日より古いのは消す
+    except Exception:
+        pass  # バックアップ失敗でもサイトは止めない
