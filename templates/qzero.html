@@ -316,7 +316,7 @@ async function openThread(tid, urlKey, mode){
   document.getElementById('qz-side').classList.remove('open');
 }
 function newThread(){
-  history.pushState(null, '', '/qzero/');
+  history.pushState(null, '', '/qzero');
   currentThread=null;
   document.getElementById('qz-log').innerHTML='';
   greet();

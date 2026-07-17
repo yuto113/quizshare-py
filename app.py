@@ -635,20 +635,6 @@ def err(message: str, status: int = 400):
 # ====================================================================
 
 
-@app.route('/chat/<mode>/<url_key>')
-@app.route('/qzero/chat/<mode>/<url_key>')
-def page_chat_url(mode, url_key):
-    import sqlite3 as _sq
-    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
-    row = conn.execute('SELECT thread_id, owner FROM qzero_threads WHERE url_key=?', (url_key,)).fetchone()
-    conn.close()
-    if not row:
-        return redirect('/qzero/')
-    user = session.get('qzero_user', '')
-    if row[1] and row[1] != user:
-        return redirect('/qzero/')
-    return render_template('qzero.html', open_thread_id=row[0], open_mode=mode)
-
 @app.route('/')
 def page_home():
     # トップページ。ログイン済みならグループへ、まだならエントリー画面へ。
@@ -4813,8 +4799,24 @@ def api_qzero_guide():
               reply=opening + '\n\n📖 使い方: ' + best['howto'])
 
 @app.route('/qzero')
+@app.route('/qzero/')
 def page_qzero():
     return render_template('qzero.html')
+
+@app.route('/chat/<mode>/<url_key>')
+@app.route('/qzero/chat/<mode>/<url_key>')
+def page_chat_url(mode, url_key):
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT thread_id, owner FROM qzero_threads WHERE url_key=?', (url_key,)).fetchone()
+    conn.close()
+    if not row:
+        return redirect('/qzero')
+    user = session.get('qzero_user', '')
+    if row[1] and row[1] != user:
+        return redirect('/qzero')
+    return render_template('qzero.html', open_thread_id=row[0], open_mode=mode)
+
 
 @app.route('/qzero/api/predict', methods=['POST'])
 def api_qzero_predict():
