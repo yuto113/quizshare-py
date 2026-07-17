@@ -5457,6 +5457,27 @@ def api_staff_hr_security():
 import hashlib, hmac, base64
 import urllib.request as _line_req
 
+def line_download_content(message_id):
+    # LINEサーバーからメッセージの中身(画像やファイル)をダウンロードする
+    # 返り値: (base64のdata URL, Content-Type) 失敗なら (None, None)
+    token = os.environ.get('LINE_CHANNEL_TOKEN', '')
+    if not token:
+        return None, None
+    try:
+        url = 'https://api-data.line.me/v2/bot/message/' + str(message_id) + '/content'
+        req = _line_req.Request(url, headers={'Authorization': 'Bearer ' + token})
+        resp = _line_req.urlopen(req, timeout=15)
+        raw = resp.read(6_000_000 + 1)  # 6MBまで(掲示板の上限と同じ)
+        if len(raw) > 6_000_000:
+            return None, None  # 大きすぎたら諦めて「送られました」表示にする
+        ctype = resp.headers.get('Content-Type', 'application/octet-stream')
+        import base64 as _b64
+        return 'data:' + ctype + ';base64,' + _b64.b64encode(raw).decode(), ctype
+    except Exception as e:
+        print('[LINE DL失敗]', e)
+        return None, None
+
+
 def line_send_to_group(text):
     token = os.environ.get('LINE_CHANNEL_TOKEN', '')
     group_id = os.environ.get('LINE_GROUP_ID', '')
@@ -5483,9 +5504,38 @@ def api_line_webhook():
             return 'bad sig', 403
     data = request.get_json(silent=True) or {}
     for event in data.get('events', []):
-        if event.get('type') != 'message' or event.get('message', {}).get('type') != 'text':
+        if event.get('type') != 'message':
             continue
-        text = event['message']['text']
+        msg = event.get('message', {})
+        mtype = msg.get('type')
+        # 種類ごとに仕分け: text=本文 / image,file=本物を取り込み / それ以外=お知らせ表示
+        text = ''
+        _img_data = None
+        _file_data = None
+        _file_name = None
+        if mtype == 'text':
+            text = msg.get('text', '')
+        elif mtype == 'image':
+            _img_data, _ct = line_download_content(msg.get('id'))
+            if not _img_data:
+                text = '画像が送られました。(取り込みに失敗)'
+        elif mtype == 'file':
+            _file_data, _ct = line_download_content(msg.get('id'))
+            _file_name = msg.get('fileName') or 'LINEのファイル'
+            if not _file_data:
+                text = 'ファイルが送られました。(取り込みに失敗)'
+        elif mtype == 'sticker':
+            text = 'スタンプが送られました。'
+        elif mtype == 'video':
+            text = '動画が送られました。'
+        elif mtype == 'audio':
+            text = '音声が送られました。'
+        elif mtype == 'location':
+            text = '位置情報が送られました。(' + str(msg.get('address') or '') + ')'
+        else:
+            text = mtype + 'が送られました。'
+        if not text and not _img_data and not _file_data:
+            continue
         source = event.get('source', {})
         # ===== 門番: 登録済みグループ以外は掲示板に載せない =====
         # 1対1(user)や知らないグループ(他人がBotを招待した場合)は全部無視する
@@ -5527,8 +5577,8 @@ def api_line_webhook():
         from datetime import datetime, timezone, timedelta
         _jst = timezone(timedelta(hours=9))
         _now = datetime.now(_jst).strftime('%Y-%m-%d %H:%M:%S')
-        conn.execute('INSERT INTO qz_messages (staff_id, staff_name, title, body, channel_id, created_at) VALUES (?,?,?,?,?,?)',
-            ('line_' + user_id[:8], display_name + '(LINE)', '', text, '22', _now))
+        conn.execute('INSERT INTO qz_messages (staff_id, staff_name, title, body, channel_id, created_at, image_data, file_data, file_name) VALUES (?,?,?,?,?,?,?,?,?)',
+            ('line_' + user_id[:8], display_name + '(LINE)', '', text, '22', _now, _img_data, _file_data, _file_name))
         conn.commit()
         conn.close()
     return 'OK', 200
