@@ -6080,6 +6080,9 @@ def api_staff_messages_post():
     file_name = data.get('file_name', '')
     if not body and not image_data and not stamp_id and not file_data:
         return err('内容を入力してね')
+    # LINE連携チャンネルは画像・ファイル・スタンプ禁止(LINE側に届かず片方しか見えなくなるため)
+    if str(data.get('channel_id', 1)) == '22' and (image_data or file_data or stamp_id):
+        return err('添付できませんでした')
     if image_data and len(image_data) > 6_000_000:
         return err('画像が大きすぎるよ')
     if file_data and len(file_data) > 8_000_000:
