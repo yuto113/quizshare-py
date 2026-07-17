@@ -561,6 +561,7 @@ setTimeout(killQzTheme, 800);
 
 <script>
 const myName = '{{ staff_name }}';
+const myStaffId = '{{ staff_id }}';
 let currentChannelId = null;
 let lastDataHash = '';
 let pendingImage = null;
@@ -813,7 +814,22 @@ async function loadMessages() {
     if (m.is_system) {
       return `<div style="text-align:center; font-size:11px; color:#9b9489; margin:6px 0;">${esc(m.body)} · ${(m.created_at||'').substring(5,16)}</div>`;
     }
-    const isMine = m.staff_name === myName;
+    const isMine = m.staff_id ? (m.staff_id === myStaffId) : (m.staff_name === myName);
+    // 送信取り消し済み: 灰色ログだけ表示(リアクションもボタンもなし)
+    if (m.unsent) {
+      return `
+    <div class="chat-bubble-row ${isMine ? 'mine' : ''}">
+      <div class="chat-avatar" style="opacity:0.4;">${esc(m.staff_name[0])}</div>
+      <div class="chat-content">
+        <div class="chat-name">${esc(m.staff_name)}</div>
+        <div class="chat-bubble" style="opacity:0.55; font-style:italic; background:#eee; color:#666;">🚫 送信取り消しされました</div>
+        <div class="chat-time">${(m.created_at||'').substring(5,16)}</div>
+      </div>
+    </div>`;
+    }
+    // 🗑=誰でも(自分の画面のみ) / 🚫=自分の送信だけ+LINE由来は不可
+    const delBtns = `<span onclick="msgHide(${m.id})" title="削除(自分の画面のみ)">🗑</span>` +
+      ((isMine && !m.is_line) ? `<span onclick="msgUnsend(${m.id})" title="送信取り消し(全員)">🚫</span>` : '');
     const reactionsHtml = Object.entries(m.reactions || {}).map(([emoji, info]) =>
       `<div class="reaction-pill ${info.mine ? 'mine' : ''}" onclick="toggleReaction(${m.id}, '${emoji}')">${emoji} ${info.count}</div>`
     ).join('');
@@ -824,6 +840,7 @@ async function loadMessages() {
         <div class="chat-name">${esc(m.staff_name)}</div>
         <div class="chat-bubble-wrap">
           <div class="reaction-trigger">
+            ${delBtns}
             <span onclick="startReply(${m.id}, '${escAttr(m.staff_name)}', '${escAttr(m.body||'')}')" style="font-size:14px;">↩️</span>
             <span onclick="toggleReaction(${m.id}, '👍')">👍</span>
             <span onclick="toggleReaction(${m.id}, '❤️')">❤️</span>
@@ -855,6 +872,22 @@ async function loadMessages() {
   }
 }
 
+async function msgHide(messageId) {
+  // 削除: 自分の画面からだけ消える(他の人には見えたまま)
+  if (!confirm('このメッセージを自分の画面から削除する?(他の人には見えたままだよ)')) return;
+  const r = await fetch('/api/staff/messages/' + messageId + '/hide', {method: 'POST'});
+  const d = await r.json();
+  if (d.ok) { lastDataHash = ''; loadMessages(); }
+  else { alert(d.error || 'エラー'); }
+}
+async function msgUnsend(messageId) {
+  // 送信取り消し: 全員の画面から消えて「取り消されました」ログが残る
+  if (!confirm('送信取り消しすると、全員の画面で「取り消されました」と表示されるよ。いい?')) return;
+  const r = await fetch('/api/staff/messages/' + messageId + '/unsend', {method: 'POST'});
+  const d = await r.json();
+  if (d.ok) { lastDataHash = ''; loadMessages(); }
+  else { alert(d.error || 'エラー'); }
+}
 async function toggleReaction(messageId, emoji) {
   await fetch('/api/staff/reactions', {
     method: 'POST', headers: {'Content-Type': 'application/json'},

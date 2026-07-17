@@ -5487,11 +5487,17 @@ def api_line_webhook():
             continue
         text = event['message']['text']
         source = event.get('source', {})
+        # ===== 門番: 登録済みグループ以外は掲示板に載せない =====
+        # 1対1(user)や知らないグループ(他人がBotを招待した場合)は全部無視する
+        if source.get('type') != 'group':
+            continue  # 1対1・複数人トークはここでストップ
         if source.get('type') == 'group' and not os.environ.get('LINE_GROUP_ID'):
             gid = source['groupId']
             os.environ['LINE_GROUP_ID'] = gid
             with open('/home/yuto113/.line_env', 'a') as f:
                 f.write('LINE_GROUP_ID=' + gid + '\n')
+        if source.get('groupId') != os.environ.get('LINE_GROUP_ID'):
+            continue  # 登録済みグループ以外(よそのグループ)はここでストップ
         user_id = source.get('userId', '')
         display_name = 'LINEメンバー'
         if user_id:
@@ -5926,11 +5932,57 @@ def api_cipher_decrypt():
         return err('このキーを使う権限がないよ', 403)
     return ok(plain=dec(row[0]))
 
+@app.route('/api/staff/messages/<int:message_id>/hide', methods=['POST'])
+def api_staff_msg_hide(message_id):
+    # 削除: 自分の画面からだけ消す(削除歴なし)。複数人が別々に削除できるよう,をつけて追記
+    sid = session.get('staff_id', '')
+    if not sid:
+        return err('ログインしてね', 403)
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT hidden_by FROM qz_messages WHERE id=?', (message_id,)).fetchone()
+    if not row:
+        conn.close()
+        return err('そのメッセージはないよ')
+    hidden = row[0] or ''
+    if (',' + hidden + ',').find(',' + sid + ',') == -1:  # まだ隠してなければ追記
+        hidden = (hidden + ',' + sid).strip(',')
+        conn.execute('UPDATE qz_messages SET hidden_by=? WHERE id=?', (hidden, message_id))
+        conn.commit()
+    conn.close()
+    return ok(hidden=True)
+
+@app.route('/api/staff/messages/<int:message_id>/unsend', methods=['POST'])
+def api_staff_msg_unsend(message_id):
+    # 送信取り消し: 全員の画面から消えて「取り消されました」ログが残る
+    sid = session.get('staff_id', '')
+    if not sid:
+        return err('ログインしてね', 403)
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT staff_id, unsent FROM qz_messages WHERE id=?', (message_id,)).fetchone()
+    if not row:
+        conn.close()
+        return err('そのメッセージはないよ')
+    if str(row[0]).startswith('line_'):
+        conn.close()
+        return err('LINEから届いたメッセージは取り消せないよ', 403)  # 仕様③
+    if row[0] != sid:
+        conn.close()
+        return err('自分が送ったメッセージしか取り消せないよ', 403)  # 仕様④
+    if row[1]:
+        conn.close()
+        return err('もう取り消し済みだよ')  # ログは二重取り消し不可
+    # 本文・画像・ファイル・スタンプを消して、取り消しログに変える
+    conn.execute("UPDATE qz_messages SET body='', title='', image_data=NULL, file_data=NULL, file_name=NULL, stamp_id=NULL, unsent=1 WHERE id=?", (message_id,))
+    conn.commit(); conn.close()
+    return ok(unsent=True)
+
 @app.route('/staff/board')
 def page_staff_board():
     if not session.get('staff_id'):
         return redirect('/staff/login')
-    return render_template('staff_board.html', staff_name=session.get('staff_name'), is_admin=staff_is_admin())
+    return render_template('staff_board.html', staff_name=session.get('staff_name'), staff_id=session.get('staff_id'), is_admin=staff_is_admin())
 
 @app.route('/api/staff/logout', methods=['POST'])
 def api_staff_logout():
@@ -5947,10 +5999,13 @@ def api_staff_messages_get():
     import sqlite3 as _sq
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
     # 重いデータ(画像・ファイルの中身)は返さず「有無」だけ返す。中身は別URLで配る
+    _sid = session.get('staff_id', '')
     rows = conn.execute(
         'SELECT id, staff_name, title, body, created_at, stamp_id, is_system, reply_to, '
-        '(image_data IS NOT NULL) AS has_image, (file_data IS NOT NULL) AS has_file, file_name '
-        'FROM qz_messages WHERE channel_id=? ORDER BY id DESC LIMIT ?', (channel_id, limit + 1)).fetchall()
+        '(image_data IS NOT NULL) AS has_image, (file_data IS NOT NULL) AS has_file, file_name, '
+        'unsent, staff_id '
+        "FROM qz_messages WHERE channel_id=? AND (',' || COALESCE(hidden_by,'') || ',') NOT LIKE ? "
+        'ORDER BY id DESC LIMIT ?', (channel_id, '%,' + _sid + ',%', limit + 1)).fetchall()
     has_more = len(rows) > limit
     rows = rows[:limit]
     my_staff_id = session.get('staff_id')
@@ -5993,7 +6048,7 @@ def api_staff_messages_get():
         is_cipher = r[0] in cipher_map
         messages.append({
             'id': r[0], 'staff_name': dec(r[1]), 'title': dec(r[2]),
-            'body': '' if is_cipher else dec(r[3]),
+            'body': '' if (is_cipher or r[11]) else dec(r[3]),
             'is_cipher': is_cipher,
             'cipher_key_name': cipher_names.get(cipher_map.get(r[0]), '暗号') if is_cipher else None,
             'created_at': r[4], 'stamp_id': r[5],
@@ -6003,6 +6058,9 @@ def api_staff_messages_get():
             'file_name': dec(r[10]) if r[10] else None,
             'read_by': read_map.get(r[0], []),
             'reactions': reactions_map.get(r[0], {}),
+            'unsent': int(r[11] or 0),
+            'staff_id': r[12],
+            'is_line': str(r[12] or '').startswith('line_'),
         })
     conn.close()
     return ok(messages=messages, has_more=has_more)
