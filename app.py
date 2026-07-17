@@ -788,36 +788,6 @@ def page_admin_entry(group_id):
     )
 
 
-# その日最初のアクセスかどうかを覚えておくメモ(メモリ上なので高速)
-_backup_memo = {'date': ''}
-
-@app.before_request
-def _daily_backup_hook():
-    # 1日1回、最初のアクセスのときに自動バックアップを裏側で動かす
-    # (無料プランはScheduled Taskが使えないのでこの方式)
-    import pytz as _p
-    from datetime import datetime as _d
-    today = _d.now(_p.timezone('Asia/Tokyo')).strftime('%Y%m%d')
-    if _backup_memo['date'] == today:
-        return  # 今日はもうチェック済み(ここで即終了するから普段は一瞬)
-    _backup_memo['date'] = today
-    marker = '/home/yuto113/backups/last_backup.txt'
-    try:
-        done = open(marker).read().strip()
-    except Exception:
-        done = ''
-    if done == today:
-        return  # 別のプロセスがもう実行済み
-    try:
-        open(marker, 'w').write(today)
-        # 訪問者を待たせないように、裏側のスレッドで実行する
-        import threading, subprocess
-        threading.Thread(
-            target=lambda: subprocess.run(['python3', '/home/yuto113/auto_backup.py']),
-            daemon=True).start()
-    except Exception:
-        pass  # バックアップに失敗してもサイト自体は止めない
-
 @app.route('/terms')
 def page_terms():
     # 利用規約ページ
@@ -7177,7 +7147,9 @@ import glob as _glob
 def daily_db_backup():
     try:
         _bk = '/home/yuto113/backups/db'
-        _today = datetime.date.today().strftime('%Y%m%d')
+        import pytz as _p_bk
+        from datetime import datetime as _d_bk
+        _today = _d_bk.now(_p_bk.timezone('Asia/Tokyo')).strftime('%Y%m%d')
         _dst = _bk + '/quizshare_' + _today + '.db'
         if not os.path.exists(_dst):  # 今日の分がまだ無いときだけ動く
             os.makedirs(_bk, exist_ok=True)
