@@ -9,7 +9,7 @@ BRAIN_PATH = os.environ.get('QZERO_MINI_BRAIN', '/home/yuto113/qzero_mini_brain.
 # 選べる世代の台帳(新しい世代を作ったらここに1行足す)
 BRAINS = {
     '9':   '/home/yuto113/qzero_mini_brain_v9.json',
-    '8':   BRAIN_PATH,
+    '8':   '/home/yuto113/qzero_mini_brain_v8.json',
     '7':   '/home/yuto113/qzero_mini_brain_v7.json',
     '6':   '/home/yuto113/qzero_mini_brain_v6.json',
     '5':   '/home/yuto113/qzero_mini_brain_v5.json',
