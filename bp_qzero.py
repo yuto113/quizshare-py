@@ -15,7 +15,7 @@ bp = Blueprint('qzero', __name__)
 
 # staff_is_adminはまだapp.py側にあるので、実行時に借りる(第3段で整理予定)
 def staff_is_admin():
-    from app import staff_is_admin as _f
+    from bp_staff import staff_is_admin as _f
     return _f()
 
 import re as _re_qzero
