@@ -4,7 +4,7 @@
 # ====================================================================
 import os
 import json
-from flask import Blueprint, render_template, request, session, redirect
+from flask import Blueprint, render_template, request, session, redirect, jsonify
 
 from qz_common import (
     enc, dec, ok, err, rate_limit, client_ip,
@@ -42,6 +42,61 @@ def _qzero_db():
     except Exception:
         pass
     return conn
+
+
+
+# ===== QZERO AI 使用量制限(トークン制) =====
+# ログイン=1日10,000 / 未ログイン(IP)=1日3,000。日本時間0時リセット
+# 管理者はqzero_bonusで個人に追加できる
+QZERO_DAILY_TOKENS = 10000
+QZERO_DAILY_TOKENS_GUEST = 3000
+
+def _qzero_usage_db():
+    conn = _qzero_db()
+    conn.execute("""CREATE TABLE IF NOT EXISTS qzero_usage (
+        owner TEXT, date TEXT, used INTEGER DEFAULT 0, UNIQUE(owner, date))""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS qzero_bonus (
+        owner TEXT PRIMARY KEY, extra INTEGER DEFAULT 0)""")
+    return conn
+
+def _qzero_usage_owner():
+    u = session.get('qzero_user')
+    return (u, True) if u else ('ip:' + client_ip(), False)
+
+def _qzero_usage_state():
+    # (owner, 今日使った量, 上限) を返す
+    import pytz as _p
+    from datetime import datetime as _d
+    owner, logged_in = _qzero_usage_owner()
+    today = _d.now(_p.timezone('Asia/Tokyo')).strftime('%Y-%m-%d')
+    conn = _qzero_usage_db()
+    row = conn.execute('SELECT used FROM qzero_usage WHERE owner=? AND date=?', (owner, today)).fetchone()
+    bonus = conn.execute('SELECT extra FROM qzero_bonus WHERE owner=?', (owner,)).fetchone()
+    conn.close()
+    base = QZERO_DAILY_TOKENS if logged_in else QZERO_DAILY_TOKENS_GUEST
+    return owner, (row[0] if row else 0), base + (bonus[0] if bonus else 0), today
+
+def _qzero_tokens_of(text):
+    # ざっくりトークン換算(日本語はほぼ1文字1トークン)
+    return max(1, len(str(text or '')))
+
+def _qzero_usage_spend(tokens):
+    # 使えるならTrue+消費記録。上限ならFalse
+    owner, used, limit, today = _qzero_usage_state()
+    if used >= limit:
+        return False
+    conn = _qzero_usage_db()
+    conn.execute('INSERT INTO qzero_usage (owner, date, used) VALUES (?,?,?) '
+                 'ON CONFLICT(owner, date) DO UPDATE SET used = used + ?',
+                 (owner, today, int(tokens), int(tokens)))
+    conn.commit()
+    conn.close()
+    return True
+
+def _qzero_usage_err():
+    return jsonify({'ok': False, 'usage_full': True,
+                    'error': '使用量がいっぱいになりました。0時0分にリセットします。'}), 429
+
 
 @bp.route('/api/qzero/patterns/list', methods=['GET'])
 def api_qzero_patterns_list():
@@ -391,6 +446,21 @@ def _qzero_mini_allowed():
     # Miniを使えるのは、QZEROに社員ログインしていてIDがyutoの人だけ(ベータテスト)
     return (session.get('qzero_user') or '') == 's:yuto'
 
+
+@bp.route('/api/qzero/mini/brain', methods=['GET'])
+def api_qzero_mini_brain():
+    # v9の脳みそをブラウザに配る(エッジ推論用)。キャッシュ1時間
+    if not _qzero_mini_allowed():
+        return err('Miniは準備中だよ(ベータテスト中)', 403)
+    from flask import Response
+    try:
+        raw = open('/home/yuto113/qzero_mini_brain_v9.json', encoding='utf-8').read()
+    except Exception:
+        return err('脳みそが見つからないよ', 500)
+    resp = Response(raw, mimetype='application/json')
+    resp.headers['Cache-Control'] = 'private, max-age=3600'
+    return resp
+
 @bp.route('/api/qzero/mini/status', methods=['GET'])
 def api_qzero_mini_status():
     return ok(allowed=_qzero_mini_allowed())
@@ -401,6 +471,8 @@ def api_qzero_mini():
         return err('Miniは準備中だよ(ベータテスト中)', 403)
     if not rate_limit(f'qzmini:{client_ip()}', 20):
         return err('少し待ってね')
+    if not _qzero_usage_spend(500):  # Miniは計算が重いので500換算
+        return _qzero_usage_err()
     from qz_qzero import mini as qzero_mini
     data = request.get_json(silent=True) or {}
     text = str(data.get('text') or '').strip()[:100]
@@ -425,6 +497,10 @@ def api_qzero_guide():
     # Guideモード: やりたいことに合うページを探して、使い方つきで案内
     if not rate_limit(f'qzguide:{client_ip()}', 30):
         return err('少し待ってね')
+    data_pre = request.get_json(silent=True) or {}
+    _cost = _qzero_tokens_of(data_pre.get('text')) + 150  # 入力+返事の概算
+    if not _qzero_usage_spend(_cost):
+        return _qzero_usage_err()
     data = request.get_json(silent=True) or {}
     text = str(data.get('text') or '').strip()[:300]
     if not text:
@@ -458,6 +534,54 @@ def api_qzero_guide():
     return ok(found=True, name=best['name'], url=best['url'], howto=best['howto'], confidence=pct,
               reply=opening + '\n\n📖 使い方: ' + best['howto'])
 
+
+@bp.route('/api/qzero/usage/me', methods=['GET'])
+def api_qzero_usage_me():
+    # 自分の今日の使用量(画面の%ゲージ用)
+    owner, used, limit, today = _qzero_usage_state()
+    return ok(used=used, limit=limit,
+              percent=min(100, round(100 * used / limit, 1)) if limit > 0 else 100,
+              full=(used >= limit))
+
+@bp.route('/api/qzero/usage/list', methods=['GET'])
+def api_qzero_usage_list():
+    # 管理者用: 今日の全アカウント使用量+追加量
+    if not staff_is_admin():
+        return err('管理者だけだよ', 403)
+    import pytz as _p
+    from datetime import datetime as _d
+    today = _d.now(_p.timezone('Asia/Tokyo')).strftime('%Y-%m-%d')
+    conn = _qzero_usage_db()
+    rows = conn.execute('SELECT owner, used FROM qzero_usage WHERE date=? ORDER BY used DESC', (today,)).fetchall()
+    bonuses = dict(conn.execute('SELECT owner, extra FROM qzero_bonus').fetchall())
+    conn.close()
+    users = [{'owner': r[0], 'used': r[1], 'extra': bonuses.get(r[0], 0)} for r in rows]
+    shown = {u['owner'] for u in users}
+    for owner, extra in bonuses.items():
+        if owner not in shown:
+            users.append({'owner': owner, 'used': 0, 'extra': extra})
+    return ok(users=users, date=today, base=QZERO_DAILY_TOKENS, base_guest=QZERO_DAILY_TOKENS_GUEST)
+
+@bp.route('/api/qzero/usage/bonus', methods=['POST'])
+def api_qzero_usage_bonus():
+    # 管理者用: 個人への追加トークン設定(マイナス不可)
+    if not staff_is_admin():
+        return err('管理者だけだよ', 403)
+    data = request.get_json(silent=True) or {}
+    owner = str(data.get('owner') or '').strip()
+    extra = int(data.get('extra') or 0)
+    if not owner:
+        return err('アカウントを指定してね')
+    if extra < 0:
+        return err('マイナスは設定できないよ')
+    extra = min(1000000, extra)
+    conn = _qzero_usage_db()
+    conn.execute('INSERT INTO qzero_bonus (owner, extra) VALUES (?,?) '
+                 'ON CONFLICT(owner) DO UPDATE SET extra=?', (owner, extra, extra))
+    conn.commit()
+    conn.close()
+    return ok(message=owner + ' に +' + str(extra) + ' トークン追加したよ')
+
 @bp.route('/qzero')
 @bp.route('/qzero/')
 def page_qzero():
@@ -483,6 +607,10 @@ def api_qzero_predict():
     # 教科あてAPI(外部サイトからも使える。これがCerebroの本体機能)
     if not rate_limit(f'qzero:{client_ip()}', 30):
         return err('少し待ってね')
+    data_pre = request.get_json(silent=True) or {}
+    _cost = _qzero_tokens_of(data_pre.get('text')) + 150  # 入力+返事の概算
+    if not _qzero_usage_spend(_cost):
+        return _qzero_usage_err()
     data = request.get_json(silent=True) or {}
     text = str(data.get('text') or '').strip()[:500]
     if not text:
@@ -498,6 +626,10 @@ def api_qzero_chat():
     # チャットAPI: 意図を読んで返事をする
     if not rate_limit(f'qzerochat:{client_ip()}', 30):
         return err('少し待ってね')
+    data_pre = request.get_json(silent=True) or {}
+    _cost = _qzero_tokens_of(data_pre.get('text')) + 150  # 入力+返事の概算
+    if not _qzero_usage_spend(_cost):
+        return _qzero_usage_err()
     data = request.get_json(silent=True) or {}
     text = str(data.get('text') or '').strip()[:500]
     if not text:

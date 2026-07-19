@@ -88,6 +88,7 @@ body { background:#ffffff !important; margin:0; }
 }
 #site-banner, .site-banner, .banner, [class*='banner'] { display: none !important; }
 </style>
+<script src="{{ url_for('static', filename='qzero_mini.js') }}"></script>
 <script>
 function cbStrip(){try{const b=document.body;Array.from(b.classList).forEach(c=>{if(c.indexOf('theme')!==-1||c==='halloween-dark')b.classList.remove(c);});b.style.background='#ffffff';document.querySelectorAll('.seasonal-emoji').forEach(e=>e.remove());}catch(e){}}
 window.applyTheme=cbStrip;window.checkAutoTheme=cbStrip;setInterval(cbStrip,2000);cbStrip();
@@ -411,8 +412,28 @@ async function cbSend(){
   // Miniモード: 自作トランスフォーマーで文章生成
   if(aiMode==='mini'){
     try{
-      const r=await fetch('/api/qzero/mini',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text, version: String(window.qzMiniVer || 9)})});
-      const data=await r.json();
+      let data;
+      if (String(window.qzMiniVer || 9) === '9') {
+        // エッジ推論: v9はブラウザ内で計算(サーバーCPU=0!)
+        const loaded = await QzeroMini.load();  // 初回だけ脳みそDL(キャッシュされる)
+        if (!loaded) {
+          data = { ok: false, error: '脳みそのダウンロードに失敗したよ' };
+        } else {
+          const result = QzeroMini.generate(text);
+          if (result.ok) {
+            const inf = QzeroMini.info();
+            data = { ok: true, reply: '続きを作ったよ:\n\n「' + result.text + '」\n\n(語彙' + inf.vocab + '語・DIM' + inf.dim + 'の自作トランスフォーマー。今この計算、君のブラウザの中で動いたよ⚡)' };
+          } else if (result.unknown && result.unknown.length) {
+            const vocab = QzeroMini.vocabulary();
+            data = { ok: true, reply: 'ごめん、「' + result.unknown.join(' ') + '」はまだ知らない言葉なんだ。\n\n私が知ってる' + vocab.length + '語はこれだよ:\n' + vocab.join(' ') + '\n\nこの言葉で「ねこが」みたいに書き出しをくれたら、続きを作るよ!' };
+          } else {
+            data = { ok: true, reply: '「ねこ が」みたいに、単語をスペースで区切った短い書き出しをちょうだい(4語まで)。\n\n使える言葉:\n' + QzeroMini.vocabulary().join(' ') };
+          }
+        }
+      } else {
+        const r=await fetch('/api/qzero/mini',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text, version: qzMiniVer})});
+        data=await r.json();
+      }
       addMsg('ai', data.ok ? data.reply : (data.error||'エラーだよ'));
     }catch(e){addMsg('ai','生成に失敗したよ');}
     return;
