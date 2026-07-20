@@ -77,4 +77,48 @@ function escS(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 function escAttrS(s){return String(s||'').replace(/\\/g,'').replace(/'/g,'').replace(/"/g,'');}
 loadSchool();
 </script>
+
+<!-- ===== QZERO使用量管理(管理者用) ===== -->
+<div style="background:#fff; border:1px solid #e3ddd0; border-radius:12px; padding:16px 20px; margin-top:20px;">
+  <h3 style="margin:0 0 4px;">📊 使用量管理</h3>
+  <p style="font-size:12px; color:#8a8270; margin:0 0 10px;">今日の使用量(トークン)。基本: ログイン10,000 / 未ログイン3,000。追加分を設定できるよ(マイナス不可)。</p>
+  <div id="usage-list" style="font-size:13px;">読み込み中…</div>
+  <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+    <input id="bonus-owner" placeholder="アカウント(例: s:yuto)" style="flex:2; min-width:140px; padding:8px; border:1px solid #ddd; border-radius:8px;">
+    <input id="bonus-extra" type="number" min="0" placeholder="追加トークン" style="flex:1; min-width:100px; padding:8px; border:1px solid #ddd; border-radius:8px;">
+    <button onclick="setBonus()" style="padding:8px 16px; background:#111; color:#fff; border:0; border-radius:8px; cursor:pointer;">設定</button>
+  </div>
+</div>
+<script>
+// 使用量一覧の読み込み(管理者用)
+async function loadUsage(){
+  const box = document.getElementById('usage-list');
+  try{
+    const d = await (await fetch('/api/qzero/usage/list')).json();
+    if(!d.ok){ box.textContent = d.error || 'エラー'; return; }
+    if(!d.users.length){ box.textContent = '今日はまだ誰も使ってないよ'; return; }
+    box.innerHTML = '<table style="width:100%; border-collapse:collapse;">' +
+      '<tr style="color:#8a8270; font-size:11px; text-align:left;"><th style="padding:4px;">アカウント</th><th>使用</th><th>追加</th><th>上限</th></tr>' +
+      d.users.map(u => {
+        const base = u.owner.startsWith('ip:') ? d.base_guest : d.base;
+        const limit = base + u.extra;
+        const full = u.used >= limit;
+        return '<tr style="border-top:1px solid #f0ece0;' + (full ? 'color:#e24b4a;font-weight:700;' : '') + '">' +
+          '<td style="padding:5px 4px; cursor:pointer;" onclick="document.getElementById(\'bonus-owner\').value=\'' + u.owner + '\'">' + u.owner + '</td>' +
+          '<td>' + u.used + '</td><td>+' + u.extra + '</td><td>' + limit + (full ? ' 🈵' : '') + '</td></tr>';
+      }).join('') + '</table>';
+  }catch(e){ box.textContent = '読み込み失敗'; }
+}
+async function setBonus(){
+  const owner = document.getElementById('bonus-owner').value.trim();
+  const extra = parseInt(document.getElementById('bonus-extra').value || '0');
+  const d = await (await fetch('/api/qzero/usage/bonus', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({owner, extra})})).json();
+  alert(d.ok ? d.message : (d.error || 'エラー'));
+  if(d.ok) loadUsage();
+}
+loadUsage();
+setInterval(loadUsage, 30000);
+</script>
+
 {% endblock %}

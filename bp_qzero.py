@@ -442,16 +442,43 @@ QZERO_GUIDE_STAFF = [
      'url': '/staff/board', 'howto': '掲示板のKPメニューから残高を確認したり、社員どうしで送りあえるよ。'},
 ]
 
-def _qzero_mini_allowed():
-    # Miniを使えるのは、QZEROに社員ログインしていてIDがyutoの人だけ(ベータテスト)
-    return (session.get('qzero_user') or '') == 's:yuto'
+def _qzero_mini_allowed(version=None):
+    # Miniの公開ルール:
+    #   v9以降(エッジ世代) → ログインしていれば誰でもOK
+    #   v8以前(旧世代)     → 管理者(role=admin)だけ。ID文字列の一致では判定しない
+    u = session.get('qzero_user') or ''
+    if not u:
+        return False  # 未ログインは全世代NG
+    try:
+        v = float(version) if version is not None else 9
+    except (TypeError, ValueError):
+        v = 9
+    if v >= 9:
+        return True
+    # 旧世代: 社員ログイン(s:)かつDBのroleがadminの人だけ
+    return u.startswith('s:') and staff_is_admin()
 
+
+
+@bp.route('/api/qzero/mini/spend', methods=['POST'])
+def api_qzero_mini_spend():
+    # エッジ推論の先払い窓口: 1回100トークン。OKなら生成許可を返す
+    if not _qzero_mini_allowed():
+        return err('Miniは準備中だよ(ベータテスト中)', 403)
+    if not rate_limit(f'qzminispend:{client_ip()}', 30):
+        return err('少し待ってね')
+    if not _qzero_usage_spend(100):
+        return _qzero_usage_err()
+    return ok(allowed=True)
 
 @bp.route('/api/qzero/mini/brain', methods=['GET'])
 def api_qzero_mini_brain():
     # v9の脳みそをブラウザに配る(エッジ推論用)。キャッシュ1時間
     if not _qzero_mini_allowed():
         return err('Miniは準備中だよ(ベータテスト中)', 403)
+    _o, _used, _limit, _t = _qzero_usage_state()
+    if _used >= _limit:
+        return _qzero_usage_err()  # 上限の人には脳みそ自体を渡さない(二重ロック)
     from flask import Response
     try:
         raw = open('/home/yuto113/qzero_mini_brain_v9.json', encoding='utf-8').read()
@@ -463,11 +490,14 @@ def api_qzero_mini_brain():
 
 @bp.route('/api/qzero/mini/status', methods=['GET'])
 def api_qzero_mini_status():
-    return ok(allowed=_qzero_mini_allowed())
+    u = session.get('qzero_user') or ''
+    can_legacy = u.startswith('s:') and staff_is_admin()
+    return ok(allowed=_qzero_mini_allowed(), legacy=can_legacy)
 
 @bp.route('/api/qzero/mini', methods=['POST'])
 def api_qzero_mini():
-    if not _qzero_mini_allowed():
+    _ver = (request.get_json(silent=True) or {}).get('version')
+    if not _qzero_mini_allowed(_ver):
         return err('Miniは準備中だよ(ベータテスト中)', 403)
     if not rate_limit(f'qzmini:{client_ip()}', 20):
         return err('少し待ってね')
