@@ -177,7 +177,7 @@ window.applyTheme=cbStrip;window.checkAutoTheme=cbStrip;setInterval(cbStrip,2000
     <input id="acc-nick" placeholder="ニックネーム(登録時のみ)" style="display:none;">
     <input id="acc-pw" type="password" placeholder="パスワード">
     <button id="acc-submit" onclick="accSubmit()" style="width:100%; padding:12px; background:#111; color:white; border:none; border-radius:8px; cursor:pointer;">ログイン</button>
-    <p style="text-align:center; margin:10px 0 0;"><a href="#" onclick="closePanel(); window.checkMiniStatus();  // ログイン後に旧世代メニューを再判定return false;" style="color:#999; font-size:0.8rem;">閉じる</a></p>
+    <p style="text-align:center; margin:10px 0 0;"><a href="#" onclick="closePanel();return false;" style="color:#999; font-size:0.8rem;">閉じる</a></p>
   </div>
 </div>
 
@@ -224,10 +224,6 @@ function toggleModeMenu() {
 }
 async function unlockMini() {
   // yutoで社員ログインしてたらMiniを解禁する
-try {
-await window.checkMiniStatus();
-} catch (e) {}
-}
 window.checkMiniStatus = async function() {
   try {
     const r = await fetch('/api/qzero/mini/status');
@@ -243,6 +239,7 @@ window.checkMiniStatus = async function() {
     }
   } catch (e) {}
 };
+  try { await window.checkMiniStatus(); } catch (e) {}
 }
 unlockMini();
 
@@ -308,7 +305,7 @@ async function accSubmit(){
   else{url='/api/qzero/login';body={user_id:id,password:pw};}
   const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const data=await r.json();
-  if(data.ok){closePanel();document.getElementById('acc-pw').value='';refreshAccount();loadThreads();}
+  if(data.ok){closePanel();document.getElementById('acc-pw').value='';refreshAccount();loadThreads();if(window.checkMiniStatus)window.checkMiniStatus();}
   else window.toast(data.error||'エラー','error');
 }
 async function qzLogout(){await fetch('/api/qzero/logout',{method:'POST'});location.reload();}
@@ -438,6 +435,8 @@ async function cbSend(){
       let data;
       if (parseFloat(window.qzMiniVer || 10) >= 9) {
         // エッジ推論: v9はブラウザ内で計算(サーバーCPU=0!)
+        // 考え中メッセージ(計算中に止まって見えないように)
+        addMsg('ai', '🧠 考え中…', true);
         // 先払い: 1回100トークンをサーバーに申告してから生成する
         const pay = await (await fetch('/api/qzero/mini/spend', {method: 'POST'})).json();
         if (!pay.ok) {
@@ -463,6 +462,8 @@ async function cbSend(){
         const r=await fetch('/api/qzero/mini',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text, version: qzMiniVer})});
         data=await r.json();
       }
+      // 考え中メッセージを消す
+      document.querySelectorAll('#qz-log .cb-msg').forEach(m => { if (m.textContent.includes('考え中')) m.remove(); });
       addMsg('ai', data.ok ? data.reply : (data.error||'エラーだよ'));
     }catch(e){addMsg('ai','生成に失敗したよ');}
     return;
@@ -577,6 +578,7 @@ window.refreshUsage();
 setInterval(window.refreshUsage, 30000);
 
 setAiMode(aiMode);  // 復元したモードをボタンと挨拶に反映
+
 })();
 </script>
 {% endblock %}
