@@ -3,17 +3,21 @@
 // サーバーのmini.pyと同じ計算をJavaScriptで行う。CPUは訪問者持ち!
 // ====================================================================
 const QzeroMini = (() => {
-  let brain = null;   // 脳みそ(ダウンロードした重み)
+  let brains = {};    // 世代ごとの脳みそ置き場
+  let brain = null;   // いま使ってる脳みそ
   let w2i = null;     // 単語→番号の辞書
 
-  // 脳みそを1回だけダウンロード(2回目以降はブラウザキャッシュ)
-  async function load() {
-    if (brain) return true;
-    const r = await fetch('/api/qzero/mini/brain');
+  // 脳みそを世代指定でダウンロード(世代ごとに1回だけ)
+  async function load(ver) {
+    ver = String(ver || '10');
+    if (brains[ver]) { brain = brains[ver].b; w2i = brains[ver].d; return true; }
+    const r = await fetch('/api/qzero/mini/brain?v=' + ver);
     if (!r.ok) return false;
-    brain = await r.json();
-    w2i = {};
-    brain.words.forEach((w, i) => { w2i[w] = i; });
+    const b = await r.json();
+    const d = {};
+    b.words.forEach((w, i) => { d[w] = i; });
+    brains[ver] = { b, d };
+    brain = b; w2i = d;
     return true;
   }
 

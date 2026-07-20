@@ -447,14 +447,12 @@ def _qzero_mini_allowed(version=None):
     #   v9以降(エッジ世代) → ログインしていれば誰でもOK
     #   v8以前(旧世代)     → 管理者(role=admin)だけ。ID文字列の一致では判定しない
     u = session.get('qzero_user') or ''
-    if not u:
-        return False  # 未ログインは全世代NG
     try:
         v = float(version) if version is not None else 9
     except (TypeError, ValueError):
         v = 9
     if v >= 9:
-        return True
+        return True  # v9以降(エッジ世代)は未ログインでもOK(ゲスト枠3,000で守られてる)
     # 旧世代: 社員ログイン(s:)かつDBのroleがadminの人だけ
     return u.startswith('s:') and staff_is_admin()
 
@@ -480,8 +478,11 @@ def api_qzero_mini_brain():
     if _used >= _limit:
         return _qzero_usage_err()  # 上限の人には脳みそ自体を渡さない(二重ロック)
     from flask import Response
+    _v = request.args.get('v', '10')
+    if _v not in ('9', '10'):
+        return err('その世代はエッジ配信してないよ')
     try:
-        raw = open('/home/yuto113/qzero_mini_brain_v9.json', encoding='utf-8').read()
+        raw = open('/home/yuto113/qzero_mini_brain_v' + _v + '.json', encoding='utf-8').read()
     except Exception:
         return err('脳みそが見つからないよ', 500)
     resp = Response(raw, mimetype='application/json')

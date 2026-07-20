@@ -117,9 +117,12 @@ window.applyTheme=cbStrip;window.checkAutoTheme=cbStrip;setInterval(cbStrip,2000
         <div style="position:relative; align-self:center;">
           <button id="qz-mode-btn" onclick="toggleModeMenu()">Core 2 ∨</button>
           <div id="qz-ver-menu">
-            <div class="qz-ver-item" onclick="document.getElementById('qz-ver-menu').classList.remove('open'); toggleModeMenu();" style="color:#a0a0a6; font-size:13px;">← モード選択に戻る</div>
+            <div class="qz-ver-item" onclick="event.stopPropagation(); document.getElementById('qz-ver-menu').classList.remove('open'); toggleModeMenu();" style="color:#a0a0a6; font-size:13px;">← モード選択に戻る</div>
             <div class="qz-ver-sep"></div>
             <div class="qz-ver-label">モデル</div>
+            <div class="qz-ver-item" data-ver="10" onclick="pickVer('10')"><span>Mini 10</span><span class="qz-ver-check"></span></div>
+            <div class="qz-ver-sep"></div>
+            <div class="qz-ver-label">旧バージョン</div>
             <div class="qz-ver-item" data-ver="9" onclick="pickVer('9')"><span>Mini 9</span><span class="qz-ver-check"></span></div>
             <div class="qz-ver-sep"></div>
 <div id="qz-legacy-vers" style="display:none;">
@@ -181,7 +184,7 @@ window.applyTheme=cbStrip;window.checkAutoTheme=cbStrip;setInterval(cbStrip,2000
 <script>
 let currentThread = null;
 let weatherDays = 1, awaitingPlace = false;
-let aiMode = 'core';  // いまの答え方モード
+let aiMode = localStorage.getItem('qzAiMode') || 'mini';  // いまの答え方モード(前回の続き、初回はmini)
 
 function pickVer(v) {
   window.qzMiniVer = v;
@@ -200,7 +203,7 @@ function showVerMenu() {
   var m = document.getElementById('qz-ver-menu');
   m.classList.toggle('open');
   // 現在の世代にチェック
-  var cur = String(window.qzMiniVer || 9);
+  var cur = String(window.qzMiniVer || 10);
   document.querySelectorAll('.qz-ver-item').forEach(function(el) {
     var ck2 = el.querySelector('.qz-ver-check'); if (ck2) ck2.textContent = el.dataset.ver === cur ? '✓' : '';
     el.classList.toggle('active', el.dataset.ver === cur);
@@ -237,10 +240,11 @@ async function unlockMini() {
 unlockMini();
 
 function setAiMode(mode) {
+  localStorage.setItem('qzAiMode', mode);  // 前回のモードを覚えておく
   aiMode = mode;
-  const QZ_VERSIONS = { core: 2, search: 1, guide: 1, mini: (window.qzMiniVer || 9) };
+  const QZ_VERSIONS = { core: 2, search: 1, guide: 1, mini: (window.qzMiniVer || 10) };
   const label = mode === 'search' ? 'Search' : (mode === 'guide' ? 'Guide' : (mode === 'mini' ? 'Mini' : 'Core'));
-  document.getElementById('qz-mode-btn').textContent = label + ' ' + (mode === 'mini' ? (window.qzMiniVer || 9) : QZ_VERSIONS[mode]) + ' ∨';
+  document.getElementById('qz-mode-btn').textContent = label + ' ' + (mode === 'mini' ? (window.qzMiniVer || 10) : QZ_VERSIONS[mode]) + ' ∨';
   // Miniモードならボタンにクリックで世代メニューを開く機能を付ける
   var btn = document.getElementById('qz-mode-btn');
   if (mode === 'mini') {
@@ -419,13 +423,13 @@ async function handleWeather(text){
 // ===== 送信 =====
 async function cbSend(){
   const inp=document.getElementById('cb-input');const text=inp.value.trim();if(text==='')return;
-  addMsg('me',text);inp.value='';setTimeout(refreshUsage, 1200);
+  addMsg('me',text);inp.value='';setTimeout(window.refreshUsage, 1200);
   if(awaitingPlace){awaitingPlace=false;const geo=await geocode(text.replace(/の天気.*$/,'').trim());if(geo){try{addMsg('ai',await fetchWeather(geo.lat,geo.lon,geo.name));}catch(e){addMsg('ai','取得失敗');}}else addMsg('ai','その地名が見つからなかった…');return;}
   // Miniモード: 自作トランスフォーマーで文章生成
   if(aiMode==='mini'){
     try{
       let data;
-      if (String(window.qzMiniVer || 9) === '9') {
+      if (parseFloat(window.qzMiniVer || 10) >= 9) {
         // エッジ推論: v9はブラウザ内で計算(サーバーCPU=0!)
         // 先払い: 1回100トークンをサーバーに申告してから生成する
         const pay = await (await fetch('/api/qzero/mini/spend', {method: 'POST'})).json();
@@ -433,7 +437,7 @@ async function cbSend(){
           addMsg('ai', pay.error || '使用量がいっぱいだよ');
           return;
         }
-        const loaded = await QzeroMini.load();  // 初回だけ脳みそDL(キャッシュされる)
+        const loaded = await QzeroMini.load(window.qzMiniVer || 10);  // 初回だけ脳みそDL(キャッシュされる)
         if (!loaded) {
           data = { ok: false, error: '脳みそのダウンロードに失敗したよ' };
         } else {
@@ -536,7 +540,7 @@ loadThreads();
   }
 
 // ===== 使用量ゲージ+上限ロック =====
-async function refreshUsage(){
+window.refreshUsage = async function(){
   try{
     const d = await (await fetch('/api/qzero/usage/me')).json();
     if(!d.ok) return;
@@ -562,9 +566,10 @@ async function refreshUsage(){
     }
   }catch(e){}
 }
-refreshUsage();
-setInterval(refreshUsage, 30000);
+window.refreshUsage();
+setInterval(window.refreshUsage, 30000);
 
+setAiMode(aiMode);  // 復元したモードをボタンと挨拶に反映
 })();
 </script>
 {% endblock %}
