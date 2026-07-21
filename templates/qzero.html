@@ -244,6 +244,7 @@ window.checkMiniStatus = async function() {
 unlockMini();
 
 function setAiMode(mode) {
+  if (window._qzSending) return;  // 考え中はモード切替も禁止
   localStorage.setItem('qzAiMode', mode);  // 前回のモードを覚えておく
   aiMode = mode;
   const QZ_VERSIONS = { core: 2, search: 1, guide: 1, mini: (window.qzMiniVer || 10) };
@@ -426,6 +427,14 @@ async function handleWeather(text){
 
 // ===== 送信 =====
 async function cbSend(){
+  // 考え中ロック: 処理中は送信もモード切替もできない
+  if (window._qzSending) return;
+  window._qzSending = true;
+  const _inp = document.getElementById('cb-input');
+  const _btn = document.getElementById('cb-send');
+  if (_inp) _inp.disabled = true;
+  if (_btn) { _btn.disabled = true; _btn.style.opacity = '0.4'; }
+  try {
   const inp=document.getElementById('cb-input');const text=inp.value.trim();if(text==='')return;
   addMsg('me',text);inp.value='';setTimeout(window.refreshUsage, 1200);
   if(awaitingPlace){awaitingPlace=false;const geo=await geocode(text.replace(/の天気.*$/,'').trim());if(geo){try{addMsg('ai',await fetchWeather(geo.lat,geo.lon,geo.name));}catch(e){addMsg('ai','取得失敗');}}else addMsg('ai','その地名が見つからなかった…');return;}
@@ -450,7 +459,7 @@ async function cbSend(){
           const result = QzeroMini.generate(text);
           if (result.ok) {
             const inf = QzeroMini.info();
-            data = { ok: true, reply: '続きを作ったよ:\n\n「' + result.text + '」\n\n(語彙' + inf.vocab + '語・DIM' + inf.dim + 'の自作トランスフォーマー。今この計算、君のブラウザの中で動いたよ⚡)' };
+            data = { ok: true, reply: '続きを作ったよ:\n\n「' + result.text.replace(/ /g, '') + '」\n\n(語彙' + inf.vocab + '語・DIM' + inf.dim + 'の自作トランスフォーマー。今この計算、君のブラウザの中で動いたよ⚡)' };
           } else if (result.unknown && result.unknown.length) {
             const vocab = QzeroMini.vocabulary();
             data = { ok: true, reply: 'ごめん、「' + result.unknown.join(' ') + '」はまだ知らない言葉なんだ。\n\n私が知ってる' + vocab.length + '語はこれだよ:\n' + vocab.join(' ') + '\n\nこの言葉で「ねこが」みたいに書き出しをくれたら、続きを作るよ!' };
@@ -529,6 +538,13 @@ async function cbSend(){
     lastTopic=(data.intent==='classify')?'classify':null;  // 話題を更新(天気モードから抜ける)
     addMsg('ai',data.ok?data.reply:(data.error||'エラー'));
   }catch(e){addMsg('ai','通信エラーが起きたよ');}
+  } finally {
+    window._qzSending = false;
+    const _inp2 = document.getElementById('cb-input');
+    const _btn2 = document.getElementById('cb-send');
+    if (_inp2) _inp2.disabled = false;
+    if (_btn2) { _btn2.disabled = false; _btn2.style.opacity = ''; }
+  }
 }
 
 // ===== 起動 =====

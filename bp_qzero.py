@@ -64,27 +64,36 @@ def _qzero_usage_owner():
     return (u, True) if u else ('ip:' + client_ip(), False)
 
 def _qzero_usage_state():
-    # (owner, 今日使った量, 上限) を返す
+    # (owner, 今日使った量(借金込み), 上限) を返す
     import pytz as _p
-    from datetime import datetime as _d
+    from datetime import datetime as _d, timedelta
     owner, logged_in = _qzero_usage_owner()
-    today = _d.now(_p.timezone('Asia/Tokyo')).strftime('%Y-%m-%d')
+    jst = _p.timezone('Asia/Tokyo')
+    today = _d.now(jst).strftime('%Y-%m-%d')
+    yesterday = (_d.now(jst) - timedelta(days=1)).strftime('%Y-%m-%d')
     conn = _qzero_usage_db()
     row = conn.execute('SELECT used FROM qzero_usage WHERE owner=? AND date=?', (owner, today)).fetchone()
     bonus = conn.execute('SELECT extra FROM qzero_bonus WHERE owner=?', (owner,)).fetchone()
-    conn.close()
     base = QZERO_DAILY_TOKENS if logged_in else QZERO_DAILY_TOKENS_GUEST
-    return owner, (row[0] if row else 0), base + (bonus[0] if bonus else 0), today
+    limit = base + (bonus[0] if bonus else 0)
+    used_today = row[0] if row else 0
+    # 前日の借金(超過分)を今日の使用量に加算
+    prev = conn.execute('SELECT used FROM qzero_usage WHERE owner=? AND date=?', (owner, yesterday)).fetchone()
+    if prev and prev[0] > limit:
+        debt = prev[0] - limit  # 昨日の超過分
+        used_today += debt  # 借金として今日に乗せる
+    conn.close()
+    return owner, used_today, limit, today
 
 def _qzero_tokens_of(text):
     # ざっくりトークン換算(日本語はほぼ1文字1トークン)
     return max(1, len(str(text or '')))
 
 def _qzero_usage_spend(tokens):
-    # 使えるならTrue+消費記録。上限ならFalse
+    # 使えるならTrue+消費記録。上限を超えたらFalse(超過分は翌日に借金として持ち越し)
     owner, used, limit, today = _qzero_usage_state()
     if used >= limit:
-        return False
+        return False  # 上限到達(昨日の借金込みで計算済み)
     conn = _qzero_usage_db()
     conn.execute('INSERT INTO qzero_usage (owner, date, used) VALUES (?,?,?) '
                  'ON CONFLICT(owner, date) DO UPDATE SET used = used + ?',
