@@ -488,10 +488,19 @@ def api_qzero_mini_brain():
         return _qzero_usage_err()  # 上限の人には脳みそ自体を渡さない(二重ロック)
     from flask import Response
     _v = request.args.get('v', '10')
-    if _v not in ('9', '10'):
+    if _v not in ('9', '10', '11'):
         return err('その世代はエッジ配信してないよ')
     try:
-        raw = open('/home/yuto113/qzero_mini_brain_v' + _v + '.json', encoding='utf-8').read()
+        _path = '/home/yuto113/qzero_mini_brain_v' + _v + '.json'
+        _gz_path = _path + '.gz'
+        # gzip圧縮版があればそれを返す(5倍速い)
+        if os.path.exists(_gz_path):
+            from flask import Response
+            resp = Response(open(_gz_path, 'rb').read(), mimetype='application/json')
+            resp.headers['Content-Encoding'] = 'gzip'
+            resp.headers['Cache-Control'] = 'private, max-age=3600'
+            return resp
+        raw = open(_path, encoding='utf-8').read()
     except Exception:
         return err('脳みそが見つからないよ', 500)
     resp = Response(raw, mimetype='application/json')

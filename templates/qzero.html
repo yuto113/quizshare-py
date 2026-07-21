@@ -120,9 +120,10 @@ window.applyTheme=cbStrip;window.checkAutoTheme=cbStrip;setInterval(cbStrip,2000
             <div class="qz-ver-item" onclick="event.stopPropagation(); document.getElementById('qz-ver-menu').classList.remove('open'); toggleModeMenu();" style="color:#a0a0a6; font-size:13px;">← モード選択に戻る</div>
             <div class="qz-ver-sep"></div>
             <div class="qz-ver-label">モデル</div>
-            <div class="qz-ver-item" data-ver="10" onclick="pickVer('10')"><span>Mini 10</span><span class="qz-ver-check"></span></div>
+            <div class="qz-ver-item" data-ver="11" onclick="pickVer('11')"><span>Mini 11</span><span class="qz-ver-check"></span></div>
             <div class="qz-ver-sep"></div>
             <div class="qz-ver-label">旧バージョン</div>
+            <div class="qz-ver-item" data-ver="10" onclick="pickVer('10')"><span>Mini 10</span><span class="qz-ver-check"></span></div>
             <div class="qz-ver-item" data-ver="9" onclick="pickVer('9')"><span>Mini 9</span><span class="qz-ver-check"></span></div>
             <div class="qz-ver-sep"></div>
 <div id="qz-legacy-vers" style="display:none;">
@@ -203,7 +204,7 @@ function showVerMenu() {
   var m = document.getElementById('qz-ver-menu');
   m.classList.toggle('open');
   // 現在の世代にチェック
-  var cur = String(window.qzMiniVer || 10);
+  var cur = String(window.qzMiniVer || 11);
   document.querySelectorAll('.qz-ver-item').forEach(function(el) {
     var ck2 = el.querySelector('.qz-ver-check'); if (ck2) ck2.textContent = el.dataset.ver === cur ? '✓' : '';
     el.classList.toggle('active', el.dataset.ver === cur);
@@ -247,9 +248,9 @@ function setAiMode(mode) {
   if (window._qzSending) return;  // 考え中はモード切替も禁止
   localStorage.setItem('qzAiMode', mode);  // 前回のモードを覚えておく
   aiMode = mode;
-  const QZ_VERSIONS = { core: 2, search: 1, guide: 1, mini: (window.qzMiniVer || 10) };
+  const QZ_VERSIONS = { core: 2, search: 1, guide: 1, mini: (window.qzMiniVer || 11) };
   const label = mode === 'search' ? 'Search' : (mode === 'guide' ? 'Guide' : (mode === 'mini' ? 'Mini' : 'Core'));
-  document.getElementById('qz-mode-btn').textContent = label + ' ' + (mode === 'mini' ? (window.qzMiniVer || 10) : QZ_VERSIONS[mode]) + ' ∨';
+  document.getElementById('qz-mode-btn').textContent = label + ' ' + (mode === 'mini' ? (window.qzMiniVer || 11) : QZ_VERSIONS[mode]) + ' ∨';
   // Miniモードならボタンにクリックで世代メニューを開く機能を付ける
   var btn = document.getElementById('qz-mode-btn');
   if (mode === 'mini') {
@@ -442,7 +443,7 @@ async function cbSend(){
   if(aiMode==='mini'){
     try{
       let data;
-      if (parseFloat(window.qzMiniVer || 10) >= 9) {
+      if (parseFloat(window.qzMiniVer || 11) >= 9) {
         // エッジ推論: v9はブラウザ内で計算(サーバーCPU=0!)
         // 考え中メッセージ(計算中に止まって見えないように)
         addMsg('ai', '🧠 考え中…', true);
@@ -452,7 +453,7 @@ async function cbSend(){
           addMsg('ai', pay.error || '使用量がいっぱいだよ');
           return;
         }
-        const loaded = await QzeroMini.load(window.qzMiniVer || 10);  // 初回だけ脳みそDL(キャッシュされる)
+        const loaded = await QzeroMini.load(window.qzMiniVer || 11);  // 初回だけ脳みそDL(キャッシュされる)
         if (!loaded) {
           data = { ok: false, error: '脳みそのダウンロードに失敗したよ' };
         } else {
