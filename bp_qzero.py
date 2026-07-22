@@ -460,10 +460,10 @@ def _qzero_mini_allowed(version=None):
         v = float(version) if version is not None else 9
     except (TypeError, ValueError):
         v = 9
-    if v >= 12:
-        return u.startswith('s:') and staff_is_admin()  # v12は管理者限定(ベータ)
+    if v >= 13:
+        return u.startswith('s:') and staff_is_admin()  # v13以上は管理者限定(ベータ)
     if v >= 9:
-        return True  # v9-11は未ログインでもOK
+        return True  # v9-12は未ログインでもOK
     # 旧世代: 社員ログイン(s:)かつDBのroleがadminの人だけ
     return u.startswith('s:') and staff_is_admin()
 
