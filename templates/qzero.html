@@ -121,12 +121,11 @@ window.applyTheme=cbStrip;window.checkAutoTheme=cbStrip;setInterval(cbStrip,2000
             <div class="qz-ver-sep"></div>
             <div class="qz-ver-label">モデル</div>
             <div class="qz-ver-item" data-ver="11" onclick="pickVer('11')"><span>Mini 11</span><span class="qz-ver-check"></span></div>
-            <div class="qz-ver-sep"></div>
-            <div class="qz-ver-label">旧バージョン</div>
             <div class="qz-ver-item" data-ver="10" onclick="pickVer('10')"><span>Mini 10</span><span class="qz-ver-check"></span></div>
             <div class="qz-ver-item" data-ver="9" onclick="pickVer('9')"><span>Mini 9</span><span class="qz-ver-check"></span></div>
             <div class="qz-ver-sep"></div>
 <div id="qz-legacy-vers" style="display:none;">
+            <div class="qz-ver-item" data-ver="12" onclick="pickVer('12')"><span>🧠 Mini 12 天才版(β)</span><span class="qz-ver-check"></span></div>
             <div class="qz-ver-label">旧バージョン</div>
             <div class="qz-ver-item" data-ver="8" onclick="pickVer('8')"><span>Mini 8</span><span class="qz-ver-check"></span></div>
             <div class="qz-ver-item" data-ver="7" onclick="pickVer('7')"><span>Mini 7</span><span class="qz-ver-check"></span></div>
@@ -449,6 +448,10 @@ async function cbSend(){
         addMsg('ai', '🧠 考え中…', true);
         // 先払い: 1回100トークンをサーバーに申告してから生成する
         const pay = await (await fetch('/api/qzero/mini/spend', {method: 'POST'})).json();
+        // v12以上: 4文字以上の入力は会話モード、1-3文字は文章生成(書き出し)
+        const isChat = parseFloat(window.qzMiniVer || 11) >= 12 && text.replace(/\s/g, '').length >= 4;
+
+
         if (!pay.ok) {
           addMsg('ai', pay.error || '使用量がいっぱいだよ');
           return;
@@ -457,10 +460,12 @@ async function cbSend(){
         if (!loaded) {
           data = { ok: false, error: '脳みそのダウンロードに失敗したよ' };
         } else {
-          const result = QzeroMini.generate(text);
+          const result = isChat ? QzeroMini.chat(text) : QzeroMini.generate(text);
           if (result.ok) {
             const inf = QzeroMini.info();
-            data = { ok: true, reply: '続きを作ったよ:\n\n「' + result.text.replace(/ /g, '') + '」\n\n(語彙' + inf.vocab + '語・DIM' + inf.dim + 'の自作トランスフォーマー。今この計算、君のブラウザの中で動いたよ⚡)' };
+            const prefix = isChat ? '' : '続きを作ったよ:\n\n「';
+            const suffix = isChat ? '' : '」';
+            data = { ok: true, reply: prefix + result.text.replace(/ /g, '') + suffix + '\n\n' + (isChat ? '(QZERO Mini 天才版・会話モード⚡)' : '(語彙' + inf.vocab + '語・DIM' + inf.dim + 'の自作トランスフォーマー⚡)') };
           } else if (result.unknown && result.unknown.length) {
             const vocab = QzeroMini.vocabulary();
             data = { ok: true, reply: 'ごめん、「' + result.unknown.join(' ') + '」はまだ知らない言葉なんだ。\n\n私が知ってる' + vocab.length + '語はこれだよ:\n' + vocab.join(' ') + '\n\nこの言葉で「ねこが」みたいに書き出しをくれたら、続きを作るよ!' };

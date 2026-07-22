@@ -141,6 +141,56 @@ const QzeroMini = (() => {
   }
 
   // 生成(mini.pyのgenerateと同じ: 上位3候補の温度サンプリング+おわりで停止)
+  // 会話モード: ユーザーの入力を「？ 〇〇 ：」で包んで回答を生成
+  function chat(userText) {
+    userText = normalizeInput(userText);
+    // スペースで区切り、？と：で包む
+    const tokens = userText.replace(/\s+/g, ' ').trim().split(' ').filter(t => t);
+    const input = ['？', ...tokens, '：'];
+    // 未知語チェック
+    const unknown = input.filter(t => !(t in w2i) && t !== '？' && t !== '：');
+    if (unknown.length > 0) {
+      // 未知語を含む場合、1文字ずつに分解して再試行
+      const retry = ['？'];
+      for (const t of tokens) {
+        if (t in w2i) { retry.push(t); }
+        else { for (const c of t) { if (c in w2i) retry.push(c); } }
+      }
+      retry.push('：');
+      if (retry.length <= 2) {
+        return { ok: false, text: 'ごめん、知らない言葉が多くて答えられないよ。' };
+      }
+      input.length = 0;
+      input.push(...retry);
+    }
+    let ctx = input.map(t => w2i[t]).filter(id => id !== undefined);
+    if (ctx.length === 0 || ctx.length >= brain.MAXLEN) {
+      return { ok: false, text: '質問が長すぎるか、知らない言葉ばかりだよ。' };
+    }
+    const result = [];
+    let foundAnswer = false;
+    for (let i = 0; i < brain.MAXLEN - ctx.length; i++) {
+      const out = forward(ctx);
+      const top = out.map((p, idx) => [p, idx]).sort((a, b2) => b2[0] - a[0]).slice(0, 3);
+      const ws = top.map(([p]) => p * p);
+      let r = Math.random() * ws.reduce((a, b2) => a + b2, 0);
+      let nxt = top[0][1];
+      for (let k = 0; k < top.length; k++) { r -= ws[k]; if (r <= 0) { nxt = top[k][1]; break; } }
+      const w = brain.words[nxt];
+      if (w === 'おわり') break;
+      if (w === '：') { foundAnswer = true; continue; }
+      if (foundAnswer || !input.includes('：')) {
+        result.push(w);
+      }
+      ctx.push(nxt);
+      if (ctx.length >= brain.MAXLEN) break;
+    }
+    if (result.length === 0) {
+      return { ok: false, text: 'うまく答えられなかったよ。別の聞き方を試してみて。' };
+    }
+    return { ok: true, text: result.join(' ') };
+  }
+
   function generate(startText) {
     startText = normalizeInput(startText);  // 漢字・カタカナ→ひらがな
     const b = brain;
@@ -244,5 +294,5 @@ const QzeroMini = (() => {
   function vocabulary() { return brain.words.filter(w => w !== 'おわり'); }
   function info() { return { dim: brain.DIM, vocab: brain.words.length }; }
 
-  return { load, generate, vocabulary, info };
+  return { load, generate, chat, vocabulary, info };
 })();
