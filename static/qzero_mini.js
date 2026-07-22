@@ -143,56 +143,54 @@ const QzeroMini = (() => {
   // 生成(mini.pyのgenerateと同じ: 上位3候補の温度サンプリング+おわりで停止)
   // 会話モード: ユーザーの入力を「？ 〇〇 ：」で包んで回答を生成
   function chat(userText) {
-    userText = normalizeInput(userText);
-    // スペースで区切り、？と：で包む
-    const tokens = userText.replace(/\s+/g, ' ').trim().split(' ').filter(t => t);
-    const input = ['？', ...tokens, '：'];
-    // 未知語チェック
-    const unknown = input.filter(t => !(t in w2i) && t !== '？' && t !== '：');
-    if (unknown.length > 0) {
-      // 未知語を含む場合、1文字ずつに分解して再試行
-      const retry = ['？'];
-      for (const t of tokens) {
-        if (t in w2i) { retry.push(t); }
-        else { for (const c of t) { if (c in w2i) retry.push(c); } }
-      }
-      retry.push('：');
-      if (retry.length <= 2) {
-        return { ok: false, text: 'ごめん、知らない言葉が多くて答えられないよ。' };
-      }
-      input.length = 0;
-      input.push(...retry);
+    // v12+(漢字語彙)ならそのまま、v11以前(ひらがな語彙)なら変換
+    if (!w2i['猫']) { userText = normalizeInput(userText); }
+
+    // トークン化: スペースがあればそれで区切る、なければ貪欲マッチ
+    var rawTokens;
+    if (/\s/.test(userText.trim())) {
+      rawTokens = userText.trim().split(/\s+/);
+    } else {
+      rawTokens = tokenize(userText.trim());
     }
-    let ctx = input.map(t => w2i[t]).filter(id => id !== undefined);
-    if (ctx.length === 0 || ctx.length >= brain.MAXLEN) {
-      return { ok: false, text: '質問が長すぎるか、知らない言葉ばかりだよ。' };
+
+    // 知ってる語だけ残す(未知語は無視してベストエフォート)
+    var knownTokens = rawTokens.filter(function(t) { return t in w2i; });
+    if (knownTokens.length === 0) {
+      return { ok: false, text: 'ごめん、知らない言葉が多くて答えられないよ。' };
     }
-    const result = [];
-    let foundAnswer = false;
-    for (let i = 0; i < brain.MAXLEN - ctx.length; i++) {
-      const out = forward(ctx);
-      const top = out.map((p, idx) => [p, idx]).sort((a, b2) => b2[0] - a[0]).slice(0, 3);
-      const ws = top.map(([p]) => p * p);
-      let r = Math.random() * ws.reduce((a, b2) => a + b2, 0);
-      let nxt = top[0][1];
-      for (let k = 0; k < top.length; k++) { r -= ws[k]; if (r <= 0) { nxt = top[k][1]; break; } }
-      const w = brain.words[nxt];
+
+    // ？ + 質問 + ： でモデルに渡す
+    var ctx = [w2i['？']];
+    for (var ti = 0; ti < knownTokens.length; ti++) { ctx.push(w2i[knownTokens[ti]]); }
+    ctx.push(w2i['：']);
+
+    if (ctx.length >= brain.MAXLEN) {
+      return { ok: false, text: '質問が長すぎるよ。短くしてみて。' };
+    }
+
+    // 生成(会話はgreedy=最も確率の高いトークンを選ぶ。安定した回答のため)
+    var result = [];
+    for (var gi = 0; gi < brain.MAXLEN - ctx.length; gi++) {
+      var out = forward(ctx);
+      // argmax(最も確率の高いトークン)
+      var nxt = 0;
+      for (var ki = 1; ki < out.length; ki++) { if (out[ki] > out[nxt]) nxt = ki; }
+      var w = brain.words[nxt];
       if (w === 'おわり') break;
-      if (w === '：') { foundAnswer = true; continue; }
-      if (foundAnswer || !input.includes('：')) {
-        result.push(w);
-      }
+      result.push(w);
       ctx.push(nxt);
       if (ctx.length >= brain.MAXLEN) break;
     }
+
     if (result.length === 0) {
       return { ok: false, text: 'うまく答えられなかったよ。別の聞き方を試してみて。' };
     }
     return { ok: true, text: result.join(' ') };
   }
-
   function generate(startText) {
-    startText = normalizeInput(startText);  // 漢字・カタカナ→ひらがな
+    // v12+(漢字語彙)ならそのまま、v11以前(ひらがな語彙)なら変換
+    if (!w2i['猫']) { startText = normalizeInput(startText); }
     const b = brain;
     let tokens = /[ \u3000]/.test(startText.trim())
       ? startText.replace(/\u3000/g, ' ').split(' ').filter(t => t)
