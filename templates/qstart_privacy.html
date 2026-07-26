@@ -13,11 +13,17 @@ body { font-family:'Segoe UI','Hiragino Sans',sans-serif; background:#faf9f6; co
 .qs-side .sub { font-size:11px; color:#8a8a9a; margin-bottom:30px; }
 .qs-side a { display:block; color:#ccc; font-size:14px; padding:8px 10px; border-radius:8px; text-decoration:none; margin-bottom:4px; }
 .qs-side a:hover { background:#2a2a4a; color:#fff; }
+.qs-side a.active { background:#2a2a4a; color:#fff; }
 .qs-content { flex:1; max-width:750px; padding:40px 40px 60px; }
-.qs-content h1 { font-size:24px; margin-bottom:6px; }
+.qs-content h1 { font-size:26px; margin-bottom:6px; }
 .qs-content .date { font-size:13px; color:#8a8270; margin-bottom:28px; }
-.qs-content h2 { font-size:16px; margin:22px 0 8px; }
-.qs-content p { font-size:14px; color:#4a4436; line-height:1.8; margin-bottom:14px; }
+.qs-content h2 { font-size:17px; margin:28px 0 10px; border-bottom:1px solid #e8e4da; padding-bottom:6px; }
+.qs-content h3 { font-size:15px; margin:16px 0 6px; color:#333; }
+.qs-content p, .qs-content li { font-size:14px; color:#4a4436; line-height:1.9; margin-bottom:10px; }
+.qs-content ul { padding-left:20px; margin-bottom:14px; }
+.qs-content table { width:100%; border-collapse:collapse; margin:12px 0 16px; font-size:14px; }
+.qs-content th, .qs-content td { border:1px solid #e8e4da; padding:8px 12px; text-align:left; }
+.qs-content th { background:#f0ede6; font-weight:600; }
 @media (max-width:768px) { .qs-side { display:none; } .qs-content { padding:24px 16px; } }
 </style>
 </head>
@@ -27,23 +33,92 @@ body { font-family:'Segoe UI','Hiragino Sans',sans-serif; background:#faf9f6; co
   <div class="sub">ゼロから作ったAIと、話そう。</div>
   <a href="/qstart">← Qstartに戻る</a>
   <a href="/qstart/terms">📄 利用規約</a>
-  <a href="/qstart/privacy" style="background:#2a2a4a; color:#fff;">🔒 プライバシー</a>
+  <a href="/qstart/privacy" class="active">🔒 プライバシー</a>
 </div>
 <div class="qs-content">
 <h1>プライバシーポリシー</h1>
-<div class="date">最終更新: 2026年7月26日</div>
+<div class="date">最終更新: 2026年7月26日 ｜ 発効日: 2026年7月26日</div>
+
+<p>本プライバシーポリシー（以下「本ポリシー」）は、Qstart（以下「本サービス」）におけるユーザーの個人情報の取り扱いについて説明します。本サービスを利用することにより、本ポリシーに同意したものとみなします。</p>
+
 <h2>第1条（収集する情報）</h2>
-<p>アカウント登録時: ニックネーム、ユーザーID、パスワード（ハッシュ化して保存）、メールアドレス、ご利用用途。利用時: チャット内容、使用トークン数、アクセス日時。</p>
-<h2>第2条（利用目的）</h2>
-<p>収集した情報は以下の目的で利用します: サービスの提供と改善、使用量の管理、不正利用の防止、AIモデルの改善。</p>
-<h2>第3条（第三者提供）</h2>
-<p>法令に基づく場合を除き、ユーザーの個人情報を第三者に提供しません。</p>
-<h2>第4条（データの保存）</h2>
-<p>チャットデータはサーバーに保存されます。アカウント削除時にデータは削除されます。</p>
-<h2>第5条（セキュリティ）</h2>
-<p>パスワードはハッシュ化して保存し、通信はHTTPSで暗号化されます。ただし、完全なセキュリティを保証するものではありません。</p>
-<h2>第6条（お問い合わせ）</h2>
-<p>プライバシーに関するお問い合わせは、QuizShareの管理者までお願いします。</p>
+<h3>1.1 ユーザーが提供する情報</h3>
+<table>
+<tr><th>情報の種類</th><th>内容</th><th>必須/任意</th></tr>
+<tr><td>ニックネーム</td><td>呼ばれたい名前</td><td>必須</td></tr>
+<tr><td>ユーザーID</td><td>ログイン用の識別子</td><td>必須</td></tr>
+<tr><td>パスワード</td><td>ハッシュ化して保存</td><td>必須</td></tr>
+<tr><td>メールアドレス</td><td>お知らせ・パスワードリセット用</td><td>必須</td></tr>
+<tr><td>ご利用用途</td><td>サービス改善のため</td><td>必須</td></tr>
+</table>
+
+<h3>1.2 利用時に自動的に収集する情報</h3>
+<ul>
+<li>チャットの内容（入力テキストとAIの応答）</li>
+<li>使用トークン数と利用時間</li>
+<li>アクセス日時</li>
+<li>利用したモデルとエフォート設定</li>
+<li>ブラウザの種類、OS（技術的なエラー解決のため）</li>
+</ul>
+
+<h3>1.3 収集しない情報</h3>
+<p>本サービスは、位置情報、連絡先、カメラ・マイク等のデバイス情報を収集しません。Cookie は、ログインセッションの維持のみに使用します。</p>
+
+<h2>第2条（情報の利用目的）</h2>
+<p>収集した情報は、以下の目的でのみ利用します:</p>
+<ul>
+<li>本サービスの提供、運営、維持</li>
+<li>アカウントの認証とセキュリティの確保</li>
+<li>使用量の管理と制限の適用</li>
+<li>サービスの改善と新機能の開発</li>
+<li>AIモデルの学習品質の向上（匿名化されたデータのみ）</li>
+<li>不正利用の検出と防止</li>
+<li>重要なお知らせの通知（メールアドレス利用時）</li>
+</ul>
+
+<h2>第3条（情報の共有と第三者提供）</h2>
+<h3>3.1 原則</h3>
+<p>本サービスは、ユーザーの個人情報を第三者に販売、貸与、またはその他の方法で商業的に提供しません。</p>
+<h3>3.2 例外</h3>
+<p>以下の場合に限り、情報を開示する場合があります:</p>
+<ul>
+<li>法令に基づく要請がある場合</li>
+<li>ユーザーの生命、身体、財産の保護に必要な場合</li>
+<li>ユーザーの明示的な同意がある場合</li>
+</ul>
+
+<h2>第4条（データの保存と管理）</h2>
+<h3>4.1 保存期間</h3>
+<p>アカウント情報はアカウントが有効な間保存されます。チャットデータは最大90日間保存した後、自動的に削除されます。</p>
+<h3>4.2 セキュリティ対策</h3>
+<ul>
+<li>パスワードはハッシュ化（scrypt）して保存し、平文では保持しません</li>
+<li>通信はHTTPS（TLS）で暗号化されます</li>
+<li>データベースへのアクセスは制限されています</li>
+</ul>
+<p>ただし、インターネットを介した完全なセキュリティを保証することはできません。</p>
+
+<h2>第5条（ユーザーの権利）</h2>
+<p>ユーザーは以下の権利を有します:</p>
+<ul>
+<li><strong>アクセス権:</strong> 自身の登録情報を確認する権利</li>
+<li><strong>訂正権:</strong> 不正確な情報の修正を求める権利</li>
+<li><strong>削除権:</strong> アカウントと関連データの削除を求める権利</li>
+<li><strong>データポータビリティ:</strong> 自身のチャット履歴のエクスポートを求める権利</li>
+</ul>
+<p>これらの権利を行使する場合は、管理者までお問い合わせください。</p>
+
+<h2>第6条（子どもの プライバシー）</h2>
+<p>13歳未満のお子様が本サービスを利用する場合は、保護者の同意が必要です。13歳未満のお子様から意図せず個人情報を収集したことが判明した場合、速やかにその情報を削除します。</p>
+
+<h2>第7条（AIモデルの改善とデータ利用）</h2>
+<p>本サービスは、AIモデルの品質向上のためにチャットデータを分析する場合があります。この場合、個人を特定できない形（匿名化）で使用します。個人情報がAIモデルのトレーニングデータに直接含まれることはありません。</p>
+
+<h2>第8条（ポリシーの変更）</h2>
+<p>本ポリシーは、サービスの変更や法令の改正に応じて更新される場合があります。重要な変更については、本サービス内またはメールで通知します。</p>
+
+<h2>第9条（お問い合わせ）</h2>
+<p>本ポリシーに関するご質問やご要望は、QuizShareの管理者機能よりお問い合わせください。</p>
 </div>
 </body>
 </html>

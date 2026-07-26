@@ -407,6 +407,10 @@ function setLoginType(t) {
   document.getElementById('qs-type-staff').style.background = t==='staff' ? '#14213d' : '#fff';
   document.getElementById('qs-type-staff').style.color = t==='staff' ? '#fff' : '#333';
   document.getElementById('qs-login-id').placeholder = t==='staff' ? '社員ID' : 'ユーザーID';
+  // 社員ログインの場合、ログイン/新規作成タブを非表示(社員は新規作成できない)
+  var tabs = document.getElementById('qs-tab-login').parentNode;
+  tabs.style.display = t==='staff' ? 'none' : 'flex';
+  if (t==='staff') { loginTab='login'; document.getElementById('qs-reg-fields').style.display='none'; document.getElementById('qs-login-terms').style.display='none'; document.getElementById('qs-submit-btn').textContent='ログイン'; }
 }
 
 async function doLogin() {
