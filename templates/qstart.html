@@ -3,7 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Qstart</title>
+<title>Qstart — ゼロから作ったAIと、話そう</title>
+<meta name="description" content="Qstart - 12歳の開発者がゼロから手書きしたTransformerベースのAIチャットサービス">
+<meta property="og:title" content="Qstart">
+<meta property="og:description" content="ゼロから作ったAIと、話そう。">
+<meta property="og:type" content="website">
 <link rel="icon" type="image/svg+xml" href="/static/qstart_icon.svg">
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -148,7 +152,10 @@ body { font-family: 'Segoe UI','Hiragino Sans',sans-serif; background:#faf9f6; c
 
 <!-- サイドバー -->
 <div class="qs-sidebar">
-  <div class="qs-logo">Q<span>start</span></div>
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div class="qs-logo">Q<span>start</span></div>
+      <button onclick="toggleSidebar()" style="background:none; border:none; color:#888; font-size:20px; cursor:pointer; padding:4px 8px;">✕</button>
+    </div>
   <div class="qs-sub">ゼロから作ったAIと、話そう。</div>
   <div class="qs-new-chat" style="opacity:0.5;cursor:not-allowed;">+ 新しいチャット</div>
   <div class="qs-history" id="qs-history">
@@ -169,6 +176,7 @@ body { font-family: 'Segoe UI','Hiragino Sans',sans-serif; background:#faf9f6; c
 <div class="qs-main">
   <!-- トップバー -->
   <div class="qs-topbar" style="position:relative;">
+    <button id="qs-sidebar-open" onclick="toggleSidebar()" style="background:none; border:none; font-size:20px; cursor:pointer; color:#14213d; display:none; margin-right:12px;">☰</button>
     <button class="qs-model-btn" id="qs-model-btn" onclick="toggleModelMenu()">Equi 1 ∨</button>
     <div class="qs-model-menu" id="qs-model-menu">
       <div class="qs-model-option" onclick="pickModel('pure')">
@@ -570,6 +578,20 @@ function hideLimitReached() {
 
 // 30秒ごとに使用量を更新
 setInterval(fetchUsage, 30000);
+
+
+// --- サイドバー開閉 ---
+function toggleSidebar() {
+  var sb = document.querySelector('.qs-sidebar');
+  var openBtn = document.getElementById('qs-sidebar-open');
+  if (sb.style.display === 'none') {
+    sb.style.display = 'flex';
+    openBtn.style.display = 'none';
+  } else {
+    sb.style.display = 'none';
+    openBtn.style.display = 'block';
+  }
+}
 
 // --- 言語 ---
 function setLang(lang) {
