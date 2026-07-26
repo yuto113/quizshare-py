@@ -1797,3 +1797,22 @@ def page_reden():
     if not is_admin:
         return redirect(url_for('page_entry'))
     return render_template('reden.html')
+
+
+# ===== Qstart (独立AIサービス) =====
+@app.route('/qstart')
+def page_qstart():
+    return render_template('qstart.html')
+
+@app.route('/api/qstart/chat', methods=['POST'])
+def api_qstart_chat():
+    # AI応答API (現在は準備中メッセージを返す)
+    data = request.get_json(silent=True) or {}
+    message = data.get('message', '')
+    model = data.get('model', 'equi')
+    effort = data.get('effort', 'mid')
+
+    # TODO: ここにPyTorchモデルの推論を入れる
+    # 現在は準備中メッセージ
+    reply = 'Qstart Equi 1 は現在学習中です! Colabで頑張ってトレーニング中...もう少し待っててね! 🔄'
+    return jsonify(ok=True, reply=reply, model=model, effort=effort)

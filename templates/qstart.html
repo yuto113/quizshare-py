@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qstart</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: 'Segoe UI','Hiragino Sans',sans-serif; background:#faf9f6; color:#14213d; height:100vh; display:flex; }
+
+/* サイドバー */
+.qs-sidebar {
+  width: 260px; background:#14213d; color:#fff; display:flex; flex-direction:column;
+  padding: 20px 16px; flex-shrink:0;
+}
+.qs-logo { font-size:24px; font-weight:700; margin-bottom:4px; }
+.qs-logo span { color:#b8860b; }
+.qs-sub { font-size:11px; color:#8a8a9a; margin-bottom:24px; }
+.qs-new-chat {
+  background:#2a2a4a; border:1px solid #3a3a5a; border-radius:10px;
+  color:#fff; padding:10px 14px; cursor:pointer; font-size:14px;
+  margin-bottom:20px; text-align:center;
+}
+.qs-new-chat:hover { background:#3a3a5a; }
+.qs-history { flex:1; overflow-y:auto; font-size:13px; color:#8a8a9a; }
+.qs-history-item {
+  padding:8px 10px; border-radius:8px; cursor:pointer; margin-bottom:2px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.qs-history-item:hover { background:#2a2a4a; }
+.qs-sidebar-bottom { border-top:1px solid #2a2a4a; padding-top:12px; margin-top:12px; }
+.qs-sidebar-link {
+  display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:8px;
+  font-size:13px; color:#ccc; cursor:pointer; text-decoration:none;
+}
+.qs-sidebar-link:hover { background:#2a2a4a; color:#fff; }
+
+/* メインエリア */
+.qs-main { flex:1; display:flex; flex-direction:column; }
+.qs-topbar {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:12px 24px; border-bottom:1px solid #e8e4da;
+}
+.qs-model-btn {
+  background:transparent; border:1px solid #d0ccc0; border-radius:8px;
+  padding:6px 14px; font-size:14px; cursor:pointer; color:#14213d;
+}
+.qs-model-btn:hover { background:#f0ede6; }
+.qs-topbar-right { display:flex; align-items:center; gap:12px; }
+.qs-effort-group { display:flex; border:1px solid #d0ccc0; border-radius:8px; overflow:hidden; }
+.qs-effort-btn {
+  padding:5px 12px; font-size:12px; cursor:pointer; background:transparent;
+  border:none; color:#666;
+}
+.qs-effort-btn.active { background:#14213d; color:#fff; }
+.qs-settings-btn {
+  background:transparent; border:none; font-size:20px; cursor:pointer; color:#666;
+}
+
+/* チャットエリア */
+.qs-chat { flex:1; overflow-y:auto; padding:24px; max-width:800px; margin:0 auto; width:100%; }
+.qs-welcome {
+  text-align:center; margin-top:15vh;
+}
+.qs-welcome h1 { font-size:28px; font-weight:600; margin-bottom:8px; }
+.qs-welcome p { font-size:15px; color:#8a8270; line-height:1.7; }
+.qs-welcome .qs-status {
+  display:inline-block; margin-top:16px; padding:6px 16px;
+  background:#fff8e7; border:1px solid #e8d5a0; border-radius:20px;
+  font-size:13px; color:#b8860b;
+}
+.qs-msg { margin-bottom:16px; display:flex; gap:10px; }
+.qs-msg-user { justify-content:flex-end; }
+.qs-msg-ai { justify-content:flex-start; }
+.qs-bubble {
+  max-width:70%; padding:10px 16px; border-radius:12px;
+  font-size:14px; line-height:1.7;
+}
+.qs-msg-user .qs-bubble { background:#14213d; color:#fff; }
+.qs-msg-ai .qs-bubble { background:#f0ede6; color:#14213d; }
+.qs-msg-ai .qs-label { font-size:11px; color:#b8b09e; margin-bottom:2px; }
+
+/* 入力エリア */
+.qs-input-area {
+  padding:16px 24px; border-top:1px solid #e8e4da;
+  max-width:800px; margin:0 auto; width:100%;
+}
+.qs-input-row { display:flex; gap:8px; }
+.qs-input {
+  flex:1; padding:10px 16px; border:1px solid #d0ccc0; border-radius:10px;
+  font-size:14px; outline:none; background:#fff;
+}
+.qs-input:focus { border-color:#14213d; }
+.qs-send {
+  padding:10px 20px; background:#14213d; color:#fff; border:none;
+  border-radius:10px; font-size:14px; cursor:pointer; font-weight:600;
+}
+.qs-send:hover { background:#1a2a50; }
+.qs-usage {
+  text-align:center; font-size:12px; color:#b8b09e; margin-top:8px;
+}
+
+/* モデル選択メニュー */
+.qs-model-menu {
+  display:none; position:absolute; top:50px; left:24px;
+  background:#fff; border:1px solid #e0dcd0; border-radius:12px;
+  box-shadow:0 4px 20px rgba(0,0,0,0.1); padding:8px 0; z-index:100; min-width:260px;
+}
+.qs-model-menu.open { display:block; }
+.qs-model-option {
+  padding:10px 16px; cursor:pointer; font-size:14px;
+}
+.qs-model-option:hover { background:#f8f7f4; }
+.qs-model-option .qs-m-name { font-weight:600; }
+.qs-model-option .qs-m-desc { font-size:12px; color:#8a8270; margin-top:2px; }
+.qs-model-option .qs-m-badge {
+  font-size:10px; padding:2px 8px; border-radius:10px; margin-left:6px;
+}
+.qs-m-available { background:#e8f5e9; color:#2e7d32; }
+.qs-m-soon { background:#fff3e0; color:#e65100; }
+.qs-m-locked { background:#f0f0f0; color:#999; }
+
+/* 設定パネル */
+.qs-settings-panel {
+  display:none; position:fixed; right:0; top:0; bottom:0; width:320px;
+  background:#fff; box-shadow:-4px 0 20px rgba(0,0,0,0.1); z-index:200;
+  padding:24px; overflow-y:auto;
+}
+.qs-settings-panel.open { display:block; }
+.qs-settings-panel h2 { font-size:18px; margin-bottom:20px; }
+.qs-s-section { margin-bottom:20px; }
+.qs-s-label { font-size:13px; color:#8a8270; margin-bottom:6px; }
+.qs-s-value { font-size:15px; font-weight:500; }
+.qs-s-bar { height:6px; background:#e8e4da; border-radius:3px; margin-top:6px; }
+.qs-s-bar-fill { height:100%; background:#14213d; border-radius:3px; }
+.qs-s-close {
+  position:absolute; top:16px; right:16px; background:none; border:none;
+  font-size:24px; cursor:pointer; color:#666;
+}
+
+@media (max-width:768px) {
+  .qs-sidebar { display:none; }
+}
+</style>
+</head>
+<body>
+
+<!-- サイドバー -->
+<div class="qs-sidebar">
+  <div class="qs-logo">Q<span>start</span></div>
+  <div class="qs-sub">ゼロから作ったAIと、話そう。</div>
+  <div class="qs-new-chat" onclick="newChat()">+ 新しいチャット</div>
+  <div class="qs-history" id="qs-history">
+    <div style="color:#666; font-size:12px; padding:8px;">チャット履歴はここに表示されます</div>
+  </div>
+  <div class="qs-sidebar-bottom">
+    <a class="qs-sidebar-link" onclick="openSettings()">⚙️ 設定</a>
+    <a class="qs-sidebar-link" href="/">🏠 QuizShareに戻る</a>
+  </div>
+</div>
+
+<!-- メインエリア -->
+<div class="qs-main">
+  <!-- トップバー -->
+  <div class="qs-topbar" style="position:relative;">
+    <button class="qs-model-btn" id="qs-model-btn" onclick="toggleModelMenu()">Equi 1 ∨</button>
+    <div class="qs-model-menu" id="qs-model-menu">
+      <div class="qs-model-option" onclick="pickModel('pure')">
+        <div><span class="qs-m-name">Pure</span> <span class="qs-m-badge qs-m-soon">準備中</span></div>
+        <div class="qs-m-desc">速い・軽量モデル</div>
+      </div>
+      <div class="qs-model-option" onclick="pickModel('equi')" style="background:#f8f7f4;">
+        <div><span class="qs-m-name">Equi 1</span> <span class="qs-m-badge qs-m-available">利用可能</span></div>
+        <div class="qs-m-desc">バランス・普段使い</div>
+      </div>
+      <div class="qs-model-option" onclick="pickModel('zin')">
+        <div><span class="qs-m-name">zin</span> <span class="qs-m-badge qs-m-soon">準備中</span></div>
+        <div class="qs-m-desc">思考・じっくり考える</div>
+      </div>
+      <div class="qs-model-option" onclick="pickModel('apex')">
+        <div><span class="qs-m-name">Apex</span> <span class="qs-m-badge qs-m-locked">Coming Soon</span></div>
+        <div class="qs-m-desc">最強・全力モデル</div>
+      </div>
+    </div>
+    <div class="qs-topbar-right">
+      <div class="qs-effort-group">
+        <button class="qs-effort-btn" onclick="setEffort('low')" id="eff-low">⚡低</button>
+        <button class="qs-effort-btn active" onclick="setEffort('mid')" id="eff-mid">⚙️中</button>
+        <button class="qs-effort-btn" onclick="setEffort('high')" id="eff-high">🔥高</button>
+      </div>
+      <button class="qs-settings-btn" onclick="openSettings()">⚙</button>
+    </div>
+  </div>
+
+  <!-- チャット -->
+  <div class="qs-chat" id="qs-chat">
+    <div class="qs-welcome" id="qs-welcome">
+      <h1>Qstart</h1>
+      <p>ゼロから作ったTransformerと会話しよう。<br>12歳の開発者が手書きしたAIがここにいる。</p>
+      <div class="qs-status" id="qs-ai-status">🔄 Equi 1 — Colabで学習中...</div>
+    </div>
+  </div>
+
+  <!-- 入力 -->
+  <div class="qs-input-area">
+    <div class="qs-input-row">
+      <input class="qs-input" id="qs-input" placeholder="メッセージを入力..." onkeydown="if(event.key==='Enter')sendMsg()">
+      <button class="qs-send" onclick="sendMsg()">送信</button>
+    </div>
+    <div class="qs-usage" id="qs-usage">今日の使用量: 0 / 50 メッセージ</div>
+  </div>
+</div>
+
+<!-- 設定パネル -->
+<div class="qs-settings-panel" id="qs-settings">
+  <button class="qs-s-close" onclick="closeSettings()">×</button>
+  <h2>設定</h2>
+
+  <div class="qs-s-section">
+    <div class="qs-s-label">アカウント</div>
+    <div class="qs-s-value" id="qs-s-account">ゲスト</div>
+  </div>
+
+  <div class="qs-s-section">
+    <div class="qs-s-label">現在のモデル</div>
+    <div class="qs-s-value" id="qs-s-model">Qstart Equi 1</div>
+  </div>
+
+  <div class="qs-s-section">
+    <div class="qs-s-label">エフォート</div>
+    <div class="qs-s-value" id="qs-s-effort">中</div>
+  </div>
+
+  <div class="qs-s-section">
+    <div class="qs-s-label">今日の使用量</div>
+    <div class="qs-s-value" id="qs-s-usage-text">0 / 50 メッセージ</div>
+    <div class="qs-s-bar"><div class="qs-s-bar-fill" id="qs-s-bar" style="width:0%"></div></div>
+  </div>
+
+  <div class="qs-s-section">
+    <div class="qs-s-label">言語</div>
+    <div class="qs-s-value">日本語</div>
+  </div>
+
+  <div class="qs-s-section" style="margin-top:40px; border-top:1px solid #e8e4da; padding-top:16px;">
+    <div style="font-size:12px; color:#b8b09e; line-height:1.6;">
+      Qstart by QZERO<br>
+      ゼロから作ったAIサービス<br>
+      開発: yuto (12歳)
+    </div>
+  </div>
+</div>
+
+<script>
+# ===== Qstart フロントエンド =====
+let currentModel = 'equi';
+let currentEffort = 'mid';
+let usageCount = 0;
+const DAILY_LIMIT = 50;
+
+# --- モデル選択 ---
+function toggleModelMenu() {
+  document.getElementById('qs-model-menu').classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.qs-topbar')) {
+    document.getElementById('qs-model-menu').classList.remove('open');
+  }
+});
+
+function pickModel(m) {
+  if (m === 'pure' || m === 'zin' || m === 'apex') {
+    alert(m.charAt(0).toUpperCase() + m.slice(1) + ' は準備中です。お楽しみに!');
+    document.getElementById('qs-model-menu').classList.remove('open');
+    return;
+  }
+  currentModel = m;
+  const names = { equi: 'Equi 1' };
+  document.getElementById('qs-model-btn').textContent = (names[m] || m) + ' ∨';
+  document.getElementById('qs-s-model').textContent = 'Qstart ' + (names[m] || m);
+  document.getElementById('qs-model-menu').classList.remove('open');
+}
+
+# --- エフォート ---
+function setEffort(level) {
+  currentEffort = level;
+  ['low','mid','high'].forEach(function(l) {
+    document.getElementById('eff-' + l).classList.toggle('active', l === level);
+  });
+  const labels = { low:'低', mid:'中', high:'高' };
+  document.getElementById('qs-s-effort').textContent = labels[level];
+}
+
+# --- 設定パネル ---
+function openSettings() {
+  document.getElementById('qs-settings').classList.add('open');
+}
+function closeSettings() {
+  document.getElementById('qs-settings').classList.remove('open');
+}
+
+# --- チャット ---
+function addMsg(role, text) {
+  var welcome = document.getElementById('qs-welcome');
+  if (welcome) welcome.style.display = 'none';
+  var chat = document.getElementById('qs-chat');
+  var div = document.createElement('div');
+  div.className = 'qs-msg ' + (role === 'user' ? 'qs-msg-user' : 'qs-msg-ai');
+  if (role === 'ai') {
+    div.innerHTML = '<div><div class="qs-label">Qstart Equi 1</div><div class="qs-bubble">' + escH(text) + '</div></div>';
+  } else {
+    div.innerHTML = '<div class="qs-bubble">' + escH(text) + '</div>';
+  }
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function escH(s) {
+  var d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function updateUsage() {
+  document.getElementById('qs-usage').textContent = '今日の使用量: ' + usageCount + ' / ' + DAILY_LIMIT + ' メッセージ';
+  document.getElementById('qs-s-usage-text').textContent = usageCount + ' / ' + DAILY_LIMIT + ' メッセージ';
+  document.getElementById('qs-s-bar').style.width = Math.min(100, usageCount / DAILY_LIMIT * 100) + '%';
+}
+
+async function sendMsg() {
+  var input = document.getElementById('qs-input');
+  var text = input.value.trim();
+  if (!text) return;
+  if (usageCount >= DAILY_LIMIT) {
+    addMsg('ai', '今日の使用量の上限に達しました。明日またお話しましょう!');
+    return;
+  }
+  input.value = '';
+  addMsg('user', text);
+  usageCount++;
+  updateUsage();
+
+  # AIにリクエスト(現在は準備中メッセージ)
+  try {
+    var r = await fetch('/api/qstart/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ message: text, model: currentModel, effort: currentEffort })
+    });
+    var data = await r.json();
+    if (data.ok) {
+      addMsg('ai', data.reply);
+    } else {
+      addMsg('ai', data.error || 'エラーが発生しました');
+    }
+  } catch(e) {
+    addMsg('ai', 'Equi 1 は現在学習中です...もう少し待っててね! 🔄');
+  }
+}
+
+function newChat() {
+  document.getElementById('qs-chat').innerHTML = '<div class="qs-welcome" id="qs-welcome"><h1>Qstart</h1><p>ゼロから作ったTransformerと会話しよう。<br>12歳の開発者が手書きしたAIがここにいる。</p><div class="qs-status" id="qs-ai-status">🔄 Equi 1 — Colabで学習中...</div></div>';
+}
+
+updateUsage();
+</script>
+</body>
+</html>
