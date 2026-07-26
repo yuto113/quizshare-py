@@ -390,7 +390,7 @@ async function sendMsg() {
 
 function newChat() {
   currentChatId = null;
-  history.pushState({}, '', '/qstart');
+  window.history.pushState({}, '', '/qstart');
   document.getElementById('qs-chat').innerHTML = '<div class="qs-welcome" id="qs-welcome"><h1>Qstart</h1><p>ゼロから作ったTransformerと会話しよう。<br>12歳の開発者が手書きしたAIがここにいる。</p><div class="qs-status" id="qs-ai-status">🔄 Equi 1 — Colabで学習中...</div></div>';
 }
 
@@ -602,11 +602,11 @@ function startNewChat() {
   history.pushState({chatId: currentChatId}, '', '/qstart/chat/' + currentChatId);
 }
 
-// ページ読み込み時: 既存チャットならIDを取得、新規なら/qstartのまま
+// ページ読み込み時: /qstart/chat/xxxならIDを取得するだけ
 (function() {
   var path = window.location.pathname;
-  if (path.startsWith('/qstart/chat/')) {
-    currentChatId = path.split('/qstart/chat/')[1];
+  if (path.indexOf('/qstart/chat/') === 0) {
+    currentChatId = path.replace('/qstart/chat/', '');
   }
 })();
 
