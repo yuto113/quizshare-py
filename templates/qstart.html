@@ -393,9 +393,11 @@ function setLoginTab(t) {
   document.getElementById('qs-tab-login').style.color = t==='login' ? '#fff' : '#333';
   document.getElementById('qs-tab-reg').style.background = t==='register' ? '#14213d' : '#fff';
   document.getElementById('qs-tab-reg').style.color = t==='register' ? '#fff' : '#333';
-  document.getElementById('qs-nick-field').style.display = (t==='register' && loginType==='qstart') ? 'block' : 'none';
+  document.getElementById('qs-reg-fields').style.display = (t==='register' && loginType==='qstart') ? 'block' : 'none';
   document.getElementById('qs-login-terms').style.display = t==='register' ? 'block' : 'none';
-  document.querySelector('#qs-login-modal button:last-of-type').textContent = t==='register' ? 'アカウント作成' : 'ログイン';
+  document.getElementById('qs-type-row').style.display = t==='register' ? 'none' : 'flex';
+  document.getElementById('qs-submit-btn').textContent = t==='register' ? 'アカウント作成' : 'ログイン';
+  if (t==='register') { loginType='qstart'; setLoginType('qstart'); }
 }
 
 function setLoginType(t) {
@@ -404,7 +406,6 @@ function setLoginType(t) {
   document.getElementById('qs-type-qstart').style.color = t==='qstart' ? '#fff' : '#333';
   document.getElementById('qs-type-staff').style.background = t==='staff' ? '#14213d' : '#fff';
   document.getElementById('qs-type-staff').style.color = t==='staff' ? '#fff' : '#333';
-  document.getElementById('qs-nick-field').style.display = (loginTab==='register' && t==='qstart') ? 'block' : 'none';
   document.getElementById('qs-login-id').placeholder = t==='staff' ? '社員ID' : 'ユーザーID';
 }
 
@@ -419,10 +420,14 @@ async function doLogin() {
     var agree = document.getElementById('qs-agree');
     if (!agree.checked) { errEl.textContent = '利用規約に同意してね'; return; }
     var nick = document.getElementById('qs-reg-nick').value.trim();
+    var email = document.getElementById('qs-reg-email').value.trim();
+    var purpose = document.getElementById('qs-reg-purpose').value;
+    if (!email) { errEl.textContent = 'メールアドレスを入力してね'; return; }
+    if (!purpose) { errEl.textContent = '用途を選んでね'; return; }
     try {
       var r = await fetch('/api/qstart/register', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({user_id:uid, nickname:nick, password:pw})
+        body: JSON.stringify({user_id:uid, nickname:nick, password:pw, email:email, purpose:purpose})
       });
       var data = await r.json();
       if (data.ok) { closeLogin(); refreshUser(); }
@@ -480,8 +485,8 @@ if (savedLang) {
 </script>
 
 <!-- ログインモーダル -->
-<div id="qs-login-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:300; display:none; align-items:center; justify-content:center;">
-  <div style="background:#fff; border-radius:16px; padding:30px; max-width:380px; width:90%; position:relative;">
+<div id="qs-login-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:300; align-items:center; justify-content:center;">
+  <div style="background:#fff; border-radius:16px; padding:30px; max-width:400px; width:90%; position:relative;">
     <button onclick="closeLogin()" style="position:absolute; top:12px; right:16px; background:none; border:none; font-size:22px; cursor:pointer; color:#666;">×</button>
     <h2 style="font-size:20px; margin-bottom:16px; color:#14213d;">Qstart にログイン</h2>
 
@@ -490,20 +495,29 @@ if (savedLang) {
       <button onclick="setLoginTab('register')" id="qs-tab-reg" style="flex:1; padding:8px; border:none; background:#fff; color:#333; font-size:13px; cursor:pointer;">新規作成</button>
     </div>
 
-    <div style="display:flex; gap:0; margin-bottom:12px; border:1px solid #d0ccc0; border-radius:8px; overflow:hidden;">
+    <div id="qs-type-row" style="display:flex; gap:0; margin-bottom:12px; border:1px solid #d0ccc0; border-radius:8px; overflow:hidden;">
       <button onclick="setLoginType('qstart')" id="qs-type-qstart" style="flex:1; padding:6px; border:none; background:#14213d; color:#fff; font-size:12px; cursor:pointer;">Qstartアカウント</button>
       <button onclick="setLoginType('staff')" id="qs-type-staff" style="flex:1; padding:6px; border:none; background:#fff; color:#333; font-size:12px; cursor:pointer;">社員アカウント</button>
     </div>
 
-    <div id="qs-nick-field" style="display:none; margin-bottom:8px;">
-      <input id="qs-reg-nick" placeholder="ニックネーム" style="width:100%; padding:10px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px;">
+    <div id="qs-reg-fields" style="display:none;">
+      <input id="qs-reg-nick" placeholder="ニックネーム（呼ばれたい名前）" style="width:100%; padding:10px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px; margin-bottom:8px;">
+      <input id="qs-reg-email" placeholder="メールアドレス" type="email" style="width:100%; padding:10px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px; margin-bottom:8px;">
+      <select id="qs-reg-purpose" style="width:100%; padding:10px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px; margin-bottom:8px; background:#fff; color:#333;">
+        <option value="" disabled selected>用途を選んでね</option>
+        <option value="study">勉強・学習</option>
+        <option value="fun">遊び・趣味</option>
+        <option value="work">仕事</option>
+        <option value="dev">開発・研究</option>
+        <option value="other">その他</option>
+      </select>
     </div>
     <input id="qs-login-id" placeholder="ユーザーID" style="width:100%; padding:10px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px; margin-bottom:8px;">
     <input id="qs-login-pw" type="password" placeholder="パスワード" style="width:100%; padding:10px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px; margin-bottom:12px;">
     <div id="qs-login-terms" style="display:none; margin-bottom:12px; font-size:12px; color:#8a8270;">
       <label><input type="checkbox" id="qs-agree"> <a href="/qstart/terms" target="_blank">利用規約</a>と<a href="/qstart/privacy" target="_blank">プライバシーポリシー</a>に同意する</label>
     </div>
-    <button onclick="doLogin()" style="width:100%; padding:10px; background:#14213d; color:#fff; border:none; border-radius:8px; font-size:14px; cursor:pointer; font-weight:600;">ログイン</button>
+    <button id="qs-submit-btn" onclick="doLogin()" style="width:100%; padding:10px; background:#14213d; color:#fff; border:none; border-radius:8px; font-size:14px; cursor:pointer; font-weight:600;">ログイン</button>
     <div id="qs-login-error" style="color:#e24b4a; font-size:13px; margin-top:8px; text-align:center;"></div>
   </div>
 </div>

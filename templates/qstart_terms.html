@@ -1,18 +1,37 @@
-{% extends "base.html" %}
-{% block head_extra %}
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>利用規約 - Qstart</title>
 <style>
-.qs-legal { max-width:700px; margin:40px auto; padding:0 20px; }
-.qs-legal h1 { font-size:24px; color:#14213d; margin-bottom:8px; }
-.qs-legal .qs-date { font-size:13px; color:#8a8270; margin-bottom:24px; }
-.qs-legal h2 { font-size:16px; color:#14213d; margin:20px 0 8px; }
-.qs-legal p { font-size:14px; color:#4a4436; line-height:1.8; margin-bottom:12px; }
-.qs-legal a { color:#14213d; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI','Hiragino Sans',sans-serif; background:#faf9f6; color:#14213d; min-height:100vh; display:flex; }
+.qs-side { width:260px; background:#14213d; color:#fff; padding:30px 20px; flex-shrink:0; }
+.qs-side .logo { font-size:24px; font-weight:700; margin-bottom:4px; }
+.qs-side .logo span { color:#b8860b; }
+.qs-side .sub { font-size:11px; color:#8a8a9a; margin-bottom:30px; }
+.qs-side a { display:block; color:#ccc; font-size:14px; padding:8px 10px; border-radius:8px; text-decoration:none; margin-bottom:4px; }
+.qs-side a:hover { background:#2a2a4a; color:#fff; }
+.qs-content { flex:1; max-width:750px; padding:40px 40px 60px; }
+.qs-content h1 { font-size:24px; margin-bottom:6px; }
+.qs-content .date { font-size:13px; color:#8a8270; margin-bottom:28px; }
+.qs-content h2 { font-size:16px; margin:22px 0 8px; }
+.qs-content p { font-size:14px; color:#4a4436; line-height:1.8; margin-bottom:14px; }
+@media (max-width:768px) { .qs-side { display:none; } .qs-content { padding:24px 16px; } }
 </style>
-{% endblock %}
-{% block content %}
-<div class="qs-legal">
-<h1>Qstart 利用規約</h1>
-<div class="qs-date">最終更新: 2026年7月26日</div>
+</head>
+<body>
+<div class="qs-side">
+  <div class="logo">Q<span>start</span></div>
+  <div class="sub">ゼロから作ったAIと、話そう。</div>
+  <a href="/qstart">← Qstartに戻る</a>
+  <a href="/qstart/terms" style="background:#2a2a4a; color:#fff;">📄 利用規約</a>
+  <a href="/qstart/privacy">🔒 プライバシー</a>
+</div>
+<div class="qs-content">
+<h1>利用規約</h1>
+<div class="date">最終更新: 2026年7月26日</div>
 <h2>第1条（サービス）</h2>
 <p>Qstartは、12歳の開発者がゼロから作ったAIチャットサービスです。本サービスは現在ベータ版であり、予告なく変更・停止する場合があります。</p>
 <h2>第2条（アカウント）</h2>
@@ -27,6 +46,6 @@
 <p>チャット内容はサービス改善のために保存・分析される場合があります。個人情報の取り扱いについてはプライバシーポリシーをご覧ください。</p>
 <h2>第7条（変更）</h2>
 <p>本規約は予告なく変更される場合があります。変更後もサービスを利用した場合、変更に同意したものとみなします。</p>
-<p style="margin-top:30px;"><a href="/qstart">← Qstartに戻る</a></p>
 </div>
-{% endblock %}
+</body>
+</html>

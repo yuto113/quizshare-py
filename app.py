@@ -1838,8 +1838,10 @@ def api_qstart_register():
     if conn.execute('SELECT id FROM qstart_users WHERE user_id=?', (user_id,)).fetchone():
         conn.close()
         return jsonify(ok=False, error='そのIDはもう使われているよ')
-    conn.execute('INSERT INTO qstart_users (user_id, nickname, password_hash) VALUES (?,?,?)',
-                 (user_id, nickname, hash_password(password)))
+    email = (data.get('email') or '').strip()
+    purpose = (data.get('purpose') or '').strip()
+    conn.execute('INSERT INTO qstart_users (user_id, nickname, password_hash, email, purpose) VALUES (?,?,?,?,?)',
+                 (user_id, nickname, hash_password(password), email, purpose))
     conn.commit()
     conn.close()
     session['qstart_user'] = user_id
