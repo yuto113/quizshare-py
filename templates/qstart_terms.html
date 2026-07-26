@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block head_extra %}
+<style>
+.qs-legal { max-width:700px; margin:40px auto; padding:0 20px; }
+.qs-legal h1 { font-size:24px; color:#14213d; margin-bottom:8px; }
+.qs-legal .qs-date { font-size:13px; color:#8a8270; margin-bottom:24px; }
+.qs-legal h2 { font-size:16px; color:#14213d; margin:20px 0 8px; }
+.qs-legal p { font-size:14px; color:#4a4436; line-height:1.8; margin-bottom:12px; }
+.qs-legal a { color:#14213d; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="qs-legal">
+<h1>Qstart 利用規約</h1>
+<div class="qs-date">最終更新: 2026年7月26日</div>
+<h2>第1条（サービス）</h2>
+<p>Qstartは、12歳の開発者がゼロから作ったAIチャットサービスです。本サービスは現在ベータ版であり、予告なく変更・停止する場合があります。</p>
+<h2>第2条（アカウント）</h2>
+<p>ユーザーは正確な情報でアカウントを作成してください。1人につき1アカウントです。パスワードの管理は本人の責任です。</p>
+<h2>第3条（禁止事項）</h2>
+<p>以下の行為を禁止します: 違法行為、他者への嫌がらせ、AIの悪用（有害コンテンツの生成要求など）、サービスへの攻撃、アカウントの売買・共有。</p>
+<h2>第4条（AI応答の免責）</h2>
+<p>QstartのAIは自作のTransformerモデルであり、応答が不正確な場合があります。AIの応答を事実として信頼しないでください。重要な判断にはAIの応答を使用しないでください。</p>
+<h2>第5条（使用量制限）</h2>
+<p>無料ユーザーには1日あたりのトークン使用量の上限があります。上限はサービスの状況により変更される場合があります。</p>
+<h2>第6条（データ）</h2>
+<p>チャット内容はサービス改善のために保存・分析される場合があります。個人情報の取り扱いについてはプライバシーポリシーをご覧ください。</p>
+<h2>第7条（変更）</h2>
+<p>本規約は予告なく変更される場合があります。変更後もサービスを利用した場合、変更に同意したものとみなします。</p>
+<p style="margin-top:30px;"><a href="/qstart">← Qstartに戻る</a></p>
+</div>
+{% endblock %}

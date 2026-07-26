@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block head_extra %}
+<style>
+.qs-legal { max-width:700px; margin:40px auto; padding:0 20px; }
+.qs-legal h1 { font-size:24px; color:#14213d; margin-bottom:8px; }
+.qs-legal .qs-date { font-size:13px; color:#8a8270; margin-bottom:24px; }
+.qs-legal h2 { font-size:16px; color:#14213d; margin:20px 0 8px; }
+.qs-legal p { font-size:14px; color:#4a4436; line-height:1.8; margin-bottom:12px; }
+.qs-legal a { color:#14213d; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="qs-legal">
+<h1>Qstart プライバシーポリシー</h1>
+<div class="qs-date">最終更新: 2026年7月26日</div>
+<h2>第1条（収集する情報）</h2>
+<p>アカウント登録時: ユーザーID、ニックネーム、パスワード（ハッシュ化して保存）。利用時: チャット内容、使用量、アクセス日時。</p>
+<h2>第2条（利用目的）</h2>
+<p>収集した情報は以下の目的で利用します: サービスの提供と改善、使用量の管理、不正利用の防止、AIモデルの改善。</p>
+<h2>第3条（第三者提供）</h2>
+<p>法令に基づく場合を除き、ユーザーの個人情報を第三者に提供しません。</p>
+<h2>第4条（データの保存）</h2>
+<p>チャットデータはサーバーに保存されます。アカウント削除時にデータは削除されます。</p>
+<h2>第5条（セキュリティ）</h2>
+<p>パスワードはハッシュ化して保存し、通信はHTTPSで暗号化されます。ただし、完全なセキュリティを保証するものではありません。</p>
+<h2>第6条（お問い合わせ）</h2>
+<p>プライバシーに関するお問い合わせは、QuizShareの管理者までお願いします。</p>
+<p style="margin-top:30px;"><a href="/qstart">← Qstartに戻る</a></p>
+</div>
+{% endblock %}

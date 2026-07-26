@@ -1816,3 +1816,86 @@ def api_qstart_chat():
     # 現在は準備中メッセージ
     reply = 'Qstart Equi 1 は現在学習中です! Colabで頑張ってトレーニング中...もう少し待っててね! 🔄'
     return jsonify(ok=True, reply=reply, model=model, effort=effort)
+
+
+# ===== Qstart 認証API =====
+@app.route('/api/qstart/register', methods=['POST'])
+def api_qstart_register():
+    # Qstartアカウント新規作成
+    import re as _re
+    data = request.get_json(silent=True) or {}
+    user_id = (data.get('user_id') or '').strip()
+    nickname = (data.get('nickname') or '').strip()
+    password = data.get('password') or ''
+    if not _re.fullmatch(r'[A-Za-z0-9_]{3,20}', user_id):
+        return jsonify(ok=False, error='IDは半角英数字3〜20文字にしてね')
+    if not nickname or len(nickname) > 20:
+        return jsonify(ok=False, error='ニックネームは1〜20文字にしてね')
+    if len(password) < 6:
+        return jsonify(ok=False, error='パスワードは6文字以上にしてね')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    if conn.execute('SELECT id FROM qstart_users WHERE user_id=?', (user_id,)).fetchone():
+        conn.close()
+        return jsonify(ok=False, error='そのIDはもう使われているよ')
+    conn.execute('INSERT INTO qstart_users (user_id, nickname, password_hash) VALUES (?,?,?)',
+                 (user_id, nickname, hash_password(password)))
+    conn.commit()
+    conn.close()
+    session['qstart_user'] = user_id
+    session['qstart_nick'] = nickname
+    return jsonify(ok=True)
+
+@app.route('/api/qstart/login', methods=['POST'])
+def api_qstart_login():
+    # Qstartログイン(Qstartアカウント or 社員アカウント)
+    data = request.get_json(silent=True) or {}
+    user_id = (data.get('user_id') or '').strip()
+    password = data.get('password') or ''
+    login_type = data.get('type', 'qstart')
+    if not user_id or not password:
+        return jsonify(ok=False, error='IDとパスワードを入力してね')
+    import sqlite3 as _sq
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    if login_type == 'staff':
+        row = conn.execute('SELECT staff_id, name, password_hash FROM qz_staff WHERE staff_id=?', (user_id,)).fetchone()
+        conn.close()
+        if not row or not verify_password(password, row[2]):
+            return jsonify(ok=False, error='IDまたはパスワードが違うよ')
+        session['qstart_user'] = row[0]
+        session['qstart_nick'] = dec(row[1]) if row[1] else row[0]
+        session['qstart_staff'] = True
+        return jsonify(ok=True, nickname=session['qstart_nick'])
+    else:
+        row = conn.execute('SELECT user_id, nickname, password_hash FROM qstart_users WHERE user_id=?', (user_id,)).fetchone()
+        conn.close()
+        if not row or not verify_password(password, row[2]):
+            return jsonify(ok=False, error='IDまたはパスワードが違うよ')
+        session['qstart_user'] = row[0]
+        session['qstart_nick'] = row[1]
+        session['qstart_staff'] = False
+        return jsonify(ok=True, nickname=row[1])
+
+@app.route('/api/qstart/logout', methods=['POST'])
+def api_qstart_logout():
+    session.pop('qstart_user', None)
+    session.pop('qstart_nick', None)
+    session.pop('qstart_staff', None)
+    return jsonify(ok=True)
+
+@app.route('/api/qstart/me')
+def api_qstart_me():
+    if session.get('qstart_user'):
+        return jsonify(ok=True, logged_in=True,
+                       user_id=session['qstart_user'],
+                       nickname=session.get('qstart_nick',''),
+                       is_staff=session.get('qstart_staff', False))
+    return jsonify(ok=True, logged_in=False)
+
+@app.route('/qstart/terms')
+def page_qstart_terms():
+    return render_template('qstart_terms.html')
+
+@app.route('/qstart/privacy')
+def page_qstart_privacy():
+    return render_template('qstart_privacy.html')
