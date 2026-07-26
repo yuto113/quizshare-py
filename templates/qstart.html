@@ -393,11 +393,24 @@ function setLoginTab(t) {
   document.getElementById('qs-tab-login').style.color = t==='login' ? '#fff' : '#333';
   document.getElementById('qs-tab-reg').style.background = t==='register' ? '#14213d' : '#fff';
   document.getElementById('qs-tab-reg').style.color = t==='register' ? '#fff' : '#333';
-  document.getElementById('qs-reg-fields').style.display = (t==='register' && loginType==='qstart') ? 'block' : 'none';
-  document.getElementById('qs-login-terms').style.display = t==='register' ? 'block' : 'none';
+  document.getElementById('qs-reg-fields').style.display = 'none';
+  document.getElementById('qs-login-terms').style.display = 'none';
   document.getElementById('qs-type-row').style.display = t==='register' ? 'none' : 'flex';
-  document.getElementById('qs-submit-btn').textContent = t==='register' ? 'アカウント作成' : 'ログイン';
-  if (t==='register') { loginType='qstart'; setLoginType('qstart'); }
+  document.getElementById('qs-submit-btn').style.display = t==='register' ? 'none' : 'block';
+  var soon = document.getElementById('qs-reg-soon');
+  if (t==='register') {
+    if (!soon) {
+      soon = document.createElement('div');
+      soon.id = 'qs-reg-soon';
+      soon.style.cssText = 'text-align:center; padding:24px 0;';
+      soon.innerHTML = '<div style="font-size:32px; margin-bottom:8px;">🚧</div><div style="font-size:16px; font-weight:600; color:#14213d; margin-bottom:6px;">新規登録は準備中...</div><div style="font-size:13px; color:#8a8270; line-height:1.6;">メール認証機能を準備しています。<br>もう少し待っててね!</div>';
+      document.getElementById('qs-submit-btn').parentNode.insertBefore(soon, document.getElementById('qs-submit-btn'));
+    }
+    soon.style.display = 'block';
+  } else {
+    if (soon) soon.style.display = 'none';
+  }
+  if (t==='login') { setLoginType(loginType); }
 }
 
 function setLoginType(t) {
