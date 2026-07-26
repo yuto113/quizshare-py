@@ -361,8 +361,13 @@ async function sendMsg() {
     var data = await r.json();
     if (data.ok) {
       addMsg('ai', data.reply);
+      fetchUsage();
     } else {
-      addMsg('ai', data.error || 'エラーが発生しました');
+      if (data.error === 'limit_reached') {
+        showLimitReached(data.recovery_time, data.weekly_pct);
+      } else {
+        addMsg('ai', data.error || 'エラーが発生しました');
+      }
     }
   } catch(e) {
     addMsg('ai', 'Equi 1 は現在学習中です...もう少し待っててね! 🔄');
@@ -514,6 +519,56 @@ async function sendCode() {
     }
   } catch(e) { errEl.textContent = '通信エラー'; btn.textContent = 'コード送信'; btn.disabled = false; }
 }
+
+
+// --- 使用量管理 ---
+async function fetchUsage() {
+  try {
+    var r = await fetch('/api/qstart/usage');
+    var data = await r.json();
+    if (data.ok) {
+      var pct = data.window_pct;
+      document.getElementById('qs-usage').textContent = '使用量: ' + pct + '% (3時間ごとにリセット)';
+      document.getElementById('qs-s-usage-text').textContent = pct + '% / 週間: ' + data.weekly_pct + '%';
+      document.getElementById('qs-s-bar').style.width = pct + '%';
+      // 100%到達時
+      if (!data.allowed) { showLimitReached(data.recovery_time, data.weekly_pct); }
+      else { hideLimitReached(); }
+    }
+  } catch(e) {}
+}
+
+function showLimitReached(recoveryTime, weeklyPct) {
+  var input = document.getElementById('qs-input');
+  var btn = document.querySelector('.qs-send');
+  input.disabled = true;
+  input.placeholder = '使用量の上限に達しました';
+  input.style.opacity = '0.5';
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.3'; btn.style.cursor = 'not-allowed'; }
+  // 上限メッセージを表示
+  var existing = document.getElementById('qs-limit-msg');
+  if (!existing) {
+    var msg = document.createElement('div');
+    msg.id = 'qs-limit-msg';
+    msg.style.cssText = 'background:#fff8e7; border:1px solid #e8d5a0; border-radius:12px; padding:20px; text-align:center; margin:20px auto; max-width:400px;';
+    document.getElementById('qs-chat').appendChild(msg);
+  }
+  var el = document.getElementById('qs-limit-msg');
+  var timeText = recoveryTime ? recoveryTime + ' に回復します' : 'しばらくお待ちください';
+  el.innerHTML = '<div style="font-size:24px; margin-bottom:8px;">⏳</div>' +
+    '<div style="font-size:16px; font-weight:600; color:#14213d; margin-bottom:6px;">使用量の上限に達しました</div>' +
+    '<div style="font-size:14px; color:#b8860b; font-weight:600; margin-bottom:8px;">' + timeText + '</div>' +
+    '<div style="font-size:12px; color:#8a8270;">週間使用量: ' + weeklyPct + '%</div>';
+  el.style.display = 'block';
+}
+
+function hideLimitReached() {
+  var el = document.getElementById('qs-limit-msg');
+  if (el) el.style.display = 'none';
+}
+
+// 30秒ごとに使用量を更新
+setInterval(fetchUsage, 30000);
 
 // --- 言語 ---
 function setLang(lang) {

@@ -1814,8 +1814,15 @@ def api_qstart_chat():
 
     # TODO: ここにPyTorchモデルの推論を入れる
     # 現在は準備中メッセージ
-    reply = 'Qstart Equi 1 は現在学習中です! Colabで頑張ってトレーニング中...もう少し待っててね! 🔄'
-    return jsonify(ok=True, reply=reply, model=model, effort=effort)
+    user_id = session.get('qstart_user', 'guest_' + request.remote_addr)
+    is_staff = session.get('qstart_staff', False)
+    usage = _qstart_check_limit(user_id, is_staff)
+    if not usage['allowed']:
+        return jsonify(ok=False, error='limit_reached', recovery_time=usage.get('recovery_time',''), window_pct=usage['window_pct'], weekly_pct=usage['weekly_pct'])
+    reply = 'Qstart Equi 1 は現在学習中です! もう少し待っててね!'
+    tokens_used = len(message) + len(reply)
+    _qstart_add_usage(user_id, tokens_used, is_staff)
+    return jsonify(ok=True, reply=reply, model=model, effort=effort, tokens_used=tokens_used)
 
 
 # ===== Qstart 認証API =====
@@ -1971,3 +1978,68 @@ def api_qstart_verify_code():
     session['qstart_user'] = user_id
     session['qstart_nick'] = nickname
     return jsonify(ok=True)
+
+
+# ===== Qstart トークン制限 =====
+QSTART_LIMIT = 4000
+QSTART_LIMIT_STAFF = 20000
+QSTART_WEEKLY = 40000
+QSTART_WEEKLY_STAFF = 200000
+QSTART_WINDOW = 3 * 3600
+
+def _qstart_check_limit(user_id, is_staff=False):
+    import time, sqlite3 as _sq
+    from datetime import datetime
+    import pytz, datetime as _dt
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    now = time.time()
+    limit = QSTART_LIMIT_STAFF if is_staff else QSTART_LIMIT
+    weekly_limit = QSTART_WEEKLY_STAFF if is_staff else QSTART_WEEKLY
+    window_start = now - QSTART_WINDOW
+    rows = conn.execute('SELECT SUM(tokens_used) FROM qstart_usage WHERE user_id=? AND window_start>?', (user_id, window_start)).fetchone()
+    window_used = rows[0] or 0
+    jst = pytz.timezone('Asia/Tokyo')
+    today = datetime.now(jst)
+    monday = today - _dt.timedelta(days=today.weekday())
+    week_start_str = monday.strftime('%Y-%m-%d')
+    wrow = conn.execute('SELECT tokens_used, week_start FROM qstart_weekly WHERE user_id=?', (user_id,)).fetchone()
+    if wrow and wrow[1] == week_start_str:
+        weekly_used = wrow[0] or 0
+    else:
+        weekly_used = 0
+        conn.execute('DELETE FROM qstart_weekly WHERE user_id=?', (user_id,))
+        conn.execute('INSERT INTO qstart_weekly (user_id, tokens_used, week_start) VALUES (?,0,?)', (user_id, week_start_str))
+        conn.commit()
+    recovery_time = None
+    if window_used >= limit:
+        oldest = conn.execute('SELECT MIN(window_start) FROM qstart_usage WHERE user_id=? AND window_start>?', (user_id, window_start)).fetchone()
+        if oldest and oldest[0]:
+            recovery_dt = datetime.fromtimestamp(oldest[0] + QSTART_WINDOW, jst)
+            recovery_time = recovery_dt.strftime('%H:%M')
+    conn.close()
+    return {'window_used': window_used, 'window_limit': limit, 'window_pct': min(100, int(window_used / limit * 100)), 'weekly_used': weekly_used, 'weekly_limit': weekly_limit, 'weekly_pct': min(100, int(weekly_used / weekly_limit * 100)), 'allowed': window_used < limit and weekly_used < weekly_limit, 'recovery_time': recovery_time}
+
+def _qstart_add_usage(user_id, tokens, is_staff=False):
+    import time, sqlite3 as _sq
+    from datetime import datetime
+    import pytz, datetime as _dt
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    conn.execute('INSERT INTO qstart_usage (user_id, tokens_used, window_start, is_staff) VALUES (?,?,?,?)', (user_id, tokens, time.time(), 1 if is_staff else 0))
+    jst = pytz.timezone('Asia/Tokyo')
+    today = datetime.now(jst)
+    monday = today - _dt.timedelta(days=today.weekday())
+    week_start_str = monday.strftime('%Y-%m-%d')
+    existing = conn.execute('SELECT user_id FROM qstart_weekly WHERE user_id=?', (user_id,)).fetchone()
+    if existing:
+        conn.execute('UPDATE qstart_weekly SET tokens_used=tokens_used+?, week_start=? WHERE user_id=?', (tokens, week_start_str, user_id))
+    else:
+        conn.execute('INSERT INTO qstart_weekly (user_id, tokens_used, week_start) VALUES (?,?,?)', (user_id, tokens, week_start_str))
+    conn.commit()
+    conn.close()
+
+@app.route('/api/qstart/usage')
+def api_qstart_usage():
+    user_id = session.get('qstart_user', 'guest_' + request.remote_addr)
+    is_staff = session.get('qstart_staff', False)
+    usage = _qstart_check_limit(user_id, is_staff)
+    return jsonify(ok=True, **usage)
