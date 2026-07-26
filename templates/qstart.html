@@ -41,10 +41,10 @@ body { font-family: 'Segoe UI','Hiragino Sans',sans-serif; background:#faf9f6; c
 .qs-sidebar-link:hover { background:#2a2a4a; color:#fff; }
 
 /* メインエリア */
-.qs-main { flex:1; display:flex; flex-direction:column; }
+.qs-main { flex:1; display:flex; flex-direction:column; min-width:0; }
 .qs-topbar {
   display:flex; justify-content:space-between; align-items:center;
-  padding:12px 24px; border-bottom:1px solid #e8e4da;
+  padding:12px 24px; border-bottom:1px solid #e8e4da; flex-wrap:wrap; gap:8px;
 }
 .qs-model-btn {
   background:transparent; border:1px solid #d0ccc0; border-radius:8px;
@@ -63,9 +63,9 @@ body { font-family: 'Segoe UI','Hiragino Sans',sans-serif; background:#faf9f6; c
 }
 
 /* チャットエリア */
-.qs-chat { flex:1; overflow-y:auto; padding:24px; max-width:800px; margin:0 auto; width:100%; }
+.qs-chat { flex:1; overflow-y:auto; padding:24px; max-width:700px; margin:0 auto; width:100%; box-sizing:border-box; }
 .qs-welcome {
-  text-align:center; margin-top:15vh;
+  text-align:center; margin-top:12vh; padding:0 20px; max-width:600px; margin-left:auto; margin-right:auto;
 }
 .qs-welcome h1 { font-size:28px; font-weight:600; margin-bottom:8px; }
 .qs-welcome p { font-size:15px; color:#8a8270; line-height:1.7; }
@@ -88,7 +88,7 @@ body { font-family: 'Segoe UI','Hiragino Sans',sans-serif; background:#faf9f6; c
 /* 入力エリア */
 .qs-input-area {
   padding:16px 24px; border-top:1px solid #e8e4da;
-  max-width:800px; margin:0 auto; width:100%;
+  max-width:700px; margin:0 auto; width:100%; box-sizing:border-box;
 }
 .qs-input-row { display:flex; gap:8px; }
 .qs-input {
@@ -737,25 +737,51 @@ function setLang(lang) {
 
 function applyLang() {
   // サイドバー
-  document.querySelector('.qs-sub').textContent = T('slogan');
-  document.querySelector('.qs-new-chat').textContent = T('new_chat');
+  var sub = document.querySelector('.qs-sub');
+  if (sub) sub.textContent = T('slogan');
+  var nc = document.querySelector('.qs-new-chat');
+  if (nc) nc.textContent = T('new_chat');
+  // サイドバーリンク
+  var links = document.querySelectorAll('.qs-sidebar-link');
+  var linkMap = {'設定':'settings','利用規約':'terms','プライバシー':'privacy','QuizShareに戻る':'back','ログアウト':'logout','Settings':'settings','Terms of Service':'terms','Privacy Policy':'privacy','Back to QuizShare':'back','Logout':'logout','设置':'settings','利用条款':'terms','隐私政策':'privacy','返回QuizShare':'back','退出':'logout'};
+  links.forEach(function(a) {
+    var txt = a.textContent.replace(/[⚙📄🔒🏠🔑]/g,'').trim();
+    Object.keys(linkMap).forEach(function(k) {
+      if (txt === k) {
+        var icons = {'settings':'⚙️ ','terms':'📄 ','privacy':'🔒 ','back':'🏠 ','logout':''};
+        a.textContent = (icons[linkMap[k]]||'') + T(linkMap[k]);
+      }
+    });
+  });
   // 入力欄
   var inp = document.getElementById('qs-input');
-  if (inp && !inp.disabled) inp.placeholder = T('input_placeholder');
+  if (inp) inp.placeholder = inp.disabled ? T('preparing') + '...' : T('input_placeholder');
+  // 送信ボタン
+  var send = document.querySelector('.qs-send');
+  if (send) send.textContent = send.disabled ? T('preparing') : T('send');
   // ウェルカム
   var wt = document.querySelector('.qs-welcome h1');
   if (wt) wt.textContent = T('welcome_title');
   var wp = document.querySelector('.qs-welcome p');
-  if (wp) wp.innerHTML = T('welcome_desc').replace('\n','<br>');
+  if (wp) wp.innerHTML = T('welcome_desc').replace(/\\n/g,'<br>');
   // 設定パネル
   var sh = document.querySelector('#qs-settings h2');
   if (sh) sh.textContent = T('settings');
+  // 設定ラベル
+  var labels = document.querySelectorAll('.qs-s-label');
+  var labelMap = ['account','model_label','effort_label','usage','lang_label'];
+  labels.forEach(function(el, i) { if (labelMap[i]) el.textContent = T(labelMap[i]); });
   // 使用量
   var usage = document.getElementById('qs-usage');
   if (usage) {
     var pctMatch = usage.textContent.match(/\d+/);
     var pct = pctMatch ? pctMatch[0] : '0';
     usage.textContent = T('usage') + ': ' + pct + '% (' + T('reset_label') + ')';
+  }
+  // 履歴プレースホルダー
+  var hist = document.querySelector('.qs-history');
+  if (hist && hist.children.length === 1 && hist.children[0].style) {
+    hist.children[0].textContent = T('history_label');
   }
 }
 
