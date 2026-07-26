@@ -131,6 +131,10 @@
           <a class="header-link danger" href="#" data-action="logout">↪ ログアウト</a>
         {% endif %}
       {% endblock %}
+    
+    {% if session.get('admin_auth') %}
+    <a href="/reden" style="color: #b8860b; font-weight: bold;">reden (AI)</a>
+    {% endif %}
     </nav>
   </div>
 </header>

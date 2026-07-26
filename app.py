@@ -1786,3 +1786,14 @@ def daily_db_backup():
                 os.remove(_old)  # 14日より古いのは消す
     except Exception:
         pass  # バックアップ失敗でもサイトは止めない
+
+
+# ===== redenモード（AIチャット・管理者のみ） =====
+@app.route('/reden')
+def page_reden():
+    # 管理者のみアクセス可能
+    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
+    is_admin = session.get('admin_auth') == True
+    if not is_admin:
+        return redirect(url_for('page_entry'))
+    return render_template('reden.html')

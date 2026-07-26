@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block head_extra %}
+<style>
+  .reden-container {
+    max-width: 600px;
+    margin: 60px auto;
+    text-align: center;
+    padding: 0 20px;
+  }
+  .reden-logo {
+    font-size: 48px;
+    font-weight: bold;
+    color: #14213d;
+    margin-bottom: 8px;
+  }
+  .reden-sub {
+    font-size: 16px;
+    color: #8a8270;
+    margin-bottom: 40px;
+  }
+  .reden-card {
+    background: #f8f7f4;
+    border: 2px solid #e3ddd0;
+    border-radius: 16px;
+    padding: 40px 30px;
+    margin-bottom: 24px;
+  }
+  .reden-badge {
+    display: inline-block;
+    background: #14213d;
+    color: #fff;
+    font-size: 12px;
+    padding: 4px 16px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+  }
+  .reden-title {
+    font-size: 22px;
+    font-weight: bold;
+    color: #14213d;
+    margin-bottom: 12px;
+  }
+  .reden-desc {
+    font-size: 15px;
+    color: #4a4436;
+    line-height: 1.7;
+    margin-bottom: 24px;
+  }
+  .reden-chat-preview {
+    background: #fff;
+    border: 1px solid #e3ddd0;
+    border-radius: 12px;
+    padding: 20px;
+    text-align: left;
+    margin-bottom: 20px;
+  }
+  .reden-msg {
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    max-width: 80%;
+  }
+  .reden-msg.user {
+    background: #14213d;
+    color: #fff;
+    margin-left: auto;
+  }
+  .reden-msg.ai {
+    background: #f0ede6;
+    color: #14213d;
+  }
+  .reden-coming {
+    font-size: 18px;
+    font-weight: bold;
+    color: #b8860b;
+  }
+  .reden-admin-note {
+    margin-top: 30px;
+    font-size: 13px;
+    color: #b8b09e;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="reden-container">
+  <div class="reden-logo">reden</div>
+  <div class="reden-sub">by QZERO ― ゼロから作ったAIと、話そう。</div>
+
+  <div class="reden-card">
+    <span class="reden-badge">Coming Soon</span>
+    <div class="reden-title">AIチャット機能</div>
+    <div class="reden-desc">
+      12歳の開発者がゼロから手書きしたTransformerが、<br>
+      QuizShareに会話機能としてやってくる。
+    </div>
+
+    <div class="reden-chat-preview">
+      <div class="reden-msg user">日本の首都はどこ？</div>
+      <div class="reden-msg ai">日本の首都は東京です。</div>
+      <div class="reden-msg user">ありがとう！</div>
+      <div class="reden-msg ai">どういたしまして！</div>
+    </div>
+
+    <div class="reden-coming">近日公開予定</div>
+  </div>
+
+  <div class="reden-admin-note">
+    ※ このページはスタッフのみに表示されています
+  </div>
+</div>
+{% endblock %}
