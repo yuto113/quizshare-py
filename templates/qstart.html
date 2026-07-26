@@ -425,13 +425,17 @@ async function doLogin() {
     if (!agree.checked) { errEl.textContent = '利用規約に同意してね'; return; }
     var nick = document.getElementById('qs-reg-nick').value.trim();
     var email = document.getElementById('qs-reg-email').value.trim();
+    var code = document.getElementById('qs-reg-code').value.trim();
+    var birthday = document.getElementById('qs-reg-birthday').value;
     var purpose = document.getElementById('qs-reg-purpose').value;
     if (!email) { errEl.textContent = 'メールアドレスを入力してね'; return; }
+    if (!code || code.length !== 6) { errEl.textContent = '6桁の認証コードを入力してね'; return; }
+    if (!birthday) { errEl.textContent = '生年月日を入力してね'; return; }
     if (!purpose) { errEl.textContent = '用途を選んでね'; return; }
     try {
-      var r = await fetch('/api/qstart/register', {
+      var r = await fetch('/api/qstart/verify-code', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({user_id:uid, nickname:nick, password:pw, email:email, purpose:purpose})
+        body: JSON.stringify({user_id:uid, nickname:nick, password:pw, email:email, purpose:purpose, code:code, birthday:birthday})
       });
       var data = await r.json();
       if (data.ok) { closeLogin(); refreshUser(); }
@@ -472,6 +476,32 @@ async function doLogout() {
   refreshUser();
 }
 
+
+// --- メール認証 ---
+async function sendCode() {
+  var email = document.getElementById('qs-reg-email').value.trim();
+  var errEl = document.getElementById('qs-login-error');
+  if (!email || email.indexOf('@') < 0) { errEl.textContent = 'メールアドレスを入力してね'; return; }
+  var btn = document.getElementById('qs-send-code-btn');
+  btn.disabled = true; btn.textContent = '送信中...';
+  try {
+    var r = await fetch('/api/qstart/send-code', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({email: email})
+    });
+    var data = await r.json();
+    if (data.ok) {
+      document.getElementById('qs-code-field').style.display = 'block';
+      btn.textContent = '再送信'; btn.disabled = false;
+      errEl.textContent = '';
+      // 開発中: コードを表示(本番では削除)
+      if (data.dev_code) { errEl.style.color='#2e7d32'; errEl.textContent = '開発モード: コードは ' + data.dev_code; }
+    } else {
+      errEl.textContent = data.error; btn.textContent = 'コード送信'; btn.disabled = false;
+    }
+  } catch(e) { errEl.textContent = '通信エラー'; btn.textContent = 'コード送信'; btn.disabled = false; }
+}
+
 // --- 言語 ---
 function setLang(lang) {
   localStorage.setItem('qstart_lang', lang);
@@ -506,7 +536,16 @@ if (savedLang) {
 
     <div id="qs-reg-fields" style="display:none;">
       <input id="qs-reg-nick" placeholder="ニックネーム（呼ばれたい名前）" style="width:100%; padding:10px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px; margin-bottom:8px;">
-      <input id="qs-reg-email" placeholder="メールアドレス" type="email" style="width:100%; padding:10px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px; margin-bottom:8px;">
+      <div style="display:flex; gap:6px; margin-bottom:8px;">
+        <input id="qs-reg-email" placeholder="メールアドレス" type="email" style="flex:1; padding:10px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px;">
+        <button onclick="sendCode()" id="qs-send-code-btn" style="padding:8px 14px; background:#14213d; color:#fff; border:none; border-radius:8px; font-size:12px; cursor:pointer; white-space:nowrap;">コード送信</button>
+      </div>
+      <div id="qs-code-field" style="display:none; margin-bottom:8px;">
+        <input id="qs-reg-code" placeholder="6桁の認証コード" maxlength="6" style="width:100%; padding:10px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px; text-align:center; letter-spacing:8px; font-weight:bold;">
+        <div style="font-size:11px; color:#8a8270; margin-top:4px;">メールに届いた6桁のコードを入力してね</div>
+      </div>
+      <input id="qs-reg-birthday" type="date" style="width:100%; padding:10px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px; margin-bottom:8px; color:#333;">
+      <div style="font-size:11px; color:#8a8270; margin:-4px 0 8px 4px;">生年月日</div>
       <select id="qs-reg-purpose" style="width:100%; padding:10px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px; margin-bottom:8px; background:#fff; color:#333;">
         <option value="" disabled selected>用途を選んでね</option>
         <option value="study">勉強・学習</option>

@@ -1901,3 +1901,73 @@ def page_qstart_terms():
 @app.route('/qstart/privacy')
 def page_qstart_privacy():
     return render_template('qstart_privacy.html')
+
+
+# ===== Qstart メール認証 =====
+@app.route('/api/qstart/send-code', methods=['POST'])
+def api_qstart_send_code():
+    # 認証コードを生成してメール送信(仮)
+    import random, time
+    import sqlite3 as _sq
+    data = request.get_json(silent=True) or {}
+    email = (data.get('email') or '').strip()
+    if not email or '@' not in email:
+        return jsonify(ok=False, error='正しいメールアドレスを入力してね')
+    # 6桁コード生成
+    code = str(random.randint(100000, 999999))
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    conn.execute('DELETE FROM qstart_verify WHERE email=?', (email,))
+    conn.execute('INSERT INTO qstart_verify (email, code, expires_at) VALUES (?,?,?)',
+                 (email, code, time.time() + 600))
+    conn.commit()
+    conn.close()
+    # TODO: 実際のメール送信(今はログに出力)
+    print(f'[Qstart認証コード] {email} → {code}')
+    # 開発中はコードをレスポンスに含める(本番では削除)
+    return jsonify(ok=True, message='認証コードを送信したよ!', dev_code=code)
+
+@app.route('/api/qstart/verify-code', methods=['POST'])
+def api_qstart_verify_code():
+    # 認証コードを確認して登録完了
+    import time
+    import sqlite3 as _sq
+    data = request.get_json(silent=True) or {}
+    email = (data.get('email') or '').strip()
+    code = (data.get('code') or '').strip()
+    user_id = (data.get('user_id') or '').strip()
+    nickname = (data.get('nickname') or '').strip()
+    password = data.get('password') or ''
+    birthday = (data.get('birthday') or '').strip()
+    purpose = (data.get('purpose') or '').strip()
+    import re as _re
+    if not _re.fullmatch(r'[A-Za-z0-9_]{3,20}', user_id):
+        return jsonify(ok=False, error='IDは半角英数字3〜20文字にしてね')
+    if not nickname or len(nickname) > 20:
+        return jsonify(ok=False, error='ニックネームは1〜20文字にしてね')
+    if len(password) < 6:
+        return jsonify(ok=False, error='パスワードは6文字以上にしてね')
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    row = conn.execute('SELECT code, expires_at FROM qstart_verify WHERE email=?', (email,)).fetchone()
+    if not row:
+        conn.close()
+        return jsonify(ok=False, error='認証コードが見つからないよ。もう一度送信してね')
+    if time.time() > row[1]:
+        conn.execute('DELETE FROM qstart_verify WHERE email=?', (email,))
+        conn.commit(); conn.close()
+        return jsonify(ok=False, error='認証コードの有効期限が切れたよ。もう一度送信してね')
+    if row[0] != code:
+        conn.close()
+        return jsonify(ok=False, error='認証コードが違うよ')
+    if conn.execute('SELECT id FROM qstart_users WHERE user_id=?', (user_id,)).fetchone():
+        conn.close()
+        return jsonify(ok=False, error='そのIDはもう使われているよ')
+    if conn.execute('SELECT id FROM qstart_users WHERE email=?', (email,)).fetchone():
+        conn.close()
+        return jsonify(ok=False, error='そのメールアドレスは既に登録されているよ')
+    conn.execute("INSERT INTO qstart_users (user_id,nickname,password_hash,email,purpose,birthday) VALUES (?,?,?,?,?,?)",
+                 (user_id, nickname, hash_password(password), email, purpose, birthday))
+    conn.execute('DELETE FROM qstart_verify WHERE email=?', (email,))
+    conn.commit(); conn.close()
+    session['qstart_user'] = user_id
+    session['qstart_nick'] = nickname
+    return jsonify(ok=True)
