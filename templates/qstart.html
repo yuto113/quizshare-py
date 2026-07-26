@@ -149,7 +149,7 @@ body { font-family: 'Segoe UI','Hiragino Sans',sans-serif; background:#faf9f6; c
 <div class="qs-sidebar">
   <div class="qs-logo">Q<span>start</span></div>
   <div class="qs-sub">ゼロから作ったAIと、話そう。</div>
-  <div class="qs-new-chat" onclick="newChat()">+ 新しいチャット</div>
+  <div class="qs-new-chat" style="opacity:0.5;cursor:not-allowed;">+ 新しいチャット</div>
   <div class="qs-history" id="qs-history">
     <div style="color:#666; font-size:12px; padding:8px;">チャット履歴はここに表示されます</div>
   </div>
@@ -184,9 +184,9 @@ body { font-family: 'Segoe UI','Hiragino Sans',sans-serif; background:#faf9f6; c
     </div>
     <div class="qs-topbar-right">
       <div class="qs-effort-group">
-        <button class="qs-effort-btn" onclick="setEffort('low')" id="eff-low">⚡低</button>
-        <button class="qs-effort-btn active" onclick="setEffort('mid')" id="eff-mid">⚙️中</button>
-        <button class="qs-effort-btn" onclick="setEffort('high')" id="eff-high">🔥高</button>
+        <button class="qs-effort-btn" id="eff-low" disabled style="opacity:0.4;">⚡低</button>
+        <button class="qs-effort-btn active" id="eff-mid" disabled style="opacity:0.7;">⚙️中</button>
+        <button class="qs-effort-btn" id="eff-high" disabled style="opacity:0.4;">🔥高</button>
       </div>
       <button class="qs-settings-btn" onclick="openSettings()">⚙</button>
     </div>
@@ -204,10 +204,10 @@ body { font-family: 'Segoe UI','Hiragino Sans',sans-serif; background:#faf9f6; c
   <!-- 入力 -->
   <div class="qs-input-area">
     <div class="qs-input-row">
-      <input class="qs-input" id="qs-input" placeholder="メッセージを入力..." onkeydown="if(event.key==='Enter')sendMsg()">
-      <button class="qs-send" onclick="sendMsg()">送信</button>
+      <input class="qs-input" id="qs-input" placeholder="Equi 1 学習中...もう少し待っててね" disabled style="opacity:0.6;">
+      <button class="qs-send" onclick="sendMsg()" disabled style="opacity:0.5;cursor:not-allowed;">準備中</button>
     </div>
-    <div class="qs-usage" id="qs-usage">今日の使用量: 0 / 50 メッセージ</div>
+    <div class="qs-usage" id="qs-usage">使用量: 0%</div>
   </div>
 </div>
 
@@ -233,7 +233,7 @@ body { font-family: 'Segoe UI','Hiragino Sans',sans-serif; background:#faf9f6; c
 
   <div class="qs-s-section">
     <div class="qs-s-label">今日の使用量</div>
-    <div class="qs-s-value" id="qs-s-usage-text">0 / 50 メッセージ</div>
+    <div class="qs-s-value" id="qs-s-usage-text">0%</div>
     <div class="qs-s-bar"><div class="qs-s-bar-fill" id="qs-s-bar" style="width:0%"></div></div>
   </div>
 
@@ -252,13 +252,13 @@ body { font-family: 'Segoe UI','Hiragino Sans',sans-serif; background:#faf9f6; c
 </div>
 
 <script>
-# ===== Qstart フロントエンド =====
+// ===== Qstart フロントエンド =====
 let currentModel = 'equi';
 let currentEffort = 'mid';
 let usageCount = 0;
-const DAILY_LIMIT = 50;
+const DAILY_LIMIT = 200000; // トークン上限
 
-# --- モデル選択 ---
+// --- モデル選択 ---
 function toggleModelMenu() {
   document.getElementById('qs-model-menu').classList.toggle('open');
 }
@@ -281,7 +281,7 @@ function pickModel(m) {
   document.getElementById('qs-model-menu').classList.remove('open');
 }
 
-# --- エフォート ---
+// --- エフォート ---
 function setEffort(level) {
   currentEffort = level;
   ['low','mid','high'].forEach(function(l) {
@@ -291,7 +291,7 @@ function setEffort(level) {
   document.getElementById('qs-s-effort').textContent = labels[level];
 }
 
-# --- 設定パネル ---
+// --- 設定パネル ---
 function openSettings() {
   document.getElementById('qs-settings').classList.add('open');
 }
@@ -299,7 +299,7 @@ function closeSettings() {
   document.getElementById('qs-settings').classList.remove('open');
 }
 
-# --- チャット ---
+// --- チャット ---
 function addMsg(role, text) {
   var welcome = document.getElementById('qs-welcome');
   if (welcome) welcome.style.display = 'none';
@@ -322,8 +322,9 @@ function escH(s) {
 }
 
 function updateUsage() {
-  document.getElementById('qs-usage').textContent = '今日の使用量: ' + usageCount + ' / ' + DAILY_LIMIT + ' メッセージ';
-  document.getElementById('qs-s-usage-text').textContent = usageCount + ' / ' + DAILY_LIMIT + ' メッセージ';
+  var pct = Math.min(100, Math.round(usageCount / DAILY_LIMIT * 100));
+  document.getElementById('qs-usage').textContent = '使用量: ' + pct + '%';
+  document.getElementById('qs-s-usage-text').textContent = pct + '%';
   document.getElementById('qs-s-bar').style.width = Math.min(100, usageCount / DAILY_LIMIT * 100) + '%';
 }
 
@@ -340,7 +341,7 @@ async function sendMsg() {
   usageCount++;
   updateUsage();
 
-  # AIにリクエスト(現在は準備中メッセージ)
+  // AIにリクエスト(現在は準備中メッセージ)
   try {
     var r = await fetch('/api/qstart/chat', {
       method: 'POST',
