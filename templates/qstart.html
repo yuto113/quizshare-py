@@ -357,6 +357,11 @@ async function sendMsg() {
   }
   input.value = '';
   addMsg('user', text);
+  // 最初のメッセージでURLを変更
+  if (!currentChatId) {
+    currentChatId = generateChatId();
+    history.pushState({chatId: currentChatId}, '', '/qstart/chat/' + currentChatId);
+  }
   usageCount++;
   updateUsage();
 
@@ -384,6 +389,8 @@ async function sendMsg() {
 }
 
 function newChat() {
+  currentChatId = null;
+  history.pushState({}, '', '/qstart');
   document.getElementById('qs-chat').innerHTML = '<div class="qs-welcome" id="qs-welcome"><h1>Qstart</h1><p>ゼロから作ったTransformerと会話しよう。<br>12歳の開発者が手書きしたAIがここにいる。</p><div class="qs-status" id="qs-ai-status">🔄 Equi 1 — Colabで学習中...</div></div>';
 }
 
@@ -580,6 +587,29 @@ function hideLimitReached() {
 setInterval(fetchUsage, 30000);
 
 
+
+// --- チャットURL管理 ---
+function generateChatId() {
+  return 'xxxxxxxx-xxxx-4xxx'.replace(/x/g, function() {
+    return Math.floor(Math.random() * 16).toString(16);
+  });
+}
+
+var currentChatId = null;
+
+function startNewChat() {
+  currentChatId = generateChatId();
+  history.pushState({chatId: currentChatId}, '', '/qstart/chat/' + currentChatId);
+}
+
+// ページ読み込み時: 既存チャットならIDを取得、新規なら/qstartのまま
+(function() {
+  var path = window.location.pathname;
+  if (path.startsWith('/qstart/chat/')) {
+    currentChatId = path.split('/qstart/chat/')[1];
+  }
+})();
+
 // --- サイドバー開閉 ---
 function toggleSidebar() {
   var sb = document.querySelector('.qs-sidebar');
@@ -594,18 +624,150 @@ function toggleSidebar() {
 }
 
 // --- 言語 ---
+var QS_TEXTS = {
+  ja: {
+    welcome_title: 'Qstart',
+    welcome_desc: 'ゼロから作ったTransformerと会話しよう。\n12歳の開発者が手書きしたAIがここにいる。',
+    input_placeholder: 'メッセージを入力...',
+    send: '送信',
+    new_chat: '+ 新しいチャット',
+    history_label: 'チャット履歴はここに表示されます',
+    settings: '設定',
+    terms: '利用規約',
+    privacy: 'プライバシー',
+    back: 'QuizShareに戻る',
+    login: 'ログイン',
+    logout: 'ログアウト',
+    usage: '使用量',
+    reset_label: '3時間ごとにリセット',
+    limit_title: '使用量の上限に達しました',
+    limit_recovery: 'に回復します',
+    preparing: '準備中',
+    account: 'アカウント',
+    model_label: '現在のモデル',
+    effort_label: 'エフォート',
+    lang_label: '言語',
+    slogan: 'ゼロから作ったAIと、話そう。',
+  },
+  en: {
+    welcome_title: 'Qstart',
+    welcome_desc: 'Chat with a Transformer built from scratch.\nCreated by a 12-year-old developer.',
+    input_placeholder: 'Type a message...',
+    send: 'Send',
+    new_chat: '+ New chat',
+    history_label: 'Chat history will appear here',
+    settings: 'Settings',
+    terms: 'Terms of Service',
+    privacy: 'Privacy Policy',
+    back: 'Back to QuizShare',
+    login: 'Login',
+    logout: 'Logout',
+    usage: 'Usage',
+    reset_label: 'Resets every 3 hours',
+    limit_title: 'Usage limit reached',
+    limit_recovery: 'Recovers at',
+    preparing: 'Preparing',
+    account: 'Account',
+    model_label: 'Current model',
+    effort_label: 'Effort',
+    lang_label: 'Language',
+    slogan: 'Chat with AI, built from zero.',
+  },
+  zh: {
+    welcome_title: 'Qstart',
+    welcome_desc: '与从零开始构建的Transformer对话。\n由12岁的开发者手写创建。',
+    input_placeholder: '输入消息...',
+    send: '发送',
+    new_chat: '+ 新对话',
+    history_label: '聊天记录将显示在这里',
+    settings: '设置',
+    terms: '使用条款',
+    privacy: '隐私政策',
+    back: '返回QuizShare',
+    login: '登录',
+    logout: '退出',
+    usage: '使用量',
+    reset_label: '每3小时重置',
+    limit_title: '已达到使用上限',
+    limit_recovery: '恢复时间',
+    preparing: '准备中',
+    account: '账户',
+    model_label: '当前模型',
+    effort_label: '努力程度',
+    lang_label: '语言',
+    slogan: '与从零构建的AI对话。',
+  },
+  ko: {
+    welcome_title: 'Qstart',
+    welcome_desc: '처음부터 만든 Transformer와 대화하세요.\n12세 개발자가 직접 만든 AI입니다.',
+    input_placeholder: '메시지를 입력하세요...',
+    send: '전송',
+    new_chat: '+ 새 채팅',
+    history_label: '채팅 기록이 여기에 표시됩니다',
+    settings: '설정',
+    terms: '이용약관',
+    privacy: '개인정보처리방침',
+    back: 'QuizShare로 돌아가기',
+    login: '로그인',
+    logout: '로그아웃',
+    usage: '사용량',
+    reset_label: '3시간마다 초기화',
+    limit_title: '사용량 한도에 도달했습니다',
+    limit_recovery: '에 복구됩니다',
+    preparing: '준비중',
+    account: '계정',
+    model_label: '현재 모델',
+    effort_label: '에포트',
+    lang_label: '언어',
+    slogan: '제로부터 만든 AI와 대화하세요.',
+  }
+};
+
+var currentLang = localStorage.getItem('qstart_lang') || 'ja';
+
+function T(key) {
+  return (QS_TEXTS[currentLang] || QS_TEXTS['ja'])[key] || QS_TEXTS['ja'][key] || key;
+}
+
 function setLang(lang) {
+  currentLang = lang;
   localStorage.setItem('qstart_lang', lang);
-  // 将来的にUIの翻訳をここに追加
+  applyLang();
+}
+
+function applyLang() {
+  // サイドバー
+  document.querySelector('.qs-sub').textContent = T('slogan');
+  document.querySelector('.qs-new-chat').textContent = T('new_chat');
+  // 入力欄
+  var inp = document.getElementById('qs-input');
+  if (inp && !inp.disabled) inp.placeholder = T('input_placeholder');
+  // ウェルカム
+  var wt = document.querySelector('.qs-welcome h1');
+  if (wt) wt.textContent = T('welcome_title');
+  var wp = document.querySelector('.qs-welcome p');
+  if (wp) wp.innerHTML = T('welcome_desc').replace('\n','<br>');
+  // 設定パネル
+  var sh = document.querySelector('#qs-settings h2');
+  if (sh) sh.textContent = T('settings');
+  // 使用量
+  var usage = document.getElementById('qs-usage');
+  if (usage) {
+    var pctMatch = usage.textContent.match(/\d+/);
+    var pct = pctMatch ? pctMatch[0] : '0';
+    usage.textContent = T('usage') + ': ' + pct + '% (' + T('reset_label') + ')';
+  }
 }
 
 // 初期化
 refreshUser();
 var savedLang = localStorage.getItem('qstart_lang');
 if (savedLang) {
+  currentLang = savedLang;
   var sel = document.getElementById('qs-lang');
   if (sel) sel.value = savedLang;
 }
+applyLang();
 
 </script>
 

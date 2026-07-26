@@ -1804,6 +1804,11 @@ def page_reden():
 def page_qstart():
     return render_template('qstart.html')
 
+@app.route('/qstart/chat/<chat_id>')
+def page_qstart_chat(chat_id):
+    # 個別チャットURL(チャットIDをテンプレートに渡す)
+    return render_template('qstart.html', chat_id=chat_id)
+
 @app.route('/api/qstart/chat', methods=['POST'])
 def api_qstart_chat():
     # AI応答API (現在は準備中メッセージを返す)
