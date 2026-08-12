@@ -308,6 +308,20 @@ body { font-family: 'Segoe UI','Hiragino Sans',sans-serif; background:#faf9f6; c
   .qs-s-body { padding:20px; }
 }
 
+/* ===== RTL(アラビア語など) ===== */
+body[dir="rtl"] { direction: rtl; }
+body[dir="rtl"] .qs-sidebar { order:2; }
+body[dir="rtl"] .qs-main { order:1; }
+body[dir="rtl"] .qs-msg-user { justify-content:flex-start; }
+body[dir="rtl"] .qs-msg-ai { justify-content:flex-end; }
+body[dir="rtl"] .qs-s-nav { border-right:none; border-left:1px solid #ece9e2; }
+body[dir="rtl"] .qs-s-close { right:auto; left:16px; }
+body[dir="rtl"] .qs-s-tab { flex-direction:row-reverse; text-align:right; }
+@media (max-width:768px) {
+  body[dir="rtl"] .qs-sidebar { transform:translateX(100%); left:auto; right:0; }
+  body[dir="rtl"] .qs-sidebar.open { transform:translateX(0); }
+}
+
 /* ===== モバイル強化 (1.5.2) ===== */
 @media (max-width: 768px) {
   /* チャット */
@@ -910,7 +924,7 @@ async function loadSettings() {
       if (el.type === 'checkbox') el.checked = !!Number(QS_SET[k]);
       else el.value = QS_SET[k];
     });
-    if (QS_SET.lang) { currentLang = QS_SET.lang; if (window.applyLang) applyLang(); }
+    if (QS_SET.lang) { currentLang = QS_SET.lang; applyDir(currentLang); if (window.applyLang) applyLang(); }
     applyAll(); applyDefaults();
   } catch(e) {}
 }
@@ -1373,7 +1387,7 @@ async function boot() {
       if (el.type === 'checkbox') el.checked = !!Number(QS_SET[k]);
       else el.value = QS_SET[k];
     });
-    if (QS_SET.lang) { currentLang = QS_SET.lang; if (window.applyLang) applyLang(); }
+    if (QS_SET.lang) { currentLang = QS_SET.lang; applyDir(currentLang); if (window.applyLang) applyLang(); }
     applyAll();
     applyDefaults();
 
@@ -2422,6 +2436,12 @@ var QS_TEXTS = {
     model_apex_desc: '최강・전력',
     ai_lang_note: '참고: AI는 일본어로 응답합니다.',  },
   fr: {
+    plan: 'Forfait',
+    tab_profile: 'Profil',
+    tab_appear: 'Apparence',
+    tab_model: 'Modèle',
+    tab_usage: 'Utilisation',
+    tab_account: 'Compte',
     welcome_title: 'Qstart',
     welcome_desc: 'Discutez avec un Transformer construit de zéro.\nCréé par un développeur de 12 ans.',
     input_placeholder: 'Tapez un message...',
@@ -2470,6 +2490,12 @@ var QS_TEXTS = {
     model_apex_desc: 'Le plus puissant',
     ai_lang_note: 'Note : l\'IA répond en japonais.',  },
   de: {
+    plan: 'Tarif',
+    tab_profile: 'Profil',
+    tab_appear: 'Darstellung',
+    tab_model: 'Modell',
+    tab_usage: 'Nutzung',
+    tab_account: 'Konto',
     welcome_title: 'Qstart',
     welcome_desc: 'Chatte mit einem Transformer, der von Grund auf gebaut wurde.\nErstellt von einem 12-jährigen Entwickler.',
     input_placeholder: 'Nachricht eingeben...',
@@ -2518,6 +2544,12 @@ var QS_TEXTS = {
     model_apex_desc: 'Am leistungsstärksten',
     ai_lang_note: 'Hinweis: Die KI antwortet auf Japanisch.',  },
   es: {
+    plan: 'Plan',
+    tab_profile: 'Perfil',
+    tab_appear: 'Apariencia',
+    tab_model: 'Modelo',
+    tab_usage: 'Uso',
+    tab_account: 'Cuenta',
     welcome_title: 'Qstart',
     welcome_desc: 'Chatea con un Transformer construido desde cero.\nCreado por un desarrollador de 12 años.',
     input_placeholder: 'Escribe un mensaje...',
@@ -2566,6 +2598,12 @@ var QS_TEXTS = {
     model_apex_desc: 'El más potente',
     ai_lang_note: 'Nota: La IA responde en japonés.',  },
   pt: {
+    plan: 'Plano',
+    tab_profile: 'Perfil',
+    tab_appear: 'Aparência',
+    tab_model: 'Modelo',
+    tab_usage: 'Uso',
+    tab_account: 'Conta',
     welcome_title: 'Qstart',
     welcome_desc: 'Converse com um Transformer construído do zero.\nCriado por um desenvolvedor de 12 anos.',
     input_placeholder: 'Digite uma mensagem...',
@@ -2614,6 +2652,12 @@ var QS_TEXTS = {
     model_apex_desc: 'O mais poderoso',
     ai_lang_note: 'Nota: A IA responde em japonês.',  },
   ar: {
+    plan: 'الخطة',
+    tab_profile: 'الملف الشخصي',
+    tab_appear: 'المظهر',
+    tab_model: 'النموذج',
+    tab_usage: 'الاستخدام',
+    tab_account: 'الحساب',
     welcome_title: 'Qstart',
     welcome_desc: 'تحدث مع Transformer مبني من الصفر.\nصنعه مطور عمره 12 سنة.',
     input_placeholder: 'اكتب رسالة...',
@@ -2662,6 +2706,12 @@ var QS_TEXTS = {
     model_apex_desc: 'الأقوى',
     ai_lang_note: 'ملاحظة: الذكاء الاصطناعي يرد باللغة اليابانية.',  },
   hi: {
+    plan: 'योजना',
+    tab_profile: 'प्रोफ़ाइल',
+    tab_appear: 'दिखावट',
+    tab_model: 'मॉडल',
+    tab_usage: 'उपयोग',
+    tab_account: 'खाता',
     welcome_title: 'Qstart',
     welcome_desc: 'शून्य से बने Transformer से बात करें।\n12 साल के डेवलपर द्वारा बनाया गया।',
     input_placeholder: 'संदेश टाइप करें...',
@@ -2710,6 +2760,12 @@ var QS_TEXTS = {
     model_apex_desc: 'सबसे शक्तिशाली',
     ai_lang_note: 'नोट: AI जापानी में जवाब देता है।',  },
   th: {
+    plan: 'แพ็กเกจ',
+    tab_profile: 'โปรไฟล์',
+    tab_appear: 'ลักษณะที่ปรากฏ',
+    tab_model: 'โมเดล',
+    tab_usage: 'การใช้งาน',
+    tab_account: 'บัญชี',
     welcome_title: 'Qstart',
     welcome_desc: 'สนทนากับ Transformer ที่สร้างจากศูนย์\nสร้างโดยนักพัฒนาอายุ 12 ปี',
     input_placeholder: 'พิมพ์ข้อความ...',
@@ -2758,6 +2814,12 @@ var QS_TEXTS = {
     model_apex_desc: 'ทรงพลังที่สุด',
     ai_lang_note: 'หมายเหตุ: AI ตอบเป็นภาษาญี่ปุ่น',  },
   vi: {
+    plan: 'Gói',
+    tab_profile: 'Hồ sơ',
+    tab_appear: 'Giao diện',
+    tab_model: 'Mô hình',
+    tab_usage: 'Mức sử dụng',
+    tab_account: 'Tài khoản',
     welcome_title: 'Qstart',
     welcome_desc: 'Trò chuyện với Transformer được xây dựng từ đầu.\nĐược tạo bởi nhà phát triển 12 tuổi.',
     input_placeholder: 'Nhập tin nhắn...',
@@ -2813,7 +2875,15 @@ function T(key) {
   return (QS_TEXTS[currentLang] || QS_TEXTS['ja'])[key] || QS_TEXTS['ja'][key] || key;
 }
 
+function applyDir(lang) {
+  var rtl = ['ar', 'he', 'fa', 'ur'];
+  var d = rtl.indexOf(lang) >= 0 ? 'rtl' : 'ltr';
+  document.body.setAttribute('dir', d);
+  document.documentElement.setAttribute('lang', lang);
+}
+
 function setLang(lang) {
+  applyDir(lang);
   currentLang = lang;
   localStorage.setItem('qstart_lang', lang);
   applyLang();
@@ -2826,6 +2896,12 @@ function applyLang() {
   if (welcome) {
     var desc = T('welcome_desc').replace(/\\n/g, '<br>');
     welcome.innerHTML = '<h1>' + T('welcome_title') + '</h1><p>' + desc + '</p><div class="qs-status" id="qs-ai-status"><span id="qs-status-text">Equi 1 — ' + T('running') + '!</span></div>';
+    plan: 'Forfait',
+    tab_profile: 'Profil',
+    tab_appear: 'Apparence',
+    tab_model: 'Modèle',
+    tab_usage: 'Utilisation',
+    tab_account: 'Compte',
   }
   // 入力欄
   var input = document.getElementById('qs-input');
