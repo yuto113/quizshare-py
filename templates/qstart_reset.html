@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>パスワード再設定 — Qstart</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;background:#14213d;
+  min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.box{background:#fff;border-radius:18px;padding:36px 32px;width:100%;max-width:400px;
+  box-shadow:0 24px 60px rgba(0,0,0,.4)}
+.logo{font-size:24px;font-weight:700;color:#14213d;text-align:center}
+.logo span{color:#b8860b}
+.sub{text-align:center;font-size:12px;color:#8a8270;margin-bottom:26px}
+h1{font-size:17px;color:#14213d;margin-bottom:8px}
+p{font-size:13px;color:#6b6555;line-height:1.8;margin-bottom:18px}
+label{display:block;font-size:12px;color:#8a8270;margin:14px 0 5px}
+input{width:100%;padding:11px 13px;border:1px solid #e0dcd2;border-radius:9px;font-size:14px;font-family:inherit}
+input:focus{outline:none;border-color:#b8860b}
+button{width:100%;padding:12px;background:#14213d;color:#fff;border:none;border-radius:9px;
+  font-size:14px;font-weight:600;cursor:pointer;margin-top:20px;font-family:inherit}
+button:hover{background:#1d2d52}
+button:disabled{opacity:.5}
+.msg{font-size:12.5px;margin-top:14px;padding:9px 12px;border-radius:8px;display:none;line-height:1.7}
+.msg.show{display:block}
+.msg.err{background:#fbe9e7;color:#c0392b}
+.msg.ok{background:#e8f5e9;color:#2e7d32}
+a.back{display:block;text-align:center;margin-top:20px;font-size:12.5px;color:#8a8270;text-decoration:none}
+</style></head><body>
+<div class="box">
+  <div class="logo">Q<span>start</span></div>
+  <div class="sub">by Qzero会社</div>
+  <div id="form">
+    <h1>新しいパスワードを設定</h1>
+    <p>6文字以上のパスワードを入力してください。</p>
+    <label>新しいパスワード</label>
+    <input id="pw" type="password" autocomplete="new-password">
+    <label>もう一度入力</label>
+    <input id="pw2" type="password" autocomplete="new-password">
+    <button id="btn" onclick="doReset()">パスワードを変更</button>
+  </div>
+  <div class="msg" id="msg"></div>
+  <a class="back" href="/qstart">← Qstartに戻る</a>
+</div>
+<script>
+var TOKEN = '{{ token }}';
+function show(t, cls){ var m=document.getElementById('msg');
+  m.textContent=t; m.className='msg show '+cls; }
+async function doReset(){
+  var p=document.getElementById('pw').value, p2=document.getElementById('pw2').value;
+  if(p.length<6){ show('パスワードは6文字以上にしてください','err'); return; }
+  if(p!==p2){ show('パスワードが一致しません','err'); return; }
+  var b=document.getElementById('btn'); b.disabled=true; b.textContent='変更中…';
+  try{
+    var r=await fetch('/qstart/api/v1/password/reset',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({token:TOKEN,password:p})});
+    var d=await r.json();
+    if(d.ok){ document.getElementById('form').style.display='none';
+      show('✅ パスワードを変更しました。新しいパスワードでログインしてください。','ok'); }
+    else { show(d.error||'変更に失敗しました','err'); b.disabled=false; b.textContent='パスワードを変更'; }
+  }catch(e){ show('通信エラー','err'); b.disabled=false; b.textContent='パスワードを変更'; }
+}
+if(!TOKEN){ document.getElementById('form').style.display='none';
+  show('リンクが正しくありません。もう一度メールから開いてください。','err'); }
+</script></body></html>

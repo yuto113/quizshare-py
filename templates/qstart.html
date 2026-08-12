@@ -1297,6 +1297,144 @@ async function loadFeatures() {
   } catch(e) {}
 }
 
+// ===== 起動: 必要な情報を1回で取る =====
+async function boot() {
+  try {
+    var r = await fetch('/qstart/api/v1/bootstrap');
+    var d = await r.json();
+    if (!d.ok) return;
+
+    // --- 凍結チェック(最優先) ---
+    if (d.me && d.me.suspended) { showSuspended(); return; }
+
+    // --- ユーザー情報 ---
+    QS_ME = d.me || {};
+    QS_ME.guest = d.guest;
+    applyMe(d);
+
+    // --- 設定 ---
+    QS_SET = d.settings || {};
+    Object.keys(QS_SET).forEach(function(k){
+      var el = document.getElementById('set-' + k) || (k==='lang' ? document.getElementById('qs-lang') : null);
+      if (!el) return;
+      if (el.type === 'checkbox') el.checked = !!Number(QS_SET[k]);
+      else el.value = QS_SET[k];
+    });
+    if (QS_SET.lang) { currentLang = QS_SET.lang; if (window.applyLang) applyLang(); }
+    applyAll();
+    applyDefaults();
+
+    // --- モデル ---
+    QS_MODELS = {};
+    (d.models || []).forEach(function(m){ QS_MODELS[m.model] = m; });
+    applyModelFlags();
+
+    // --- 機能フラグ ---
+    QS_FEAT = d.features || {};
+    var pl = document.querySelector('a[href="/qstart/projects"]');
+    if (pl) pl.style.display = QS_FEAT.projects ? 'block' : 'none';
+
+    // --- お知らせ ---
+    QS_ANN_LOGGED = !d.guest;
+    var langOk = function(a){
+      return a && a.id && (a.title || a.body) &&
+             (!a.lang || a.lang === 'all' || a.lang === currentLang);
+    };
+    QS_ANN = (d.announcements || []).filter(langOk);
+    QS_ANN_BANNER = (d.banner || []).filter(langOk);
+    if (!QS_ANN_LOGGED) {
+      QS_ANN_BANNER = QS_ANN_BANNER.filter(function(a){ return !guestDismissed(a.id); });
+    }
+    updateAnnDot();
+    if (QS_ANN_BANNER.length) showAnnBanner(QS_ANN_BANNER[0]); else hideAnnBanner();
+
+    // --- 残高 ---
+    QS_QUOTA = d.quota || {};
+    QS_CHATS = d.chats || [];
+    renderHistory();
+
+  } catch(e) {}
+  // 使用量は別建て(送信のたびに変わるので)
+  fetchServerUsage();
+}
+
+var QS_QUOTA = {};
+
+function applyMe(d) {
+  var set = function(id, v){ var e = document.getElementById(id); if (e) e.textContent = v; };
+  if (d.guest) {
+    set('qs-s-account','ゲスト'); set('qs-s-email','—');
+    set('qs-s-plan','ログインしていません'); set('qs-s-plan2','ログインしていません');
+  } else {
+    var m = d.me;
+    set('qs-s-account', m.nickname || m.user_id);
+    set('qs-s-account2', m.nickname || m.user_id);
+    set('qs-s-email', m.email || '未登録');
+    set('qs-s-plan', m.plan); set('qs-s-plan2', m.plan);
+    var rs = document.getElementById('qs-s-role-sec');
+    if (rs) {
+      if (m.role === 'admin' || m.role === 'moderator') {
+        rs.style.display = 'block';
+        set('qs-s-role', m.role === 'admin' ? '👑 管理者' : '🛡 モデレーター');
+      } else { rs.style.display = 'none'; }
+    }
+  }
+  setAdminTab(d.guest ? 'guest' : (d.me.role || 'user'));
+}
+
+function showSuspended() {
+  document.body.innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:center;height:100vh;'
+    + 'font-family:inherit;background:#faf9f6;text-align:center;padding:24px;">'
+    + '<div><div style="font-size:44px;margin-bottom:16px;">🔒</div>'
+    + '<h1 style="font-size:19px;color:#14213d;margin-bottom:10px;">ご利用いただけません</h1>'
+    + '<p style="font-size:13.5px;color:#6b6555;line-height:1.8;">'
+    + 'このアカウントは現在ご利用いただけない状態です。<br>'
+    + 'お心当たりがない場合はお問い合わせください。</p>'
+    + '<a href="/" style="display:inline-block;margin-top:20px;padding:9px 18px;'
+    + 'background:#14213d;color:#fff;border-radius:9px;text-decoration:none;font-size:13px;">'
+    + 'QuizShareに戻る</a></div></div>';
+}
+
+function applyUsageQuick(u) {
+  var pct = u.limit > 0 ? Math.min(100, Math.round(u.used / u.limit * 100)) : 0;
+  var ug = document.getElementById('qs-usage');
+  if (ug) {
+    if (pct >= 80) {
+      ug.style.display = 'block';
+      ug.style.color = pct >= 95 ? '#c0392b' : '#b8860b';
+      ug.textContent = (pct >= 95 ? '⚠️ ' : '') + '残り ' + (u.remaining||0).toLocaleString() + ' トークン (' + pct + '% 使用)';
+    } else { ug.style.display = 'none'; }
+  }
+  var bw = document.getElementById('qs-s-bar-window');
+  if (bw) bw.style.width = pct + '%';
+  var pw = document.getElementById('qs-s-pct-window');
+  if (pw) pw.textContent = pct + '%';
+  var wn = document.getElementById('qs-s-window-num');
+  if (wn) wn.textContent = (u.used||0).toLocaleString() + ' / ' + (u.limit||0).toLocaleString();
+}
+
+function openForgot() {
+  var b = document.getElementById('qs-forgot-box');
+  b.style.display = b.style.display === 'none' ? 'block' : 'none';
+}
+async function sendForgot() {
+  var e = document.getElementById('qs-forgot-email').value.trim();
+  var m = document.getElementById('qs-forgot-msg');
+  if (!e || e.indexOf('@') < 0) { m.style.color='#c0392b'; m.textContent='メールアドレスを入力してください'; return; }
+  var b = document.getElementById('qs-forgot-btn');
+  b.disabled = true; b.textContent = '送信中…';
+  try {
+    var r = await fetch('/qstart/api/v1/password/request', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({email: e}) });
+    var d = await r.json();
+    m.style.color = d.ok ? '#2e7d32' : '#c0392b';
+    m.textContent = d.message || d.error || '';
+  } catch(err) { m.style.color='#c0392b'; m.textContent='通信エラー'; }
+  b.disabled = false; b.textContent = '送信';
+}
+
 function qsTab(name) {
   if (name === 'admin' && (!QS_ME || QS_ME.role !== 'admin')) return;
   document.querySelectorAll('.qs-s-tab').forEach(function(t){
@@ -1310,9 +1448,7 @@ function qsTab(name) {
 
 function openSettings() {
   document.getElementById('qs-settings').classList.add('open');
-  loadSettings();
-  loadModelFlags();
-  loadMe();
+  // bootで取得済みなので再取得しない
   var a = document.getElementById('qs-s-account');
   var a2 = document.getElementById('qs-s-account2');
   if (a && a2) a2.textContent = a.textContent;
@@ -1446,7 +1582,7 @@ async function sendMsg() {
     var r = await fetch('/api/qstart/chat', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ message: text, model: currentModel, effort: currentEffort, file: pendingFile ? pendingFile.substring(0, 500) : null, file_type: pendingFileType })
+      body: JSON.stringify({ message: text, model: currentModel, effort: currentEffort, chat_id: currentChatId || '', file: pendingFile ? pendingFile.substring(0, 500) : null, file_type: pendingFileType })
     });
     var data = await r.json();
     if (data.ok) {
@@ -1454,7 +1590,8 @@ async function sendMsg() {
       if (te) te.remove();
       addMsg('ai', data.reply);
       saveChatToHistory();
-      fetchUsage();
+      touchChat(text);
+      if (data.usage) applyUsageQuick(data.usage); else fetchServerUsage();
       pendingFile = null;
       pendingFileType = null;
     } else {
@@ -1473,48 +1610,126 @@ async function sendMsg() {
   }
 }
 
-function saveChatToHistory() {
-  if (!currentChatId) return;
-  var msgs = document.querySelectorAll('.qs-msg');
-  if (msgs.length === 0) return;
-  var chatData = [];
-  msgs.forEach(function(m) {
+// ===== 履歴(サーバー優先・未ログインは端末保存) =====
+var QS_CHATS = [];
+
+function collectMessages() {
+  var out = [];
+  document.querySelectorAll('.qs-msg').forEach(function(m){
     var role = m.classList.contains('qs-msg-user') ? 'user' : 'ai';
-    var text = m.querySelector('.qs-msg-text');
-    if (text) chatData.push({role: role, text: text.textContent});
+    var b = m.querySelector('.qs-bubble');
+    if (b) out.push({ role: role, text: b.textContent });
   });
-  if (chatData.length === 0) return;
-  var history = JSON.parse(localStorage.getItem('qstart_history') || '[]');
-  var existing = history.findIndex(function(h) { return h.id === currentChatId; });
-  var title = chatData[0].text.substring(0, 20) + (chatData[0].text.length > 20 ? '...' : '');
-  var entry = {id: currentChatId, title: title, messages: chatData, time: Date.now()};
-  if (existing >= 0) { history[existing] = entry; } else { history.unshift(entry); }
-  if (history.length > 20) history = history.slice(0, 20);
-  localStorage.setItem('qstart_history', JSON.stringify(history));
+  return out;
+}
+
+function saveChatToHistory() {
+  // ログイン中はサーバーに保存済み(チャットAPIが保存する)
+  if (QS_ME && !QS_ME.guest) { return; }
+  if (!currentChatId) return;
+  var msgs = collectMessages();
+  if (!msgs.length) return;
+  try {
+    var history = JSON.parse(localStorage.getItem('qstart_history') || '[]');
+    var t = msgs[0].text.substring(0, 24) + (msgs[0].text.length > 24 ? '…' : '');
+    var entry = { id: currentChatId, title: t, messages: msgs, time: Date.now() };
+    var idx = history.findIndex(function(h){ return h.id === currentChatId; });
+    if (idx >= 0) history[idx] = entry; else history.unshift(entry);
+    localStorage.setItem('qstart_history', JSON.stringify(history.slice(0, 20)));
+  } catch(e) {}
   renderHistory();
 }
 
 function renderHistory() {
   var el = document.getElementById('qs-history');
-  var history = JSON.parse(localStorage.getItem('qstart_history') || '[]');
-  if (history.length === 0) {
-    el.innerHTML = '<div style="padding:12px;color:#8a8a9a;font-size:13px;"><span id="qs-t-history">チャット履歴はここに表示されます</span></div>';
+  if (!el) return;
+  var list;
+  if (QS_ME && !QS_ME.guest) {
+    list = QS_CHATS.map(function(c){
+      return { id: c.chat_id, title: c.title || '無題のチャット' };
+    });
+  } else {
+    try { list = JSON.parse(localStorage.getItem('qstart_history') || '[]'); }
+    catch(e) { list = []; }
+  }
+  if (!list.length) {
+    el.innerHTML = '<div style="padding:12px;color:#8a8a9a;font-size:13px;">'
+      + '<span id="qs-t-history">' + (typeof T === 'function' ? T('history_label') : 'チャット履歴はここに表示されます') + '</span></div>';
     return;
   }
-  el.innerHTML = history.map(function(h) {
-    return '<div class="qs-history-item" onclick="loadChat(\''+h.id+'\')" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid #2a2a4a;font-size:13px;color:#ccc;">'+h.title+'</div>';
-  }).join('');
+  el.innerHTML = '';
+  list.forEach(function(h){
+    var row = document.createElement('div');
+    row.className = 'qs-history-item';
+    row.style.cssText = 'padding:10px 12px;cursor:pointer;border-bottom:1px solid #2a2a4a;'
+      + 'font-size:13px;color:#ccc;display:flex;align-items:center;gap:6px;';
+    if (h.id === currentChatId) row.style.background = '#1d2a44';
+    var t = document.createElement('div');
+    t.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    t.textContent = h.title;
+    t.onclick = function(){ loadChat(h.id); };
+    var x = document.createElement('span');
+    x.textContent = '✕';
+    x.style.cssText = 'opacity:.35;font-size:11px;padding:2px 4px;';
+    x.onclick = function(e){ e.stopPropagation(); deleteChat(h.id); };
+    row.appendChild(t); row.appendChild(x);
+    el.appendChild(row);
+  });
 }
 
-function loadChat(chatId) {
-  var history = JSON.parse(localStorage.getItem('qstart_history') || '[]');
-  var chat = history.find(function(h) { return h.id === chatId; });
-  if (!chat) return;
+async function loadChat(chatId) {
   currentChatId = chatId;
   window.history.pushState({chatId: chatId}, '', '/qstart/chat/' + chatId);
   var el = document.getElementById('qs-chat');
   el.innerHTML = '';
-  chat.messages.forEach(function(m) { addMsg(m.role, m.text); });
+
+  if (QS_ME && !QS_ME.guest) {
+    try {
+      var r = await fetch('/qstart/api/v1/chats/' + encodeURIComponent(chatId));
+      var d = await r.json();
+      if (d.ok) {
+        (d.messages || []).forEach(function(m){ addMsg(m.role, m.content); });
+      }
+    } catch(e) {}
+  } else {
+    try {
+      var hist = JSON.parse(localStorage.getItem('qstart_history') || '[]');
+      var c = hist.find(function(h){ return h.id === chatId; });
+      if (c) c.messages.forEach(function(m){ addMsg(m.role, m.text); });
+    } catch(e) {}
+  }
+  renderHistory();
+}
+
+async function deleteChat(chatId) {
+  if (!confirm('このチャットを削除しますか？')) return;
+  if (QS_ME && !QS_ME.guest) {
+    try { await fetch('/qstart/api/v1/chats/' + encodeURIComponent(chatId), {method:'DELETE'}); } catch(e) {}
+    QS_CHATS = QS_CHATS.filter(function(c){ return c.chat_id !== chatId; });
+  } else {
+    try {
+      var h = JSON.parse(localStorage.getItem('qstart_history') || '[]');
+      localStorage.setItem('qstart_history', JSON.stringify(h.filter(function(x){ return x.id !== chatId; })));
+    } catch(e) {}
+  }
+  if (currentChatId === chatId) newChat();
+  else renderHistory();
+}
+
+// 送信後にサイドバーへ即反映(サーバーに再取得しない)
+function touchChat(title) {
+  if (!QS_ME || QS_ME.guest || !currentChatId) return;
+  var i = QS_CHATS.findIndex(function(c){ return c.chat_id === currentChatId; });
+  if (i >= 0) {
+    QS_CHATS[i].updated_at = new Date().toISOString();
+    var c = QS_CHATS.splice(i, 1)[0];
+    QS_CHATS.unshift(c);
+  } else {
+    QS_CHATS.unshift({ chat_id: currentChatId,
+      title: (title || '').substring(0, 40) || '無題のチャット',
+      updated_at: new Date().toISOString() });
+  }
+  renderHistory();
 }
 
 function newChat() {
@@ -1561,6 +1776,10 @@ function setLoginTab(t) {
 
   var ts = document.getElementById('qs-turnstile-box');
   if (ts) ts.style.display = 'none';
+  var fr = document.getElementById('qs-forgot-row');
+  if (fr) fr.style.display = reg ? 'none' : 'block';
+  var fb = document.getElementById('qs-forgot-box');
+  if (fb) fb.style.display = 'none';
 
   if (reg) {
     loadSignupConfig();
@@ -1852,7 +2071,7 @@ function hideLimitReached() {
 }
 
 // 30秒ごとに使用量を更新
-setInterval(fetchUsage, 30000);
+// fetchUsage は fetchServerUsage に統合
 
 
 
@@ -2747,7 +2966,7 @@ async function fetchServerUsage() {
   } catch(e) {}
 }
 setTimeout(fetchServerUsage, 500);
-setInterval(fetchServerUsage, 30000);
+setInterval(fetchServerUsage, 60000);
 
 function openPromoModal() {
   document.getElementById('qs-promo-modal').style.display = 'flex';
@@ -2776,11 +2995,7 @@ async function usePromoCode() {
     document.getElementById('qs-promo-msg').innerHTML = '<div style="color:#c44;font-size:13px;">通信エラー</div>';
   }
 }
-loadModelFlags();
-loadAnnouncements();
-applyAll();
-checkStatus();
-loadFeatures();
+boot();
 </script>
 
 <!-- 優待コードモーダル -->
@@ -2861,6 +3076,20 @@ loadFeatures();
     </div>
     <button id="qs-submit-btn" onclick="doLogin()" style="width:100%; padding:10px; background:#14213d; color:#fff; border:none; border-radius:8px; font-size:14px; cursor:pointer; font-weight:600;">ログイン</button>
     <div id="qs-login-error" style="color:#e24b4a; font-size:13px; margin-top:8px; text-align:center;"></div>
+    <div id="qs-forgot-row" style="text-align:center; margin-top:12px;">
+      <a onclick="openForgot()" style="font-size:12.5px; color:#8a8270; cursor:pointer; text-decoration:underline;">パスワードを忘れた方</a>
+    </div>
+    <div id="qs-forgot-box" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid #eee;">
+      <div style="font-size:12px; color:#8a8270; margin-bottom:8px;">
+        登録したメールアドレスに再設定用のリンクを送ります。</div>
+      <div style="display:flex; gap:6px;">
+        <input id="qs-forgot-email" type="email" placeholder="メールアドレス"
+          style="flex:1; padding:9px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px;">
+        <button onclick="sendForgot()" id="qs-forgot-btn"
+          style="padding:8px 14px; background:#14213d; color:#fff; border:none; border-radius:8px; font-size:12px; cursor:pointer; white-space:nowrap;">送信</button>
+      </div>
+      <div id="qs-forgot-msg" style="font-size:12px; margin-top:8px;"></div>
+    </div>
   </div>
 </div>
 

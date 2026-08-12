@@ -370,6 +370,7 @@ def privacy_delete():
         return jsonify({'ok': False, 'error': 'confirm_required'}), 400
     scope = d.get('scope', 'history')
     conn = db()
+    conn.execute('DELETE FROM qstart_messages WHERE user_id=?', (uid,))
     conn.execute('DELETE FROM qstart_chats WHERE user_id=?', (uid,))
     if scope == 'all':
         for t in ['qstart_projects','qstart_project_files','qstart_settings',
@@ -429,6 +430,222 @@ def announce_read(aid):
 
 
 # ========== 管理者 API ==========
+# ========== チャット履歴 ==========
+def history_on(uid):
+    """このユーザーが履歴保存をONにしているか"""
+    if not uid: return False
+    conn = db()
+    r = conn.execute('SELECT save_history FROM qstart_settings WHERE user_id=?', (uid,)).fetchone()
+    conn.close()
+    return bool(r['save_history']) if r else True
+
+
+def save_message(uid, chat_id, role, content, model='', tokens=0, title=None):
+    """メッセージを1件保存。履歴OFFなら何もしない"""
+    if not uid or not chat_id or not history_on(uid):
+        return False
+    conn = db()
+    conn.execute("""INSERT INTO qstart_messages(chat_id,user_id,role,content,model,tokens,created_at)
+                    VALUES(?,?,?,?,?,?,?)""",
+                 (chat_id, uid, role, (content or '')[:20000], model, tokens, now()))
+    # チャット一覧も更新
+    conn.execute("""INSERT INTO qstart_chats(chat_id,user_id,title,model,created_at,updated_at)
+                    VALUES(?,?,?,?,?,?)
+                    ON CONFLICT(chat_id) DO UPDATE SET updated_at=excluded.updated_at""",
+                 (chat_id, uid, (title or content or '')[:80], model, now(), now()))
+    conn.commit(); conn.close()
+    return True
+
+
+@qstart_core.route('/qstart/api/v1/chats')
+@require_login
+def list_chats():
+    uid = cur_uid()
+    conn = db()
+    rows = conn.execute("""SELECT c.chat_id, c.title, c.project_id, c.model, c.updated_at,
+        (SELECT COUNT(*) FROM qstart_messages m WHERE m.chat_id=c.chat_id) n
+        FROM qstart_chats c WHERE c.user_id=?
+        ORDER BY c.updated_at DESC LIMIT 100""", (uid,)).fetchall()
+    conn.close()
+    return jsonify({'ok': True, 'chats': [dict(r) for r in rows]})
+
+
+@qstart_core.route('/qstart/api/v1/chats/<cid>')
+@require_login
+def get_chat(cid):
+    uid = cur_uid()
+    conn = db()
+    msgs = conn.execute("""SELECT role,content,model,created_at FROM qstart_messages
+        WHERE chat_id=? AND user_id=? ORDER BY id LIMIT 500""", (cid, uid)).fetchall()
+    meta = conn.execute('SELECT * FROM qstart_chats WHERE chat_id=? AND user_id=?', (cid, uid)).fetchone()
+    conn.close()
+    return jsonify({'ok': True, 'chat': dict(meta) if meta else None,
+                    'messages': [dict(r) for r in msgs]})
+
+
+@qstart_core.route('/qstart/api/v1/chats/<cid>', methods=['PATCH','DELETE'])
+@require_login
+def edit_chat(cid):
+    uid = cur_uid()
+    conn = db()
+    if request.method == 'DELETE':
+        conn.execute('DELETE FROM qstart_messages WHERE chat_id=? AND user_id=?', (cid, uid))
+        conn.execute('DELETE FROM qstart_chats WHERE chat_id=? AND user_id=?', (cid, uid))
+    else:
+        d = request.get_json(silent=True) or {}
+        sets, vals = [], []
+        for k in ['title', 'project_id']:
+            if k in d:
+                sets.append(f'{k}=?'); vals.append(d[k])
+        if sets:
+            vals += [now(), cid, uid]
+            conn.execute(f'UPDATE qstart_chats SET {",".join(sets)}, updated_at=? WHERE chat_id=? AND user_id=?', vals)
+    conn.commit(); conn.close()
+    return jsonify({'ok': True})
+
+
+# ========== パスワード再設定 ==========
+@qstart_core.route('/qstart/api/v1/password/request', methods=['POST'])
+def pw_request():
+    import secrets as _sec, qstart_mail as qm
+    d = request.get_json(silent=True) or {}
+    email = (d.get('email') or '').strip()
+    if not email or '@' not in email:
+        return jsonify({'ok': False, 'error': 'メールアドレスを入力してください'}), 400
+    conn = db()
+    conn.execute("CREATE TABLE IF NOT EXISTS qstart_pw_reset (token TEXT PRIMARY KEY, user_id TEXT, expires_at REAL, used INTEGER DEFAULT 0)")
+    u = conn.execute('SELECT user_id FROM qstart_users WHERE email=?', (email,)).fetchone()
+    if u:
+        tok = _sec.token_urlsafe(32)
+        conn.execute('INSERT INTO qstart_pw_reset(token,user_id,expires_at) VALUES(?,?,?)',
+                     (tok, u['user_id'], time.time() + 3600))
+        conn.commit()
+        link = 'https://yuto113.pythonanywhere.com/qstart/reset?t=' + tok
+        html = ('<div style="max-width:480px;margin:40px auto;background:#fff;border-radius:16px;'
+          'padding:36px 32px;border:1px solid #ece9e2;font-family:sans-serif;">'
+          '<div style="font-size:22px;font-weight:700;color:#14213d;">Q<span style="color:#b8860b;">start</span></div>'
+          '<div style="font-size:11px;color:#a09a8a;margin-bottom:26px;">by Qzero会社</div>'
+          '<div style="font-size:17px;font-weight:600;color:#14213d;margin-bottom:10px;">パスワードの再設定</div>'
+          '<div style="font-size:13.5px;color:#4a4438;line-height:1.9;margin-bottom:20px;">'
+          '以下のボタンから、新しいパスワードを設定してください。</div>'
+          '<a href="' + link + '" style="display:inline-block;padding:12px 24px;background:#14213d;'
+          'color:#fff;text-decoration:none;border-radius:9px;font-size:14px;">パスワードを再設定</a>'
+          '<div style="font-size:12px;color:#8a8270;line-height:1.8;margin-top:22px;">'
+          'このリンクは1時間有効です。<br>心当たりがない場合は、このメールを破棄してください。</div></div>')
+        qm.send_mail(email, 'Qstart パスワードの再設定', html, kind='pw_reset')
+    conn.close()
+    return jsonify({'ok': True, 'message': 'メールを送信しました。届かない場合は迷惑メールをご確認ください。'})
+
+
+@qstart_core.route('/qstart/api/v1/password/reset', methods=['POST'])
+def pw_reset():
+    d = request.get_json(silent=True) or {}
+    tok = (d.get('token') or '').strip()
+    pw = d.get('password') or ''
+    if len(pw) < 6:
+        return jsonify({'ok': False, 'error': 'パスワードは6文字以上にしてください'}), 400
+    conn = db()
+    try:
+        r = conn.execute('SELECT user_id,expires_at,used FROM qstart_pw_reset WHERE token=?', (tok,)).fetchone()
+    except Exception:
+        conn.close(); return jsonify({'ok': False, 'error': 'リンクが無効です'}), 400
+    if not r or r['used'] or r['expires_at'] < time.time():
+        conn.close()
+        return jsonify({'ok': False, 'error': 'リンクの有効期限が切れています'}), 400
+    from qz_common import hash_password
+    conn.execute('UPDATE qstart_users SET password_hash=? WHERE user_id=?',
+                 (hash_password(pw), r['user_id']))
+    conn.execute('UPDATE qstart_pw_reset SET used=1 WHERE token=?', (tok,))
+    conn.commit(); conn.close()
+    return jsonify({'ok': True})
+
+
+@qstart_core.route('/qstart/reset')
+def pw_reset_page():
+    return render_template('qstart_reset.html', token=request.args.get('t', ''))
+
+
+# ========== 起動時に必要な情報を1本で返す ==========
+@qstart_core.route('/qstart/api/v1/bootstrap')
+def bootstrap():
+    """ページを開いたときに必要なものを全部まとめて返す。
+    従来 /me /settings /models /announcements /status /features の6本を1本に。"""
+    uid = cur_uid()
+    conn = db()
+    out = {'ok': True, 'guest': not uid}
+
+    # --- ユーザー情報 ---
+    if uid:
+        u = conn.execute('SELECT user_id,nickname,email,lang,created_at FROM qstart_users WHERE user_id=?', (uid,)).fetchone()
+        fl = conn.execute('SELECT role,status FROM qstart_user_flags WHERE user_id=?', (uid,)).fetchone()
+        st = (fl['status'] if fl else 'active') or 'active'
+        is_staff = bool(session.get('qstart_staff'))
+        email = (u['email'] if u else '') or ''
+        if email and '@' in email:
+            nm, dm = email.split('@', 1)
+            email = (nm[:2] + '***' if len(nm) > 2 else '***') + '@' + dm
+        out['me'] = {
+            'user_id': uid,
+            'nickname': session.get('qstart_nick') or (u['nickname'] if u else uid),
+            'email': email,
+            'plan': 'スタッフ' if is_staff else 'Free',
+            'role': qstart_role(uid),
+            'status': st,
+            'suspended': st != 'active',
+            'is_staff': is_staff,
+        }
+        # --- 設定 ---
+        s = conn.execute('SELECT * FROM qstart_settings WHERE user_id=?', (uid,)).fetchone()
+        if not s:
+            conn.execute('INSERT INTO qstart_settings(user_id,updated_at) VALUES(?,?)', (uid, now()))
+            conn.commit()
+            s = conn.execute('SELECT * FROM qstart_settings WHERE user_id=?', (uid,)).fetchone()
+        out['settings'] = {k: s[k] for k in SETTING_KEYS}
+        # --- 残高 ---
+        q = conn.execute('SELECT window_bonus,monthly_bonus FROM qstart_user_quota WHERE user_id=?', (uid,)).fetchone()
+        stk = conn.execute('SELECT tokens FROM qstart_user_stock WHERE user_id=?', (uid,)).fetchone()
+        out['quota'] = {
+            'window_bonus': (q['window_bonus'] if q else 0) or 0,
+            'monthly_bonus': (q['monthly_bonus'] if q else 0) or 0,
+            'stock': (stk['tokens'] if stk else 0) or 0,
+        }
+    else:
+        out['me'] = {'role': 'guest', 'suspended': False}
+        out['settings'] = {}
+        out['quota'] = {'window_bonus': 0, 'monthly_bonus': 0, 'stock': 0}
+
+    # --- モデル ---
+    out['models'] = [dict(r) for r in conn.execute(
+        'SELECT model,enabled,maintenance,note,min_role FROM qstart_model_flags')]
+
+    # --- お知らせ ---
+    anns = conn.execute("""SELECT * FROM qstart_announcements
+        WHERE active=1 AND (starts_at IS NULL OR starts_at<=?) AND (ends_at IS NULL OR ends_at>=?)
+        ORDER BY id DESC LIMIT 30""", (now(), now())).fetchall()
+    read = set()
+    if uid:
+        read = {r[0] for r in conn.execute(
+            'SELECT ann_id FROM qstart_announce_reads WHERE user_id=?', (uid,))}
+    items = [dict(r, unread=(r['id'] not in read)) for r in anns]
+    out['announcements'] = items
+    out['banner'] = [x for x in items if x['unread']] if uid else items[:1]
+
+    # --- 最近のチャット ---
+    if uid:
+        out['chats'] = [dict(r) for r in conn.execute(
+            """SELECT chat_id,title,project_id,updated_at FROM qstart_chats
+               WHERE user_id=? ORDER BY updated_at DESC LIMIT 30""", (uid,))]
+    else:
+        out['chats'] = []
+
+    # --- 機能フラグ ---
+    keys = [r['key'] for r in conn.execute('SELECT key FROM qstart_feature_flags')]
+    conn.close()
+    out['features'] = {k: feature_for(k, uid) for k in keys}
+
+    return jsonify(out)
+
+
 # ========== 凍結・権限チェック ==========
 def user_status(uid):
     if not uid: return 'active'

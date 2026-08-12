@@ -1800,15 +1800,33 @@ import glob as _glob
 def daily_db_backup():
     try:
         _bk = '/home/yuto113/backups/db'
-        import pytz as _p_bk
+        import pytz as _p_bk, gzip as _gz, sqlite3 as _sq_bk
         from datetime import datetime as _d_bk
         _today = _d_bk.now(_p_bk.timezone('Asia/Tokyo')).strftime('%Y%m%d')
-        _dst = _bk + '/quizshare_' + _today + '.db'
-        if not os.path.exists(_dst):  # 今日の分がまだ無いときだけ動く
-            os.makedirs(_bk, exist_ok=True)
-            shutil.copy('/home/yuto113/quizshare.db', _dst)
-            for _old in sorted(_glob.glob(_bk + '/quizshare_*.db'))[:-3]:
-                os.remove(_old)  # 14日より古いのは消す
+        _dst = _bk + '/quizshare_' + _today + '.db.gz'
+        if os.path.exists(_dst):
+            return  # 今日の分は取得済み
+        os.makedirs(_bk, exist_ok=True)
+        _tmp = _bk + '/_tmp_' + _today + '.db'
+
+        # SQLiteの正しいバックアップ(書き込み中でも壊れない)
+        _s = _sq_bk.connect('/home/yuto113/quizshare.db')
+        _d = _sq_bk.connect(_tmp)
+        with _d:
+            _s.backup(_d)
+        _d.close(); _s.close()
+
+        # gzip圧縮(39MB → 約27MB)
+        with open(_tmp, 'rb') as _fi, _gz.open(_dst, 'wb', compresslevel=6) as _fo:
+            shutil.copyfileobj(_fi, _fo)
+        os.remove(_tmp)
+
+        # 7世代だけ残す
+        for _old in sorted(_glob.glob(_bk + '/quizshare_*.db.gz'))[:-5]:
+            os.remove(_old)
+        # 旧形式(非圧縮)も掃除
+        for _old in _glob.glob(_bk + '/quizshare_*.db'):
+            os.remove(_old)
     except Exception:
         pass  # バックアップ失敗でもサイトは止めない
 
@@ -1846,6 +1864,21 @@ def api_qstart_chat():
     # 現在は準備中メッセージ
     user_id = session.get('qstart_user', 'guest_' + request.remote_addr)
     is_staff = session.get('qstart_staff', False)
+
+    # --- 連打防止(10秒に5回まで) ---
+    import time as _t_rl
+    _rk = 'qs_rl_' + str(user_id)
+    _hist = _QS_RATE.get(_rk, [])
+    _now_rl = _t_rl.time()
+    _hist = [x for x in _hist if _now_rl - x < 10]
+    if len(_hist) >= 5:
+        return jsonify(ok=False, error='rate_limit',
+                       message='送信が早すぎます。少し待ってからお試しください。')
+    _hist.append(_now_rl)
+    _QS_RATE[_rk] = _hist
+    if len(_QS_RATE) > 5000:
+        _QS_RATE.clear()
+
     if session.get('qstart_user') and _qstart_suspended(session['qstart_user']):
         session.pop('qstart_user', None)
         session.pop('qstart_nick', None)
@@ -1923,7 +1956,31 @@ def api_qstart_chat():
         _conn.close()
     except:
         pass
-    return jsonify(ok=True, reply=reply, model=model, effort=effort, tokens_used=tokens_used)
+    # --- 履歴をサーバーに保存(設定がONのときだけ) ---
+    _cid = (data.get('chat_id') or '').strip()[:64]
+    if _cid and session.get('qstart_user'):
+        try:
+            import qstart_core as _qc
+            _qc.save_message(session['qstart_user'], _cid, 'user', message, model, 0,
+                             title=message[:60])
+            _qc.save_message(session['qstart_user'], _cid, 'ai', reply, model, tokens_used)
+        except Exception:
+            pass
+
+    # --- 使用量を応答に含める(追加リクエストを減らす) ---
+    _usage = None
+    try:
+        import qstart_api as _qa
+        _w = _qa.get_window_usage(user_id)
+        _pw, _pm = _qa.get_perm_bonus(user_id)
+        _usage = {'used': _w, 'limit': _qa.WINDOW_TOKENS + _pw,
+                  'remaining': max(0, _qa.WINDOW_TOKENS + _pw - _w),
+                  'stock': _qa.get_stock(user_id)}
+    except Exception:
+        pass
+
+    return jsonify(ok=True, reply=reply, model=model, effort=effort,
+                   tokens_used=tokens_used, usage=_usage)
 
 
 # ===== Qstart 認証API =====
@@ -1958,6 +2015,8 @@ def _api_qstart_register_old():
     session['qstart_user'] = user_id
     session['qstart_nick'] = nickname
     return jsonify(ok=True)
+
+_QS_RATE = {}
 
 def _qstart_suspended(uid):
     """凍結されているか(qstart_core と同じ判定)"""
