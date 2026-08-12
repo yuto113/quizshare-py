@@ -598,6 +598,82 @@ def admin_mail_test():
     return jsonify({'ok': ok, 'result': str(res)})
 
 
+# ========== 登録設定(公開) ==========
+@qstart_core.route('/qstart/api/v1/signup-config')
+def signup_config_public():
+    import qstart_signup as qs
+    return jsonify(dict({'ok': True}, **qs.public_config()))
+
+
+# ========== 登録管理(管理者) ==========
+@qstart_core.route('/qstart/api/v1/admin/signup', methods=['GET','POST'])
+@require_admin
+def admin_signup():
+    import qstart_signup as qs, qstart_mail as qm
+    if request.method == 'GET':
+        conn = db()
+        uses = conn.execute("""SELECT u.code, u.user_id, u.used_at, i.note
+            FROM qstart_invite_uses u LEFT JOIN qstart_invites i ON i.code=u.code
+            ORDER BY u.id DESC LIMIT 100""").fetchall()
+        conn.close()
+        return jsonify({'ok': True,
+            'config': qs.get_config(),
+            'invites': qs.list_invites(),
+            'uses': [dict(r) for r in uses],
+            'signups_today': qm.signups_today(),
+            'has_turnstile': bool(os.environ.get('TURNSTILE_SECRET_KEY')),
+            'has_resend': bool(os.environ.get('RESEND_API_KEY'))})
+    d = request.get_json(silent=True) or {}
+    kw = {}
+    for k in ['mode','require_turnstile','require_email','daily_limit']:
+        if k in d:
+            kw[k] = int(d[k]) if k != 'mode' else d[k]
+    if kw:
+        qs.set_config(**kw)
+        alog('signup_config', '', json.dumps(kw, ensure_ascii=False))
+    return jsonify({'ok': True})
+
+
+@qstart_core.route('/qstart/api/v1/admin/invites', methods=['POST'])
+@require_admin
+def admin_invite_create():
+    import qstart_signup as qs
+    d = request.get_json(silent=True) or {}
+    n_make = max(1, min(int(d.get('count', 1)), 50))
+    made = []
+    for _ in range(n_make):
+        c = qs.new_invite(note=(d.get('note') or '')[:200],
+                          max_uses=int(d.get('max_uses', 1)),
+                          expires_at=d.get('expires_at') or None,
+                          by=cur_uid() or session.get('staff_id','admin'),
+                          code=(d.get('code') or '').strip().upper() or None,
+                          min_age=int(d.get('min_age', 13)),
+                          grant_role=d.get('grant_role') or None,
+                          bonus_window=int(d.get('bonus_window', 0) or 0),
+                          bonus_monthly=int(d.get('bonus_monthly', 0) or 0),
+                          bonus_stock=int(d.get('bonus_stock', 0) or 0))
+        if c: made.append(c)
+    alog('invite_create', ','.join(made[:5]), f'{len(made)}件')
+    return jsonify({'ok': bool(made), 'codes': made})
+
+
+@qstart_core.route('/qstart/api/v1/admin/invites/<code>', methods=['PATCH','DELETE'])
+@require_admin
+def admin_invite_edit(code):
+    conn = db()
+    if request.method == 'DELETE':
+        conn.execute('DELETE FROM qstart_invites WHERE code=?', (code,))
+        act = 'invite_delete'
+    else:
+        d = request.get_json(silent=True) or {}
+        conn.execute('UPDATE qstart_invites SET active=? WHERE code=?',
+                     (1 if d.get('active') else 0, code))
+        act = 'invite_toggle'
+    conn.commit(); conn.close()
+    alog(act, code)
+    return jsonify({'ok': True})
+
+
 @qstart_core.route('/qstart/api/v1/admin/stats')
 @require_admin
 def admin_stats():

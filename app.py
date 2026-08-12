@@ -2045,13 +2045,16 @@ def api_qstart_send_code():
         return jsonify(ok=False, error='正しいメールアドレスを入力してね')
 
     import qstart_mail as _qm
+    import qstart_signup as _qs
 
-    # --- 受付状況チェック ---
-    allowed, reason = _qm.can_signup()
+    # --- 受付状況 + 人間確認 + 招待コード ---
+    _ip = request.headers.get('X-Forwarded-For', request.remote_addr or '').split(',')[0].strip()
+    allowed, code_r, msg = _qs.can_signup(
+        turnstile_token=data.get('turnstile'),
+        invite_code=data.get('invite'),
+        ip=_ip)
     if not allowed:
-        if reason == 'closed':
-            return jsonify(ok=False, error='現在、新規登録の受付を停止しています。')
-        return jsonify(ok=False, error='現在、アカウントの作成が込み合っています。後日の登録をお願いします。')
+        return jsonify(ok=False, error=msg, reason=code_r)
 
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
 
@@ -2082,6 +2085,61 @@ def api_qstart_send_code():
 
     return jsonify(ok=True, message='認証コードをメールで送ったよ！30分以内に入力してね')
 
+@app.route('/api/qstart/signup', methods=['POST'])
+def api_qstart_signup():
+    """メール認証なしの登録(Turnstile + 招待コード)"""
+    import re as _re, sqlite3 as _sq
+    import qstart_signup as _qs, qstart_mail as _qm
+    data = request.get_json(silent=True) or {}
+
+    cfg = _qs.get_config()
+    if cfg['require_email']:
+        return jsonify(ok=False, error='メール認証が必要です'), 400
+
+    _ip = request.headers.get('X-Forwarded-For', request.remote_addr or '').split(',')[0].strip()
+    allowed, code_r, msg = _qs.can_signup(
+        turnstile_token=data.get('turnstile'),
+        invite_code=data.get('invite'), ip=_ip)
+    if not allowed:
+        return jsonify(ok=False, error=msg, reason=code_r)
+
+    user_id = (data.get('user_id') or '').strip()
+    nickname = (data.get('nickname') or '').strip()
+    password = data.get('password') or ''
+    email = (data.get('email') or '').strip()
+    if not _re.fullmatch(r'[A-Za-z0-9_]{3,20}', user_id):
+        return jsonify(ok=False, error='IDは半角英数字3〜20文字にしてね')
+    if not nickname or len(nickname) > 20:
+        return jsonify(ok=False, error='ニックネームは1〜20文字にしてね')
+    if len(password) < 6:
+        return jsonify(ok=False, error='パスワードは6文字以上にしてね')
+
+    age_ok, age_msg, _lim = _qs.check_age(data.get('birthday'), data.get('invite'))
+    if not age_ok:
+        return jsonify(ok=False, error=age_msg, reason='age')
+
+    conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+    if conn.execute('SELECT id FROM qstart_users WHERE user_id=?', (user_id,)).fetchone():
+        conn.close()
+        return jsonify(ok=False, error='そのIDはもう使われているよ')
+    conn.execute("""INSERT INTO qstart_users (user_id,nickname,password_hash,email,purpose,birthday)
+                    VALUES (?,?,?,?,?,?)""",
+                 (user_id, nickname, hash_password(password), email,
+                  (data.get('purpose') or '').strip(), (data.get('birthday') or '').strip()))
+    conn.commit(); conn.close()
+
+    _inv = (data.get('invite') or '').strip().upper()
+    if _inv:
+        _qs.use_invite(_inv, user_id)
+        _qs.apply_invite_bonus(_inv, user_id)
+    _qm.bump_signup()
+
+    session['qstart_user'] = user_id
+    session['qstart_nick'] = nickname
+    session['qstart_staff'] = False
+    return jsonify(ok=True)
+
+
 @app.route('/api/qstart/verify-code', methods=['POST'])
 def api_qstart_verify_code():
     # 認証コードを確認して登録完了
@@ -2102,6 +2160,10 @@ def api_qstart_verify_code():
         return jsonify(ok=False, error='ニックネームは1〜20文字にしてね')
     if len(password) < 6:
         return jsonify(ok=False, error='パスワードは6文字以上にしてね')
+    import qstart_signup as _qs2
+    _age_ok, _age_msg, _l = _qs2.check_age(birthday, data.get('invite'))
+    if not _age_ok:
+        return jsonify(ok=False, error=_age_msg, reason='age')
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
     row = conn.execute('SELECT code, expires_at FROM qstart_verify WHERE email=?', (email,)).fetchone()
     if not row:
@@ -2125,7 +2187,11 @@ def api_qstart_verify_code():
     conn.execute('DELETE FROM qstart_verify WHERE email=?', (email,))
     conn.commit(); conn.close()
     try:
-        import qstart_mail as _qm
+        import qstart_mail as _qm, qstart_signup as _qs
+        _iv = (data.get('invite') or '').strip().upper()
+        if _iv:
+            _qs.use_invite(_iv, user_id)
+            _qs.apply_invite_bonus(_iv, user_id)
         _qm.bump_signup()
     except Exception:
         pass

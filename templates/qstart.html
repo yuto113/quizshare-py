@@ -9,6 +9,7 @@
 <meta property="og:description" content="ゼロから作ったAIと、話そう。">
 <meta property="og:type" content="website">
 <link rel="icon" type="image/svg+xml" href="/static/qstart_icon.svg">
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 
@@ -1540,28 +1541,32 @@ function closeLogin() {
 
 function setLoginTab(t) {
   loginTab = t;
-  document.getElementById('qs-tab-login').style.background = t==='login' ? '#14213d' : '#fff';
-  document.getElementById('qs-tab-login').style.color = t==='login' ? '#fff' : '#333';
-  document.getElementById('qs-tab-reg').style.background = t==='register' ? '#14213d' : '#fff';
-  document.getElementById('qs-tab-reg').style.color = t==='register' ? '#fff' : '#333';
-  document.getElementById('qs-reg-fields').style.display = 'none';
-  document.getElementById('qs-login-terms').style.display = 'none';
-  document.getElementById('qs-type-row').style.display = t==='register' ? 'none' : 'flex';
-  document.getElementById('qs-submit-btn').style.display = t==='register' ? 'none' : 'block';
+  var reg = (t === 'register');
+  document.getElementById('qs-tab-login').style.background = reg ? '#fff' : '#14213d';
+  document.getElementById('qs-tab-login').style.color = reg ? '#333' : '#fff';
+  document.getElementById('qs-tab-reg').style.background = reg ? '#14213d' : '#fff';
+  document.getElementById('qs-tab-reg').style.color = reg ? '#fff' : '#333';
+
+  document.getElementById('qs-reg-fields').style.display = reg ? 'block' : 'none';
+  document.getElementById('qs-login-terms').style.display = reg ? 'block' : 'none';
+  document.getElementById('qs-type-row').style.display = reg ? 'none' : 'flex';
+
+  var btn = document.getElementById('qs-submit-btn');
+  btn.style.display = 'block';
+  btn.textContent = reg ? 'アカウントを作成' : 'ログイン';
+
+  // 古い「準備中」表示が残っていたら消す
   var soon = document.getElementById('qs-reg-soon');
-  if (t==='register') {
-    if (!soon) {
-      soon = document.createElement('div');
-      soon.id = 'qs-reg-soon';
-      soon.style.cssText = 'text-align:center; padding:24px 0;';
-      soon.innerHTML = '<div style="font-size:32px; margin-bottom:8px;">🚧</div><div style="font-size:16px; font-weight:600; color:#14213d; margin-bottom:6px;">新規登録は準備中...</div><div style="font-size:13px; color:#8a8270; line-height:1.6;">メール認証機能を準備しています。<br>もう少し待っててね!</div>';
-      document.getElementById('qs-submit-btn').parentNode.insertBefore(soon, document.getElementById('qs-submit-btn'));
-    }
-    soon.style.display = 'block';
+  if (soon) soon.remove();
+
+  var ts = document.getElementById('qs-turnstile-box');
+  if (ts) ts.style.display = 'none';
+
+  if (reg) {
+    loadSignupConfig();
   } else {
-    if (soon) soon.style.display = 'none';
+    setLoginType(loginType);
   }
-  if (t==='login') { setLoginType(loginType); }
 }
 
 function setLoginType(t) {
@@ -1585,6 +1590,12 @@ async function doLogin() {
 
   if (loginTab === 'register') {
     if (loginType === 'staff') { errEl.textContent = '社員アカウントは新規作成できません'; return; }
+    if (QS_SIGNUP && !QS_SIGNUP.open) {
+      errEl.textContent = QS_SIGNUP.mode === 'closed'
+        ? '現在、新規登録の受付を停止しています。'
+        : '現在、アカウントの作成が込み合っています。後日の登録をお願いします。';
+      return;
+    }
     var agree = document.getElementById('qs-agree');
     if (!agree.checked) { errEl.textContent = '利用規約に同意してね'; return; }
     var nick = document.getElementById('qs-reg-nick').value.trim();
@@ -1592,18 +1603,36 @@ async function doLogin() {
     var code = document.getElementById('qs-reg-code').value.trim();
     var birthday = document.getElementById('qs-reg-birthday').value;
     var purpose = document.getElementById('qs-reg-purpose').value;
-    if (!email) { errEl.textContent = 'メールアドレスを入力してね'; return; }
-    if (!code || code.length !== 6) { errEl.textContent = '6桁の認証コードを入力してね'; return; }
+    var invEl = document.getElementById('qs-reg-invite');
+    var invite = invEl ? invEl.value.trim().toUpperCase() : '';
+    var needEmail = !QS_SIGNUP || QS_SIGNUP.require_email;
+
+    if (!nick) { errEl.textContent = 'ニックネームを入力してね'; return; }
+    if (QS_SIGNUP && QS_SIGNUP.mode === 'invite' && !invite) {
+      errEl.textContent = '招待コードを入力してね'; return; }
+    if (QS_SIGNUP && QS_SIGNUP.require_turnstile && !QS_TS_TOKEN) {
+      errEl.textContent = '「私は人間です」の確認を完了してね'; return; }
+    if (needEmail) {
+      if (!email) { errEl.textContent = 'メールアドレスを入力してね'; return; }
+      if (!code || code.length !== 6) { errEl.textContent = '6桁の認証コードを入力してね'; return; }
+    }
     if (!birthday) { errEl.textContent = '生年月日を入力してね'; return; }
     if (!purpose) { errEl.textContent = '用途を選んでね'; return; }
+
+    var url = needEmail ? '/api/qstart/verify-code' : '/api/qstart/signup';
+    var body = { user_id: uid, nickname: nick, password: pw, email: email,
+                 purpose: purpose, birthday: birthday,
+                 invite: invite, turnstile: QS_TS_TOKEN };
+    if (needEmail) body.code = code;
+
     try {
-      var r = await fetch('/api/qstart/verify-code', {
+      var r = await fetch(url, {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({user_id:uid, nickname:nick, password:pw, email:email, purpose:purpose, code:code, birthday:birthday})
+        body: JSON.stringify(body)
       });
       var data = await r.json();
       if (data.ok) { closeLogin(); refreshUser(); }
-      else { errEl.textContent = data.error; }
+      else { errEl.textContent = data.error; resetTurnstile(); }
     } catch(e) { errEl.textContent = '通信エラー'; }
   } else {
     try {
@@ -1642,28 +1671,137 @@ async function doLogout() {
 
 
 // --- メール認証 ---
+// ===== 登録設定 =====
+var QS_SIGNUP = null;
+var QS_TS_ID = null;
+var QS_TS_TOKEN = '';
+
+async function loadSignupConfig() {
+  try {
+    var r = await fetch('/qstart/api/v1/signup-config');
+    var d = await r.json();
+    if (!d.ok) return;
+    QS_SIGNUP = d;
+
+    var closed = document.getElementById('qs-signup-closed');
+    var inv = document.getElementById('qs-invite-row');
+    var em = document.getElementById('qs-email-row');
+    var emOpt = document.getElementById('qs-email-opt');
+    var tsBox = document.getElementById('qs-turnstile-box');
+    var btn = document.getElementById('qs-submit-btn');
+
+    if (!d.open) {
+      closed.style.display = 'block';
+      closed.textContent = d.mode === 'closed'
+        ? '現在、新規登録の受付を停止しています。'
+        : '現在、アカウントの作成が込み合っています。後日の登録をお願いします。';
+      inv.style.display = 'none'; em.style.display = 'none';
+      tsBox.style.display = 'none';
+      if (btn) { btn.disabled = true; btn.style.opacity = '.5'; }
+      return;
+    }
+    closed.style.display = 'none';
+    var ah = document.getElementById('qs-age-hint');
+    if (ah && d.min_age) {
+      ah.innerHTML = '（' + d.min_age + '歳以上・' + d.min_age
+        + '歳未満の方は保護者の同意を得て招待コードをご使用ください）';
+    }
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+
+    // 招待制なら必須、全開放なら任意で表示
+    inv.style.display = (d.mode === 'closed') ? 'none' : 'block';
+    var invIn = document.getElementById('qs-reg-invite');
+    var invHint = document.getElementById('qs-invite-hint');
+    if (invIn) {
+      if (d.mode === 'invite') {
+        invIn.placeholder = '招待コード（必須）';
+        invIn.style.borderColor = '#c9a227';
+        if (invHint) invHint.textContent = '現在は招待制です。コードをお持ちの方のみ登録できます。';
+      } else {
+        invIn.placeholder = '招待コード（お持ちの方のみ）';
+        invIn.style.borderColor = '#d0ccc0';
+        if (invHint) invHint.textContent = 'コードをお持ちの方は入力してください。特典が受け取れます。';
+      }
+    }
+    em.style.display = d.require_email ? 'flex' : 'none';
+    emOpt.style.display = d.require_email ? 'none' : 'block';
+    if (!d.require_email) {
+      var optIn = document.getElementById('qs-reg-email');
+      if (optIn) { optIn.placeholder = 'メールアドレス（任意）'; }
+      em.style.display = 'flex';
+      var sb = document.getElementById('qs-send-code-btn');
+      if (sb) sb.style.display = 'none';
+    }
+
+    if (d.require_turnstile && d.site_key) {
+      tsBox.style.display = 'block';
+      renderTurnstile(d.site_key);
+    } else {
+      tsBox.style.display = 'none';
+    }
+  } catch(e) {}
+}
+
+function renderTurnstile(siteKey) {
+  if (!window.turnstile) { setTimeout(function(){ renderTurnstile(siteKey); }, 400); return; }
+  if (QS_TS_ID !== null) { window.turnstile.reset(QS_TS_ID); return; }
+  try {
+    QS_TS_ID = window.turnstile.render('#qs-turnstile', {
+      sitekey: siteKey,
+      language: (typeof currentLang !== 'undefined' ? currentLang : 'ja'),
+      callback: function(t){ QS_TS_TOKEN = t; },
+      'expired-callback': function(){ QS_TS_TOKEN = ''; },
+      'error-callback': function(){ QS_TS_TOKEN = ''; }
+    });
+  } catch(e) {}
+}
+
+function resetTurnstile() {
+  QS_TS_TOKEN = '';
+  if (QS_TS_ID !== null && window.turnstile) {
+    try { window.turnstile.reset(QS_TS_ID); } catch(e) {}
+  }
+}
+
 async function sendCode() {
   var email = document.getElementById('qs-reg-email').value.trim();
   var errEl = document.getElementById('qs-login-error');
+  errEl.style.color = '#e24b4a';
   if (!email || email.indexOf('@') < 0) { errEl.textContent = 'メールアドレスを入力してね'; return; }
+
+  if (QS_SIGNUP && QS_SIGNUP.require_turnstile && !QS_TS_TOKEN) {
+    errEl.textContent = '「私は人間です」の確認を完了してね'; return;
+  }
+  var invEl = document.getElementById('qs-reg-invite');
+  if (QS_SIGNUP && QS_SIGNUP.mode === 'invite' && (!invEl || !invEl.value.trim())) {
+    errEl.textContent = '招待コードを入力してね'; return;
+  }
+
   var btn = document.getElementById('qs-send-code-btn');
   btn.disabled = true; btn.textContent = '送信中...';
   try {
     var r = await fetch('/api/qstart/send-code', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({email: email})
+      body: JSON.stringify({ email: email,
+        turnstile: QS_TS_TOKEN,
+        invite: invEl ? invEl.value.trim().toUpperCase() : '',
+        lang: (typeof currentLang !== 'undefined' ? currentLang : 'ja') })
     });
     var data = await r.json();
     if (data.ok) {
       document.getElementById('qs-code-field').style.display = 'block';
       btn.textContent = '再送信'; btn.disabled = false;
-      errEl.textContent = '';
-      // 開発中: コードを表示(本番では削除)
-      if (data.dev_code) { errEl.style.color='#2e7d32'; errEl.textContent = '開発モード: コードは ' + data.dev_code; }
+      errEl.style.color = '#2e7d32';
+      errEl.textContent = 'メールを送ったよ！30分以内にコードを入力してね';
     } else {
-      errEl.textContent = data.error; btn.textContent = 'コード送信'; btn.disabled = false;
+      errEl.textContent = data.error || '送信できませんでした';
+      btn.textContent = 'コード送信'; btn.disabled = false;
+      resetTurnstile();
     }
-  } catch(e) { errEl.textContent = '通信エラー'; btn.textContent = 'コード送信'; btn.disabled = false; }
+  } catch(e) {
+    errEl.textContent = '通信エラー';
+    btn.textContent = 'コード送信'; btn.disabled = false;
+  }
 }
 
 
@@ -2678,17 +2816,32 @@ loadFeatures();
     </div>
 
     <div id="qs-reg-fields" style="display:none;">
+      <div id="qs-signup-closed" style="display:none; background:#fdf0ee; border:1px solid #f0d0c8;
+        border-radius:9px; padding:12px 14px; font-size:13px; color:#a3211a; line-height:1.7; margin-bottom:12px;"></div>
+
+      <div id="qs-invite-row" style="display:none; margin-bottom:10px;">
+        <input id="qs-reg-invite" placeholder="招待コード（QS-XXXXXX）" maxlength="20"
+          style="width:100%; padding:10px; border:1px solid #c9a227; border-radius:8px;
+          font-size:14px; text-transform:uppercase; background:#fdfaf2;">
+        <div id="qs-invite-hint" style="font-size:11px; color:#8a8270; margin-top:4px;">
+          コードをお持ちの方は入力してください。</div>
+      </div>
+
       <input id="qs-reg-nick" placeholder="ニックネーム（呼ばれたい名前）" style="width:100%; padding:10px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px; margin-bottom:8px;">
-      <div style="display:flex; gap:6px; margin-bottom:8px;">
+
+      <div id="qs-email-row" style="display:flex; gap:6px; margin-bottom:8px;">
         <input id="qs-reg-email" placeholder="メールアドレス" type="email" style="flex:1; padding:10px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px;">
         <button onclick="sendCode()" id="qs-send-code-btn" style="padding:8px 14px; background:#14213d; color:#fff; border:none; border-radius:8px; font-size:12px; cursor:pointer; white-space:nowrap;">コード送信</button>
       </div>
+      <div id="qs-email-opt" style="display:none; font-size:11px; color:#8a8270; margin:-4px 0 8px 2px;">
+        メールアドレスは任意です。入力するとパスワードを忘れたときに復旧できます。</div>
       <div id="qs-code-field" style="display:none; margin-bottom:8px;">
         <input id="qs-reg-code" placeholder="6桁の認証コード" maxlength="6" style="width:100%; padding:10px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px; text-align:center; letter-spacing:8px; font-weight:bold;">
         <div style="font-size:11px; color:#8a8270; margin-top:4px;">メールに届いた6桁のコードを入力してね</div>
       </div>
       <input id="qs-reg-birthday" type="date" style="width:100%; padding:10px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px; margin-bottom:8px; color:#333;">
-      <div style="font-size:11px; color:#8a8270; margin:-4px 0 8px 4px;">生年月日</div>
+      <div style="font-size:11px; color:#8a8270; margin:-4px 0 8px 4px;">
+        生年月日<span id="qs-age-hint"></span></div>
       <select id="qs-reg-purpose" style="width:100%; padding:10px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px; margin-bottom:8px; background:#fff; color:#333;">
         <option value="" disabled selected>用途を選んでね</option>
         <option value="study">勉強・学習</option>
@@ -2700,6 +2853,9 @@ loadFeatures();
     </div>
     <input id="qs-login-id" placeholder="ユーザーID" style="width:100%; padding:10px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px; margin-bottom:8px;">
     <input id="qs-login-pw" type="password" placeholder="パスワード" style="width:100%; padding:10px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px; margin-bottom:12px;">
+    <div id="qs-turnstile-box" style="display:none; margin-bottom:12px;">
+      <div id="qs-turnstile"></div>
+    </div>
     <div id="qs-login-terms" style="display:none; margin-bottom:12px; font-size:12px; color:#8a8270;">
       <label><input type="checkbox" id="qs-agree"> <a href="/qstart/terms" target="_blank">利用規約</a>と<a href="/qstart/privacy" target="_blank">プライバシーポリシー</a>に同意する</label>
     </div>

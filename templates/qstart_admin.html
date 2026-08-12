@@ -11,7 +11,7 @@ body { font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif; back
 .hd .logo { font-size:18px; font-weight:700; } .hd .logo span { color:#b8860b; }
 .hd .badge { font-size:11px; background:#b8860b; padding:3px 8px; border-radius:20px; }
 .hd a { margin-left:auto; color:#aab; font-size:13px; text-decoration:none; }
-.tabs { display:flex; gap:2px; background:#fff; padding:0 16px; border-bottom:1px solid #e8e4da; overflow-x:auto; }
+.tabs { display:flex; flex-wrap:wrap; gap:2px; background:#fff; padding:0 16px; border-bottom:1px solid #e8e4da; }
 .tab { padding:13px 16px; font-size:14px; color:#7a7362; cursor:pointer; white-space:nowrap; border-bottom:2px solid transparent; }
 .tab:hover { color:#14213d; }
 .tab.active { color:#14213d; font-weight:600; border-bottom-color:#b8860b; }
@@ -60,7 +60,7 @@ button.red { background:#b03a3a; }
   <div class="tab" data-p="features" onclick="tab('features')">🚩 機能フラグ</div>
   <div class="tab" data-p="promo" onclick="tab('promo')">🎟 優待コード</div>
   <div class="tab" data-p="pricing" onclick="tab('pricing')">💰 料金・売上</div>
-  <div class="tab" data-p="mail" onclick="tab('mail')">💌 メール・登録</div>
+  <div class="tab" data-p="signup" onclick="tab('signup')">🎫 登録・メール</div>
   <div class="tab" data-p="reports" onclick="tab('reports')">🚨 通報</div>
   <div class="tab" data-p="logs" onclick="tab('logs')">📜 監査ログ</div>
 </div>
@@ -219,8 +219,88 @@ button.red { background:#b03a3a; }
   <tbody id="buyBody"></tbody></table>
 </div>
 
-<div class="pane" id="p-mail">
-  <h2>メール・新規登録</h2>
+<div class="pane" id="p-signup">
+  <h2>新規登録の設定</h2>
+  <div class="cards" id="suCards"></div>
+
+  <div class="form">
+    <div style="font-size:13px;font-weight:600;margin-bottom:12px;">受付モード</div>
+    <div class="row" style="margin-bottom:14px;">
+      <select id="suMode" onchange="saveSignup()" style="min-width:220px;">
+        <option value="closed">🔒 停止中 — 誰も登録できない</option>
+        <option value="invite">🎫 招待制 — コードを持つ人だけ</option>
+        <option value="open">🌏 全開放 — 誰でも登録できる</option>
+      </select>
+      <span id="suModeMsg" style="font-size:12px;color:#8a8270;"></span>
+    </div>
+
+    <div class="row" style="margin-bottom:12px;">
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+        <input type="checkbox" id="suTurnstile" onchange="saveSignup()" style="width:17px;height:17px;">
+        人間確認 (Cloudflare Turnstile)
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+        <input type="checkbox" id="suEmail" onchange="saveSignup()" style="width:17px;height:17px;">
+        メール認証を必須にする
+      </label>
+      <div>1日の上限
+        <input id="suLimit" type="number" min="1" max="10000" style="width:90px" onchange="saveSignup()">人
+      </div>
+    </div>
+    <div id="suHint" style="font-size:11.5px;color:#a09a8a;line-height:1.9;"></div>
+  </div>
+
+  <div class="form">
+    <div style="font-size:13px;font-weight:600;margin-bottom:10px;">招待コードを発行</div>
+    <div class="row" style="margin-bottom:8px;">
+      <div><label style="font-size:11px;color:#8a8270;">発行数</label><br>
+        <input id="ivCount" type="number" value="1" min="1" max="50" style="width:80px"></div>
+      <div><label style="font-size:11px;color:#8a8270;">1コードで何人まで</label><br>
+        <select id="ivMax">
+          <option value="1">1人</option><option value="5">5人</option>
+          <option value="10">10人</option><option value="50">50人</option>
+          <option value="-1">無制限</option>
+        </select></div>
+      <div><label style="font-size:11px;color:#8a8270;">有効期限</label><br>
+        <input id="ivExp" type="date"></div>
+      <div><label style="font-size:11px;color:#8a8270;">メモ</label><br>
+        <input id="ivNote" placeholder="例: 学校の友達用" style="width:180px"></div>
+    </div>
+    <div class="row" style="margin-bottom:8px;">
+      <div><label style="font-size:11px;color:#8a8270;">年齢制限</label><br>
+        <select id="ivAge">
+          <option value="13">13歳以上（通常）</option>
+          <option value="0">制限なし（保護者同意済み）</option>
+          <option value="18">18歳以上</option>
+        </select></div>
+      <div><label style="font-size:11px;color:#8a8270;">権限を付与</label><br>
+        <select id="ivRole">
+          <option value="">なし</option>
+          <option value="moderator">moderator</option>
+        </select></div>
+      <div><label style="font-size:11px;color:#8a8270;">3時間枠 +（恒久）</label><br>
+        <input id="ivBw" type="number" value="0" min="0" style="width:110px"></div>
+      <div><label style="font-size:11px;color:#8a8270;">予備タンク +</label><br>
+        <input id="ivBs" type="number" value="0" min="0" style="width:110px"></div>
+      <button class="gold" onclick="makeInvite()">🎫 発行</button>
+    </div>
+    <div id="ivResult" style="font-size:13px;margin-top:8px;"></div>
+    <div style="font-size:11px;color:#a09a8a;margin-top:8px;line-height:1.8;">
+      「制限なし」を選ぶと13歳未満でも登録できます。保護者に直接渡すコードにのみ使ってください。<br>
+      全開放モードでも、コードを入力すれば特典と年齢緩和が適用されます。</div>
+  </div>
+
+  <table><thead><tr><th>コード</th><th>使用</th><th>期限</th><th>メモ</th><th>状態</th><th>作成</th><th></th></tr></thead>
+  <tbody id="ivBody"></tbody></table>
+
+  <h2 style="margin-top:26px;">使用履歴</h2>
+  <table><thead><tr><th>日時</th><th>コード</th><th>登録したID</th><th>メモ</th></tr></thead>
+  <tbody id="ivUses"></tbody></table>
+</div>
+
+
+<h2 style="margin-top:30px;">メール送信</h2>
+
   <div class="cards" id="mailCards"></div>
 
   <div class="form">
@@ -255,6 +335,8 @@ button.red { background:#b03a3a; }
   <h2 style="margin-top:26px;">送信ログ</h2>
   <table><thead><tr><th>日時</th><th>種類</th><th>状態</th><th>エラー</th></tr></thead>
   <tbody id="mlLogs"></tbody></table>
+
+</div>
 </div>
 
 <div class="pane" id="p-reports">
@@ -284,7 +366,7 @@ async function api(p,m,b){
 function tab(n){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.p===n));
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active',p.id==='p-'+n));
-  ({dash:loadStats,users:()=>loadUsers(1),announce:loadAnnounce,models:loadModels,features:loadFeatures,promo:loadPromo,pricing:loadPricing,mail:loadMail,reports:loadReports,logs:loadLogs}[n]||function(){})();
+  ({dash:loadStats,users:()=>loadUsers(1),announce:loadAnnounce,models:loadModels,features:loadFeatures,promo:loadPromo,pricing:loadPricing,signup:function(){loadSignup();loadMail();},reports:loadReports,logs:loadLogs}[n]||function(){})();
 }
 function bars(el,items,key,val){
   var max=Math.max(1,...items.map(i=>i[val]));
@@ -550,6 +632,89 @@ async function testMail(){
   else { m.style.color='#c0392b'; m.textContent='❌ 失敗: '+(d.result||d.error||''); }
   loadMail();
 }
+
+var MODE_MSG = {
+  closed: '誰も新規登録できません',
+  invite: '招待コードを持つ人だけ登録できます',
+  open:   '誰でも登録できます'
+};
+async function loadSignup(){
+  var d = await api('signup'); if(!d.ok) return;
+  var c = d.config;
+  document.getElementById('suMode').value = c.mode;
+  document.getElementById('suTurnstile').checked = !!Number(c.require_turnstile);
+  document.getElementById('suEmail').checked = !!Number(c.require_email);
+  document.getElementById('suLimit').value = c.daily_limit;
+  document.getElementById('suModeMsg').textContent = MODE_MSG[c.mode] || '';
+
+  var active = d.invites.filter(function(i){return i.active;}).length;
+  document.getElementById('suCards').innerHTML =
+    [['受付モード', {closed:'🔒 停止',invite:'🎫 招待制',open:'🌏 全開放'}[c.mode]],
+     ['今日の登録', d.signups_today + ' / ' + c.daily_limit],
+     ['有効な招待コード', active],
+     ['人間確認', d.has_turnstile ? (Number(c.require_turnstile)?'✅ ON':'OFF') : '❌ 未設定']]
+    .map(function(x){ return '<div class="card"><div class="k">'+x[0]+'</div><div class="v" style="font-size:18px;">'+x[1]+'</div></div>'; }).join('');
+
+  var h = [];
+  if (!d.has_turnstile) h.push('<span style="color:#c0392b;">⚠ TURNSTILE_SECRET_KEY が未設定です</span>');
+  if (Number(c.require_email) && !d.has_resend) h.push('<span style="color:#c0392b;">⚠ メール認証が必須ですが RESEND_API_KEY が未設定です</span>');
+  if (Number(c.require_email)) h.push('メール認証はドメイン未認証だと自分宛にしか届きません。');
+  h.push('人間確認をONにするとボットの大量登録を防げます。');
+  document.getElementById('suHint').innerHTML = h.join('<br>');
+
+  document.getElementById('ivBody').innerHTML = d.invites.map(function(i){
+    var left = i.max_uses < 0 ? '∞' : i.max_uses;
+    var expd = i.expires_at && i.expires_at < new Date().toISOString().slice(0,10);
+    return '<tr><td style="font-family:monospace;font-weight:600;">'+esc(i.code)+'</td>'
+      +'<td>'+(i.used_count||0)+' / '+left+'</td>'
+      +'<td style="font-size:11px;'+(expd?'color:#c0392b;':'color:#999;')+'">'+esc(i.expires_at||'無期限')+'</td>'
+      +'<td style="font-size:12px;">'+esc(i.note||'')
+      +(Number(i.min_age)===0?' <span class="pill on">年齢制限なし</span>':'')
+      +(i.grant_role?' <span class="pill on">'+esc(i.grant_role)+'</span>':'')
+      +((i.bonus_window||i.bonus_stock)?' <span class="pill on">特典あり</span>':'')+'</td>'
+      +'<td><span class="pill '+(i.active&&!expd?'on':'off')+'">'+(expd?'期限切れ':(i.active?'有効':'停止'))+'</span></td>'
+      +'<td style="font-size:11px;color:#999;">'+esc((i.created_at||'').slice(0,10))+'</td>'
+      +'<td><button class="ghost" onclick="copyInv(\''+esc(i.code)+'\')">コピー</button> '
+      +'<button class="ghost" onclick="togInv(\''+esc(i.code)+'\','+(i.active?0:1)+')">'+(i.active?'停止':'再開')+'</button> '
+      +'<button class="red" onclick="delInv(\''+esc(i.code)+'\')">削除</button></td></tr>';
+  }).join('') || '<tr><td colspan="7" style="color:#aaa;">招待コードがありません</td></tr>';
+
+  document.getElementById('ivUses').innerHTML = (d.uses||[]).map(function(u){
+    return '<tr><td style="font-size:11px;color:#999;">'+esc((u.used_at||'').slice(0,16))+'</td>'
+      +'<td style="font-family:monospace;">'+esc(u.code)+'</td>'
+      +'<td>'+esc(u.user_id)+'</td><td style="font-size:12px;">'+esc(u.note||'')+'</td></tr>';
+  }).join('') || '<tr><td colspan="4" style="color:#aaa;">まだ使われていません</td></tr>';
+}
+async function saveSignup(){
+  await api('signup','POST',{
+    mode: document.getElementById('suMode').value,
+    require_turnstile: document.getElementById('suTurnstile').checked ? 1 : 0,
+    require_email: document.getElementById('suEmail').checked ? 1 : 0,
+    daily_limit: document.getElementById('suLimit').value });
+  loadSignup();
+}
+async function makeInvite(){
+  var d = await api('invites','POST',{
+    count: document.getElementById('ivCount').value,
+    max_uses: document.getElementById('ivMax').value,
+    expires_at: document.getElementById('ivExp').value || null,
+    note: document.getElementById('ivNote').value,
+    min_age: document.getElementById('ivAge').value,
+    grant_role: document.getElementById('ivRole').value || null,
+    bonus_window: document.getElementById('ivBw').value || 0,
+    bonus_stock: document.getElementById('ivBs').value || 0 });
+  var r = document.getElementById('ivResult');
+  if(d.ok){ r.style.color='#2e7d32';
+    r.innerHTML = '発行しました: <b style="font-family:monospace;">'+d.codes.join('</b>, <b style="font-family:monospace;">')+'</b>';
+    document.getElementById('ivNote').value=''; loadSignup(); }
+  else { r.style.color='#c0392b'; r.textContent='発行に失敗しました'; }
+}
+async function togInv(c,v){ await api('invites/'+encodeURIComponent(c),'PATCH',{active:v}); loadSignup(); }
+async function delInv(c){ if(!confirm(c+' を削除しますか？'))return;
+  await api('invites/'+encodeURIComponent(c),'DELETE'); loadSignup(); }
+function copyInv(c){ navigator.clipboard.writeText(c).then(function(){
+  var r=document.getElementById('ivResult'); r.style.color='#2e7d32';
+  r.textContent='コピーしました: '+c; }); }
 
 async function loadReports(){
   var d=await api('reports'); if(!d.ok)return;
