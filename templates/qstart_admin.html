@@ -41,6 +41,42 @@ button.red { background:#b03a3a; }
 .bar .t { width:120px; color:#7a7362; }
 .bar .g { flex:1; height:8px; background:#f0ede5; border-radius:4px; overflow:hidden; }
 .bar .g i { display:block; height:100%; background:#b8860b; }
+
+/* ===== モバイル対応 ===== */
+@media (max-width: 768px) {
+  .hd { padding:11px 14px; gap:8px; }
+  .hd .logo { font-size:16px; }
+  .hd a { font-size:12px; }
+  .tabs { padding:0 8px; gap:1px; }
+  .tab { padding:10px 11px; font-size:12.5px; }
+  .wrap { padding:16px 12px 40px; }
+  h2 { font-size:15px; margin-bottom:12px; }
+
+  .cards { grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:9px; }
+  .card { padding:12px; }
+  .card .v { font-size:19px; }
+
+  .form { padding:14px; }
+  .row { gap:8px; }
+  .row > div { flex:1 1 auto; min-width:0; }
+  input, select { max-width:100%; }
+  input[style*="width:280px"], input[style*="width:260px"],
+  input[style*="width:200px"], input[style*="width:180px"] { width:100% !important; }
+
+  /* テーブルを横スクロール可能に */
+  table { display:block; overflow-x:auto; white-space:nowrap; font-size:12px; }
+  th, td { padding:9px 8px; }
+  td[style*="max-width"] { max-width:200px !important; white-space:normal; }
+
+  button { padding:9px 12px; font-size:12.5px; }
+  textarea { font-size:13px; }
+}
+
+@media (max-width: 480px) {
+  .cards { grid-template-columns:1fr 1fr; }
+  .tab { padding:9px 9px; font-size:12px; }
+  .hd .badge { display:none; }
+}
 </style>
 </head>
 <body>

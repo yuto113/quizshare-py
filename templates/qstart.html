@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Qstart — ゼロから作ったAIと、話そう</title>
 <meta name="description" content="Qstart - 12歳の開発者がゼロから手書きしたTransformerベースのAIチャットサービス">
 <meta property="og:title" content="Qstart">
@@ -308,9 +308,60 @@ body { font-family: 'Segoe UI','Hiragino Sans',sans-serif; background:#faf9f6; c
   .qs-s-body { padding:20px; }
 }
 
-@media (max-width:768px) {
-  .qs-sidebar { display:none; }
+/* ===== モバイル強化 (1.5.2) ===== */
+@media (max-width: 768px) {
+  /* チャット */
+  .qs-chat { padding:14px 12px; }
+  .qs-bubble { max-width:88%; font-size:14px; line-height:1.75; }
+  .qs-welcome h1 { font-size:26px; }
+  .qs-welcome p { font-size:13px; padding:0 12px; }
+  .qs-topbar { padding:9px 12px; gap:8px; flex-wrap:nowrap; overflow-x:auto; }
+  .qs-model-btn { font-size:13px; padding:7px 11px; white-space:nowrap; }
+  .qs-effort-btn { padding:6px 8px; font-size:12px; }
+  .qs-effort-group { flex-shrink:0; }
+  /* 入力欄をタップしやすく */
+  .qs-input-area { padding:10px 12px; }
+  .qs-input { font-size:16px !important; padding:12px 14px; }  /* iOSの自動ズーム防止 */
+  body[data-fs] .qs-input { font-size:16px !important; }
+  .qs-send { padding:12px 16px; font-size:14px; }
+  .qs-file-btn { width:44px; height:44px; }
+  /* サイドバーを全画面に */
+  .qs-sidebar { width:84%; max-width:300px; box-shadow:4px 0 24px rgba(0,0,0,.3); }
+  .qs-sidebar-link { padding:12px 10px; font-size:14px; }
+  /* ハンバーガーを表示 */
+  #qs-sidebar-open { display:block !important; }
+  .qs-sidebar {
+    position:fixed; left:0; top:0; bottom:0; z-index:210;
+    transform:translateX(-100%); transition:transform .22s ease;
+  }
+  .qs-sidebar.open { transform:translateX(0); }
+  .qs-main { width:100%; }
+  .qs-new-chat { padding:13px; font-size:14px; }
+  /* お知らせバナー */
+  #qs-ann-banner { padding:9px 12px; font-size:12.5px; gap:8px; }
+  #qs-ann-banner a { font-size:11px; }
 }
+
+@media (max-width: 480px) {
+  .qs-bubble { max-width:92%; }
+  .qs-welcome h1 { font-size:23px; }
+  .qs-model-btn { max-width:120px; overflow:hidden; text-overflow:ellipsis; }
+  .qs-effort-btn { padding:6px; font-size:11px; }
+  .qs-s-tab { padding:8px 10px; font-size:12.5px; }
+  .qs-s-body { padding:18px 16px; }
+  .qs-s-pane select { min-width:100%; }
+  .qs-btn { display:block; width:100%; text-align:center; margin:6px 0 0; }
+}
+
+/* 横向き・小さい高さ */
+@media (max-height: 500px) and (orientation: landscape) {
+  .qs-welcome { padding:12px 0; }
+  .qs-welcome h1 { font-size:19px; margin-bottom:4px; }
+  .qs-welcome p { font-size:12px; }
+  .qs-s-modal { height:96vh; }
+}
+
+
 </style>
 </head>
 <body>
@@ -319,7 +370,7 @@ body { font-family: 'Segoe UI','Hiragino Sans',sans-serif; background:#faf9f6; c
 <div class="qs-sidebar">
   <div style="display:flex; justify-content:space-between; align-items:center;">
       <div class="qs-logo">Q<span>start</span></div>
-      <button onclick="toggleSidebar()" style="background:none; border:none; color:#888; font-size:20px; cursor:pointer; padding:4px 8px;">✕</button>
+      <button onclick="if(isMobile())closeSidebar();else toggleSidebar();" style="background:none; border:none; color:#888; font-size:20px; cursor:pointer; padding:4px 8px;">✕</button>
     </div>
   <div class="qs-sub">ゼロから作ったAIと、話そう。</div>
   <div class="qs-new-chat" onclick="newChat()">+ 新しいチャット</div>
@@ -2099,17 +2150,57 @@ function startNewChat() {
 })();
 
 // --- サイドバー開閉 ---
+function isMobile() { return window.innerWidth <= 768; }
+
 function toggleSidebar() {
   var sb = document.querySelector('.qs-sidebar');
-  var openBtn = document.getElementById('qs-sidebar-open');
-  if (sb.style.display === 'none') {
-    sb.style.display = 'flex';
-    openBtn.style.display = 'none';
+  if (!sb) return;
+  if (isMobile()) {
+    sb.classList.toggle('open');
+    toggleOverlay(sb.classList.contains('open'));
   } else {
-    sb.style.display = 'none';
-    openBtn.style.display = 'block';
+    var openBtn = document.getElementById('qs-sidebar-open');
+    var hidden = sb.style.display === 'none';
+    sb.style.display = hidden ? 'flex' : 'none';
+    if (openBtn) openBtn.style.display = hidden ? 'none' : 'block';
   }
 }
+
+function toggleOverlay(show) {
+  var ov = document.getElementById('qs-overlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'qs-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:205;display:none;';
+    ov.onclick = function(){ closeSidebar(); };
+    document.body.appendChild(ov);
+  }
+  ov.style.display = show ? 'block' : 'none';
+}
+
+function closeSidebar() {
+  var sb = document.querySelector('.qs-sidebar');
+  if (sb) sb.classList.remove('open');
+  toggleOverlay(false);
+}
+
+// モバイルではリンクを押したら閉じる
+document.addEventListener('click', function(e) {
+  if (!isMobile()) return;
+  var a = e.target.closest('.qs-sidebar-link, .qs-new-chat, .qs-history-item');
+  if (a) setTimeout(closeSidebar, 120);
+});
+
+// 画面幅が変わったら状態をリセット
+window.addEventListener('resize', function() {
+  var sb = document.querySelector('.qs-sidebar');
+  if (!sb) return;
+  if (!isMobile()) {
+    sb.classList.remove('open');
+    toggleOverlay(false);
+    if (sb.style.display === 'none') sb.style.display = 'flex';
+  }
+});
 
 // --- 言語 ---
 var QS_TEXTS = {
