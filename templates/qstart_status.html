@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>稼働状況 — Qstart</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;background:#faf9f6;color:#14213d;min-height:100vh}
+.hd{display:flex;align-items:center;gap:12px;padding:14px 22px;background:#fff;border-bottom:1px solid #ece9e2}
+.hd a{color:#14213d;text-decoration:none;font-size:14px}
+.logo{font-size:18px;font-weight:700}.logo span{color:#b8860b}
+.wrap{max-width:640px;margin:0 auto;padding:32px 22px 60px}
+h1{font-size:22px;margin-bottom:22px}
+.big{background:#fff;border:1px solid #ece9e2;border-radius:14px;padding:26px;text-align:center;margin-bottom:20px}
+.big .dot{font-size:44px;margin-bottom:10px}
+.big .t{font-size:19px;font-weight:600;margin-bottom:5px}
+.big .s{font-size:12.5px;color:#8a8270}
+.item{background:#fff;border:1px solid #ece9e2;border-radius:12px;padding:15px 17px;
+  margin-bottom:10px;display:flex;align-items:center;gap:12px}
+.item .n{flex:1}
+.item .n b{font-size:14px;display:block;margin-bottom:3px}
+.item .n span{font-size:11.5px;color:#a09a8a}
+.pill{font-size:11.5px;padding:4px 11px;border-radius:20px;white-space:nowrap}
+.pill.ok{background:#e8f5e9;color:#2e7d32}
+.pill.warn{background:#fff6e5;color:#8a5a00}
+.pill.ng{background:#fbe9e7;color:#c0392b}
+.pill.off{background:#f0ede5;color:#8a8270}
+h2{font-size:14px;color:#8a8270;margin:26px 0 11px}
+.foot{font-size:11.5px;color:#a09a8a;line-height:1.9;margin-top:24px;text-align:center}
+.foot a{color:#b8860b}
+.load{text-align:center;padding:50px;color:#a09a8a}
+</style></head><body>
+
+<div class="hd">
+  <a class="logo" href="/qstart">Q<span>start</span></a>
+  <div style="flex:1"></div>
+  <a href="/qstart">← Qstartに戻る</a>
+</div>
+
+<div class="wrap">
+  <h1>稼働状況</h1>
+  <div id="body"><div class="load">読み込み中…</div></div>
+  <div class="foot">
+    このページは1分ごとに自動更新されます。<br>
+    障害が続く場合は<a href="/qstart/contact">お問い合わせ</a>からご連絡ください。<br>
+    <span style="color:#c8c2b4;">Qstart by Qzero会社</span>
+  </div>
+</div>
+
+<script>
+var MODEL_NAME = {equi:'Equi 1', zin:'zin 1', pure:'Pure 1', apex:'Apex 1'};
+var MODEL_DESC = {equi:'バランス型・普段使い', zin:'思考型・じっくり考える',
+                  pure:'高速・軽量', apex:'最高性能'};
+var MODEL_SOON = {pure:'2026年秋 公開予定', apex:'2026年秋 公開予定'};
+
+async function load(){
+  try{
+    var r = await fetch('/qstart/health');
+    var d = await r.json();
+    render(d, r.status);
+  }catch(e){
+    document.getElementById('body').innerHTML =
+      '<div class="big"><div class="dot">🔴</div><div class="t">接続できません</div>'
+      + '<div class="s">サービスに到達できませんでした</div></div>';
+  }
+}
+
+function render(d, code){
+  var ok = d.ok && code === 200;
+  var h = '<div class="big"><div class="dot">' + (ok ? '🟢' : '🟠') + '</div>'
+    + '<div class="t">' + (ok ? 'すべて正常に稼働しています' : '一部に問題が発生しています') + '</div>'
+    + '<div class="s">最終確認: ' + esc(d.time || '') + '</div></div>';
+
+  var c = d.checks || {};
+
+  h += '<h2>システム</h2>';
+  var dbOk = c.database && c.database.ok;
+  h += item('データベース', dbOk ? ('応答 ' + c.database.ms + 'ms') : 'エラー',
+            dbOk ? 'ok' : 'ng', dbOk ? '正常' : '異常');
+
+  var e1 = c.errors_1h || 0;
+  h += item('エラー発生数', '直近1時間', e1 === 0 ? 'ok' : (e1 > 50 ? 'ng' : 'warn'),
+            e1 === 0 ? 'なし' : e1 + '件');
+
+  h += item('メール送信', '認証コード・お知らせ', c.mail ? 'ok' : 'off',
+            c.mail ? '利用可能' : '準備中');
+  h += item('人間確認', '不正登録の防止', c.turnstile ? 'ok' : 'off',
+            c.turnstile ? '有効' : '無効');
+
+  h += '<h2>モデル</h2>';
+  var ms = c.models || {};
+  ['equi','zin','pure','apex'].forEach(function(k){
+    if (!(k in ms)) return;
+    var st = ms[k];
+    var cls = st === 'on' ? 'ok' : (st === 'maintenance' ? 'warn' : 'off');
+    var lbl = st === 'on' ? '稼働中' : (st === 'maintenance' ? 'メンテナンス中' : '準備中');
+    var desc = MODEL_DESC[k] || '';
+    if (st !== 'on' && st !== 'maintenance' && MODEL_SOON[k]) desc = MODEL_SOON[k];
+    h += item(MODEL_NAME[k] || k, desc, cls, lbl);
+  });
+
+  document.getElementById('body').innerHTML = h;
+}
+
+function item(name, desc, cls, label){
+  return '<div class="item"><div class="n"><b>' + esc(name) + '</b>'
+    + (desc ? '<span>' + esc(desc) + '</span>' : '') + '</div>'
+    + '<span class="pill ' + cls + '">' + esc(label) + '</span></div>';
+}
+
+function esc(s){ var d=document.createElement('div'); d.textContent=(s==null?'':s); return d.innerHTML; }
+
+load();
+setInterval(load, 60000);
+</script></body></html>
