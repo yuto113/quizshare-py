@@ -195,6 +195,14 @@ def require_admin(f):
         return f(*a, **kw)
     return w
 
+def require_moderator(f):
+    @wraps(f)
+    def w(*a, **kw):
+        if qstart_role() not in ('admin', 'moderator'):
+            return jsonify({'ok': False, 'error': 'forbidden'}), 403
+        return f(*a, **kw)
+    return w
+
 def alog(action, target='', detail=''):
     ip = request.headers.get('X-Forwarded-For', request.remote_addr or '')
     ih = hashlib.sha256(ip.encode()).hexdigest()[:16]
@@ -894,13 +902,6 @@ def user_status(uid):
 def is_suspended(uid):
     return user_status(uid) in ('suspended', 'banned')
 
-def require_moderator(f):
-    @wraps(f)
-    def w(*a, **kw):
-        if qstart_role() not in ('admin', 'moderator'):
-            return jsonify({'ok': False, 'error': 'forbidden'}), 403
-        return f(*a, **kw)
-    return w
 
 @qstart_core.route('/qstart/api/v1/status')
 def my_status():

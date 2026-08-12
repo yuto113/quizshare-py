@@ -61,6 +61,7 @@ button.red { background:#b03a3a; }
   <div class="tab" data-p="promo" onclick="tab('promo')">🎟 優待コード</div>
   <div class="tab" data-p="pricing" onclick="tab('pricing')">💰 料金・売上</div>
   <div class="tab" data-p="signup" onclick="tab('signup')">🎫 登録・メール</div>
+  <div class="tab" data-p="contacts" onclick="tab('contacts')">📮 問い合わせ</div>
   <div class="tab" data-p="reports" onclick="tab('reports')">🚨 通報</div>
   <div class="tab" data-p="errors" onclick="tab('errors')">🐛 エラー</div>
   <div class="tab" data-p="logs" onclick="tab('logs')">📜 監査ログ</div>
@@ -303,6 +304,15 @@ button.red { background:#b03a3a; }
 
 </div>
 
+<div class="pane" id="p-contacts">
+  <h2>お問い合わせ</h2>
+  <div class="row">
+    <a href="/qstart/contact" target="_blank"><button class="ghost">📮 フォームを見る</button></a>
+    <button class="ghost" onclick="loadContacts()">🔄 更新</button>
+  </div>
+  <div id="ctBody"></div>
+</div>
+
 <div class="pane" id="p-reports">
   <h2>通報・フィードバック</h2>
   <table><thead><tr><th>ID</th><th>ユーザー</th><th>種別</th><th>内容</th><th>状態</th><th>日時</th><th></th></tr></thead>
@@ -350,7 +360,7 @@ async function api(p,m,b){
 function tab(n){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.p===n));
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active',p.id==='p-'+n));
-  ({dash:loadStats,users:()=>loadUsers(1),announce:loadAnnounce,models:loadModels,features:loadFeatures,promo:loadPromo,pricing:loadPricing,signup:loadSignup,reports:loadReports,errors:loadErrors,logs:function(){loadLogs();loadBackup();}}[n]||function(){})();
+  ({dash:loadStats,users:()=>loadUsers(1),announce:loadAnnounce,models:loadModels,features:loadFeatures,promo:loadPromo,pricing:loadPricing,signup:loadSignup,contacts:loadContacts,reports:loadReports,errors:loadErrors,logs:function(){loadLogs();loadBackup();}}[n]||function(){})();
 }
 function bars(el,items,key,val){
   var max=Math.max(1,...items.map(i=>i[val]));
@@ -641,6 +651,56 @@ async function delInv(c){ if(!confirm(c+' を削除しますか？'))return;
 function copyInv(c){ navigator.clipboard.writeText(c).then(function(){
   var r=document.getElementById('ivResult'); r.style.color='#2e7d32';
   r.textContent='コピーしました: '+c; }); }
+
+var CT_CAT = {question:'使い方の質問', bug:'不具合の報告', request:'機能のご要望',
+  account:'アカウント', parent:'保護者から', privacy:'プライバシー',
+  business:'取材・お仕事', other:'その他'};
+
+async function loadContacts(){
+  var d = await api('contacts'); if(!d.ok) return;
+  var openN = d.contacts.filter(function(c){return c.status==='open';}).length;
+  var hd = document.querySelector('#p-contacts h2');
+  if (hd) hd.textContent = 'お問い合わせ' + (openN ? '（未対応 ' + openN + '件）' : '');
+  var el = document.getElementById('ctBody');
+  if (!d.contacts.length) {
+    el.innerHTML = '<div style="padding:40px;text-align:center;color:#aaa;">お問い合わせはありません</div>';
+    return;
+  }
+  el.innerHTML = d.contacts.map(function(c){
+    var isOpen = c.status === 'open';
+    return '<div style="background:#fff;border:1px solid '+(isOpen?'#f0e0c0':'#ece9e2')
+      +';border-radius:12px;padding:16px;margin-bottom:12px;">'
+      +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">'
+      +'<span class="pill '+(isOpen?'off':'on')+'">'+(isOpen?'未対応':'返信済み')+'</span>'
+      +'<b style="font-size:13px;">'+esc(CT_CAT[c.category]||c.category)+'</b>'
+      +'<span style="font-size:12px;color:#8a8270;">'+esc(c.name||'名前なし')+' &lt;'+esc(c.email)+'&gt;</span>'
+      +'<span style="flex:1"></span>'
+      +'<span style="font-size:11px;color:#999;">'+esc((c.created_at||'').slice(0,16))+'</span></div>'
+      +(c.subject?'<div style="font-size:13.5px;font-weight:600;margin-bottom:6px;">'+esc(c.subject)+'</div>':'')
+      +'<div style="font-size:13px;color:#3a3630;line-height:1.8;white-space:pre-wrap;'
+      +'background:#faf9f5;border-radius:8px;padding:12px;margin-bottom:10px;">'+esc(c.body)+'</div>'
+      +(c.reply?'<div style="font-size:12.5px;color:#2e7d32;line-height:1.8;white-space:pre-wrap;'
+        +'background:#f1f8f2;border-radius:8px;padding:12px;margin-bottom:10px;">'
+        +'<b>返信 ('+esc((c.replied_at||'').slice(0,16))+')</b><br>'+esc(c.reply)+'</div>':'')
+      +(isOpen?'<textarea id="ctR'+c.id+'" placeholder="返信内容（メールで送信されます）" '
+        +'style="width:100%;min-height:80px;padding:10px;border:1px solid #ddd8cc;border-radius:8px;'
+        +'font-size:13px;font-family:inherit;line-height:1.6;"></textarea>'
+        +'<div class="row" style="margin:10px 0 0;">'
+        +'<button class="gold" onclick="replyContact('+c.id+')">📧 返信を送る</button>'
+        +'<button class="ghost" onclick="closeContact('+c.id+')">返信せず完了</button></div>':'')
+      +'</div>';
+  }).join('');
+}
+async function replyContact(id){
+  var t = document.getElementById('ctR'+id).value.trim();
+  if(!t){ alert('返信内容を入力してください'); return; }
+  await api('contacts/'+id,'PATCH',{reply:t});
+  loadContacts();
+}
+async function closeContact(id){
+  await api('contacts/'+id,'PATCH',{status:'closed'});
+  loadContacts();
+}
 
 async function loadReports(){
   var d=await api('reports'); if(!d.ok)return;
