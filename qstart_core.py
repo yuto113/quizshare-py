@@ -992,6 +992,56 @@ def whoami():
                     'created_at': (u['created_at'] if u else None)})
 
 
+# ========== モデルの取得元 ==========
+def init_model_source():
+    conn = db()
+    conn.execute("""CREATE TABLE IF NOT EXISTS qstart_model_source (
+        model TEXT PRIMARY KEY,
+        weights_url TEXT, config_url TEXT,
+        note TEXT, updated_at TEXT
+    )""")
+    conn.commit(); conn.close()
+
+init_model_source()
+
+
+def get_model_source(model):
+    """モデルの重みの場所。URLでもローカルパスでも可"""
+    conn = db()
+    r = conn.execute('SELECT weights_url,config_url FROM qstart_model_source WHERE model=?',
+                     (model,)).fetchone()
+    conn.close()
+    if r and r['weights_url']:
+        return {'weights': r['weights_url'], 'config': r['config_url']}
+    # 既定のローカルパス
+    base = '/home/yuto113/quizshare-py'
+    known = {'equi': 'equi1', 'zin': 'zin1'}
+    d = known.get(model)
+    if d and os.path.exists(f'{base}/{d}/weights.npz'):
+        return {'weights': f'{base}/{d}/weights.npz', 'config': f'{base}/{d}/config.json'}
+    return None
+
+
+@qstart_core.route('/qstart/api/v1/admin/model-source', methods=['GET','POST'])
+@require_admin
+def admin_model_source():
+    conn = db()
+    if request.method == 'GET':
+        rows = conn.execute('SELECT * FROM qstart_model_source').fetchall()
+        conn.close()
+        return jsonify({'ok': True, 'sources': [dict(r) for r in rows]})
+    d = request.get_json(silent=True) or {}
+    conn.execute("""INSERT INTO qstart_model_source(model,weights_url,config_url,note,updated_at)
+        VALUES(?,?,?,?,?) ON CONFLICT(model) DO UPDATE SET
+        weights_url=excluded.weights_url, config_url=excluded.config_url,
+        note=excluded.note, updated_at=excluded.updated_at""",
+        (d.get('model'), (d.get('weights_url') or '').strip(),
+         (d.get('config_url') or '').strip(), d.get('note',''), now()))
+    conn.commit(); conn.close()
+    alog('model_source', d.get('model',''), d.get('weights_url','')[:120])
+    return jsonify({'ok': True})
+
+
 # ========== モデル一覧(誰でも読める) ==========
 @qstart_core.route('/qstart/api/v1/models')
 def public_models():

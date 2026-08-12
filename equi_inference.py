@@ -9,8 +9,14 @@ class EquiInference:
     def __init__(self, weights_path, config_path):
         print('Equi 1 読み込み中...', flush=True)
 
-        with open(config_path, encoding='utf-8') as f:
-            raw = json.load(f)
+        if str(config_path).startswith('http'):
+            import urllib.request as _u2
+            _req2 = _u2.Request(config_path, headers={'User-Agent': 'Qstart/1.6'})
+            with _u2.urlopen(_req2, timeout=60) as _r2:
+                raw = json.loads(_r2.read().decode('utf-8'))
+        else:
+            with open(config_path, encoding='utf-8') as f:
+                raw = json.load(f)
 
         self.vocab = raw['vocab']
         self.config = raw['config']
@@ -32,10 +38,60 @@ class EquiInference:
         self.AN = self.w2i['：']
 
         # ★ float16で読み込み（メモリ半減+計算高速化）
-        raw_weights = dict(np.load(weights_path, allow_pickle=False))
+        if str(weights_path).startswith('http'):
+            import urllib.request as _u, io as _io, time as _t
+            print(f'  リモート取得中...', flush=True)
+            _t0 = _t.time()
+            _req = _u.Request(weights_path, headers={'User-Agent': 'Qstart/1.6'})
+            with _u.urlopen(_req, timeout=300) as _r:
+                _buf = _io.BytesIO(_r.read())
+            print(f'  取得完了 {_buf.getbuffer().nbytes/1e6:.0f}MB ({_t.time()-_t0:.1f}秒)', flush=True)
+            raw_weights = dict(np.load(_buf, allow_pickle=False))
+            del _buf
+        else:
+            raw_weights = dict(np.load(weights_path, allow_pickle=False))
         self.W = {}
         for k, v in raw_weights.items():
             self.W[k] = v  # float32のまま（安定性優先）
+
+        # nn.MultiheadAttention 形式(in_proj_weight)を Wq/Wk/Wv に分解
+        _conv = 0
+        for k in list(self.W.keys()):
+            if k.endswith('attn.in_proj_weight'):
+                p = k[:-len('in_proj_weight')]
+                w = self.W[k]
+                d = w.shape[0] // 3
+                self.W[p + 'Wq.weight'] = w[:d]
+                self.W[p + 'Wk.weight'] = w[d:2*d]
+                self.W[p + 'Wv.weight'] = w[2*d:]
+                bk = p + 'in_proj_bias'
+                if bk in self.W:
+                    b = self.W[bk]
+                    self.W[p + 'Wq.bias'] = b[:d]
+                    self.W[p + 'Wk.bias'] = b[d:2*d]
+                    self.W[p + 'Wv.bias'] = b[2*d:]
+                _conv += 1
+            # out_proj → Wo
+            if k.endswith('attn.out_proj.weight'):
+                p = k[:-len('out_proj.weight')]
+                self.W[p + 'Wo.weight'] = self.W[k]
+                if p + 'out_proj.bias' in self.W:
+                    self.W[p + 'Wo.bias'] = self.W[p + 'out_proj.bias']
+            # ffn.0 / ffn.2 → fc1 / fc2
+            if '.ffn.0.' in k:
+                self.W[k.replace('.ffn.0.', '.ffn.fc1.')] = self.W[k]
+            if '.ffn.2.' in k:
+                self.W[k.replace('.ffn.2.', '.ffn.fc2.')] = self.W[k]
+                self.W[k.replace('.ffn.2.', '.ffn.3.')] = self.W[k]
+        # 出力層の別名
+        for a, b in [('head.weight', 'output.weight'), ('head.bias', 'output.bias'),
+                     ('ln_f.weight', 'ln_final.weight'), ('ln_f.bias', 'ln_final.bias')]:
+            if a in self.W and b not in self.W:
+                self.W[b] = self.W[a]
+            if b in self.W and a not in self.W:
+                self.W[a] = self.W[b]
+        if _conv:
+            print(f'  MultiheadAttention形式を変換: {_conv}層', flush=True)
 
         # ★ レスポンスキャッシュ
         self._cache = {}

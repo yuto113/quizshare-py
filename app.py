@@ -1851,7 +1851,7 @@ def daily_db_backup():
         os.remove(_tmp)
 
         # 7世代だけ残す
-        for _old in sorted(_glob.glob(_bk + '/quizshare_*.db.gz'))[:-5]:
+        for _old in sorted(_glob.glob(_bk + '/quizshare_*.db.gz'))[:-2]:
             os.remove(_old)
         # 旧形式(非圧縮)も掃除
         for _old in _glob.glob(_bk + '/quizshare_*.db'):
@@ -1942,7 +1942,23 @@ def api_qstart_chat():
             _zin_model
         except NameError:
             _zin_model = None
-        if model in ('zin', 'zin-1'):
+        try:
+            _apex_model
+        except NameError:
+            _apex_model = None
+
+        if model in ('apex', 'apex-2', 'apex2'):
+            if _apex_model is None:
+                import qstart_core as _qc_ap
+                _u = _qc_ap.get_model_source('apex')
+                if not _u:
+                    raise RuntimeError('Apex はまだ準備中です')
+                _apex_model = EquiInference(_u['weights'], _u['config'])
+            reply = _apex_model.chat(message)
+            if effort == 'low':
+                _s = reply.split('。')
+                reply = _s[0] + '。' if _s[0] else reply
+        elif model in ('zin', 'zin-1'):
             if _zin_model is None:
                 _zin_model = EquiInference(
                     '/home/yuto113/quizshare-py/zin1/weights.npz',
