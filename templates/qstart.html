@@ -9,6 +9,12 @@
 <meta property="og:description" content="ゼロから作ったAIと、話そう。">
 <meta property="og:type" content="website">
 <link rel="icon" type="image/svg+xml" href="/static/qstart_icon.svg">
+<link rel="manifest" href="/static/qstart_manifest.json">
+<meta name="theme-color" content="#14213d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Qstart">
+<link rel="apple-touch-icon" href="/static/qstart_icon.svg">
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -389,6 +395,11 @@ body[dir="rtl"] .qs-s-tab { flex-direction:row-reverse; text-align:right; }
   <div class="qs-sub">ゼロから作ったAIと、話そう。</div>
   <div class="qs-new-chat" onclick="newChat()">+ 新しいチャット</div>
   <a class="qs-sidebar-link" href="/qstart/projects" style="display:block;margin:8px 0 4px;">📁 プロジェクト</a>
+  <div id="qs-search-row" style="display:none;padding:0 2px 8px;">
+    <input id="qs-search" placeholder="🔍 チャットを検索" oninput="doSearch()"
+      style="width:100%;padding:8px 11px;border:1px solid #2a2a4a;border-radius:8px;
+      background:#1a2338;color:#ddd;font-size:12.5px;font-family:inherit;">
+  </div>
   <div class="qs-history" id="qs-history">
     <div style="color:#666; font-size:12px; padding:8px;"><span id="qs-t-history">チャット履歴はここに表示されます</span></div>
   </div>
@@ -437,6 +448,7 @@ body[dir="rtl"] .qs-s-tab { flex-direction:row-reverse; text-align:right; }
         <button class="qs-effort-btn active" id="eff-mid" onclick="setEffort('mid',this)" data-eff="mid">⚙️中</button>
         <button class="qs-effort-btn" id="eff-high" onclick="setEffort('high',this)" data-eff="high">🔥高</button>
       </div>
+      <button class="qs-settings-btn" onclick="exportChat()" title="この会話を書き出す">⬇</button>
       <button class="qs-settings-btn" onclick="openSettings()">⚙</button>
     </div>
   </div>
@@ -571,6 +583,11 @@ body[dir="rtl"] .qs-s-tab { flex-direction:row-reverse; text-align:right; }
         <select id="set-font_size" onchange="saveSetting('font_size',this.value);applyFont()">
           <option value="sm">小</option><option value="md">標準</option><option value="lg">大</option>
         </select></div>
+      <div class="qs-s-section" id="qs-install-row" style="display:none;">
+        <div class="qs-s-label">アプリとして使う</div>
+        <a class="qs-btn gold" onclick="installApp()">📱 ホーム画面に追加</a>
+        <div class="qs-s-desc">ブラウザを開かずにアプリのように使えます。</div>
+      </div>
     </div>
 
     <!-- アカウント -->
@@ -705,7 +722,10 @@ body[dir="rtl"] .qs-s-tab { flex-direction:row-reverse; text-align:right; }
 
       <div class="qs-s-section">
         <div class="qs-s-label">トークンを購入</div>
-        <div id="qs-buy-off" class="qs-s-desc">現在すべての機能を無料で提供しています。トークン販売は準備中です。</div>
+        <div id="qs-buy-off" class="qs-s-desc">
+          現在、Qstartはすべての機能を<b>無料</b>で提供しています。<br>
+          将来トークンの購入を開始する場合は、事前にお知らせし、
+          <a href="/qstart/terms" style="color:#b8860b;">利用規約</a>を改定したうえで実施します。</div>
         <div id="qs-buy-on" style="display:none;">
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
             <select id="qs-buy-amt" onchange="calcBuy()">
@@ -1418,6 +1438,8 @@ async function boot() {
     // --- 残高 ---
     QS_QUOTA = d.quota || {};
     QS_CHATS = d.chats || [];
+    var sr = document.getElementById('qs-search-row');
+    if (sr) sr.style.display = (!d.guest && QS_CHATS.length >= 3) ? 'block' : 'none';
     renderHistory();
 
   } catch(e) {}
@@ -1501,6 +1523,109 @@ async function sendForgot() {
   } catch(err) { m.style.color='#c0392b'; m.textContent='通信エラー'; }
   b.disabled = false; b.textContent = '送信';
 }
+
+// ===== チャット検索 =====
+var QS_SEARCH_T = null;
+function doSearch() { clearTimeout(QS_SEARCH_T); QS_SEARCH_T = setTimeout(runSearch, 300); }
+
+async function runSearch() {
+  var q = (document.getElementById('qs-search').value || '').trim();
+  if (q.length < 2) { renderHistory(); return; }
+  try {
+    var r = await fetch('/qstart/api/v1/search?q=' + encodeURIComponent(q));
+    var d = await r.json();
+    if (!d.ok) return;
+    var el = document.getElementById('qs-history');
+    if (!d.results.length) {
+      el.textContent = '';
+      var nf = document.createElement('div');
+      nf.style.cssText = 'padding:14px 12px;color:#8a8a9a;font-size:12.5px;';
+      nf.textContent = '一致する会話はありません';
+      el.appendChild(nf); return;
+    }
+    el.innerHTML = '';
+    var hd = document.createElement('div');
+    hd.style.cssText = 'padding:8px 12px;color:#8a8a9a;font-size:11px;';
+    hd.textContent = d.results.length + '件 / ' + d.chats + 'チャット';
+    el.appendChild(hd);
+    d.results.forEach(function(x){
+      var row = document.createElement('div');
+      row.style.cssText = 'padding:10px 12px;cursor:pointer;border-bottom:1px solid #2a2a4a;';
+      row.onclick = function(){ loadChat(x.chat_id); document.getElementById('qs-search').value = ''; };
+      var t = document.createElement('div');
+      t.style.cssText = 'font-size:12px;color:#aab;margin-bottom:3px;';
+      t.textContent = (x.role === 'user' ? '\uD83E\uDDD1 ' : '\uD83E\uDD16 ') + (x.title || '無題');
+      var s = document.createElement('div');
+      s.style.cssText = 'font-size:12px;color:#ddd;line-height:1.6;';
+      s.textContent = x.snippet || '';
+      row.appendChild(t); row.appendChild(s);
+      el.appendChild(row);
+    });
+  } catch(e) {}
+}
+
+// ===== 会話の書き出し =====
+async function exportChat() {
+  if (!currentChatId) { alert('書き出す会話がありません'); return; }
+  if (!QS_ME || QS_ME.guest) {
+    // 未ログインは画面から直接作る
+    var msgs = collectMessages();
+    if (!msgs.length) { alert('書き出す会話がありません'); return; }
+    var lines = ['# Qstart の会話', '', '---', ''];
+    msgs.forEach(function(m){
+      lines.push('### ' + (m.role === 'user' ? 'あなた' : 'Qstart'));
+      lines.push(''); lines.push(m.text); lines.push('');
+    });
+    downloadText(lines.join('\n'), 'qstart-chat.md');
+    return;
+  }
+  try {
+    var r = await fetch('/qstart/api/v1/chats/' + encodeURIComponent(currentChatId) + '/export');
+    var d = await r.json();
+    if (!d.ok) { alert('書き出しに失敗しました'); return; }
+    var name = (d.title || 'chat').replace(/[\\/:*?"<>|]/g, '_').slice(0, 40);
+    downloadText(d.markdown, 'qstart-' + name + '.md');
+  } catch(e) { alert('通信エラー'); }
+}
+
+function downloadText(text, filename) {
+  var blob = new Blob([text], {type: 'text/markdown;charset=utf-8'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+}
+
+// ===== PWA =====
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('/static/qstart_sw.js', {scope: '/qstart'})
+      .catch(function(){});
+  });
+}
+
+var QS_INSTALL = null;
+window.addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault();
+  QS_INSTALL = e;
+  var b = document.getElementById('qs-install-row');
+  if (b) b.style.display = 'block';
+});
+
+async function installApp() {
+  if (!QS_INSTALL) return;
+  QS_INSTALL.prompt();
+  await QS_INSTALL.userChoice;
+  QS_INSTALL = null;
+  var b = document.getElementById('qs-install-row');
+  if (b) b.style.display = 'none';
+}
+
+window.addEventListener('appinstalled', function(){
+  var b = document.getElementById('qs-install-row');
+  if (b) b.style.display = 'none';
+});
 
 function qsTab(name) {
   if (name === 'admin' && (!QS_ME || QS_ME.role !== 'admin')) return;
@@ -2896,12 +3021,6 @@ function applyLang() {
   if (welcome) {
     var desc = T('welcome_desc').replace(/\\n/g, '<br>');
     welcome.innerHTML = '<h1>' + T('welcome_title') + '</h1><p>' + desc + '</p><div class="qs-status" id="qs-ai-status"><span id="qs-status-text">Equi 1 — ' + T('running') + '!</span></div>';
-    plan: 'Forfait',
-    tab_profile: 'Profil',
-    tab_appear: 'Apparence',
-    tab_model: 'Modèle',
-    tab_usage: 'Utilisation',
-    tab_account: 'Compte',
   }
   // 入力欄
   var input = document.getElementById('qs-input');

@@ -1,0 +1,20 @@
+{
+  "name": "Qstart — ゼロから作られたAI",
+  "short_name": "Qstart",
+  "description": "事前学習モデルを一切使わず、ゼロから構築されたAIチャットサービス",
+  "start_url": "/qstart",
+  "scope": "/qstart",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#14213d",
+  "theme_color": "#14213d",
+  "lang": "ja",
+  "categories": ["productivity", "education", "utilities"],
+  "icons": [
+    { "src": "/static/qstart_icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "新しいチャット", "url": "/qstart", "description": "新しい会話を始める" },
+    { "name": "プロジェクト", "url": "/qstart/projects", "description": "プロジェクト一覧" }
+  ]
+}

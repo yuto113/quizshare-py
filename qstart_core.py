@@ -465,6 +465,64 @@ def save_message(uid, chat_id, role, content, model='', tokens=0, title=None):
     return True
 
 
+@qstart_core.route('/qstart/api/v1/search')
+@require_login
+def search_chats():
+    """チャット履歴を全文検索"""
+    uid = cur_uid()
+    q = (request.args.get('q') or '').strip()
+    if len(q) < 2:
+        return jsonify({'ok': True, 'results': []})
+    conn = db()
+    rows = conn.execute("""SELECT m.chat_id, m.role, m.content, m.created_at,
+        c.title, c.project_id FROM qstart_messages m
+        LEFT JOIN qstart_chats c ON c.chat_id = m.chat_id
+        WHERE m.user_id=? AND m.content LIKE ?
+        ORDER BY m.id DESC LIMIT 40""", (uid, f'%{q}%')).fetchall()
+    out, seen = [], set()
+    for r in rows:
+        d = dict(r); c = d['content'] or ''
+        i = c.lower().find(q.lower())
+        if i >= 0:
+            s = max(0, i - 40)
+            d['snippet'] = ('…' if s > 0 else '') + c[s:i+len(q)+60] + ('…' if i+len(q)+60 < len(c) else '')
+        else:
+            d['snippet'] = c[:100]
+        d.pop('content', None)
+        out.append(d); seen.add(d['chat_id'])
+    conn.close()
+    return jsonify({'ok': True, 'results': out, 'chats': len(seen)})
+
+
+@qstart_core.route('/qstart/api/v1/chats/<cid>/export')
+@require_login
+def export_chat(cid):
+    """会話をMarkdownで書き出す"""
+    uid = cur_uid()
+    fmt = request.args.get('format', 'md')
+    conn = db()
+    meta = conn.execute('SELECT * FROM qstart_chats WHERE chat_id=? AND user_id=?', (cid, uid)).fetchone()
+    msgs = conn.execute("""SELECT role,content,model,created_at FROM qstart_messages
+        WHERE chat_id=? AND user_id=? ORDER BY id""", (cid, uid)).fetchall()
+    conn.close()
+    if not msgs:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    title = (meta['title'] if meta else '') or '無題のチャット'
+    if fmt == 'json':
+        return jsonify({'ok': True, 'title': title,
+                        'messages': [dict(m) for m in msgs]})
+    lines = [f'# {title}', '', f'*Qstart で書き出し — {now()}*', '', '---', '']
+    names = {'equi': 'Equi 1', 'zin': 'zin 1', 'pure': 'Pure 1', 'apex': 'Apex 1'}
+    for m in msgs:
+        who = 'あなた' if m['role'] == 'user' else ('Qstart ' + names.get(m['model'], m['model'] or ''))
+        lines.append(f'### {who}')
+        lines.append('')
+        lines.append(m['content'] or '')
+        lines.append('')
+    lines += ['---', '', 'Qstart by Qzero会社 — ゼロから作られたAI']
+    return jsonify({'ok': True, 'title': title, 'markdown': '\n'.join(lines)})
+
+
 @qstart_core.route('/qstart/api/v1/chats')
 @require_login
 def list_chats():
