@@ -504,6 +504,121 @@ def edit_chat(cid):
     return jsonify({'ok': True})
 
 
+# ========== エラー監視 ==========
+def init_error_table():
+    conn = db()
+    conn.execute('''CREATE TABLE IF NOT EXISTS qstart_errors (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        kind TEXT, path TEXT, method TEXT,
+        message TEXT, trace TEXT,
+        user_id TEXT, ip_hash TEXT,
+        count INTEGER DEFAULT 1,
+        first_at TEXT, last_at TEXT,
+        fingerprint TEXT
+    )''')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_err_fp ON qstart_errors(fingerprint)')
+    conn.commit(); conn.close()
+
+init_error_table()
+
+
+def log_error(exc, kind='500'):
+    import traceback as _tb
+    try:
+        tr = _tb.format_exc()[-3000:]
+        msg = f'{type(exc).__name__}: {exc}'[:500]
+        path = request.path if request else ''
+        method = request.method if request else ''
+        # 同じ場所の同じエラーはまとめる
+        fp = hashlib.md5((msg[:200] + path).encode()).hexdigest()[:16]
+        ip = request.headers.get('X-Forwarded-For', request.remote_addr or '') if request else ''
+        ih = hashlib.sha256(ip.split(',')[0].strip().encode()).hexdigest()[:16]
+        conn = db()
+        r = conn.execute('SELECT id FROM qstart_errors WHERE fingerprint=?', (fp,)).fetchone()
+        if r:
+            conn.execute('UPDATE qstart_errors SET count=count+1, last_at=?, trace=? WHERE id=?',
+                         (now(), tr, r['id']))
+        else:
+            conn.execute('''INSERT INTO qstart_errors
+                (kind,path,method,message,trace,user_id,ip_hash,first_at,last_at,fingerprint)
+                VALUES(?,?,?,?,?,?,?,?,?,?)''',
+                (kind, path, method, msg, tr, cur_uid() or '', ih, now(), now(), fp))
+        # 100件を超えたら古いものを消す
+        conn.execute('''DELETE FROM qstart_errors WHERE id NOT IN
+            (SELECT id FROM qstart_errors ORDER BY last_at DESC LIMIT 200)''')
+        conn.commit(); conn.close()
+    except Exception:
+        pass
+
+
+@qstart_core.route('/qstart/api/v1/admin/errors')
+@require_admin
+def admin_errors():
+    conn = db()
+    rows = conn.execute('''SELECT id,kind,path,method,message,user_id,count,first_at,last_at
+        FROM qstart_errors ORDER BY last_at DESC LIMIT 100''').fetchall()
+    n24 = conn.execute("""SELECT COALESCE(SUM(count),0) FROM qstart_errors
+        WHERE last_at > datetime('now','-1 day','localtime')""").fetchone()[0]
+    conn.close()
+    return jsonify({'ok': True, 'errors': [dict(r) for r in rows], 'count_24h': n24})
+
+
+@qstart_core.route('/qstart/api/v1/admin/errors/<int:eid>')
+@require_admin
+def admin_error_detail(eid):
+    conn = db()
+    r = conn.execute('SELECT * FROM qstart_errors WHERE id=?', (eid,)).fetchone()
+    conn.close()
+    return jsonify({'ok': bool(r), 'error': dict(r) if r else None})
+
+
+@qstart_core.route('/qstart/api/v1/admin/errors', methods=['DELETE'])
+@require_admin
+def admin_errors_clear():
+    conn = db()
+    conn.execute('DELETE FROM qstart_errors')
+    conn.commit(); conn.close()
+    alog('errors_clear')
+    return jsonify({'ok': True})
+
+
+# ========== ヘルスチェック(稼働状況) ==========
+@qstart_core.route('/qstart/health')
+def health():
+    import time as _t
+    st = {'ok': True, 'time': now(), 'checks': {}}
+    t0 = _t.time()
+    try:
+        conn = db()
+        conn.execute('SELECT 1').fetchone()
+        conn.close()
+        st['checks']['database'] = {'ok': True, 'ms': round((_t.time()-t0)*1000, 1)}
+    except Exception as e:
+        st['ok'] = False
+        st['checks']['database'] = {'ok': False, 'error': str(e)[:100]}
+    try:
+        conn = db()
+        rows = conn.execute('SELECT model,enabled,maintenance FROM qstart_model_flags').fetchall()
+        conn.close()
+        st['checks']['models'] = {m['model']: ('maintenance' if m['maintenance']
+                                  else ('on' if m['enabled'] else 'off')) for m in rows}
+    except Exception:
+        st['checks']['models'] = {}
+    try:
+        conn = db()
+        n = conn.execute("""SELECT COALESCE(SUM(count),0) FROM qstart_errors
+            WHERE last_at > datetime('now','-1 hour','localtime')""").fetchone()[0]
+        conn.close()
+        st['checks']['errors_1h'] = n
+        if n > 50:
+            st['ok'] = False
+    except Exception:
+        pass
+    st['checks']['mail'] = bool(os.environ.get('RESEND_API_KEY'))
+    st['checks']['turnstile'] = bool(os.environ.get('TURNSTILE_SECRET_KEY'))
+    return jsonify(st), (200 if st['ok'] else 503)
+
+
 # ========== パスワード再設定 ==========
 @qstart_core.route('/qstart/api/v1/password/request', methods=['POST'])
 def pw_request():
@@ -910,6 +1025,11 @@ def admin_stats():
            FROM qstart_api_usage WHERE timestamp>=strftime('%s','now','-14 day')
            GROUP BY d ORDER BY d""")]
     s['reports_open'] = conn.execute("SELECT COUNT(*) FROM qstart_reports WHERE status='open'").fetchone()[0]
+    try:
+        s['errors_24h'] = conn.execute("""SELECT COALESCE(SUM(count),0) FROM qstart_errors
+            WHERE last_at > datetime('now','-1 day','localtime')""").fetchone()[0]
+    except Exception:
+        s['errors_24h'] = 0
     conn.close()
     return jsonify({'ok': True, 'stats': s})
 

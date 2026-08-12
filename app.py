@@ -1796,6 +1796,35 @@ import shutil
 # 古いバックアップは14日分だけ残して削除する
 import glob as _glob
 
+@app.errorhandler(500)
+def _qs_error_500(e):
+    try:
+        from qstart_core import log_error
+        log_error(e, '500')
+    except Exception:
+        pass
+    return e
+
+
+@app.errorhandler(Exception)
+def _qs_error_any(e):
+    from werkzeug.exceptions import HTTPException
+    if isinstance(e, HTTPException):
+        if e.code and e.code >= 500:
+            try:
+                from qstart_core import log_error
+                log_error(e, str(e.code))
+            except Exception:
+                pass
+        return e
+    try:
+        from qstart_core import log_error
+        log_error(e, 'exception')
+    except Exception:
+        pass
+    raise e
+
+
 @app.before_request
 def daily_db_backup():
     try:

@@ -62,6 +62,7 @@ button.red { background:#b03a3a; }
   <div class="tab" data-p="pricing" onclick="tab('pricing')">💰 料金・売上</div>
   <div class="tab" data-p="signup" onclick="tab('signup')">🎫 登録・メール</div>
   <div class="tab" data-p="reports" onclick="tab('reports')">🚨 通報</div>
+  <div class="tab" data-p="errors" onclick="tab('errors')">🐛 エラー</div>
   <div class="tab" data-p="logs" onclick="tab('logs')">📜 監査ログ</div>
 </div>
 
@@ -337,12 +338,32 @@ button.red { background:#b03a3a; }
   <tbody id="mlLogs"></tbody></table>
 
 </div>
-</div>
 
 <div class="pane" id="p-reports">
   <h2>通報・フィードバック</h2>
   <table><thead><tr><th>ID</th><th>ユーザー</th><th>種別</th><th>内容</th><th>状態</th><th>日時</th><th></th></tr></thead>
   <tbody id="rBody"></tbody></table>
+</div>
+
+<div class="pane" id="p-errors">
+  <h2>エラー監視</h2>
+  <div class="cards" id="erCards"></div>
+  <div class="row">
+    <button class="ghost" onclick="loadErrors()">🔄 更新</button>
+    <button class="red" onclick="clearErrors()">すべて消去</button>
+    <a href="/qstart/health" target="_blank"><button class="ghost">🩺 稼働状況を見る</button></a>
+  </div>
+  <table><thead><tr><th>最終発生</th><th>回数</th><th>場所</th><th>内容</th><th></th></tr></thead>
+  <tbody id="erBody"></tbody></table>
+  <div id="erDetail" style="display:none;background:#fff;border:1px solid #ece9e2;
+    border-radius:12px;padding:16px;margin-top:14px;">
+    <div style="display:flex;align-items:center;margin-bottom:10px;">
+      <b id="erTitle" style="flex:1;font-size:13px;"></b>
+      <button class="ghost" onclick="document.getElementById('erDetail').style.display='none'">閉じる</button>
+    </div>
+    <pre id="erTrace" style="font-size:11px;background:#faf9f5;padding:12px;border-radius:8px;
+      overflow-x:auto;white-space:pre-wrap;line-height:1.6;color:#5c5647;"></pre>
+  </div>
 </div>
 
 <div class="pane" id="p-logs">
@@ -351,7 +372,6 @@ button.red { background:#b03a3a; }
   <tbody id="lBody"></tbody></table>
 </div>
 
-</div>
 
 <script>
 var A='/qstart/api/v1/admin/';
@@ -366,7 +386,7 @@ async function api(p,m,b){
 function tab(n){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.p===n));
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active',p.id==='p-'+n));
-  ({dash:loadStats,users:()=>loadUsers(1),announce:loadAnnounce,models:loadModels,features:loadFeatures,promo:loadPromo,pricing:loadPricing,signup:function(){loadSignup();loadMail();},reports:loadReports,logs:loadLogs}[n]||function(){})();
+  ({dash:loadStats,users:()=>loadUsers(1),announce:loadAnnounce,models:loadModels,features:loadFeatures,promo:loadPromo,pricing:loadPricing,signup:function(){loadSignup();loadMail();},reports:loadReports,errors:loadErrors,logs:function(){loadLogs();loadBackup();}}[n]||function(){})();
 }
 function bars(el,items,key,val){
   var max=Math.max(1,...items.map(i=>i[val]));
@@ -374,7 +394,7 @@ function bars(el,items,key,val){
 }
 async function loadStats(){
   var d=await api('stats'); if(!d.ok)return; var s=d.stats;
-  var C=[['総ユーザー',s.users_total],['今日の登録',s.users_today],['プロジェクト',s.projects],['チャット',s.chats],['24hトークン',s.tokens_24h],['累計トークン',s.tokens_total],['未対応通報',s.reports_open]];
+  var C=[['総ユーザー',s.users_total],['今日の登録',s.users_today],['プロジェクト',s.projects],['チャット',s.chats],['24hトークン',s.tokens_24h],['累計トークン',s.tokens_total],['未対応通報',s.reports_open],['24hエラー',s.errors_24h||0]];
   document.getElementById('statCards').innerHTML=C.map(c=>'<div class="card"><div class="k">'+c[0]+'</div><div class="v">'+num(c[1])+'</div></div>').join('');
   bars(document.getElementById('byModel'),s.by_model,'model','tokens');
   bars(document.getElementById('byLang'),s.by_lang,'lang','n');
@@ -738,6 +758,33 @@ async function loadReports(){
 }
 async function closeReport(id){ await api('reports/'+id,'PATCH',{status:'closed'}); loadReports(); loadStats(); }
 async function reopenReport(id){ await api('reports/'+id,'PATCH',{status:'open'}); loadReports(); loadStats(); }
+async function loadErrors(){
+  var d = await api('errors'); if(!d.ok) return;
+  var tot = d.errors.reduce(function(a,e){return a+(e.count||0);},0);
+  document.getElementById('erCards').innerHTML =
+    [['24時間のエラー', d.count_24h],['種類', d.errors.length],['累計', tot]]
+    .map(function(c){ var warn = c[0]==='24時間のエラー' && c[1]>0;
+      return '<div class="card"><div class="k">'+c[0]+'</div><div class="v" style="'
+        +(warn?'color:#c0392b;':'')+'">'+num(c[1])+'</div></div>'; }).join('');
+  document.getElementById('erBody').innerHTML = d.errors.map(function(e){
+    return '<tr><td style="font-size:11px;color:#999;">'+esc((e.last_at||'').slice(5,16))+'</td>'
+      +'<td><b>'+e.count+'</b></td>'
+      +'<td style="font-size:12px;font-family:monospace;">'+esc(e.method)+' '+esc(e.path)+'</td>'
+      +'<td style="font-size:12px;color:#c0392b;max-width:380px;">'+esc((e.message||'').slice(0,120))+'</td>'
+      +'<td><button class="ghost" onclick="showErr('+e.id+')">詳細</button></td></tr>';
+  }).join('') || '<tr><td colspan="5" style="color:#2e7d32;">✅ エラーはありません</td></tr>';
+}
+async function showErr(id){
+  var d = await api('errors/'+id); if(!d.ok) return;
+  document.getElementById('erTitle').textContent = d.error.message;
+  document.getElementById('erTrace').textContent = d.error.trace || '(スタックトレースなし)';
+  document.getElementById('erDetail').style.display = 'block';
+}
+async function clearErrors(){
+  if(!confirm('エラー記録をすべて消去しますか？')) return;
+  await api('errors','DELETE'); loadErrors();
+}
+
 async function loadLogs(){
   var d=await api('logs'); if(!d.ok)return;
   document.getElementById('lBody').innerHTML=d.logs.map(l=>
