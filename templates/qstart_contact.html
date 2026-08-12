@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>お問い合わせ — Qstart</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;background:#faf9f6;color:#14213d;min-height:100vh}
+.hd{display:flex;align-items:center;gap:12px;padding:14px 22px;background:#fff;border-bottom:1px solid #ece9e2}
+.hd a{color:#14213d;text-decoration:none;font-size:14px}
+.logo{font-size:18px;font-weight:700}.logo span{color:#b8860b}
+.wrap{max-width:600px;margin:0 auto;padding:32px 22px 60px}
+h1{font-size:22px;margin-bottom:8px}
+.lead{font-size:13.5px;color:#6b6555;line-height:1.9;margin-bottom:26px}
+.box{background:#fff;border:1px solid #ece9e2;border-radius:14px;padding:24px}
+label{display:block;font-size:12px;color:#8a8270;margin:16px 0 5px}
+label:first-child{margin-top:0}
+input,select,textarea{width:100%;padding:11px 13px;border:1px solid #e0dcd2;border-radius:9px;
+  font-size:14px;font-family:inherit}
+textarea{min-height:140px;line-height:1.7;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#b8860b}
+button{width:100%;padding:13px;background:#14213d;color:#fff;border:none;border-radius:9px;
+  font-size:14px;font-weight:600;cursor:pointer;margin-top:22px;font-family:inherit}
+button:hover{background:#1d2d52}button:disabled{opacity:.5}
+.msg{font-size:13px;margin-top:14px;padding:11px 14px;border-radius:9px;display:none;line-height:1.7}
+.msg.show{display:block}
+.msg.err{background:#fbe9e7;color:#c0392b}.msg.ok{background:#e8f5e9;color:#2e7d32}
+.note{font-size:11.5px;color:#a09a8a;line-height:1.8;margin-top:20px}
+.faq{margin-top:28px}
+.faq h2{font-size:15px;margin-bottom:12px}
+.faq .q{background:#fff;border:1px solid #ece9e2;border-radius:10px;padding:14px 16px;margin-bottom:9px}
+.faq .q b{font-size:13.5px;display:block;margin-bottom:5px}
+.faq .q p{font-size:12.5px;color:#6b6555;line-height:1.8}
+</style></head><body>
+
+<div class="hd">
+  <a class="logo" href="/qstart">Q<span>start</span></a>
+  <div style="flex:1"></div>
+  <a href="/qstart">← Qstartに戻る</a>
+</div>
+
+<div class="wrap">
+  <h1>お問い合わせ</h1>
+  <div class="lead">ご質問・ご要望・不具合の報告などをお送りください。<br>
+    保護者の方からのお問い合わせもこちらで承ります。</div>
+
+  <div class="box" id="form">
+    <label>お名前</label>
+    <input id="cName" maxlength="60" placeholder="任意">
+
+    <label>メールアドレス <span style="color:#c0392b">*</span></label>
+    <input id="cEmail" type="email" maxlength="200" placeholder="返信先">
+
+    <label>種類</label>
+    <select id="cCat">
+      <option value="question">使い方の質問</option>
+      <option value="bug">不具合の報告</option>
+      <option value="request">機能のご要望</option>
+      <option value="account">アカウントについて</option>
+      <option value="parent">保護者の方から</option>
+      <option value="privacy">プライバシー・データについて</option>
+      <option value="business">取材・お仕事のご相談</option>
+      <option value="other">その他</option>
+    </select>
+
+    <label>件名</label>
+    <input id="cSubject" maxlength="200" placeholder="任意">
+
+    <label>お問い合わせ内容 <span style="color:#c0392b">*</span></label>
+    <textarea id="cBody" maxlength="4000" placeholder="できるだけ詳しくお書きください。&#10;不具合の場合は、使用した端末やブラウザ、起きたことを教えていただけると助かります。"></textarea>
+
+    <button id="cBtn" onclick="send()">送信する</button>
+  </div>
+  <div class="msg" id="msg"></div>
+
+  <div class="note">
+    いただいた内容は、お問い合わせへの対応のみに使用します。<br>
+    通常3〜7日以内にご返信します。個人での運営のため、お返事が遅れる場合があります。<br>
+    プライバシーの取り扱いについては<a href="/qstart/privacy" style="color:#b8860b;">プライバシーポリシー</a>をご覧ください。
+  </div>
+
+  <div class="faq">
+    <h2>よくあるご質問</h2>
+    <div class="q"><b>パスワードを忘れました</b>
+      <p>ログイン画面の「パスワードを忘れた方」から再設定できます。登録したメールアドレスにリンクをお送りします。</p></div>
+    <div class="q"><b>13歳未満でも使えますか</b>
+      <p>保護者の方の同意のうえ、招待コードを使って登録していただけます。コードをご希望の場合はこちらからご連絡ください。</p></div>
+    <div class="q"><b>AIの回答が正しくありません</b>
+      <p>回答の下にある「🚩 報告」からお知らせください。今後の改善に使わせていただきます。</p></div>
+    <div class="q"><b>データを削除したい</b>
+      <p>設定画面の「プライバシー」から、チャット履歴やアカウントをご自身で削除できます。データの書き出しも可能です。</p></div>
+    <div class="q"><b>使用量の上限に達しました</b>
+      <p>3時間ごとに回復します。設定画面の「使用量」から回復までの状況をご確認いただけます。</p></div>
+  </div>
+</div>
+
+<script>
+function show(t, cls){ var m=document.getElementById('msg'); m.textContent=t; m.className='msg show '+cls; }
+async function send(){
+  var email=document.getElementById('cEmail').value.trim();
+  var body=document.getElementById('cBody').value.trim();
+  if(!email||email.indexOf('@')<0){ show('メールアドレスを入力してください','err'); return; }
+  if(body.length<5){ show('お問い合わせ内容を入力してください','err'); return; }
+  var b=document.getElementById('cBtn'); b.disabled=true; b.textContent='送信中…';
+  try{
+    var r=await fetch('/qstart/api/v1/contact',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:document.getElementById('cName').value,
+        email:email, category:document.getElementById('cCat').value,
+        subject:document.getElementById('cSubject').value, body:body,
+        lang:(navigator.language||'ja').slice(0,2)})});
+    var d=await r.json();
+    if(d.ok){ document.getElementById('form').style.display='none';
+      show('✅ 送信しました。確認メールをお送りしています。内容を確認のうえ、順次ご返信いたします。','ok'); }
+    else { show(d.error||'送信に失敗しました','err'); b.disabled=false; b.textContent='送信する'; }
+  }catch(e){ show('通信エラーが発生しました','err'); b.disabled=false; b.textContent='送信する'; }
+}
+</script></body></html>

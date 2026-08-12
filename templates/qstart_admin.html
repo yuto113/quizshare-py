@@ -297,45 +297,9 @@ button.red { background:#b03a3a; }
   <h2 style="margin-top:26px;">使用履歴</h2>
   <table><thead><tr><th>日時</th><th>コード</th><th>登録したID</th><th>メモ</th></tr></thead>
   <tbody id="ivUses"></tbody></table>
+
+
 </div>
-
-
-<h2 style="margin-top:30px;">メール送信</h2>
-
-  <div class="cards" id="mailCards"></div>
-
-  <div class="form">
-    <div class="row" style="margin-bottom:12px;align-items:center;">
-      <div style="font-size:14px;font-weight:600;">新規登録の受付</div>
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-        <input type="checkbox" id="mlOpen" style="width:18px;height:18px;" onchange="saveMail()">
-        <span id="mlOpenPill" class="pill off">停止中</span>
-      </label>
-      <div style="font-size:11px;color:#a09a8a;">
-        オフにすると「現在、新規登録の受付を停止しています」と表示されます</div>
-    </div>
-    <div id="mlLimitInfo" style="font-size:12px;color:#6b6555;background:#faf9f5;
-      border:1px solid #ece9e2;border-radius:8px;padding:10px 12px;line-height:1.9;"></div>
-  </div>
-
-  <div class="form">
-    <div style="font-size:13px;font-weight:600;margin-bottom:10px;">テスト送信</div>
-    <div class="row" style="margin-bottom:0;">
-      <input id="mlTestTo" placeholder="送信先メールアドレス" style="width:260px">
-      <button class="gold" onclick="testMail()">送信</button>
-      <span id="mlTestMsg" style="font-size:13px;"></span>
-    </div>
-    <div style="font-size:11px;color:#a09a8a;margin-top:8px;">
-      認証コード「000000」のテストメールを送ります。1日の送信数にカウントされます。</div>
-  </div>
-
-  <h2 style="margin-top:26px;">日別の推移</h2>
-  <table><thead><tr><th>日付</th><th>メール送信</th><th>成功</th><th>新規登録</th></tr></thead>
-  <tbody id="mlDaily"></tbody></table>
-
-  <h2 style="margin-top:26px;">送信ログ</h2>
-  <table><thead><tr><th>日時</th><th>種類</th><th>状態</th><th>エラー</th></tr></thead>
-  <tbody id="mlLogs"></tbody></table>
 
 </div>
 
@@ -386,7 +350,7 @@ async function api(p,m,b){
 function tab(n){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.p===n));
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active',p.id==='p-'+n));
-  ({dash:loadStats,users:()=>loadUsers(1),announce:loadAnnounce,models:loadModels,features:loadFeatures,promo:loadPromo,pricing:loadPricing,signup:function(){loadSignup();loadMail();},reports:loadReports,errors:loadErrors,logs:function(){loadLogs();loadBackup();}}[n]||function(){})();
+  ({dash:loadStats,users:()=>loadUsers(1),announce:loadAnnounce,models:loadModels,features:loadFeatures,promo:loadPromo,pricing:loadPricing,signup:loadSignup,reports:loadReports,errors:loadErrors,logs:function(){loadLogs();loadBackup();}}[n]||function(){})();
 }
 function bars(el,items,key,val){
   var max=Math.max(1,...items.map(i=>i[val]));
@@ -600,64 +564,6 @@ async function saveFx(){
 var CAT_NAME = {wrong:'事実と違う', broken:'文章が壊れている', harmful:'不適切・有害',
   offtopic:'質問と関係ない', other:'その他'};
 
-async function loadMail(){
-  var d = await api('mail'); if(!d.ok) return;
-  var pctM = Math.round(d.sent_today / d.mail_limit * 100);
-  var pctS = Math.round(d.signups_today / d.signup_limit * 100);
-  document.getElementById('mailCards').innerHTML =
-    [['今日のメール送信', d.sent_today + ' / ' + d.mail_limit],
-     ['今日の新規登録', d.signups_today + ' / ' + d.signup_limit],
-     ['APIキー', d.has_key ? '✅ 設定済み' : '❌ 未設定'],
-     ['受付状態', d.signup_open ? '受付中' : '停止中']]
-    .map(function(c){ return '<div class="card"><div class="k">'+c[0]+'</div><div class="v" style="font-size:19px;">'+c[1]+'</div></div>'; }).join('');
-
-  document.getElementById('mlOpen').checked = d.signup_open;
-  var p = document.getElementById('mlOpenPill');
-  p.className = 'pill ' + (d.signup_open ? 'on' : 'off');
-  p.textContent = d.signup_open ? '受付中' : '停止中';
-
-  document.getElementById('mlLimitInfo').innerHTML =
-    '1日の新規登録上限: <b>' + d.signup_limit + '人</b>（現在 ' + d.signups_today + '人・' + pctS + '%）<br>'
-    + '1日のメール送信上限: <b>' + d.mail_limit + '通</b>（現在 ' + d.sent_today + '通・' + pctM + '%）<br>'
-    + '<span style="color:#a09a8a;">上限に達すると「現在、アカウントの作成が込み合っています。後日の登録をお願いします。」と表示されます。'
-    + 'Resend無料枠は1日100通・月3,000通です。</span>';
-
-  var sm = {};
-  (d.signups||[]).forEach(function(s){ sm[s.date] = s.count; });
-  document.getElementById('mlDaily').innerHTML = (d.daily||[]).map(function(x){
-    return '<tr><td>'+esc(x.d)+'</td><td>'+x.n+'</td><td>'+(x.sent||0)+'</td>'
-      +'<td>'+(sm[x.d]||0)+'</td></tr>';
-  }).join('') || '<tr><td colspan="4" style="color:#aaa;">まだデータがありません</td></tr>';
-
-  var KIND = {verify:'認証コード', other:'その他'};
-  document.getElementById('mlLogs').innerHTML = (d.logs||[]).map(function(l){
-    var okk = l.status === 'sent';
-    return '<tr><td style="font-size:11px;color:#999;">'+esc((l.created_at||'').slice(0,16))+'</td>'
-      +'<td>'+esc(KIND[l.kind]||l.kind)+'</td>'
-      +'<td><span class="pill '+(okk?'on':'off')+'">'+esc(l.status)+'</span></td>'
-      +'<td style="font-size:11px;color:#c0392b;max-width:340px;">'+esc(l.error||'')+'</td></tr>';
-  }).join('') || '<tr><td colspan="4" style="color:#aaa;">送信ログはありません</td></tr>';
-}
-async function saveMail(){
-  await api('mail','POST',{signup_open: document.getElementById('mlOpen').checked});
-  loadMail();
-}
-async function testMail(){
-  var to = document.getElementById('mlTestTo').value.trim();
-  var m = document.getElementById('mlTestMsg');
-  if(!to){ m.style.color='#c0392b'; m.textContent='アドレスを入力してください'; return; }
-  m.style.color='#8a8270'; m.textContent='送信中…';
-  var d = await api('mail/test','POST',{to:to});
-  if(d.ok){ m.style.color='#2e7d32'; m.textContent='✅ 送信しました'; }
-  else { m.style.color='#c0392b'; m.textContent='❌ 失敗: '+(d.result||d.error||''); }
-  loadMail();
-}
-
-var MODE_MSG = {
-  closed: '誰も新規登録できません',
-  invite: '招待コードを持つ人だけ登録できます',
-  open:   '誰でも登録できます'
-};
 async function loadSignup(){
   var d = await api('signup'); if(!d.ok) return;
   var c = d.config;

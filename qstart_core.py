@@ -504,6 +504,128 @@ def edit_chat(cid):
     return jsonify({'ok': True})
 
 
+# ========== 問い合わせ ==========
+def init_contact_table():
+    conn = db()
+    conn.execute('''CREATE TABLE IF NOT EXISTS qstart_contacts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT, email TEXT, category TEXT, subject TEXT, body TEXT,
+        user_id TEXT, lang TEXT DEFAULT 'ja',
+        status TEXT DEFAULT 'open', reply TEXT, handled_by TEXT,
+        ip_hash TEXT, created_at TEXT, replied_at TEXT
+    )''')
+    conn.commit(); conn.close()
+
+init_contact_table()
+
+
+@qstart_core.route('/qstart/contact')
+def contact_page():
+    return render_template('qstart_contact.html')
+
+
+@qstart_core.route('/qstart/api/v1/contact', methods=['POST'])
+def contact_submit():
+    d = request.get_json(silent=True) or {}
+    name = (d.get('name') or '').strip()[:60]
+    email = (d.get('email') or '').strip()[:200]
+    body = (d.get('body') or '').strip()[:4000]
+    if not body or len(body) < 5:
+        return jsonify({'ok': False, 'error': 'お問い合わせ内容を入力してください'}), 400
+    if not email or '@' not in email:
+        return jsonify({'ok': False, 'error': 'メールアドレスを入力してください'}), 400
+
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr or '').split(',')[0].strip()
+    ih = hashlib.sha256(ip.encode()).hexdigest()[:16]
+    conn = db()
+    n = conn.execute("""SELECT COUNT(*) FROM qstart_contacts
+        WHERE ip_hash=? AND created_at > datetime('now','-1 hour','localtime')""", (ih,)).fetchone()[0]
+    if n >= 5:
+        conn.close()
+        return jsonify({'ok': False, 'error': '送信が多すぎます。時間をおいてお試しください。'}), 429
+
+    conn.execute('''INSERT INTO qstart_contacts
+        (name,email,category,subject,body,user_id,lang,ip_hash,created_at)
+        VALUES(?,?,?,?,?,?,?,?,?)''',
+        (name, email, (d.get('category') or 'other')[:40],
+         (d.get('subject') or '')[:200], body,
+         cur_uid() or '', (d.get('lang') or 'ja')[:5], ih, now()))
+    conn.commit(); conn.close()
+
+    # 自動返信
+    try:
+        import qstart_mail as qm
+        html = ('<div style="max-width:480px;margin:40px auto;background:#fff;border-radius:16px;'
+          'padding:36px 32px;border:1px solid #ece9e2;font-family:sans-serif;">'
+          '<div style="font-size:22px;font-weight:700;color:#14213d;">Q<span style="color:#b8860b;">start</span></div>'
+          '<div style="font-size:11px;color:#a09a8a;margin-bottom:26px;">by Qzero会社</div>'
+          '<div style="font-size:17px;font-weight:600;color:#14213d;margin-bottom:10px;">'
+          'お問い合わせを受け付けました</div>'
+          '<div style="font-size:13.5px;color:#4a4438;line-height:1.9;margin-bottom:20px;">'
+          'お問い合わせいただきありがとうございます。<br>内容を確認のうえ、順次ご返信いたします。</div>'
+          '<div style="background:#faf9f5;border:1px solid #ece9e2;border-radius:10px;'
+          'padding:14px;font-size:13px;color:#5c5647;line-height:1.8;white-space:pre-wrap;">'
+          + (body[:500].replace('<','&lt;')) + '</div>'
+          '<div style="font-size:12px;color:#8a8270;margin-top:22px;line-height:1.8;">'
+          'このメールは自動送信です。返信は不要です。</div></div>')
+        qm.send_mail(email, 'Qstart お問い合わせを受け付けました', html, kind='contact')
+    except Exception:
+        pass
+    return jsonify({'ok': True})
+
+
+@qstart_core.route('/qstart/api/v1/admin/contacts')
+@require_moderator
+def admin_contacts():
+    conn = db()
+    rows = conn.execute("""SELECT * FROM qstart_contacts
+        ORDER BY (status='open') DESC, id DESC LIMIT 100""").fetchall()
+    conn.close()
+    return jsonify({'ok': True, 'contacts': [dict(r) for r in rows]})
+
+
+@qstart_core.route('/qstart/api/v1/admin/contacts/<int:cid>', methods=['PATCH'])
+@require_moderator
+def admin_contact_update(cid):
+    d = request.get_json(silent=True) or {}
+    conn = db()
+    if d.get('reply'):
+        conn.execute('UPDATE qstart_contacts SET reply=?, status=?, handled_by=?, replied_at=? WHERE id=?',
+                     (d['reply'][:4000], 'replied',
+                      cur_uid() or session.get('staff_id',''), now(), cid))
+        r = conn.execute('SELECT email,body FROM qstart_contacts WHERE id=?', (cid,)).fetchone()
+        conn.commit(); conn.close()
+        if r and r['email']:
+            try:
+                import qstart_mail as qm
+                html = ('<div style="max-width:480px;margin:40px auto;background:#fff;border-radius:16px;'
+                  'padding:36px 32px;border:1px solid #ece9e2;font-family:sans-serif;">'
+                  '<div style="font-size:22px;font-weight:700;color:#14213d;">Q<span style="color:#b8860b;">start</span></div>'
+                  '<div style="font-size:11px;color:#a09a8a;margin-bottom:26px;">by Qzero会社</div>'
+                  '<div style="font-size:17px;font-weight:600;color:#14213d;margin-bottom:14px;">'
+                  'お問い合わせへの回答</div>'
+                  '<div style="font-size:13.5px;color:#4a4438;line-height:1.9;white-space:pre-wrap;">'
+                  + d['reply'][:2000].replace('<','&lt;') + '</div>'
+                  '<div style="border-top:1px solid #f0ede5;margin-top:24px;padding-top:14px;'
+                  'font-size:12px;color:#a09a8a;line-height:1.7;">お問い合わせ内容:<br>'
+                  + (r['body'] or '')[:300].replace('<','&lt;') + '</div></div>')
+                qm.send_mail(r['email'], 'Qstart お問い合わせへの回答', html, kind='contact_reply')
+            except Exception:
+                pass
+        alog('contact_reply', str(cid))
+        return jsonify({'ok': True})
+    if 'status' in d:
+        conn.execute('UPDATE qstart_contacts SET status=? WHERE id=?', (d['status'], cid))
+        conn.commit()
+    conn.close()
+    return jsonify({'ok': True})
+
+
+@qstart_core.route('/qstart/status')
+def status_page():
+    return render_template('qstart_status.html')
+
+
 # ========== エラー監視 ==========
 def init_error_table():
     conn = db()
