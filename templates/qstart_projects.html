@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>プロジェクト — Qstart</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;
+  background:#faf9f6; color:#14213d; min-height:100vh; }
+.hd { display:flex; align-items:center; gap:12px; padding:14px 22px;
+  background:#fff; border-bottom:1px solid #ece9e2; position:sticky; top:0; z-index:10; }
+.hd .logo { font-size:18px; font-weight:700; color:#14213d; text-decoration:none; }
+.hd .logo span { color:#b8860b; }
+.hd .sp { flex:1; }
+.wrap { max-width:900px; margin:0 auto; padding:28px 22px 60px; }
+h1 { font-size:22px; margin-bottom:20px; }
+.bar { display:flex; gap:10px; align-items:center; margin-bottom:22px; flex-wrap:wrap; }
+.search { flex:1; min-width:200px; position:relative; }
+.search input { width:100%; padding:10px 14px 10px 38px; border:1px solid #e0dcd2;
+  border-radius:10px; font-size:14px; background:#fff; font-family:inherit; }
+.search:before { content:"🔍"; position:absolute; left:13px; top:10px; font-size:14px; opacity:.5; }
+select { padding:10px 12px; border:1px solid #e0dcd2; border-radius:10px;
+  font-size:14px; background:#fff; font-family:inherit; }
+.btn { padding:10px 18px; background:#14213d; color:#fff; border:none;
+  border-radius:10px; font-size:14px; cursor:pointer; font-weight:600; font-family:inherit; }
+.btn:hover { background:#1d2d52; }
+.btn.gold { background:#b8860b; }
+.btn.ghost { background:#fff; color:#14213d; border:1px solid #e0dcd2; font-weight:400; }
+.card { background:#fff; border:1px solid #ece9e2; border-radius:14px;
+  padding:20px; margin-bottom:12px; cursor:pointer; transition:border-color .15s, transform .1s; }
+.card:hover { border-color:#d8d2c4; transform:translateY(-1px); }
+.card .t { font-size:16px; font-weight:600; margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+.card .d { font-size:13.5px; color:#6b6555; line-height:1.65; margin-bottom:12px; }
+.card .m { font-size:12px; color:#a09a8a; display:flex; gap:14px; }
+.empty { text-align:center; padding:70px 20px; color:#a09a8a; }
+.empty .e { font-size:44px; margin-bottom:14px; }
+/* モーダル */
+.mask { display:none; position:fixed; inset:0; background:rgba(30,28,24,.45);
+  z-index:100; align-items:center; justify-content:center; padding:20px; }
+.mask.open { display:flex; }
+.modal { background:#fff; border-radius:16px; width:100%; max-width:480px;
+  padding:26px; box-shadow:0 24px 60px rgba(0,0,0,.25); }
+.modal h2 { font-size:18px; margin-bottom:18px; }
+.modal label { display:block; font-size:12px; color:#8a8270; margin:14px 0 5px; }
+.modal input, .modal textarea { width:100%; padding:10px 13px; border:1px solid #e0dcd2;
+  border-radius:9px; font-size:14px; font-family:inherit; }
+.modal textarea { min-height:80px; resize:vertical; line-height:1.6; }
+.modal .acts { display:flex; gap:10px; justify-content:flex-end; margin-top:22px; }
+.icons { display:flex; gap:6px; flex-wrap:wrap; }
+.icons button { font-size:19px; padding:7px 9px; border:1px solid #e8e4da;
+  background:#fff; border-radius:9px; cursor:pointer; }
+.icons button.on { border-color:#b8860b; background:#fdf9ef; }
+@media (max-width:600px){ .wrap{padding:20px 14px 50px;} h1{font-size:19px;} }
+</style>
+</head>
+<body>
+
+<div class="hd">
+  <a class="logo" href="/qstart">Q<span>start</span></a>
+  <div class="sp"></div>
+  <a href="/qstart"><button class="btn ghost">💬 チャットへ</button></a>
+</div>
+
+<div class="wrap">
+  {% if need_login %}
+  <div class="empty">
+    <div class="e">🔒</div>
+    <div style="font-size:15px;margin-bottom:16px;">プロジェクトを使うにはログインが必要です</div>
+    <a href="/qstart"><button class="btn">ログインする</button></a>
+  </div>
+  {% else %}
+  <h1>プロジェクト</h1>
+  <div class="bar">
+    <div class="search"><input id="q" placeholder="プロジェクトを検索" oninput="render()"></div>
+    <select id="sort" onchange="render()">
+      <option value="updated">最終更新日</option>
+      <option value="created">作成日</option>
+      <option value="name">名前順</option>
+    </select>
+    <button class="btn" onclick="openNew()">＋ 新規プロジェクト</button>
+  </div>
+  <div id="list"></div>
+  {% endif %}
+</div>
+
+<div class="mask" id="mask" onclick="if(event.target===this)closeNew()">
+  <div class="modal">
+    <h2 id="mTitle">新規プロジェクト</h2>
+    <label>アイコン</label>
+    <div class="icons" id="icons"></div>
+    <label>名前</label>
+    <input id="pName" maxlength="80" placeholder="例: 数学の勉強">
+    <label>説明（任意）</label>
+    <textarea id="pDesc" maxlength="1000" placeholder="このプロジェクトが何のためのものか"></textarea>
+    <label>カスタム指示（任意）</label>
+    <textarea id="pInst" maxlength="8000" placeholder="このプロジェクト内でAIにどう振る舞ってほしいか"></textarea>
+    <div class="acts">
+      <button class="btn ghost" onclick="closeNew()">キャンセル</button>
+      <button class="btn gold" id="mSave" onclick="saveProject()">作成</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var PROJ = [], editId = null, curIcon = '📁';
+var ICONS = ['📁','📚','🧪','💡','🎨','🎮','🏫','🩺','💻','🎵','⚽','🌏'];
+
+function esc(s){var d=document.createElement('div');d.textContent=(s==null?'':s);return d.innerHTML;}
+function fmt(s){ if(!s)return''; var d=new Date(s.replace(' ','T'));
+  if(isNaN(d))return s.slice(0,10);
+  return (d.getMonth()+1)+'月'+d.getDate()+'日'; }
+
+async function load(){
+  var r = await fetch('/qstart/api/v1/projects');
+  var d = await r.json();
+  if(!d.ok){ document.getElementById('list').innerHTML='<div class="empty">読み込みに失敗しました</div>'; return; }
+  PROJ = d.projects || [];
+  render();
+}
+
+function render(){
+  var q = (document.getElementById('q').value||'').toLowerCase();
+  var s = document.getElementById('sort').value;
+  var a = PROJ.filter(function(p){
+    return !q || (p.name||'').toLowerCase().indexOf(q)>=0 || (p.description||'').toLowerCase().indexOf(q)>=0;
+  });
+  a.sort(function(x,y){
+    if(s==='name') return (x.name||'').localeCompare(y.name||'','ja');
+    if(s==='created') return (y.created_at||'').localeCompare(x.created_at||'');
+    return (y.updated_at||'').localeCompare(x.updated_at||'');
+  });
+  var el = document.getElementById('list');
+  if(!a.length){
+    if(PROJ.length){
+      el.innerHTML = '<div class="empty">一致するプロジェクトはありません</div>';
+    } else {
+      el.innerHTML = '<div class="empty"><div class="e">📁</div>'
+        + '<div style="font-size:15px;margin-bottom:8px;">まだプロジェクトがありません</div>'
+        + '<div style="font-size:13px;margin-bottom:18px;">関連するチャットをまとめて、AIに専用の指示を与えられます</div>'
+        + '<button class="btn" id="firstBtn">＋ 最初のプロジェクトを作る</button></div>';
+      var fb = document.getElementById('firstBtn');
+      if(fb) fb.onclick = openNew;
+    }
+    return;
+  }
+  el.innerHTML = '';
+  a.forEach(function(p){
+    var c = document.createElement('div');
+    c.className = 'card';
+    c.onclick = function(){ location.href = '/qstart/project/' + p.id; };
+    var t = document.createElement('div'); t.className='t';
+    var ic = document.createElement('span'); ic.textContent = p.icon || '📁';
+    t.appendChild(ic);
+    t.appendChild(document.createTextNode(p.name || ''));
+    c.appendChild(t);
+    if(p.description){
+      var d = document.createElement('div'); d.className='d';
+      d.textContent = p.description; c.appendChild(d);
+    }
+    var m = document.createElement('div'); m.className='m';
+    var s1 = document.createElement('span'); s1.textContent = fmt(p.updated_at);
+    var s2 = document.createElement('span'); s2.textContent = '💬 ' + (p.chats||0) + ' チャット';
+    m.appendChild(s1); m.appendChild(s2);
+    c.appendChild(m);
+    el.appendChild(c);
+  });
+}
+
+function openNew(){
+  editId=null; curIcon='📁';
+  document.getElementById('mTitle').textContent='新規プロジェクト';
+  document.getElementById('mSave').textContent='作成';
+  ['pName','pDesc','pInst'].forEach(function(i){document.getElementById(i).value='';});
+  drawIcons();
+  document.getElementById('mask').classList.add('open');
+  setTimeout(function(){document.getElementById('pName').focus();},50);
+}
+function closeNew(){ document.getElementById('mask').classList.remove('open'); }
+function drawIcons(){
+  var box = document.getElementById('icons');
+  box.innerHTML = '';
+  ICONS.forEach(function(ic){
+    var b = document.createElement('button');
+    b.textContent = ic;
+    if(ic === curIcon) b.className = 'on';
+    b.onclick = function(){ curIcon = ic; drawIcons(); };
+    box.appendChild(b);
+  });
+}
+
+async function saveProject(){
+  var name = document.getElementById('pName').value.trim();
+  if(!name){ alert('名前を入力してください'); return; }
+  var body = { name:name, icon:curIcon,
+    description:document.getElementById('pDesc').value,
+    instructions:document.getElementById('pInst').value };
+  var r = await fetch('/qstart/api/v1/projects', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  var d = await r.json();
+  if(d.ok){ closeNew(); location.href='/qstart/project/'+d.id; }
+  else alert(d.error==='limit_reached'?'プロジェクトは50個までです':'作成に失敗しました');
+}
+document.addEventListener('keydown',function(e){ if(e.key==='Escape')closeNew(); });
+
+{% if not need_login %}load();{% endif %}
+</script>
+</body>
+</html>

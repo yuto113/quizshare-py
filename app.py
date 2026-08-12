@@ -21,6 +21,8 @@ from datetime import datetime, timezone
 from contextlib import contextmanager
 from urllib.parse import urlparse
 
+from qstart_api import qstart_api
+from qstart_core import qstart_core
 from flask import (
     Flask, render_template, request, jsonify,
     session, redirect, url_for, abort, g,
@@ -42,11 +44,34 @@ app = Flask(__name__)
 
 # セッション(ログイン状態を覚えておく入れ物)の暗号化キー
 # これがないと他の人になりすまされちゃう。
+# ===== .env を読み込む(APIキーなどの秘密情報) =====
+def _load_env():
+    import os as _o
+    p = _o.path.expanduser('~/.env')
+    if not _o.path.exists(p):
+        return
+    try:
+        with open(p, encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#') or '=' not in line:
+                    continue
+                k, v = line.split('=', 1)
+                _o.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+    except Exception:
+        pass
+_load_env()
+
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'dev-only-' + secrets.token_hex(16))
 
 # セッションのクッキーを安全にする設定
+app.register_blueprint(qstart_api)
+app.register_blueprint(qstart_core)
+
 app.config.update(
-    SESSION_COOKIE_HTTPONLY=True,   # JavaScriptから読めないようにする
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_PERMANENT=True,
+    PERMANENT_SESSION_LIFETIME=2592000,  # 30日間ログイン保持   # JavaScriptから読めないようにする
     SESSION_COOKIE_SAMESITE='Lax',  # 他のサイトから送られないようにする
     SESSION_COOKIE_SECURE=os.environ.get('FLASK_DEBUG', '0') != '1',  # HTTPSの時だけクッキーを送る(本番用)
     MAX_CONTENT_LENGTH=20 * 1024 * 1024,  # 大きすぎるデータ(20MB超)は拒否
@@ -1795,7 +1820,7 @@ def page_reden():
     admin_pw = os.environ.get('ADMIN_PASSWORD', '')
     is_admin = session.get('admin_auth') == True
     if not is_admin:
-        return redirect(url_for('page_entry'))
+        return redirect(url_for('page_home'))
     return render_template('reden.html')
 
 
@@ -1821,19 +1846,93 @@ def api_qstart_chat():
     # 現在は準備中メッセージ
     user_id = session.get('qstart_user', 'guest_' + request.remote_addr)
     is_staff = session.get('qstart_staff', False)
+    if session.get('qstart_user') and _qstart_suspended(session['qstart_user']):
+        session.pop('qstart_user', None)
+        session.pop('qstart_nick', None)
+        session.pop('qstart_staff', None)
+        return jsonify(ok=False, error='suspended',
+                       message='このアカウントは現在ご利用いただけません。')
     usage = _qstart_check_limit(user_id, is_staff)
     if not usage['allowed']:
         return jsonify(ok=False, error='limit_reached', recovery_time=usage.get('recovery_time',''), window_pct=usage['window_pct'], weekly_pct=usage['weekly_pct'])
-    reply = 'Qstart Equi 1 は現在学習中です! もう少し待っててね!'
+    # ファイル情報があればメッセージに追加
+    file_data = data.get('file')
+    file_type = data.get('file_type', '')
+    if file_data and file_type:
+        if file_type.startswith('image/'):
+            message = message + '（画像が添付されています。申し訳ありませんが、画像の内容を理解する機能はまだありません）' if message else '画像について教えてください'
+        else:
+            # テキストファイルの内容を質問に追加
+            message = message + '。以下はファイルの内容です：' + file_data[:300] if message else 'このファイルについて教えてください：' + file_data[:300]
+
+    # Equi 1で推論
+    try:
+        import sys
+        if '/home/yuto113/quizshare-py' not in sys.path:
+            sys.path.insert(0, '/home/yuto113/quizshare-py')
+        from equi_inference import EquiInference
+        global _equi_model, _zin_model
+        try:
+            _equi_model
+        except NameError:
+            _equi_model = None
+        try:
+            _zin_model
+        except NameError:
+            _zin_model = None
+        if model in ('zin', 'zin-1'):
+            if _zin_model is None:
+                _zin_model = EquiInference(
+                    '/home/yuto113/quizshare-py/zin1/weights.npz',
+                    '/home/yuto113/quizshare-py/zin1/config.json'
+                )
+            if effort == 'low':
+                reply = _zin_model.chat(message)
+                sents = reply.split('。')
+                reply = sents[0] + '。' if sents[0] else reply
+            elif effort == 'high':
+                reply = _zin_model.chat(message)
+            else:
+                reply = _zin_model.chat(message)
+        else:
+            if _equi_model is None:
+                _equi_model = EquiInference(
+                    '/home/yuto113/quizshare-py/equi1/weights.npz',
+                    '/home/yuto113/quizshare-py/equi1/config.json'
+                )
+            # effort設定
+            if effort == 'low':
+                reply = _equi_model.chat(message)
+                sents = reply.split('。')
+                reply = sents[0] + '。' if sents[0] else reply
+            elif effort == 'high':
+                reply = _equi_model.chat(message)
+            else:
+                reply = _equi_model.chat(message)
+    except Exception as e:
+        reply = f'エラーが発生しました: {str(e)}'
     tokens_used = len(message) + len(reply)
     _qstart_add_usage(user_id, tokens_used, is_staff)
+    # APIとの使用量共有
+    try:
+        import sqlite3 as _sq3
+        _conn = _sq3.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+        _conn.execute("INSERT INTO qstart_api_usage(user_id,source,model,tokens_used) VALUES(?,?,?,?)",
+                      (user_id, 'chat', model, tokens_used))
+        _conn.commit()
+        _conn.close()
+    except:
+        pass
     return jsonify(ok=True, reply=reply, model=model, effort=effort, tokens_used=tokens_used)
 
 
 # ===== Qstart 認証API =====
 @app.route('/api/qstart/register', methods=['POST'])
 def api_qstart_register():
-    # Qstartアカウント新規作成
+    # ★このルートは廃止。メール認証(/api/qstart/send-code → verify-code)を使うこと
+    return jsonify(ok=False, error='メール認証が必要です。登録画面からやり直してね'), 410
+
+def _api_qstart_register_old():
     import re as _re
     data = request.get_json(silent=True) or {}
     user_id = (data.get('user_id') or '').strip()
@@ -1860,6 +1959,20 @@ def api_qstart_register():
     session['qstart_nick'] = nickname
     return jsonify(ok=True)
 
+def _qstart_suspended(uid):
+    """凍結されているか(qstart_core と同じ判定)"""
+    if not uid: return None
+    try:
+        import sqlite3 as _s
+        c = _s.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+        r = c.execute('SELECT status FROM qstart_user_flags WHERE user_id=?', (uid,)).fetchone()
+        c.close()
+        st = (r[0] if r else 'active') or 'active'
+        return st if st in ('suspended', 'banned') else None
+    except Exception:
+        return None
+
+
 @app.route('/api/qstart/login', methods=['POST'])
 def api_qstart_login():
     # Qstartログイン(Qstartアカウント or 社員アカウント)
@@ -1885,6 +1998,11 @@ def api_qstart_login():
         conn.close()
         if not row or not verify_password(password, row[2]):
             return jsonify(ok=False, error='IDまたはパスワードが違うよ')
+        _sus = _qstart_suspended(row[0])
+        if _sus:
+            return jsonify(ok=False, error=(
+                'このアカウントは現在ご利用いただけません。' if _sus == 'suspended'
+                else 'このアカウントは利用停止されています。'))
         session['qstart_user'] = row[0]
         session['qstart_nick'] = row[1]
         session['qstart_staff'] = False
@@ -1923,20 +2041,46 @@ def api_qstart_send_code():
     import sqlite3 as _sq
     data = request.get_json(silent=True) or {}
     email = (data.get('email') or '').strip()
-    if not email or '@' not in email:
+    if not email or '@' not in email or len(email) > 200:
         return jsonify(ok=False, error='正しいメールアドレスを入力してね')
-    # 6桁コード生成
-    code = str(random.randint(100000, 999999))
+
+    import qstart_mail as _qm
+
+    # --- 受付状況チェック ---
+    allowed, reason = _qm.can_signup()
+    if not allowed:
+        if reason == 'closed':
+            return jsonify(ok=False, error='現在、新規登録の受付を停止しています。')
+        return jsonify(ok=False, error='現在、アカウントの作成が込み合っています。後日の登録をお願いします。')
+
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+
+    # 既に登録済みのメールなら弾く
+    if conn.execute('SELECT id FROM qstart_users WHERE email=?', (email,)).fetchone():
+        conn.close()
+        return jsonify(ok=False, error='このメールアドレスは既に登録されているよ')
+
+    # --- 同じメールへの連投を防ぐ(60秒) ---
+    _prev = conn.execute('SELECT expires_at FROM qstart_verify WHERE email=?', (email,)).fetchone()
+    if _prev and (_prev[0] - time.time()) > (1800 - 60):
+        conn.close()
+        return jsonify(ok=False, error='少し時間をおいてからもう一度試してね')
+
+    code = str(random.randint(100000, 999999))
     conn.execute('DELETE FROM qstart_verify WHERE email=?', (email,))
     conn.execute('INSERT INTO qstart_verify (email, code, expires_at) VALUES (?,?,?)',
-                 (email, code, time.time() + 600))
+                 (email, code, time.time() + 1800))
     conn.commit()
     conn.close()
-    # TODO: 実際のメール送信(今はログに出力)
-    print(f'[Qstart認証コード] {email} → {code}')
-    # 開発中はコードをレスポンスに含める(本番では削除)
-    return jsonify(ok=True, message='認証コードを送信したよ!', dev_code=code)
+
+    lang = (data.get('lang') or 'ja')
+    sent, res = _qm.send_verify_code(email, code, lang)
+    if not sent:
+        if res == 'daily_limit':
+            return jsonify(ok=False, error='現在、アカウントの作成が込み合っています。後日の登録をお願いします。')
+        return jsonify(ok=False, error='メールを送信できませんでした。しばらくしてからもう一度試してね')
+
+    return jsonify(ok=True, message='認証コードをメールで送ったよ！30分以内に入力してね')
 
 @app.route('/api/qstart/verify-code', methods=['POST'])
 def api_qstart_verify_code():
@@ -1980,6 +2124,11 @@ def api_qstart_verify_code():
                  (user_id, nickname, hash_password(password), email, purpose, birthday))
     conn.execute('DELETE FROM qstart_verify WHERE email=?', (email,))
     conn.commit(); conn.close()
+    try:
+        import qstart_mail as _qm
+        _qm.bump_signup()
+    except Exception:
+        pass
     session['qstart_user'] = user_id
     session['qstart_nick'] = nickname
     return jsonify(ok=True)

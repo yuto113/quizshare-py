@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理者ログイン — Qstart</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;
+  background:#14213d; color:#fff; min-height:100vh;
+  display:flex; align-items:center; justify-content:center; padding:20px; }
+.box { background:#fff; color:#14213d; border-radius:18px; padding:36px 32px;
+  width:100%; max-width:380px; box-shadow:0 24px 60px rgba(0,0,0,.4); }
+.logo { font-size:24px; font-weight:700; text-align:center; margin-bottom:4px; }
+.logo span { color:#b8860b; }
+.sub { text-align:center; font-size:12px; color:#8a8270; margin-bottom:26px; }
+.badge { display:inline-block; background:#b8860b; color:#fff; font-size:10px;
+  padding:3px 9px; border-radius:20px; letter-spacing:.06em; }
+label { display:block; font-size:12px; color:#8a8270; margin:14px 0 5px; }
+input { width:100%; padding:11px 13px; border:1px solid #e0dcd2; border-radius:9px;
+  font-size:14px; font-family:inherit; }
+input:focus { outline:none; border-color:#b8860b; }
+button { width:100%; padding:12px; background:#14213d; color:#fff; border:none;
+  border-radius:9px; font-size:14px; font-weight:600; cursor:pointer;
+  margin-top:22px; font-family:inherit; }
+button:hover { background:#1d2d52; }
+button:disabled { opacity:.5; cursor:not-allowed; }
+.err { background:#fbe9e7; color:#c0392b; font-size:12.5px; padding:9px 12px;
+  border-radius:8px; margin-top:14px; display:none; line-height:1.6; }
+.err.show { display:block; }
+.back { display:block; text-align:center; margin-top:20px;
+  font-size:12.5px; color:#8a8270; text-decoration:none; }
+.note { font-size:11px; color:#a09a8a; text-align:center; margin-top:16px; line-height:1.7; }
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="logo">Q<span>start</span></div>
+  <div class="sub"><span class="badge">ADMIN</span></div>
+
+  <label>社員ID</label>
+  <input id="sid" autocomplete="username" autofocus>
+  <label>パスワード</label>
+  <input id="pw" type="password" autocomplete="current-password">
+  <button id="btn" onclick="doLogin()">ログイン</button>
+  <div class="err" id="err"></div>
+
+  <div class="note">Qstart 管理者権限を持つアカウントのみ<br>ログインできます。すべての操作は記録されます。</div>
+  <a class="back" href="/qstart">← Qstartに戻る</a>
+</div>
+
+<script>
+function showErr(m){ var e=document.getElementById('err'); e.textContent=m; e.classList.add('show'); }
+async function doLogin(){
+  var sid=document.getElementById('sid').value.trim();
+  var pw=document.getElementById('pw').value;
+  if(!sid||!pw){ showErr('社員IDとパスワードを入力してください'); return; }
+  var b=document.getElementById('btn'); b.disabled=true; b.textContent='確認中…';
+  try{
+    var r=await fetch('/qstart/admin/login',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({staff_id:sid,password:pw})});
+    var d=await r.json();
+    if(d.ok){ location.href='/qstart/admin'; return; }
+    if(d.error==='too_many') showErr('試行回数が多すぎます。60秒後にもう一度お試しください。');
+    else showErr('社員IDまたはパスワードが違います。または管理者権限がありません。');
+  }catch(e){ showErr('通信に失敗しました'); }
+  b.disabled=false; b.textContent='ログイン';
+}
+document.addEventListener('keydown',function(e){ if(e.key==='Enter')doLogin(); });
+</script>
+</body>
+</html>

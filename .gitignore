@@ -9,3 +9,8 @@ venv/
 
 # ユーザー画像はGitHubに上げない(プライバシー保護)
 static/uploads/*
+*.env
+equi1/
+zin1/
+*.npz
+*.pt

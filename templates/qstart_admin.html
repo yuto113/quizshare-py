@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Qstart 管理者</title>
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif; background:#f7f6f2; color:#2b2820; }
+.hd { background:#14213d; color:#fff; padding:14px 22px; display:flex; align-items:center; gap:14px; }
+.hd .logo { font-size:18px; font-weight:700; } .hd .logo span { color:#b8860b; }
+.hd .badge { font-size:11px; background:#b8860b; padding:3px 8px; border-radius:20px; }
+.hd a { margin-left:auto; color:#aab; font-size:13px; text-decoration:none; }
+.tabs { display:flex; gap:2px; background:#fff; padding:0 16px; border-bottom:1px solid #e8e4da; overflow-x:auto; }
+.tab { padding:13px 16px; font-size:14px; color:#7a7362; cursor:pointer; white-space:nowrap; border-bottom:2px solid transparent; }
+.tab:hover { color:#14213d; }
+.tab.active { color:#14213d; font-weight:600; border-bottom-color:#b8860b; }
+.wrap { padding:24px; max-width:1200px; margin:0 auto; }
+.pane { display:none; } .pane.active { display:block; }
+h2 { font-size:17px; margin-bottom:16px; color:#14213d; }
+.cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; margin-bottom:24px; }
+.card { background:#fff; border:1px solid #ece9e2; border-radius:12px; padding:16px; }
+.card .k { font-size:11px; color:#8a8270; margin-bottom:6px; }
+.card .v { font-size:24px; font-weight:700; color:#14213d; }
+table { width:100%; background:#fff; border-radius:12px; overflow:hidden; border-collapse:collapse; font-size:13px; }
+th { background:#faf9f5; padding:11px; text-align:left; color:#7a7362; font-size:12px; font-weight:600; }
+td { padding:11px; border-top:1px solid #f2efe8; }
+input,select,textarea { padding:8px 11px; border:1px solid #ddd8cc; border-radius:8px; font-size:13px; font-family:inherit; }
+textarea { width:100%; min-height:90px; }
+button { padding:8px 14px; background:#14213d; color:#fff; border:none; border-radius:8px; font-size:13px; cursor:pointer; }
+button:hover { background:#1d2d52; }
+button.gold { background:#b8860b; } button.ghost { background:#fff; color:#14213d; border:1px solid #ddd8cc; }
+button.red { background:#b03a3a; }
+.row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+.pill { font-size:11px; padding:3px 8px; border-radius:20px; }
+.pill.on { background:#e8f5e9; color:#2e7d32; } .pill.off { background:#fbe9e7; color:#c0392b; }
+.form { background:#fff; border:1px solid #ece9e2; border-radius:12px; padding:18px; margin-bottom:20px; }
+.form label { display:block; font-size:12px; color:#8a8270; margin:10px 0 4px; }
+.bars { background:#fff; border:1px solid #ece9e2; border-radius:12px; padding:18px; }
+.bar { display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:12px; }
+.bar .t { width:120px; color:#7a7362; }
+.bar .g { flex:1; height:8px; background:#f0ede5; border-radius:4px; overflow:hidden; }
+.bar .g i { display:block; height:100%; background:#b8860b; }
+</style>
+</head>
+<body>
+
+<div class="hd">
+  <div class="logo">Q<span>start</span></div>
+  <div class="badge">ADMIN</div><div style="font-size:11px;color:#8a93a8;">v1.5</div>
+  <a href="/qstart" style="margin-left:auto;">← Qstartに戻る</a>
+  <a href="#" onclick="adminLogout();return false;" style="margin-left:16px;color:#e88;">ログアウト</a>
+</div>
+
+<div class="tabs">
+  <div class="tab active" data-p="dash" onclick="tab('dash')">📊 ダッシュボード</div>
+  <div class="tab" data-p="users" onclick="tab('users')">👥 ユーザー</div>
+  <div class="tab" data-p="announce" onclick="tab('announce')">📢 お知らせ</div>
+  <div class="tab" data-p="models" onclick="tab('models')">🤖 モデル</div>
+  <div class="tab" data-p="features" onclick="tab('features')">🚩 機能フラグ</div>
+  <div class="tab" data-p="promo" onclick="tab('promo')">🎟 優待コード</div>
+  <div class="tab" data-p="pricing" onclick="tab('pricing')">💰 料金・売上</div>
+  <div class="tab" data-p="mail" onclick="tab('mail')">💌 メール・登録</div>
+  <div class="tab" data-p="reports" onclick="tab('reports')">🚨 通報</div>
+  <div class="tab" data-p="logs" onclick="tab('logs')">📜 監査ログ</div>
+</div>
+
+<div class="wrap">
+
+<div class="pane active" id="p-dash">
+  <h2>ダッシュボード</h2>
+  <div class="cards" id="statCards"></div>
+  <div class="bars">
+    <div style="font-size:13px;font-weight:600;margin-bottom:12px;">モデル別トークン</div>
+    <div id="byModel"></div>
+    <div style="font-size:13px;font-weight:600;margin:18px 0 12px;">言語別ユーザー</div>
+    <div id="byLang"></div>
+  </div>
+</div>
+
+<div class="pane" id="p-users">
+  <h2>ユーザー管理</h2>
+  <div style="background:#fff;border:1px solid #ece9e2;border-radius:12px;padding:12px 15px;
+    margin-bottom:14px;font-size:12.5px;color:#6b6555;line-height:1.8;">
+    <b>凍結</b>するとログインできなくなり、ログイン中でも次の発言でログアウトされます。<br>
+    <b>権限</b>: user=一般 / moderator=通報対応のみ / admin=すべての管理操作
+  </div>
+  <div class="row">
+    <input id="uq" placeholder="ID / ニックネーム / メールで検索" style="width:280px">
+    <button onclick="loadUsers(1)">検索</button>
+    <span id="uTotal" style="font-size:12px;color:#8a8270;"></span>
+  </div>
+  <table><thead><tr><th>ID</th><th>名前</th><th>言語</th><th>トークン</th><th>権限</th><th>状態</th><th>登録</th><th></th></tr></thead>
+  <tbody id="uBody"></tbody></table>
+  <div class="row" style="margin-top:12px;">
+    <button class="ghost" onclick="loadUsers(uPage-1)">← 前</button>
+    <span id="uPage" style="font-size:13px;"></span>
+    <button class="ghost" onclick="loadUsers(uPage+1)">次 →</button>
+  </div>
+</div>
+
+<div class="pane" id="p-announce">
+  <h2>お知らせ配信</h2>
+  <div class="form">
+    <label>タイトル</label><input id="anTitle" style="width:100%">
+    <label>本文</label><textarea id="anBody"></textarea>
+    <div class="row" style="margin-top:12px;">
+      <select id="anLevel"><option value="info">お知らせ</option><option value="warn">注意</option><option value="critical">重要</option></select>
+      <select id="anLang"><option value="all">全言語</option><option value="ja">日本語</option><option value="en">English</option><option value="zh">中文</option><option value="ko">한국어</option></select>
+      <select id="anTarget"><option value="all">全員</option><option value="free">Free</option><option value="staff">社員</option></select>
+      <button class="gold" onclick="createAnnounce()">配信する</button>
+    </div>
+  </div>
+  <table><thead><tr><th>ID</th><th>タイトル</th><th>レベル</th><th>対象</th><th>状態</th><th>作成</th><th></th></tr></thead>
+  <tbody id="anBodyList"></tbody></table>
+</div>
+
+<div class="pane" id="p-models">
+  <h2>モデル制御</h2>
+  <table><thead><tr><th>モデル</th><th>公開</th><th>メンテ</th><th>最低権限</th><th>メモ</th><th></th></tr></thead>
+  <tbody id="mBody"></tbody></table>
+</div>
+
+<div class="pane" id="p-features">
+  <h2>機能フラグ（段階リリース）</h2>
+  <div style="background:#fff;border:1px solid #ece9e2;border-radius:12px;padding:14px 16px;
+    margin-bottom:16px;font-size:12.5px;color:#6b6555;line-height:1.9;">
+    新しい機能を少しずつ公開する仕組みです。<b>公開率</b>を 10 にすると、
+    ユーザーの約10%にだけその機能が表示されます。問題がなければ徐々に上げていきます。<br>
+    <span style="color:#a09a8a;">
+    projects=プロジェクト機能 / purchase=トークン販売 / voice=音声入力 / artifacts=生成物表示 /
+    register_open=新規登録の受付</span>
+  </div>
+  <table><thead><tr><th>キー</th><th>有効</th><th>公開率%</th><th>メモ</th><th></th></tr></thead>
+  <tbody id="fBody"></tbody></table>
+</div>
+
+<div class="pane" id="p-promo">
+  <h2>優待コード</h2>
+  <div class="form">
+    <div style="font-size:13px;font-weight:600;margin-bottom:6px;">新しいコードを発行</div>
+    <div class="row" style="margin-bottom:0;">
+      <div><label style="font-size:11px;color:#8a8270;">コード（空なら自動生成）</label><br>
+        <input id="pcCode" placeholder="QS-XXXXXXXX" style="width:180px;text-transform:uppercase"></div>
+      <div><label style="font-size:11px;color:#8a8270;">種類</label><br>
+        <select id="pcType" onchange="pcHint()">
+          <option value="token_add">トークン追加</option>
+          <option value="monthly_add">月間枠を追加</option>
+          <option value="feature">機能を解放</option>
+        </select></div>
+      <div><label style="font-size:11px;color:#8a8270;">持続性</label><br>
+        <select id="pcPersist" onchange="pcHint()">
+          <option value="0">ナシ（使い切り）</option>
+          <option value="1">アリ（毎回復活）</option>
+        </select></div>
+      <div><label style="font-size:11px;color:#8a8270;">値</label><br>
+        <input id="pcValue" type="number" value="50000" style="width:120px"></div>
+      <div><label style="font-size:11px;color:#8a8270;">使用上限</label><br>
+        <select id="pcMax">
+          <option value="1">1人</option><option value="5">5人</option>
+          <option value="10">10人</option><option value="50">50人</option>
+          <option value="100">100人</option><option value="-1">無制限</option>
+        </select></div>
+      <div><label style="font-size:11px;color:#8a8270;">有効期限（任意）</label><br>
+        <input id="pcExp" type="date"></div>
+    </div>
+    <label>説明</label>
+    <input id="pcDesc" placeholder="例: 夏のキャンペーン" style="width:100%">
+    <div id="pcHint" class="hint" style="font-size:11px;color:#a09a8a;margin-top:6px;"></div>
+    <div class="row" style="margin-top:14px;">
+      <button class="gold" onclick="createPromo()">🎟 発行する</button>
+      <span id="pcResult" style="font-size:13px;"></span>
+    </div>
+  </div>
+  <table><thead><tr><th>コード</th><th>種類</th><th>持続</th><th>値</th><th>使用</th><th>期限</th><th>説明</th><th>状態</th><th></th></tr></thead>
+  <tbody id="pcBody"></tbody></table>
+</div>
+
+<div class="pane" id="p-pricing">
+  <h2>料金・売上</h2>
+
+  <div class="form">
+    <div class="row" style="margin-bottom:14px;align-items:center;">
+      <div style="font-size:14px;font-weight:600;">トークン販売</div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+        <input type="checkbox" id="prEnabled" style="width:18px;height:18px;">
+        <span id="prStatus" class="pill off">停止中</span>
+      </label>
+      <div style="font-size:11px;color:#a09a8a;">オフの間は購入ボタンが「準備中」になります</div>
+    </div>
+
+    <div style="font-size:13px;font-weight:600;margin:6px 0 10px;">基準価格（USD建て）</div>
+    <div class="row" style="margin-bottom:8px;">
+      <div><label style="font-size:11px;color:#8a8270;">100トークンあたり (USD)</label><br>
+        <input id="prUsd" type="number" step="0.00001" style="width:150px" oninput="prCalc()"></div>
+      <div><label style="font-size:11px;color:#8a8270;">最低購入トークン</label><br>
+        <input id="prMin" type="number" style="width:130px"></div>
+      <button class="gold" onclick="savePricing()">保存</button>
+      <span id="prSaved" style="font-size:13px;color:#2e7d32;"></span>
+    </div>
+    <div id="prCalcBox" style="font-size:12px;color:#6b6555;background:#faf9f5;border:1px solid #ece9e2;border-radius:8px;padding:10px 12px;margin-top:6px;line-height:1.9;"></div>
+  </div>
+
+  <div class="form">
+    <div style="font-size:13px;font-weight:600;margin-bottom:4px;">為替レート（1 USD = ?）</div>
+    <div style="font-size:11px;color:#a09a8a;margin-bottom:12px;">
+      表示用。実際の請求はUSDで確定します。1日1回自動更新されます。
+      <span id="fxTime" style="margin-left:8px;"></span>
+      <button class="ghost" style="margin-left:8px;padding:4px 10px;font-size:11px;" onclick="refreshFx()">🔄 今すぐ更新</button>
+    </div>
+    <div id="fxBox" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;"></div>
+    <button class="gold" style="margin-top:14px;" onclick="saveFx()">レートを保存</button>
+    <span id="fxSaved" style="font-size:13px;color:#2e7d32;margin-left:10px;"></span>
+  </div>
+
+  <h2 style="margin-top:26px;">購入履歴</h2>
+  <div class="cards" id="saleCards"></div>
+  <table><thead><tr><th>日時</th><th>ユーザー</th><th>トークン</th><th>金額(USD)</th><th>状態</th><th>備考</th></tr></thead>
+  <tbody id="buyBody"></tbody></table>
+</div>
+
+<div class="pane" id="p-mail">
+  <h2>メール・新規登録</h2>
+  <div class="cards" id="mailCards"></div>
+
+  <div class="form">
+    <div class="row" style="margin-bottom:12px;align-items:center;">
+      <div style="font-size:14px;font-weight:600;">新規登録の受付</div>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <input type="checkbox" id="mlOpen" style="width:18px;height:18px;" onchange="saveMail()">
+        <span id="mlOpenPill" class="pill off">停止中</span>
+      </label>
+      <div style="font-size:11px;color:#a09a8a;">
+        オフにすると「現在、新規登録の受付を停止しています」と表示されます</div>
+    </div>
+    <div id="mlLimitInfo" style="font-size:12px;color:#6b6555;background:#faf9f5;
+      border:1px solid #ece9e2;border-radius:8px;padding:10px 12px;line-height:1.9;"></div>
+  </div>
+
+  <div class="form">
+    <div style="font-size:13px;font-weight:600;margin-bottom:10px;">テスト送信</div>
+    <div class="row" style="margin-bottom:0;">
+      <input id="mlTestTo" placeholder="送信先メールアドレス" style="width:260px">
+      <button class="gold" onclick="testMail()">送信</button>
+      <span id="mlTestMsg" style="font-size:13px;"></span>
+    </div>
+    <div style="font-size:11px;color:#a09a8a;margin-top:8px;">
+      認証コード「000000」のテストメールを送ります。1日の送信数にカウントされます。</div>
+  </div>
+
+  <h2 style="margin-top:26px;">日別の推移</h2>
+  <table><thead><tr><th>日付</th><th>メール送信</th><th>成功</th><th>新規登録</th></tr></thead>
+  <tbody id="mlDaily"></tbody></table>
+
+  <h2 style="margin-top:26px;">送信ログ</h2>
+  <table><thead><tr><th>日時</th><th>種類</th><th>状態</th><th>エラー</th></tr></thead>
+  <tbody id="mlLogs"></tbody></table>
+</div>
+
+<div class="pane" id="p-reports">
+  <h2>通報・フィードバック</h2>
+  <table><thead><tr><th>ID</th><th>ユーザー</th><th>種別</th><th>内容</th><th>状態</th><th>日時</th><th></th></tr></thead>
+  <tbody id="rBody"></tbody></table>
+</div>
+
+<div class="pane" id="p-logs">
+  <h2>監査ログ</h2>
+  <table><thead><tr><th>日時</th><th>管理者</th><th>操作</th><th>対象</th><th>詳細</th></tr></thead>
+  <tbody id="lBody"></tbody></table>
+</div>
+
+</div>
+
+<script>
+var A='/qstart/api/v1/admin/';
+var uPage=1;
+function esc(s){var d=document.createElement('div');d.textContent=(s==null?'':s);return d.innerHTML;}
+function num(n){return (n||0).toLocaleString();}
+async function api(p,m,b){
+  var o={method:m||'GET',headers:{'Content-Type':'application/json'}};
+  if(b)o.body=JSON.stringify(b);
+  var r=await fetch(A+p,o); return await r.json();
+}
+function tab(n){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.p===n));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active',p.id==='p-'+n));
+  ({dash:loadStats,users:()=>loadUsers(1),announce:loadAnnounce,models:loadModels,features:loadFeatures,promo:loadPromo,pricing:loadPricing,mail:loadMail,reports:loadReports,logs:loadLogs}[n]||function(){})();
+}
+function bars(el,items,key,val){
+  var max=Math.max(1,...items.map(i=>i[val]));
+  el.innerHTML=items.map(i=>'<div class="bar"><div class="t">'+esc(i[key])+'</div><div class="g"><i style="width:'+(i[val]/max*100)+'%"></i></div><div style="width:80px;text-align:right;">'+num(i[val])+'</div></div>').join('')||'<div style="color:#aaa;font-size:12px;">データなし</div>';
+}
+async function loadStats(){
+  var d=await api('stats'); if(!d.ok)return; var s=d.stats;
+  var C=[['総ユーザー',s.users_total],['今日の登録',s.users_today],['プロジェクト',s.projects],['チャット',s.chats],['24hトークン',s.tokens_24h],['累計トークン',s.tokens_total],['未対応通報',s.reports_open]];
+  document.getElementById('statCards').innerHTML=C.map(c=>'<div class="card"><div class="k">'+c[0]+'</div><div class="v">'+num(c[1])+'</div></div>').join('');
+  bars(document.getElementById('byModel'),s.by_model,'model','tokens');
+  bars(document.getElementById('byLang'),s.by_lang,'lang','n');
+}
+async function loadUsers(p){
+  p=Math.max(1,p||1);
+  var d=await api('users?page='+p+'&q='+encodeURIComponent(document.getElementById('uq').value));
+  if(!d.ok)return; uPage=d.page;
+  document.getElementById('uTotal').textContent=num(d.total)+'人';
+  document.getElementById('uPage').textContent=d.page+' / '+Math.max(1,Math.ceil(d.total/d.per));
+  document.getElementById('uBody').innerHTML=d.users.map(u=>
+    '<tr><td>'+esc(u.user_id)+'</td><td>'+esc(u.nickname)+'</td><td>'+esc(u.lang||'ja')+'</td><td>'+num(u.tokens)+'</td>'+
+    '<td><select onchange="setUser(\''+esc(u.user_id)+'\',\'role\',this.value)">'+
+    ['user','moderator','admin'].map(r=>'<option value="'+r+'"'+(u.role===r?' selected':'')+'>'+r+'</option>').join('')+'</select></td>'+
+    '<td><span class="pill '+(u.status==='active'?'on':'off')+'">'+esc(u.status)+'</span></td>'+
+    '<td style="font-size:11px;color:#999;">'+esc((u.created_at||'').slice(0,10))+'</td>'+
+    '<td><button class="'+(u.status==='active'?'red':'ghost')+'" onclick="setUser(\''+esc(u.user_id)+'\',\'status\',\''+(u.status==='active'?'suspended':'active')+'\')">'+(u.status==='active'?'凍結':'解除')+'</button></td></tr>').join('');
+}
+async function setUser(uid,k,v){var b={};b[k]=v;await api('users/'+uid,'PATCH',b);loadUsers(uPage);}
+async function loadAnnounce(){
+  var d=await api('announce'); if(!d.ok)return;
+  document.getElementById('anBodyList').innerHTML=d.announcements.map(a=>
+    '<tr><td>'+a.id+'</td><td>'+esc(a.title)+'</td><td>'+esc(a.level)+'</td><td>'+esc(a.target)+'</td>'+
+    '<td><span class="pill '+(a.active?'on':'off')+'">'+(a.active?'配信中':'停止')+'</span></td>'+
+    '<td style="font-size:11px;color:#999;">'+esc((a.created_at||'').slice(0,16))+'</td>'+
+    '<td><button class="ghost" onclick="togAn('+a.id+','+(a.active?0:1)+')">'+(a.active?'停止':'再開')+'</button> '+
+    '<button class="red" onclick="delAn('+a.id+')">削除</button></td></tr>').join('');
+}
+async function createAnnounce(){
+  var t=document.getElementById('anTitle').value.trim();
+  if(!t){alert('タイトルを入力してください');return;}
+  await api('announce','POST',{title:t,body:document.getElementById('anBody').value,
+    level:document.getElementById('anLevel').value,lang:document.getElementById('anLang').value,
+    target:document.getElementById('anTarget').value});
+  document.getElementById('anTitle').value='';document.getElementById('anBody').value='';
+  loadAnnounce();
+}
+async function togAn(id,v){await api('announce/'+id,'PATCH',{active:v});loadAnnounce();}
+async function delAn(id){if(!confirm('削除しますか？'))return;await api('announce/'+id,'DELETE');loadAnnounce();}
+async function loadModels(){
+  var d=await api('models'); if(!d.ok)return;
+  document.getElementById('mBody').innerHTML=d.models.map(m=>
+    '<tr><td style="font-weight:600;">'+esc(m.model)+'</td>'+
+    '<td><input type="checkbox" id="me-'+m.model+'"'+(m.enabled?' checked':'')+'></td>'+
+    '<td><input type="checkbox" id="mm-'+m.model+'"'+(m.maintenance?' checked':'')+'></td>'+
+    '<td><select id="mr-'+m.model+'">'+['user','staff','admin'].map(r=>'<option value="'+r+'"'+(m.min_role===r?' selected':'')+'>'+r+'</option>').join('')+'</select></td>'+
+    '<td><input id="mn-'+m.model+'" value="'+esc(m.note)+'" style="width:180px"></td>'+
+    '<td><button onclick="saveModel(\''+m.model+'\')">保存</button></td></tr>').join('');
+}
+async function saveModel(m){
+  await api('models','POST',{model:m,enabled:document.getElementById('me-'+m).checked,
+    maintenance:document.getElementById('mm-'+m).checked,min_role:document.getElementById('mr-'+m).value,
+    note:document.getElementById('mn-'+m).value});
+  loadModels();
+}
+async function loadFeatures(){
+  var d=await api('features'); if(!d.ok)return;
+  document.getElementById('fBody').innerHTML=d.features.map(f=>
+    '<tr><td style="font-weight:600;">'+esc(f.key)+'</td>'+
+    '<td><input type="checkbox" id="fe-'+f.key+'"'+(f.enabled?' checked':'')+'></td>'+
+    '<td><input type="number" id="fp-'+f.key+'" value="'+(f.rollout_pct||0)+'" min="0" max="100" style="width:70px"></td>'+
+    '<td><input id="fn-'+f.key+'" value="'+esc(f.note)+'" style="width:200px"></td>'+
+    '<td><button onclick="saveFeat(\''+f.key+'\')">保存</button></td></tr>').join('');
+}
+async function saveFeat(k){
+  await api('features','POST',{key:k,enabled:document.getElementById('fe-'+k).checked,
+    rollout_pct:document.getElementById('fp-'+k).value,note:document.getElementById('fn-'+k).value});
+  loadFeatures();
+}
+function pcHint(){
+  var t=document.getElementById('pcType').value;
+  var p=document.getElementById('pcPersist').value;
+  var el=document.getElementById('pcHint');
+  if(t==='feature'){ el.textContent='機能を解放します（値は使いません）'; return; }
+  var v=Number(document.getElementById('pcValue').value||0).toLocaleString();
+  if(p==='1'){
+    el.innerHTML='<b>持続性アリ</b>：'+(t==='monthly_add'?'月間枠':'3時間枠')
+      +'の上限が <b>+'+v+'</b> トークン<b>恒久的に</b>増えます。リセットのたびに復活します。';
+  } else {
+    el.innerHTML='<b>持続性ナシ</b>：<b>'+v+'</b> トークンの予備タンクをもらえます。'
+      +'通常枠を使い切ったあとに消費され、なくなったら終わりです（復活しません）。';
+  }
+}
+async function loadPromo(){
+  pcHint();
+  var d=await api('promo'); if(!d.ok)return;
+  var TN={token_add:'トークン追加',monthly_add:'月間枠',feature:'機能解放'};
+  document.getElementById('pcBody').innerHTML=d.codes.map(function(c){
+    var left = c.max_uses<0 ? '∞' : c.max_uses;
+    var exp = c.expires_at ? esc(c.expires_at) : '無期限';
+    var expired = c.expires_at && c.expires_at < new Date().toISOString().slice(0,10);
+    return '<tr><td style="font-family:monospace;font-weight:600;">'+esc(c.code)+'</td>'+
+    '<td>'+(TN[c.type]||esc(c.type))+'</td>'+
+    '<td>'+(Number(c.persistent)?'<span class="pill on">アリ</span>':'<span class="pill off">ナシ</span>')+'</td>'+
+    '<td>'+num(c.value)+'</td>'+
+    '<td>'+(c.used_count||0)+' / '+left+'</td>'+
+    '<td style="font-size:11px;'+(expired?'color:#c0392b;':'color:#999;')+'">'+exp+'</td>'+
+    '<td style="font-size:12px;max-width:160px;">'+esc(c.description||'')+'</td>'+
+    '<td><span class="pill '+(c.active&&!expired?'on':'off')+'">'+(expired?'期限切れ':(c.active?'有効':'停止'))+'</span></td>'+
+    '<td><button class="ghost" onclick="copyCode(\''+esc(c.code)+'\')">コピー</button> '+
+    '<button class="ghost" onclick="togPromo(\''+esc(c.code)+'\','+(c.active?0:1)+')">'+(c.active?'停止':'再開')+'</button> '+
+    '<button class="red" onclick="delPromo(\''+esc(c.code)+'\')">削除</button></td></tr>';
+  }).join('')||'<tr><td colspan="9" style="color:#aaa;">コードがありません</td></tr>';
+}
+async function createPromo(){
+  var b={code:document.getElementById('pcCode').value.trim(),
+    type:document.getElementById('pcType').value,
+    value:document.getElementById('pcValue').value,
+    max_uses:document.getElementById('pcMax').value,
+    persistent:document.getElementById('pcPersist').value,
+    expires_at:document.getElementById('pcExp').value||null,
+    description:document.getElementById('pcDesc').value};
+  var d=await api('promo','POST',b);
+  var r=document.getElementById('pcResult');
+  if(d.ok){ r.style.color='#2e7d32'; r.textContent='発行しました: '+d.code;
+    document.getElementById('pcCode').value=''; document.getElementById('pcDesc').value='';
+    loadPromo(); }
+  else { r.style.color='#c0392b';
+    r.textContent=(d.error==='duplicate'?'そのコードは既に存在します':'発行に失敗しました'); }
+}
+async function togPromo(c,v){ await api('promo/'+encodeURIComponent(c),'PATCH',{active:v}); loadPromo(); }
+async function delPromo(c){ if(!confirm(c+' を削除しますか？'))return;
+  await api('promo/'+encodeURIComponent(c),'DELETE'); loadPromo(); }
+function copyCode(c){ navigator.clipboard.writeText(c).then(function(){
+  var r=document.getElementById('pcResult'); r.style.color='#2e7d32';
+  r.textContent='コピーしました: '+c; }); }
+
+var FX = [];
+function prCalc(){
+  var u = parseFloat(document.getElementById('prUsd').value||0);
+  if(!u){ document.getElementById('prCalcBox').textContent=''; return; }
+  var m = u * 10000;  // 1Mトークンあたり
+  var lines = ['<b>1Mトークン = $'+m.toFixed(2)+'</b>'];
+  FX.slice(0,6).forEach(function(f){
+    if(f.currency==='USD') return;
+    var v = m * f.rate;
+    lines.push('　'+f.currency+': '+f.symbol+v.toLocaleString(undefined,{maximumFractionDigits:f.decimals}));
+  });
+  lines.push('<span style="color:#a09a8a;">参考: Haiku 4.5の入力は $1.00 / 1Mトークン</span>');
+  document.getElementById('prCalcBox').innerHTML = lines.join('<br>');
+}
+async function loadPricing(){
+  var d = await api('pricing'); if(!d.ok) return;
+  var p = d.pricing;
+  document.getElementById('prUsd').value = p.usd_per_100_tokens;
+  document.getElementById('prMin').value = p.min_tokens;
+  var en = !!Number(p.enabled) && d.sale_on;
+  document.getElementById('prEnabled').checked = en;
+  var st = document.getElementById('prStatus');
+  st.className = 'pill ' + (en?'on':'off');
+  st.textContent = en ? '販売中' : '停止中';
+  FX = d.fx || [];
+  document.getElementById('fxBox').innerHTML = FX.map(function(f){
+    return '<div><label style="font-size:11px;color:#8a8270;">'+esc(f.currency)+' ('+esc(f.symbol)+')</label><br>'
+      +'<input id="fx-'+f.currency+'" type="number" step="0.0001" value="'+f.rate+'" style="width:100%" oninput="prCalc()"></div>';
+  }).join('');
+  prCalc();
+  var t = FX.length ? (FX[0].updated_at||'') : '';
+  document.getElementById('fxTime').textContent = t ? ('最終更新: '+t.slice(0,16)) : '';
+  var b = d.purchases||[];
+  var done = b.filter(function(x){return x.status==='completed';});
+  var sum = done.reduce(function(a,x){return a+(x.amount||0);},0);
+  var tok = done.reduce(function(a,x){return a+(x.tokens||0);},0);
+  document.getElementById('saleCards').innerHTML =
+    [['売上合計(USD)','$'+sum.toFixed(2)],['販売トークン',num(tok)],
+     ['取引数',b.length],['未処理',b.filter(function(x){return x.status==='pending';}).length]]
+    .map(function(c){return '<div class="card"><div class="k">'+c[0]+'</div><div class="v">'+c[1]+'</div></div>';}).join('');
+  document.getElementById('buyBody').innerHTML = b.map(function(x){
+    return '<tr><td style="font-size:11px;color:#999;">'+esc((x.created_at||'').slice(0,16))+'</td>'
+      +'<td>'+esc(x.user_id)+'</td><td>'+num(x.tokens)+'</td><td>$'+(x.amount||0).toFixed(4)+'</td>'
+      +'<td><span class="pill '+(x.status==='completed'?'on':'off')+'">'+esc(x.status)+'</span></td>'
+      +'<td style="font-size:11px;color:#777;">'+esc(x.note||'')+'</td></tr>';
+  }).join('')||'<tr><td colspan="6" style="color:#aaa;">購入履歴はありません</td></tr>';
+}
+async function savePricing(){
+  await api('pricing','POST',{usd_per_100_tokens:document.getElementById('prUsd').value,
+    min_tokens:document.getElementById('prMin').value,
+    enabled:document.getElementById('prEnabled').checked});
+  await api('features','POST',{key:'purchase',enabled:document.getElementById('prEnabled').checked,rollout_pct:100});
+  var s=document.getElementById('prSaved'); s.textContent='保存しました';
+  setTimeout(function(){s.textContent='';},1600);
+  loadPricing();
+}
+async function refreshFx(){
+  var s=document.getElementById('fxSaved'); s.style.color='#8a8270'; s.textContent='取得中…';
+  var d=await api('fx/refresh','POST');
+  if(d.ok && d.updated){ s.style.color='#2e7d32'; s.textContent=d.updated+'通貨を更新しました'; }
+  else if(d.skipped){ s.style.color='#8a8270'; s.textContent='最新です'; }
+  else { s.style.color='#c0392b'; s.textContent='取得に失敗しました'; }
+  setTimeout(function(){s.textContent='';},2500);
+  loadPricing();
+}
+async function saveFx(){
+  var arr = FX.map(function(f){
+    return {currency:f.currency, rate:document.getElementById('fx-'+f.currency).value};
+  });
+  await api('pricing','POST',{fx:arr});
+  var s=document.getElementById('fxSaved'); s.textContent='保存しました';
+  setTimeout(function(){s.textContent='';},1600);
+  loadPricing();
+}
+
+var CAT_NAME = {wrong:'事実と違う', broken:'文章が壊れている', harmful:'不適切・有害',
+  offtopic:'質問と関係ない', other:'その他'};
+
+async function loadMail(){
+  var d = await api('mail'); if(!d.ok) return;
+  var pctM = Math.round(d.sent_today / d.mail_limit * 100);
+  var pctS = Math.round(d.signups_today / d.signup_limit * 100);
+  document.getElementById('mailCards').innerHTML =
+    [['今日のメール送信', d.sent_today + ' / ' + d.mail_limit],
+     ['今日の新規登録', d.signups_today + ' / ' + d.signup_limit],
+     ['APIキー', d.has_key ? '✅ 設定済み' : '❌ 未設定'],
+     ['受付状態', d.signup_open ? '受付中' : '停止中']]
+    .map(function(c){ return '<div class="card"><div class="k">'+c[0]+'</div><div class="v" style="font-size:19px;">'+c[1]+'</div></div>'; }).join('');
+
+  document.getElementById('mlOpen').checked = d.signup_open;
+  var p = document.getElementById('mlOpenPill');
+  p.className = 'pill ' + (d.signup_open ? 'on' : 'off');
+  p.textContent = d.signup_open ? '受付中' : '停止中';
+
+  document.getElementById('mlLimitInfo').innerHTML =
+    '1日の新規登録上限: <b>' + d.signup_limit + '人</b>（現在 ' + d.signups_today + '人・' + pctS + '%）<br>'
+    + '1日のメール送信上限: <b>' + d.mail_limit + '通</b>（現在 ' + d.sent_today + '通・' + pctM + '%）<br>'
+    + '<span style="color:#a09a8a;">上限に達すると「現在、アカウントの作成が込み合っています。後日の登録をお願いします。」と表示されます。'
+    + 'Resend無料枠は1日100通・月3,000通です。</span>';
+
+  var sm = {};
+  (d.signups||[]).forEach(function(s){ sm[s.date] = s.count; });
+  document.getElementById('mlDaily').innerHTML = (d.daily||[]).map(function(x){
+    return '<tr><td>'+esc(x.d)+'</td><td>'+x.n+'</td><td>'+(x.sent||0)+'</td>'
+      +'<td>'+(sm[x.d]||0)+'</td></tr>';
+  }).join('') || '<tr><td colspan="4" style="color:#aaa;">まだデータがありません</td></tr>';
+
+  var KIND = {verify:'認証コード', other:'その他'};
+  document.getElementById('mlLogs').innerHTML = (d.logs||[]).map(function(l){
+    var okk = l.status === 'sent';
+    return '<tr><td style="font-size:11px;color:#999;">'+esc((l.created_at||'').slice(0,16))+'</td>'
+      +'<td>'+esc(KIND[l.kind]||l.kind)+'</td>'
+      +'<td><span class="pill '+(okk?'on':'off')+'">'+esc(l.status)+'</span></td>'
+      +'<td style="font-size:11px;color:#c0392b;max-width:340px;">'+esc(l.error||'')+'</td></tr>';
+  }).join('') || '<tr><td colspan="4" style="color:#aaa;">送信ログはありません</td></tr>';
+}
+async function saveMail(){
+  await api('mail','POST',{signup_open: document.getElementById('mlOpen').checked});
+  loadMail();
+}
+async function testMail(){
+  var to = document.getElementById('mlTestTo').value.trim();
+  var m = document.getElementById('mlTestMsg');
+  if(!to){ m.style.color='#c0392b'; m.textContent='アドレスを入力してください'; return; }
+  m.style.color='#8a8270'; m.textContent='送信中…';
+  var d = await api('mail/test','POST',{to:to});
+  if(d.ok){ m.style.color='#2e7d32'; m.textContent='✅ 送信しました'; }
+  else { m.style.color='#c0392b'; m.textContent='❌ 失敗: '+(d.result||d.error||''); }
+  loadMail();
+}
+
+async function loadReports(){
+  var d=await api('reports'); if(!d.ok)return;
+  var open_n = d.reports.filter(function(r){return r.status==='open';}).length;
+  var hd = document.querySelector('#p-reports h2');
+  if (hd) hd.textContent = '通報・フィードバック' + (open_n ? '（未対応 ' + open_n + '件）' : '');
+  document.getElementById('rBody').innerHTML=d.reports.map(function(r){
+    var isOpen = r.status === 'open';
+    return '<tr'+(isOpen?' style="background:#fffdf7;"':'')+'>'+
+    '<td>'+r.id+'</td><td>'+esc(r.user_id)+'</td>'+
+    '<td>'+esc(CAT_NAME[r.category]||r.category)+'</td>'+
+    '<td style="max-width:320px;font-size:12px;white-space:pre-wrap;">'+esc((r.body||'').slice(0,200))+'</td>'+
+    '<td><span class="pill '+(isOpen?'off':'on')+'">'+(isOpen?'未対応':'対応済み')+'</span></td>'+
+    '<td style="font-size:11px;color:#999;">'+esc((r.created_at||'').slice(0,16))+'</td>'+
+    '<td>'+(isOpen
+      ? '<button onclick="closeReport('+r.id+')">対応済みに</button>'
+      : '<button class="ghost" onclick="reopenReport('+r.id+')">戻す</button>')+
+    '</td></tr>';
+  }).join('')
+    ||'<tr><td colspan="7" style="color:#aaa;">通報はありません</td></tr>';
+}
+async function closeReport(id){ await api('reports/'+id,'PATCH',{status:'closed'}); loadReports(); loadStats(); }
+async function reopenReport(id){ await api('reports/'+id,'PATCH',{status:'open'}); loadReports(); loadStats(); }
+async function loadLogs(){
+  var d=await api('logs'); if(!d.ok)return;
+  document.getElementById('lBody').innerHTML=d.logs.map(l=>
+    '<tr><td style="font-size:11px;color:#999;">'+esc((l.created_at||'').slice(0,16))+'</td>'+
+    '<td>'+esc(l.admin_id)+'</td><td>'+esc(l.action)+'</td><td>'+esc(l.target)+'</td>'+
+    '<td style="font-size:11px;color:#777;max-width:300px;">'+esc((l.detail||'').slice(0,100))+'</td></tr>').join('')
+    ||'<tr><td colspan="5" style="color:#aaa;">ログなし</td></tr>';
+}
+async function adminLogout(){
+  if(!confirm('ログアウトしますか？')) return;
+  await fetch('/qstart/admin/logout',{method:'POST'});
+  location.href='/qstart';
+}
+loadStats();
+</script>
+</body>
+</html>
