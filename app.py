@@ -1826,6 +1826,33 @@ def _qs_error_any(e):
 
 
 @app.before_request
+def _qstart_maintenance_gate():
+    """メンテナンス中はQstart関連を遮断(管理者とテストサイトは除く)"""
+    p = request.path or ''
+    if not (p.startswith('/qstart') or p.startswith('/api/qstart')):
+        return None
+    # 例外: 管理者ページ・メンテ画面・稼働状況・テストサイト・メンテAPI
+    for allow in ('/qstart/admin', '/qstart/maintenance', '/qstart/status',
+                  '/qstart/health', '/qstart/api/v1/maintenance',
+                  '/qstart/terms', '/qstart/privacy', '/qstart/contact'):
+        if p.startswith(allow):
+            return None
+    try:
+        import qstart_core as _qc_m
+        if not _qc_m.in_maintenance():
+            return None
+        if _qc_m.qstart_role() == 'admin':
+            return None   # 管理者は通常どおり使える
+    except Exception:
+        return None
+    # APIならJSON、ページならメンテ画面
+    if p.startswith('/api/') or '/api/v1/' in p:
+        return jsonify(ok=False, error='maintenance',
+                       message='現在メンテナンス中です。しばらくお待ちください。'), 503
+    return redirect('/qstart/maintenance')
+
+
+@app.before_request
 def daily_db_backup():
     try:
         _bk = '/home/yuto113/backups/db'

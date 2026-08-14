@@ -424,24 +424,7 @@ body[dir="rtl"] .qs-s-tab { flex-direction:row-reverse; text-align:right; }
   <div class="qs-topbar" style="position:relative;">
     <button id="qs-sidebar-open" onclick="toggleSidebar()" style="background:none; border:none; font-size:20px; cursor:pointer; color:#14213d; display:none; margin-right:12px;">☰</button>
     <button class="qs-model-btn" id="qs-model-btn" onclick="toggleModelMenu()">Equi 1 ∨</button>
-    <div class="qs-model-menu" id="qs-model-menu">
-      <div class="qs-model-option" onclick="pickModel('pure')">
-        <div><span class="qs-m-name">Pure</span> <span class="qs-m-badge qs-m-soon" data-i18n="coming_2026">2026年秋公開</span></div>
-        <div class="qs-m-desc"><span class="qs-m-desc-text" id="qs-desc-pure">速い・軽量モデル</span></div>
-      </div>
-      <div class="qs-model-option" onclick="pickModel('equi')" style="background:#f8f7f4;">
-        <div><span class="qs-m-name">Equi 1</span> <span class="qs-m-badge qs-m-available" data-i18n="available">利用可能</span></div>
-        <div class="qs-m-desc"><span class="qs-m-desc-text" id="qs-desc-equi">バランス・普段使い</span></div>
-      </div>
-      <div class="qs-model-option" onclick="pickModel('zin')" style="background:#f8f7f4;">
-        <div><span class="qs-m-name">zin</span> <span class="qs-m-badge qs-m-live" style="background:#e8f5e9;color:#2e7d32;" data-i18n="available">利用可能</span></div>
-        <div class="qs-m-desc"><span class="qs-m-desc-text" id="qs-desc-zin">思考・じっくり考える</span></div>
-      </div>
-      <div class="qs-model-option" onclick="pickModel('apex')">
-        <div><span class="qs-m-name">Apex</span> <span class="qs-m-badge qs-m-locked" data-i18n="coming_2026">2026年秋公開</span></div>
-        <div class="qs-m-desc"><span class="qs-m-desc-text" id="qs-desc-apex">最強・全力モデル</span></div>
-      </div>
-    </div>
+    <div class="qs-model-menu" id="qs-model-menu"></div>
     <div class="qs-topbar-right">
       <div class="qs-effort-group">
         <button class="qs-effort-btn" id="eff-low" onclick="setEffort('low',this)" data-eff="low">⚡低</button>
@@ -507,6 +490,16 @@ body[dir="rtl"] .qs-s-tab { flex-direction:row-reverse; text-align:right; }
       <a class="qs-btn gold" onclick="sendReport()">報告する</a>
     </div>
   </div>
+</div>
+
+<!-- メンテナンス予告バナー -->
+<div id="qs-maint-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:255;
+  padding:11px 18px;font-size:13px;background:#fff6e5;color:#8a5a00;
+  display:none;align-items:center;gap:12px;box-shadow:0 2px 12px rgba(0,0,0,.12);">
+  <span>🔧</span>
+  <div style="flex:1;min-width:0;line-height:1.6;" id="qs-maint-text"></div>
+  <button onclick="dismissMaint()" style="background:none;border:none;font-size:17px;
+    cursor:pointer;color:inherit;opacity:.6;padding:0 4px;">✕</button>
 </div>
 
 <!-- お知らせバナー -->
@@ -610,6 +603,7 @@ body[dir="rtl"] .qs-s-tab { flex-direction:row-reverse; text-align:right; }
         <select id="set-default_model" onchange="saveSetting('default_model',this.value)">
           <option value="equi">Equi 1 — バランス</option>
           <option value="zin">zin 1 — 思考</option>
+          <option value="apex">Apex 2 — 最高性能</option>
         </select>
         <div class="qs-s-desc" id="qs-model-soon">Pure 1 / Apex 1 は2026年秋に公開予定です</div></div>
       <div class="qs-s-section"><div class="qs-s-label">既定のエフォート</div>
@@ -822,7 +816,170 @@ let usageCount = 0;
 const DAILY_LIMIT = 200000; // トークン上限
 
 // --- モデル選択 ---
+// ===== モデル選択(2階層: モデル → バージョン) =====
+var QS_MENU_VIEW = 'family';   // 'family' or 'version'
+var QS_MENU_FAM = null;
+
+var FAM_ICON = { pure:'⚡', equi:'⚙️', zin:'💭', apex:'🔥' };
+var FAM_NAME = { pure:'Pure', equi:'Equi', zin:'zin', apex:'Apex' };
+var FAM_DESC = { pure:'速い・軽量', equi:'バランス・普段使い',
+                 zin:'思考・じっくり考える', apex:'最高性能' };
+
+function familyOf(m) {
+  var f = QS_MODELS[m];
+  return (f && f.family) || m;
+}
+
+function modelsByFamily() {
+  var out = {};
+  Object.keys(QS_MODELS).forEach(function(k){
+    var m = QS_MODELS[k];
+    var fam = m.family || k;
+    if (!out[fam]) out[fam] = [];
+    out[fam].push(m);
+  });
+  Object.keys(out).forEach(function(f){
+    out[f].sort(function(a,b){ return (b.version||1) - (a.version||1); });
+  });
+  return out;
+}
+
+function renderModelMenu() {
+  var el = document.getElementById('qs-model-menu');
+  if (!el) return;
+  el.innerHTML = '';
+  var byFam = modelsByFamily();
+
+  if (QS_MENU_VIEW === 'version' && QS_MENU_FAM) {
+    // --- バージョン選択 ---
+    var back = document.createElement('div');
+    back.className = 'qs-model-back';
+    back.style.cssText = 'padding:11px 14px;font-size:12.5px;color:#8a8270;cursor:pointer;'
+      + 'border-bottom:1px solid #f0ede5;';
+    back.textContent = '← モデル選択に戻る';
+    back.onclick = function(e){ e.stopPropagation(); QS_MENU_VIEW='family'; renderModelMenu(); };
+    el.appendChild(back);
+
+    var hd = document.createElement('div');
+    hd.style.cssText = 'padding:10px 14px 5px;font-size:11px;color:#a09a8a;';
+    hd.textContent = 'バージョン';
+    el.appendChild(hd);
+
+    var list = byFam[QS_MENU_FAM] || [];
+    var latest = list.filter(function(m){ return Number(m.is_latest); });
+    var old = list.filter(function(m){ return !Number(m.is_latest); });
+
+    latest.forEach(function(m){ el.appendChild(versionRow(m)); });
+    if (old.length) {
+      var oh = document.createElement('div');
+      oh.style.cssText = 'padding:10px 14px 5px;font-size:11px;color:#a09a8a;'
+        + 'border-top:1px solid #f0ede5;margin-top:4px;';
+      oh.textContent = '旧バージョン';
+      el.appendChild(oh);
+      old.forEach(function(m){ el.appendChild(versionRow(m)); });
+    }
+    return;
+  }
+
+  // --- モデル(ファミリー)選択 ---
+  ['pure','equi','zin','apex'].forEach(function(fam){
+    var list = byFam[fam];
+    if (!list || !list.length) return;
+    var top = list.filter(function(m){ return Number(m.is_latest); })[0] || list[0];
+    var usable = modelUsable(top.model);
+
+    var row = document.createElement('div');
+    row.className = 'qs-model-option';
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;'
+      + (usable ? '' : 'opacity:.5;');
+    if (familyOf(currentModel) === fam) row.style.background = '#faf9f5';
+
+    var ic = document.createElement('span');
+    ic.style.cssText = 'font-size:16px;';
+    ic.textContent = FAM_ICON[fam] || '🤖';
+
+    var mid = document.createElement('div');
+    mid.style.cssText = 'flex:1;min-width:0;';
+    var nm = document.createElement('div');
+    nm.innerHTML = '<span class="qs-m-name">' + esc2(top.display || FAM_NAME[fam]) + '</span>';
+    var bd = document.createElement('span');
+    bd.className = 'qs-m-badge';
+    if (Number(top.maintenance)) {
+      bd.textContent = 'メンテナンス中';
+      bd.style.cssText = 'background:#fff3e0;color:#e65100;';
+    } else if (usable) {
+      bd.textContent = '利用可能';
+      bd.style.cssText = 'background:#e8f5e9;color:#2e7d32;';
+    } else {
+      bd.textContent = '2026年秋公開';
+      bd.style.cssText = 'background:#f0ede5;color:#8a8270;';
+    }
+    nm.appendChild(document.createTextNode(' '));
+    nm.appendChild(bd);
+    var ds = document.createElement('div');
+    ds.className = 'qs-m-desc';
+    ds.textContent = FAM_DESC[fam] || (top.note || '');
+    mid.appendChild(nm); mid.appendChild(ds);
+
+    row.appendChild(ic); row.appendChild(mid);
+
+    if (list.length > 1) {
+      var ar = document.createElement('span');
+      ar.style.cssText = 'color:#c8c2b4;font-size:14px;';
+      ar.textContent = '›';
+      row.appendChild(ar);
+      row.onclick = function(e){
+        e.stopPropagation();
+        QS_MENU_FAM = fam; QS_MENU_VIEW = 'version'; renderModelMenu();
+      };
+    } else {
+      row.onclick = function(e){ e.stopPropagation(); pickModel(top.model); };
+    }
+    el.appendChild(row);
+  });
+}
+
+function versionRow(m) {
+  var row = document.createElement('div');
+  row.className = 'qs-model-option';
+  row.style.cssText = 'display:flex;align-items:center;gap:10px;'
+    + (modelUsable(m.model) ? '' : 'opacity:.5;');
+  var mid = document.createElement('div');
+  mid.style.cssText = 'flex:1;';
+  var nm = document.createElement('div');
+  nm.className = 'qs-m-name';
+  nm.textContent = m.display || m.model;
+  var ds = document.createElement('div');
+  ds.className = 'qs-m-desc';
+  ds.textContent = (m.params && m.params !== '—' ? m.params + ' パラメータ' : '')
+    + (Number(m.maintenance) ? ' ・メンテナンス中' : '');
+  mid.appendChild(nm);
+  if (ds.textContent) mid.appendChild(ds);
+  row.appendChild(mid);
+  if (currentModel === m.model) {
+    var ck = document.createElement('span');
+    ck.style.cssText = 'color:#b8860b;font-weight:700;';
+    ck.textContent = '✓';
+    row.appendChild(ck);
+  }
+  row.onclick = function(e){ e.stopPropagation(); pickModel(m.model); };
+  return row;
+}
+
+function esc2(s){ var d=document.createElement('div'); d.textContent=(s==null?'':s); return d.innerHTML; }
+
 function toggleModelMenu() {
+  var el = document.getElementById('qs-model-menu');
+  var opening = !el.classList.contains('open');
+  if (opening) {
+    QS_MENU_VIEW = 'family';
+    QS_MENU_FAM = null;
+    renderModelMenu();
+  }
+  el.classList.toggle('open');
+}
+
+function _oldToggleModelMenu() {
   document.getElementById('qs-model-menu').classList.toggle('open');
 }
 document.addEventListener('click', function(e) {
@@ -841,8 +998,12 @@ function pickModel(m) {
     return;
   }
   currentModel = m;
-  const names = { equi: 'Equi 1', zin: 'zin 1' };
-  document.getElementById('qs-model-btn').textContent = (names[m] || m) + ' ∨';
+  var mf = QS_MODELS[m] || {};
+  var disp = mf.display || m;
+  document.getElementById('qs-model-btn').textContent = disp + ' ∨';
+  var sm = document.getElementById('qs-s-model');
+  if (sm) sm.textContent = 'Qstart ' + disp;
+  QS_MENU_VIEW = 'family'; QS_MENU_FAM = null;
   document.getElementById('qs-s-model').textContent = 'Qstart ' + (names[m] || m);
   document.getElementById('qs-model-menu').classList.remove('open');
 }
@@ -915,7 +1076,7 @@ function applyDefaults() {
   var dm = QS_SET.default_model;
   if (dm && modelUsable(dm) && dm !== currentModel) {
     currentModel = dm;
-    var names = { equi:'Equi 1', zin:'zin 1', pure:'Pure 1', apex:'Apex 1' };
+    var names = { equi:'Equi 1', zin:'zin 1', pure:'Pure 1', apex:'Apex 2' };
     var b = document.getElementById('qs-model-btn');
     if (b) b.textContent = (names[dm]||dm) + ' ∨';
     var sm = document.getElementById('qs-s-model');
@@ -1040,7 +1201,18 @@ function modelUsable(m) {
 }
 
 function applyModelFlags() {
-  // モデルメニューの見た目を更新
+  renderModelMenu();
+  // 既定モデルの選択肢
+  var sel = document.getElementById('set-default_model');
+  if (sel) Array.from(sel.options).forEach(function(o){ o.disabled = !modelUsable(o.value); });
+  if (!modelUsable(currentModel)) {
+    currentModel = 'equi';
+    var b = document.getElementById('qs-model-btn');
+    if (b) b.textContent = 'Equi 1 ∨';
+  }
+}
+
+function _oldApplyModelFlags() {
   document.querySelectorAll('.qs-model-option').forEach(function(el){
     var oc = el.getAttribute('onclick') || '';
     var mm = oc.match(/pickModel\('([a-z]+)'\)/);
@@ -1446,6 +1618,7 @@ async function boot() {
   } catch(e) {}
   // 使用量は別建て(送信のたびに変わるので)
   fetchServerUsage();
+  loadMaintNotice();
 }
 
 var QS_QUOTA = {};
@@ -1601,7 +1774,7 @@ function downloadText(text, filename) {
 // ===== PWA =====
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function(){
-    navigator.serviceWorker.register('/static/qstart_sw.js', {scope: '/qstart'})
+    navigator.serviceWorker.register('/static/qstart_sw.js')
       .catch(function(){});
   });
 }
@@ -1627,6 +1800,59 @@ window.addEventListener('appinstalled', function(){
   var b = document.getElementById('qs-install-row');
   if (b) b.style.display = 'none';
 });
+
+// ===== メンテナンス予告 =====
+var QS_MAINT = null;
+
+async function loadMaintNotice() {
+  try {
+    var r = await fetch('/qstart/api/v1/maintenance');
+    var d = await r.json();
+    if (!d.ok || !d.upcoming) { hideMaintBanner(); return; }
+    var m = d.upcoming;
+    if (maintDismissed(m.id)) { hideMaintBanner(); return; }
+    QS_MAINT = m;
+    var b = document.getElementById('qs-maint-banner');
+    var t = document.getElementById('qs-maint-text');
+    t.textContent = fmtMaint(m.starts_at) + 'ごろから' + fmtMaintEnd(m.ends_at)
+      + 'ごろまでメンテナンスをする予定です。'
+      + 'AIが一時的に使用できなくなりますが、ご協力お願いします！';
+    b.style.display = 'flex';
+    document.body.style.paddingTop =
+      (document.getElementById('qs-ann-banner').style.display === 'flex' ? '88px' : '44px');
+  } catch(e) {}
+}
+
+function fmtMaint(s) {
+  // "2026-08-15 02:00" → "2026年8月15日の2時0分"
+  try {
+    var p = s.split(' ');
+    var d = p[0].split('-'), t = p[1].split(':');
+    return Number(d[0]) + '年' + Number(d[1]) + '月' + Number(d[2]) + '日の'
+         + Number(t[0]) + '時' + Number(t[1]) + '分';
+  } catch(e) { return s; }
+}
+function fmtMaintEnd(s) {
+  try {
+    var t = s.split(' ')[1].split(':');
+    return Number(t[0]) + '時' + Number(t[1]) + '分';
+  } catch(e) { return s; }
+}
+
+function maintDismissed(id) {
+  try { return localStorage.getItem('qs_maint_read') === String(id); }
+  catch(e) { return false; }
+}
+function dismissMaint() {
+  try { if (QS_MAINT) localStorage.setItem('qs_maint_read', String(QS_MAINT.id)); } catch(e) {}
+  hideMaintBanner();
+}
+function hideMaintBanner() {
+  var b = document.getElementById('qs-maint-banner');
+  if (b) b.style.display = 'none';
+  var ab = document.getElementById('qs-ann-banner');
+  document.body.style.paddingTop = (ab && ab.style.display === 'flex') ? '44px' : '';
+}
 
 function qsTab(name) {
   if (name === 'admin' && (!QS_ME || QS_ME.role !== 'admin')) return;
@@ -1664,11 +1890,11 @@ function addMsg(role, text) {
   div.className = 'qs-msg ' + (role === 'user' ? 'qs-msg-user' : 'qs-msg-ai');
 
   if (role === 'ai') {
-    var names = { equi:'Equi 1', zin:'zin 1', pure:'Pure 1', apex:'Apex 1' };
+    var names = { equi:'Equi 1', zin:'zin 1', pure:'Pure 1', apex:'Apex 2' };
     var wrap = document.createElement('div');
     var lb = document.createElement('div');
     lb.className = 'qs-label';
-    lb.textContent = 'Qstart ' + (names[currentModel] || currentModel);
+    lb.style.display = 'none';
     var bb = document.createElement('div');
     bb.className = 'qs-bubble';
     bb.textContent = text;
@@ -1748,19 +1974,40 @@ function updateUsage() {
   // サーバーから取得
 }
 
+var QS_SENDING = false;
+
+function setSendingUI(on) {
+  QS_SENDING = on;
+  var btn = document.querySelector('.qs-send');
+  var inp = document.getElementById('qs-input');
+  if (btn) {
+    btn.disabled = on;
+    btn.style.opacity = on ? '.45' : '1';
+    btn.style.cursor = on ? 'not-allowed' : 'pointer';
+    btn.textContent = on ? '…' : (typeof T === 'function' ? T('send') || '送信' : '送信');
+  }
+  if (inp) {
+    inp.disabled = on;
+    inp.placeholder = on ? '返答を待っています…'
+      : (typeof T === 'function' ? T('input_placeholder') || 'メッセージを入力...' : 'メッセージを入力...');
+  }
+}
+
 async function sendMsg() {
+  if (QS_SENDING) return;   // ★連投を防ぐ
   var input = document.getElementById('qs-input');
   var text = input.value.trim();
   if (!text) return;
   // 使用量はサーバー側でチェック
   input.value = '';
+  setSendingUI(true);
   addMsg('user', text);
   // 考え中インジケーター表示
   var thinkId = 'thinking-' + Date.now();
   var thinkDiv = document.createElement('div');
   thinkDiv.id = thinkId;
   thinkDiv.className = 'qs-msg qs-msg-ai';
-  thinkDiv.innerHTML = '<div class="qs-msg-name">Qstart Equi 1</div><div class="qs-thinking"><span class="qs-think-dot"></span><span class="qs-think-text">考え中...</span></div>';
+  thinkDiv.innerHTML = '<div class="qs-thinking"><span class="qs-think-dot"></span><span class="qs-think-text">考え中...</span></div>';
   document.getElementById('qs-chat').appendChild(thinkDiv);
   thinkDiv.scrollIntoView({behavior:'smooth'});
   // 最初のメッセージでURLを変更
@@ -1775,7 +2022,7 @@ async function sendMsg() {
     var r = await fetch('/api/qstart/chat', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ message: text, model: currentModel, effort: currentEffort, chat_id: currentChatId || '', file: pendingFile ? pendingFile.substring(0, 500) : null, file_type: pendingFileType })
+      body: JSON.stringify({ message: text, model: currentModel, effort: currentEffort, chat_id: currentChatId || '', file: (QS_FILE && QS_FILE.data) ? String(QS_FILE.data).substring(0, 500) : null, file_type: QS_FILE ? QS_FILE.type : null })
     });
     var data = await r.json();
     if (data.ok) {
@@ -1785,21 +2032,29 @@ async function sendMsg() {
       saveChatToHistory();
       touchChat(text);
       if (data.usage) applyUsageQuick(data.usage); else fetchServerUsage();
-      pendingFile = null;
-      pendingFileType = null;
+      clearFile();
+      setSendingUI(false);
     } else {
+      var teX = document.getElementById(thinkId);
+      if (teX) teX.remove();
+      setSendingUI(false);
       if (data.error === 'limit_reached') {
         showLimitReached(data.recovery_time, data.weekly_pct);
+      } else if (data.error === 'rate_limit') {
+        addMsg('ai', data.message || '送信が早すぎます。少し待ってからお試しください。');
+      } else if (data.error === 'suspended') {
+        addMsg('ai', data.message || 'このアカウントは現在ご利用いただけません。');
       } else {
-        var te2 = document.getElementById(thinkId);
-        if (te2) te2.remove();
         addMsg('ai', data.error || 'エラーが発生しました');
       }
     }
   } catch(e) {
     var te3 = document.getElementById(thinkId);
     if (te3) te3.remove();
-    addMsg('ai', '通信エラーが発生しました');
+    console.error('チャット送信エラー:', e);
+    addMsg('ai', '通信エラー: ' + (e && e.message ? e.message : e));
+  } finally {
+    setSendingUI(false);
   }
 }
 

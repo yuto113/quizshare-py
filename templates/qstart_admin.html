@@ -99,6 +99,7 @@ button.red { background:#b03a3a; }
   <div class="tab" data-p="signup" onclick="tab('signup')">🎫 登録・メール</div>
   <div class="tab" data-p="contacts" onclick="tab('contacts')">📮 問い合わせ</div>
   <div class="tab" data-p="reports" onclick="tab('reports')">🚨 通報</div>
+  <div class="tab" data-p="maint" onclick="tab('maint')">🔧 メンテナンス</div>
   <div class="tab" data-p="errors" onclick="tab('errors')">🐛 エラー</div>
   <div class="tab" data-p="logs" onclick="tab('logs')">📜 監査ログ</div>
 </div>
@@ -355,6 +356,53 @@ button.red { background:#b03a3a; }
   <tbody id="rBody"></tbody></table>
 </div>
 
+<div class="pane" id="p-maint">
+  <h2>メンテナンス</h2>
+  <div id="mtStatus"></div>
+
+  <div class="form">
+    <div style="font-size:13px;font-weight:600;margin-bottom:10px;">新しいメンテナンスを予約</div>
+    <div class="row" style="margin-bottom:8px;">
+      <div><label style="font-size:11px;color:#8a8270;">開始</label><br>
+        <input id="mtStart" type="datetime-local"></div>
+      <div><label style="font-size:11px;color:#8a8270;">終了</label><br>
+        <input id="mtEnd" type="datetime-local"></div>
+    </div>
+    <label style="font-size:11px;color:#8a8270;">タイトル</label>
+    <input id="mtTitle" placeholder="例: システム更新のためのメンテナンス" style="width:100%">
+    <label style="font-size:11px;color:#8a8270;margin-top:10px;display:block;">詳細（任意）</label>
+    <textarea id="mtBody" placeholder="ユーザーに表示される説明" style="min-height:70px;"></textarea>
+    <div class="row" style="margin-top:14px;">
+      <button class="gold" onclick="createMaint(false)">📅 予約する</button>
+      <button class="red" onclick="createMaint(true)">🚨 緊急メンテを今すぐ開始</button>
+      <span id="mtMsg" style="font-size:13px;"></span>
+    </div>
+    <div style="font-size:11px;color:#a09a8a;margin-top:8px;line-height:1.8;">
+      通常の予約は24時間以上先から。緊急メンテは即座に開始され、24時間ルールを飛ばします。<br>
+      メンテナンス中は管理者以外 Qstart にアクセスできなくなります（テスト用: <a href="/admin/qzero" target="_blank" style="color:#b8860b;">/admin/qzero</a>）。
+    </div>
+  </div>
+
+  <table><thead><tr><th>期間</th><th>タイトル</th><th>種類</th><th>状態</th><th>補償</th><th></th></tr></thead>
+  <tbody id="mtBody2"></tbody></table>
+
+  <div id="mtComp" style="display:none;background:#fff;border:1px solid #ece9e2;
+    border-radius:12px;padding:18px;margin-top:16px;">
+    <div style="display:flex;align-items:center;margin-bottom:12px;">
+      <b id="mtCompTitle" style="flex:1;font-size:14px;">補償の計算</b>
+      <button class="ghost" onclick="document.getElementById('mtComp').style.display='none'">閉じる</button>
+    </div>
+    <div id="mtCompInfo" style="font-size:12.5px;color:#6b6555;background:#faf9f5;
+      border-radius:8px;padding:11px 13px;margin-bottom:12px;line-height:1.9;"></div>
+    <table><thead><tr><th>ユーザー</th><th>プラン</th><th>状態</th><th>付与量</th><th>期間延長</th><th>理由</th></tr></thead>
+    <tbody id="mtCompBody"></tbody></table>
+    <div class="row" style="margin-top:14px;">
+      <button class="gold" onclick="doCompensate()">この内容で付与する</button>
+      <span id="mtCompMsg" style="font-size:13px;"></span>
+    </div>
+  </div>
+</div>
+
 <div class="pane" id="p-errors">
   <h2>エラー監視</h2>
   <div class="cards" id="erCards"></div>
@@ -396,7 +444,7 @@ async function api(p,m,b){
 function tab(n){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.p===n));
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active',p.id==='p-'+n));
-  ({dash:loadStats,users:()=>loadUsers(1),announce:loadAnnounce,models:loadModels,features:loadFeatures,promo:loadPromo,pricing:loadPricing,signup:loadSignup,contacts:loadContacts,reports:loadReports,errors:loadErrors,logs:function(){loadLogs();loadBackup();}}[n]||function(){})();
+  ({dash:loadStats,users:()=>loadUsers(1),announce:loadAnnounce,models:loadModels,features:loadFeatures,promo:loadPromo,pricing:loadPricing,signup:loadSignup,contacts:loadContacts,reports:loadReports,maint:loadMaint,errors:loadErrors,logs:function(){loadLogs();loadBackup();}}[n]||function(){})();
 }
 function bars(el,items,key,val){
   var max=Math.max(1,...items.map(i=>i[val]));
@@ -760,6 +808,119 @@ async function loadReports(){
 }
 async function closeReport(id){ await api('reports/'+id,'PATCH',{status:'closed'}); loadReports(); loadStats(); }
 async function reopenReport(id){ await api('reports/'+id,'PATCH',{status:'open'}); loadReports(); loadStats(); }
+var MT_CUR = null;
+
+async function loadMaint(){
+  var d = await api('maintenance'); if(!d.ok) return;
+  var st = document.getElementById('mtStatus');
+  if (d.active) {
+    st.innerHTML = '<div style="background:#fdecea;border:1px solid #f5c6c0;border-radius:12px;'
+      + 'padding:16px;margin-bottom:16px;">'
+      + '<b style="color:#a3211a;font-size:15px;">🔧 現在メンテナンス中</b><br>'
+      + '<span style="font-size:13px;color:#6b6555;">'+esc(d.active.starts_at)+' 〜 '+esc(d.active.ends_at)+'</span><br>'
+      + '<button class="gold" style="margin-top:10px;" onclick="endMaint('+d.active.id+')">メンテナンスを終了する</button></div>';
+  } else if (d.upcoming) {
+    st.innerHTML = '<div style="background:#fff6e5;border:1px solid #f0dcb0;border-radius:12px;'
+      + 'padding:16px;margin-bottom:16px;">'
+      + '<b style="color:#8a5a00;font-size:15px;">📅 メンテナンス予定</b><br>'
+      + '<span style="font-size:13px;color:#6b6555;">'+esc(d.upcoming.starts_at)+' 〜 '+esc(d.upcoming.ends_at)+'</span><br>'
+      + '<span style="font-size:12px;color:#a09a8a;">ユーザーの画面にバナーで告知されています</span></div>';
+  } else {
+    st.innerHTML = '<div style="background:#e8f5e9;border:1px solid #c8e6c9;border-radius:12px;'
+      + 'padding:14px;margin-bottom:16px;font-size:13.5px;color:#2e7d32;">'
+      + '✅ 現在メンテナンスの予定はありません</div>';
+  }
+
+  var TYPE = {1:'🚨 緊急', 0:'📅 予定'};
+  var STAT = {scheduled:'予約中', active:'実施中', done:'完了', cancelled:'中止'};
+  document.getElementById('mtBody2').innerHTML = (d.list||[]).map(function(m){
+    return '<tr><td style="font-size:12px;">'+esc(m.starts_at)+'<br>〜 '+esc(m.ends_at)+'</td>'
+      +'<td style="font-size:12.5px;">'+esc(m.title||'')+'</td>'
+      +'<td>'+(TYPE[Number(m.is_emergency)]||'')+'</td>'
+      +'<td><span class="pill '+(m.status==='done'?'on':'off')+'">'+(STAT[m.status]||m.status)+'</span></td>'
+      +'<td style="font-size:12px;">'+(m.compensated_at
+          ? '<span style="color:#2e7d32;">✅ '+num(m.compensate)+'</span>'
+          : '<span style="color:#a09a8a;">未</span>')+'</td>'
+      +'<td><button class="ghost" onclick="previewComp('+m.id+')">補償を計算</button> '
+      +'<button class="red" onclick="delMaint('+m.id+')">削除</button></td></tr>';
+  }).join('') || '<tr><td colspan="6" style="color:#aaa;">まだありません</td></tr>';
+}
+
+async function createMaint(emergency){
+  var s = document.getElementById('mtStart').value;
+  var e = document.getElementById('mtEnd').value;
+  var m = document.getElementById('mtMsg');
+  if (emergency && !s) {
+    // 緊急は今から2時間を既定に
+    var now = new Date(); var end = new Date(now.getTime() + 2*3600*1000);
+    s = fmtDT(now); e = fmtDT(end);
+  }
+  if (!s || !e) { m.style.color='#c0392b'; m.textContent='開始と終了を指定してください'; return; }
+  if (emergency && !confirm('緊急メンテナンスを今すぐ開始しますか？\n管理者以外はQstartを使えなくなります。')) return;
+  var d = await api('maintenance','POST',{
+    starts_at: s.replace('T',' ').slice(0,16),
+    ends_at: e.replace('T',' ').slice(0,16),
+    title: document.getElementById('mtTitle').value,
+    body: document.getElementById('mtBody').value,
+    emergency: emergency });
+  if (d.ok) { m.style.color='#2e7d32'; m.textContent='✅ 登録しました'; loadMaint(); }
+  else { m.style.color='#c0392b'; m.textContent=d.error||'失敗しました'; }
+  setTimeout(function(){m.textContent='';}, 4000);
+}
+
+function fmtDT(dt){
+  var p = function(n){ return String(n).padStart(2,'0'); };
+  return dt.getFullYear()+'-'+p(dt.getMonth()+1)+'-'+p(dt.getDate())
+       +'T'+p(dt.getHours())+':'+p(dt.getMinutes());
+}
+async function endMaint(id){
+  if(!confirm('メンテナンスを終了しますか？')) return;
+  await api('maintenance/'+id,'PATCH',{status:'done'});
+  loadMaint();
+}
+async function delMaint(id){
+  if(!confirm('削除しますか？')) return;
+  await api('maintenance/'+id,'DELETE'); loadMaint();
+}
+
+async function previewComp(id){
+  var d = await api('maintenance/'+id+'/preview');
+  if(!d.ok){ alert('計算に失敗しました'); return; }
+  MT_CUR = {id:id, users:d.users};
+  document.getElementById('mtComp').style.display='block';
+  document.getElementById('mtCompTitle').textContent = '補償の計算 (#'+id+')';
+  document.getElementById('mtCompInfo').innerHTML =
+    'メンテナンス時間: <b>'+d.hours+'時間</b>（1時間あたり '+num(d.per_hour)+' トークン相当）<br>'
+    + '基準の付与量: <b>'+num(d.base)+' トークン</b>　合計: <b>'+num(d.total)+' トークン</b> / '+d.users.length+'人<br>'
+    + (d.already ? '<span style="color:#c0392b;">⚠️ このメンテナンスは既に補償済みです</span>'
+                 : '<span style="color:#a09a8a;">付与量は下の表で直接変更できます。</span>');
+  document.getElementById('mtCompBody').innerHTML = d.users.map(function(u,i){
+    return '<tr><td>'+esc(u.user_id)+'<br><span style="font-size:11px;color:#999;">'+esc(u.nickname||'')+'</span></td>'
+      +'<td>'+((u.plan||'free')==='free'?'Free':'<b style="color:#b8860b;">'+esc(u.plan)+'</b>')+'</td>'
+      +'<td><span class="pill '+(u.status==='active'?'on':'off')+'">'+esc(u.status)+'</span></td>'
+      +'<td><input type="number" id="cp'+i+'" value="'+u.amount+'" style="width:100px"></td>'
+      +'<td>'+(u.extend_hours>0?'<input type="number" step="0.1" id="ce'+i+'" value="'+u.extend_hours+'" style="width:80px">時間':'—')+'</td>'
+      +'<td style="font-size:11.5px;color:#777;">'+esc(u.reason)+'</td></tr>';
+  }).join('');
+}
+
+async function doCompensate(){
+  if(!MT_CUR) return;
+  var m = document.getElementById('mtCompMsg');
+  var plan = MT_CUR.users.map(function(u,i){
+    var a = document.getElementById('cp'+i);
+    var e = document.getElementById('ce'+i);
+    return {user_id:u.user_id, amount: a?Number(a.value):0,
+            extend_hours: e?Number(e.value):0};
+  });
+  var total = plan.reduce(function(s,x){return s+x.amount;},0);
+  if(!confirm(plan.length+'人に合計 '+total.toLocaleString()+' トークンを付与します。\nよろしいですか？')) return;
+  m.style.color='#8a8270'; m.textContent='付与中…';
+  var d = await api('maintenance/'+MT_CUR.id+'/compensate','POST',{amount: total, users: plan});
+  if(d.ok){ m.style.color='#2e7d32'; m.textContent='✅ '+d.users+'人に付与しました'; loadMaint(); }
+  else { m.style.color='#c0392b'; m.textContent=d.error||'失敗しました'; }
+}
+
 async function loadErrors(){
   var d = await api('errors'); if(!d.ok) return;
   var tot = d.errors.reduce(function(a,e){return a+(e.count||0);},0);

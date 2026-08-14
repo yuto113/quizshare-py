@@ -692,6 +692,266 @@ def status_page():
     return render_template('qstart_status.html')
 
 
+# ========== メンテナンス ==========
+def init_maintenance():
+    _mk_compensation_cols()
+
+def _mk_compensation_cols():
+    conn = db()
+    conn.execute("""CREATE TABLE IF NOT EXISTS qstart_maintenance (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        starts_at TEXT, ends_at TEXT, title TEXT, body TEXT,
+        status TEXT DEFAULT 'scheduled', created_by TEXT, created_at TEXT)""")
+    for col, typ in [('is_emergency','INTEGER DEFAULT 0'),
+                     ('compensate','INTEGER DEFAULT 0'),
+                     ('compensated_at','TEXT')]:
+        try: conn.execute(f'ALTER TABLE qstart_maintenance ADD COLUMN {col} {typ}')
+        except Exception: pass
+    conn.commit(); conn.close()
+
+def _init_maintenance_orig():
+    conn = db()
+    conn.execute("""CREATE TABLE IF NOT EXISTS qstart_maintenance (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        starts_at TEXT, ends_at TEXT,
+        title TEXT, body TEXT,
+        status TEXT DEFAULT 'scheduled',
+        created_by TEXT, created_at TEXT
+    )""")
+    conn.commit(); conn.close()
+
+init_maintenance()
+
+
+def current_maintenance():
+    """今メンテナンス中か / 予告中か"""
+    conn = db()
+    n = now()
+    active = conn.execute("""SELECT * FROM qstart_maintenance
+        WHERE status IN ('scheduled','active')
+          AND starts_at <= ? AND ends_at >= ?
+        ORDER BY starts_at LIMIT 1""", (n, n)).fetchone()
+    upcoming = conn.execute("""SELECT * FROM qstart_maintenance
+        WHERE status='scheduled' AND starts_at > ?
+        ORDER BY starts_at LIMIT 1""", (n,)).fetchone()
+    conn.close()
+    return (dict(active) if active else None), (dict(upcoming) if upcoming else None)
+
+
+def in_maintenance():
+    a, _ = current_maintenance()
+    return a is not None
+
+
+@qstart_core.route('/qstart/api/v1/maintenance')
+def maintenance_info():
+    a, u = current_maintenance()
+    return jsonify({'ok': True, 'active': a, 'upcoming': u,
+                    'is_admin': qstart_role() == 'admin'})
+
+
+@qstart_core.route('/qstart/api/v1/admin/maintenance', methods=['GET','POST'])
+@require_admin
+def admin_maintenance():
+    conn = db()
+    if request.method == 'GET':
+        rows = conn.execute('SELECT * FROM qstart_maintenance ORDER BY starts_at DESC LIMIT 50').fetchall()
+        conn.close()
+        a, u = current_maintenance()
+        return jsonify({'ok': True, 'list': [dict(r) for r in rows],
+                        'active': a, 'upcoming': u})
+
+    d = request.get_json(silent=True) or {}
+    st = (d.get('starts_at') or '').strip()
+    en = (d.get('ends_at') or '').strip()
+    if not st or not en:
+        conn.close()
+        return jsonify({'ok': False, 'error': '開始と終了の日時を指定してください'}), 400
+    # 24時間以上先しか予約できない
+    import datetime as _dt
+    try:
+        _s = _dt.datetime.strptime(st, '%Y-%m-%d %H:%M')
+        _e = _dt.datetime.strptime(en, '%Y-%m-%d %H:%M')
+    except Exception:
+        conn.close()
+        return jsonify({'ok': False, 'error': '日時の形式が正しくありません'}), 400
+    if _e <= _s:
+        conn.close()
+        return jsonify({'ok': False, 'error': '終了は開始より後にしてください'}), 400
+    if not d.get('emergency') and not d.get('force') and (_s - _dt.datetime.now()).total_seconds() < 86400:
+        conn.close()
+        return jsonify({'ok': False, 'error': 'メンテナンスは24時間以上先から予約できます',
+                        'need_force': True}), 400
+
+    conn.execute("""INSERT INTO qstart_maintenance
+        (starts_at,ends_at,title,body,status,created_by,created_at,is_emergency,compensate)
+        VALUES(?,?,?,?,?,?,?,?,?)""",
+        (_s.strftime('%Y-%m-%d %H:%M'), _e.strftime('%Y-%m-%d %H:%M'),
+         (d.get('title') or 'メンテナンスのお知らせ')[:120],
+         (d.get('body') or '')[:2000],
+         'active' if d.get('emergency') else 'scheduled',
+         cur_uid() or session.get('staff_id','admin'), now(),
+         1 if d.get('emergency') else 0,
+         int(d.get('compensate', 0) or 0)))
+    conn.commit(); conn.close()
+    alog('maintenance_create', st + '〜' + en)
+    return jsonify({'ok': True})
+
+
+@qstart_core.route('/qstart/api/v1/admin/maintenance/<int:mid>', methods=['PATCH','DELETE'])
+@require_admin
+def admin_maintenance_edit(mid):
+    conn = db()
+    if request.method == 'DELETE':
+        conn.execute('DELETE FROM qstart_maintenance WHERE id=?', (mid,))
+        act = 'maintenance_delete'
+    else:
+        d = request.get_json(silent=True) or {}
+        conn.execute('UPDATE qstart_maintenance SET status=? WHERE id=?',
+                     (d.get('status', 'done'), mid))
+        act = 'maintenance_' + d.get('status', 'done')
+    conn.commit(); conn.close()
+    alog(act, str(mid))
+    return jsonify({'ok': True})
+
+
+@qstart_core.route('/qstart/api/v1/admin/maintenance/<int:mid>/preview')
+@require_admin
+def admin_maintenance_preview(mid):
+    """補償の対象者と付与量を計算(まだ付与しない)"""
+    conn = db()
+    m = conn.execute('SELECT * FROM qstart_maintenance WHERE id=?', (mid,)).fetchone()
+    if not m:
+        conn.close(); return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    import datetime as _dt
+    try:
+        _s = _dt.datetime.strptime(m['starts_at'], '%Y-%m-%d %H:%M')
+        _e = _dt.datetime.strptime(m['ends_at'], '%Y-%m-%d %H:%M')
+        hours = max(0.0, (_e - _s).total_seconds() / 3600)
+    except Exception:
+        hours = 0.0
+
+    # 3時間で4,000トークン → 1時間あたり約1,333
+    per_hour = 4000 / 3.0
+    base = int(hours * per_hour)
+
+    # 対象: メンテ期間中またはその前後3時間に使っていた人 = 影響を受けた人
+    rows = conn.execute("""SELECT u.user_id, u.nickname,
+        COALESCE(f.status,'active') status,
+        COALESCE(s.plan,'free') plan,
+        s.expires_at,
+        (SELECT COUNT(*) FROM qstart_api_usage a
+         WHERE a.user_id=u.user_id
+           AND a.timestamp >= strftime('%s',?) - 10800
+           AND a.timestamp <= strftime('%s',?)) hit
+        FROM qstart_users u
+        LEFT JOIN qstart_user_flags f ON f.user_id=u.user_id
+        LEFT JOIN qstart_subscriptions s ON s.user_id=u.user_id
+        ORDER BY u.created_at""", (m['starts_at'], m['ends_at'])).fetchall()
+    conn.close()
+
+    out = []
+    for r in rows:
+        d = dict(r)
+        d['extend_hours'] = 0
+        if d['status'] != 'active':
+            d['amount'] = 0
+            d['reason'] = '凍結中のため対象外'
+        elif (d.get('plan') or 'free') != 'free':
+            # 有料プラン: 契約期間を延長(トークンも少し付ける)
+            d['amount'] = base
+            d['extend_hours'] = round(hours, 2)
+            d['reason'] = f"有料プラン（{d['plan']}）→ 期間を{hours:.1f}時間延長"
+        elif d['hit'] > 0:
+            d['amount'] = base
+            d['reason'] = 'メンテ前後に利用あり'
+        else:
+            d['amount'] = base // 2
+            d['reason'] = '利用なし（半額）'
+        out.append(d)
+
+    return jsonify({'ok': True, 'hours': round(hours, 2), 'base': base,
+                    'per_hour': int(per_hour),
+                    'total': sum(x['amount'] for x in out),
+                    'users': out, 'already': bool(m['compensated_at'])})
+
+
+@qstart_core.route('/qstart/api/v1/admin/maintenance/<int:mid>/compensate', methods=['POST'])
+@require_admin
+def admin_maintenance_compensate(mid):
+    """メンテナンスのお詫びとして全ユーザーの予備タンクにトークンを付与"""
+    d = request.get_json(silent=True) or {}
+    amount = int(d.get('amount', 0) or 0)
+    if amount <= 0:
+        return jsonify({'ok': False, 'error': '付与量を指定してください'}), 400
+    conn = db()
+    m = conn.execute('SELECT * FROM qstart_maintenance WHERE id=?', (mid,)).fetchone()
+    if not m:
+        conn.close(); return jsonify({'ok': False, 'error': 'not_found'}), 404
+    if m['compensated_at']:
+        conn.close(); return jsonify({'ok': False, 'error': '既に付与済みです'}), 400
+
+    n_now = now()
+    # 個別指定(プレビューで調整した結果)があればそれを使う
+    plan = d.get('users')
+    if plan:
+        pairs = [(x['user_id'], int(x.get('amount', 0) or 0)) for x in plan]
+    else:
+        pairs = [(r['user_id'], amount) for r in conn.execute('SELECT user_id FROM qstart_users')]
+    users = [p[0] for p in pairs if p[1] > 0]
+    ext_map = {}
+    if plan:
+        ext_map = {x['user_id']: float(x.get('extend_hours', 0) or 0) for x in plan}
+    for uid, amt in pairs:
+        hrs = ext_map.get(uid, 0)
+        if amt <= 0 and hrs <= 0: continue
+        if amt > 0:
+            conn.execute('INSERT OR IGNORE INTO qstart_user_stock(user_id,tokens,updated_at) VALUES(?,0,?)',
+                         (uid, n_now))
+            conn.execute('UPDATE qstart_user_stock SET tokens=tokens+?, updated_at=? WHERE user_id=?',
+                         (amt, n_now, uid))
+        if hrs > 0:
+            # 有料プランの契約期間を延長
+            conn.execute("""UPDATE qstart_subscriptions
+                SET expires_at = datetime(expires_at, '+' || ? || ' hours'),
+                    extended_hours = COALESCE(extended_hours,0) + ?, updated_at=?
+                WHERE user_id=?""", (hrs, hrs, n_now, uid))
+        conn.execute("""INSERT INTO qstart_compensations
+            (maintenance_id,user_id,plan,tokens,extended_hours,created_at)
+            VALUES(?,?,?,?,?,?)""",
+            (mid, uid, 'paid' if hrs > 0 else 'free', amt, hrs, n_now))
+    conn.execute('UPDATE qstart_maintenance SET compensate=?, compensated_at=? WHERE id=?',
+                 (amount, n_now, mid))
+
+    # お知らせも自動配信
+    conn.execute("""INSERT INTO qstart_announcements
+        (title,body,level,lang,target,active,created_by,created_at)
+        VALUES(?,?,?,?,?,1,?,?)""",
+        ('メンテナンスのお詫び',
+         f'{m["starts_at"]} 〜 {m["ends_at"]} のメンテナンスにご協力いただきありがとうございました。\n'
+         f'お詫びとして、全ユーザーの皆さまに {amount:,} トークンを付与しました。\n'
+         '設定画面の「使用量」からご確認いただけます。\n\n[Qzero会社]',
+         'info', 'all', 'all', cur_uid() or 'admin', n_now))
+    conn.commit(); conn.close()
+    alog('maintenance_compensate', str(mid), f'{amount} x {len(users)}人')
+    return jsonify({'ok': True, 'users': len(users), 'amount': amount})
+
+
+@qstart_core.route('/qstart/maintenance')
+def maintenance_page():
+    a, u = current_maintenance()
+    return render_template('qstart_maintenance.html', m=a or u or {})
+
+
+# ===== テスト環境 =====
+@qstart_core.route('/admin/qzero')
+def test_site():
+    if qstart_role() != 'admin':
+        return '<h1>403</h1><p>管理者のみアクセスできます。</p>', 403
+    return render_template('qstart.html', test_mode=True)
+
+
 # ========== エラー監視 ==========
 def init_error_table():
     conn = db()
@@ -919,7 +1179,7 @@ def bootstrap():
 
     # --- モデル ---
     out['models'] = [dict(r) for r in conn.execute(
-        'SELECT model,enabled,maintenance,note,min_role FROM qstart_model_flags')]
+        'SELECT model,enabled,maintenance,note,min_role,family,version,display,is_latest,params FROM qstart_model_flags ORDER BY family, version DESC')]
 
     # --- お知らせ ---
     anns = conn.execute("""SELECT * FROM qstart_announcements
@@ -1046,7 +1306,7 @@ def admin_model_source():
 @qstart_core.route('/qstart/api/v1/models')
 def public_models():
     conn = db()
-    rows = conn.execute('SELECT model,enabled,maintenance,note,min_role FROM qstart_model_flags').fetchall()
+    rows = conn.execute('SELECT model,enabled,maintenance,note,min_role,family,version,display,is_latest,params FROM qstart_model_flags ORDER BY family, version DESC').fetchall()
     conn.close()
     return jsonify({'ok': True, 'models': [dict(r) for r in rows]})
 
