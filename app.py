@@ -2000,14 +2000,20 @@ def api_qstart_chat():
         except NameError:
             _apex_model = None
 
-        if model in ('apex', 'apex-2', 'apex2'):
-            if _apex_model is None:
-                import qstart_core as _qc_ap
-                _u = _qc_ap.get_model_source('apex')
-                if not _u:
-                    raise RuntimeError('Apex はまだ準備中です')
-                _apex_model = EquiInference(_u['weights'], _u['config'])
-            reply = _apex_model.chat(message)
+        # ★ モデル名から取得元を引く汎用の仕組み(apex3 / 今後のモデルも自動対応)
+        try:
+            _MODEL_CACHE
+        except NameError:
+            _MODEL_CACHE = {}
+
+        if model not in ('equi', 'equi-1', 'zin', 'zin-1'):
+            import qstart_core as _qc_ap
+            _u = _qc_ap.get_model_source(model)
+            if not _u:
+                raise RuntimeError(f'{model} はまだ準備中です')
+            if model not in _MODEL_CACHE:
+                _MODEL_CACHE[model] = EquiInference(_u['weights'], _u['config'])
+            reply = _MODEL_CACHE[model].chat(message)
             if effort == 'low':
                 _s = reply.split('。')
                 reply = _s[0] + '。' if _s[0] else reply
