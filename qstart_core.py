@@ -16,7 +16,14 @@ def db():
     return conn
 
 def now():
-    return time.strftime('%Y-%m-%d %H:%M:%S')
+    # 日本時間で統一(サーバーはUTCなので9時間ずらす)
+    try:
+        import pytz
+        from datetime import datetime as _dt
+        return _dt.now(pytz.timezone('Asia/Tokyo')).strftime('%Y-%m-%d %H:%M:%S')
+    except Exception:
+        from datetime import datetime as _dt, timedelta as _td
+        return (_dt.utcnow() + _td(hours=9)).strftime('%Y-%m-%d %H:%M:%S')
 
 def nid():
     return uuid.uuid4().hex[:16]
@@ -692,6 +699,134 @@ def status_page():
     return render_template('qstart_status.html')
 
 
+# ========== Voto — 採点API専用モデル ==========
+_VOTO = None
+
+def load_voto():
+    """Votoモデルを読み込む(APIからのみ使う)"""
+    global _VOTO
+    if _VOTO is not None:
+        return _VOTO
+    u = get_model_source('voto')
+    if not u:
+        return None
+    try:
+        from equi_inference import EquiInference
+        _VOTO = EquiInference(u['weights'], u['config'])
+    except Exception:
+        return None
+    return _VOTO
+
+
+def voto_judge(question, correct, user_answer):
+    """採点する。(判定, 理由) を返す"""
+    m = load_voto()
+    if not m:
+        return None, None
+    prompt = f'問題「{question[:80]}」正解「{correct[:60]}」回答「{user_answer[:60]}」'
+    try:
+        out = (m.chat(prompt) or '').strip()
+    except Exception:
+        return None, None
+    if out.startswith('部分'):
+        v = '部分正解'
+    elif out.startswith('正解'):
+        v = '正解'
+    elif out.startswith('不正解'):
+        v = '不正解'
+    else:
+        return None, out
+    reason = out.split('。', 1)[1].strip() if '。' in out else ''
+    return v, reason
+
+
+# --- 段階的な採点(自由研究の4段階) ---
+def grade_answer(question, correct, user_answer, alt_answers=None, use_ai=True):
+    """
+    ① 完全一致 → ② 表記ゆれ → ③ 別解 → ④ Voto(AI)
+    どの段階で判定したかも返す
+    """
+    import unicodedata as _u
+    def norm(s):
+        s = _u.normalize('NFKC', (s or '').strip())
+        return s.replace(' ', '').replace('　', '')
+
+    ua, ca = norm(user_answer), norm(correct)
+    if not ua:
+        return {'verdict': '不正解', 'reason': '答えが入力されていません。',
+                'stage': 'empty', 'by': 'rule'}
+
+    # ① 完全一致
+    if ua == ca:
+        return {'verdict': '正解', 'reason': '正解と一致しています。',
+                'stage': 1, 'by': 'exact'}
+
+    # ② 表記ゆれ(ひらがな/カタカナ/全半角/括弧/単位)
+    K = 'ァィゥェォャュョッアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポ'
+    H = 'ぁぃぅぇぉゃゅょっあいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんがぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽ'
+    k2h = str.maketrans(K, H)
+    if ua.translate(k2h) == ca.translate(k2h):
+        return {'verdict': '正解', 'reason': '書き方は違いますが同じ答えです。',
+                'stage': 2, 'by': 'kana'}
+    import re as _re
+    strip_p = lambda s: _re.sub(r'[（(][^）)]*[）)]', '', s).strip()
+    if strip_p(ua) and strip_p(ua) == strip_p(ca):
+        return {'verdict': '正解', 'reason': '括弧の有無が違うだけです。',
+                'stage': 2, 'by': 'paren'}
+    if ca.endswith(('県','府','都')) and ua == ca[:-1]:
+        return {'verdict': '正解', 'reason': '都道府県名が省略されていますが同じ場所です。',
+                'stage': 2, 'by': 'pref'}
+
+    # ③ 別解
+    if alt_answers:
+        alts = [norm(a) for a in _re.split(r'[,、|/]', alt_answers) if a.strip()]
+        if ua in alts:
+            return {'verdict': '正解', 'reason': '別の正しい答えです。',
+                    'stage': 3, 'by': 'alt'}
+
+    # ④ Voto(AI)
+    if use_ai:
+        v, r = voto_judge(question, correct, user_answer)
+        if v:
+            return {'verdict': v, 'reason': r or '', 'stage': 4, 'by': 'voto'}
+
+    return {'verdict': '不正解', 'reason': f'正しい答えは「{correct}」です。',
+            'stage': 'fallback', 'by': 'rule'}
+
+
+@qstart_core.route('/qstart/api/v1/grade', methods=['POST'])
+def api_grade():
+    """採点API(APIキー or ログインが必要)"""
+    d = request.get_json(silent=True) or {}
+    q = (d.get('question') or '').strip()
+    c = (d.get('correct') or '').strip()
+    u = (d.get('answer') or '').strip()
+    if not c:
+        return jsonify({'ok': False, 'error': 'correct_required'}), 400
+    r = grade_answer(q, c, u, d.get('alt'), use_ai=d.get('use_ai', True))
+    return jsonify(dict({'ok': True}, **r))
+
+
+@qstart_core.route('/qstart/api/v1/grade/batch', methods=['POST'])
+def api_grade_batch():
+    """まとめて採点(自由研究の精度測定用)"""
+    d = request.get_json(silent=True) or {}
+    items = d.get('items') or []
+    if not isinstance(items, list) or len(items) > 500:
+        return jsonify({'ok': False, 'error': 'bad_items'}), 400
+    use_ai = d.get('use_ai', True)
+    out = []
+    for it in items:
+        r = grade_answer(it.get('question',''), it.get('correct',''),
+                         it.get('answer',''), it.get('alt'), use_ai=use_ai)
+        r['id'] = it.get('id')
+        out.append(r)
+    # 段階ごとの内訳
+    import collections as _c
+    stats = dict(_c.Counter(str(x['stage']) for x in out))
+    return jsonify({'ok': True, 'results': out, 'stats': stats, 'n': len(out)})
+
+
 # ========== メンテナンス ==========
 def init_maintenance():
     _mk_compensation_cols()
@@ -726,13 +861,13 @@ init_maintenance()
 def current_maintenance():
     """今メンテナンス中か / 予告中か"""
     conn = db()
-    n = now()
+    n = now()[:16]   # 'YYYY-MM-DD HH:MM' に揃える(保存側と桁を合わせる)
     active = conn.execute("""SELECT * FROM qstart_maintenance
         WHERE status IN ('scheduled','active')
-          AND starts_at <= ? AND ends_at >= ?
+          AND substr(starts_at,1,16) <= ? AND substr(ends_at,1,16) >= ?
         ORDER BY starts_at LIMIT 1""", (n, n)).fetchone()
     upcoming = conn.execute("""SELECT * FROM qstart_maintenance
-        WHERE status='scheduled' AND starts_at > ?
+        WHERE status='scheduled' AND substr(starts_at,1,16) > ?
         ORDER BY starts_at LIMIT 1""", (n,)).fetchone()
     conn.close()
     return (dict(active) if active else None), (dict(upcoming) if upcoming else None)
@@ -778,7 +913,8 @@ def admin_maintenance():
     if _e <= _s:
         conn.close()
         return jsonify({'ok': False, 'error': '終了は開始より後にしてください'}), 400
-    if not d.get('emergency') and not d.get('force') and (_s - _dt.datetime.now()).total_seconds() < 86400:
+    _jst_now = _dt.datetime.strptime(now()[:16], '%Y-%m-%d %H:%M')
+    if not d.get('emergency') and not d.get('force') and (_s - _jst_now).total_seconds() < 86400:
         conn.close()
         return jsonify({'ok': False, 'error': 'メンテナンスは24時間以上先から予約できます',
                         'need_force': True}), 400
@@ -944,12 +1080,56 @@ def maintenance_page():
     return render_template('qstart_maintenance.html', m=a or u or {})
 
 
-# ===== テスト環境 =====
-@qstart_core.route('/admin/qzero')
-def test_site():
+# ===== テスト環境 (/admin/qstart 配下) =====
+def _test_guard():
     if qstart_role() != 'admin':
-        return '<h1>403</h1><p>管理者のみアクセスできます。</p>', 403
+        return ('<div style="font-family:sans-serif;text-align:center;padding:60px;">'
+                '<h1 style="font-size:22px;">403</h1>'
+                '<p style="color:#666;">テスト環境は管理者のみアクセスできます。</p>'
+                '<a href="/qstart" style="color:#b8860b;">Qstartに戻る</a></div>'), 403
+    return None
+
+
+@qstart_core.route('/admin/qstart')
+def test_site():
+    g = _test_guard()
+    if g: return g
     return render_template('qstart.html', test_mode=True)
+
+
+@qstart_core.route('/admin/qstart/chat/<chat_id>')
+def test_chat(chat_id):
+    g = _test_guard()
+    if g: return g
+    return render_template('qstart.html', test_mode=True)
+
+
+@qstart_core.route('/admin/qstart/projects')
+def test_projects():
+    g = _test_guard()
+    if g: return g
+    return render_template('qstart_projects.html', need_login=False, test_mode=True)
+
+
+@qstart_core.route('/admin/qstart/project/<pid>')
+def test_project(pid):
+    g = _test_guard()
+    if g: return g
+    return render_template('qstart_project.html', pid=pid, need_login=False, test_mode=True)
+
+
+@qstart_core.route('/admin/qstart/status')
+def test_status():
+    g = _test_guard()
+    if g: return g
+    return render_template('qstart_status.html', test_mode=True)
+
+
+@qstart_core.route('/admin/qstart/contact')
+def test_contact():
+    g = _test_guard()
+    if g: return g
+    return render_template('qstart_contact.html', test_mode=True)
 
 
 # ========== エラー監視 ==========

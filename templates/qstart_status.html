@@ -54,6 +54,11 @@ var MODEL_SOON = {pure:'2026年秋 公開予定'};
 
 async function load(){
   try{
+    var mr = await fetch('/qstart/api/v1/maintenance?t=' + Date.now(), {cache:'no-store'});
+    var md = await mr.json();
+    window.QS_MAINT_INFO = md;
+  }catch(e){ window.QS_MAINT_INFO = null; }
+  try{
     var r = await fetch('/qstart/health');
     var d = await r.json();
     render(d, r.status);
@@ -66,13 +71,37 @@ async function load(){
 
 function render(d, code){
   var ok = d.ok && code === 200;
-  var h = '<div class="big"><div class="dot">' + (ok ? '🟢' : '🟠') + '</div>'
-    + '<div class="t">' + (ok ? 'すべて正常に稼働しています' : '一部に問題が発生しています') + '</div>'
-    + '<div class="s">最終確認: ' + esc(d.time || '') + '</div></div>';
+  var mi = window.QS_MAINT_INFO || {};
+  var h = '';
+
+  if (mi.active) {
+    // メンテナンス中
+    h += '<div class="big" style="border-color:#f0d0c8;background:#fdf6f4;">'
+      + '<div class="dot">🔧</div>'
+      + '<div class="t" style="color:#a3211a;">ただいまメンテナンス中です</div>'
+      + '<div class="s">' + esc(mi.active.starts_at) + ' 〜 ' + esc(mi.active.ends_at) + '</div>'
+      + (mi.active.title ? '<div class="s" style="margin-top:6px;">' + esc(mi.active.title) + '</div>' : '')
+      + '</div>';
+  } else if (mi.upcoming) {
+    // メンテナンス予定
+    h += '<div class="big" style="border-color:#f0dcb0;background:#fffbf3;">'
+      + '<div class="dot">📅</div>'
+      + '<div class="t" style="color:#8a5a00;">メンテナンスの予定があります</div>'
+      + '<div class="s">' + esc(mi.upcoming.starts_at) + ' 〜 ' + esc(mi.upcoming.ends_at) + '</div>'
+      + (mi.upcoming.title ? '<div class="s" style="margin-top:6px;">' + esc(mi.upcoming.title) + '</div>' : '')
+      + '</div>';
+  } else {
+    h += '<div class="big"><div class="dot">' + (ok ? '🟢' : '🟠') + '</div>'
+      + '<div class="t">' + (ok ? 'すべて正常に稼働しています' : '一部に問題が発生しています') + '</div>'
+      + '<div class="s">最終確認: ' + esc(d.time || '') + '</div></div>';
+  }
 
   var c = d.checks || {};
 
   h += '<h2>システム</h2>';
+  if (mi.active) {
+    h += item('サービス全体', 'メンテナンス作業中', 'warn', '停止中');
+  }
   var dbOk = c.database && c.database.ok;
   h += item('データベース', dbOk ? ('応答 ' + c.database.ms + 'ms') : 'エラー',
             dbOk ? 'ok' : 'ng', dbOk ? '正常' : '異常');
@@ -91,6 +120,7 @@ function render(d, code){
   ['equi','zin','pure','apex'].forEach(function(k){
     if (!(k in ms)) return;
     var st = ms[k];
+    if (mi.active && st === 'on') st = 'maintenance';   // 全体メンテ中は全モデルをメンテ表示
     var cls = st === 'on' ? 'ok' : (st === 'maintenance' ? 'warn' : 'off');
     var lbl = st === 'on' ? '稼働中' : (st === 'maintenance' ? 'メンテナンス中' : '準備中');
     var desc = MODEL_DESC[k] || '';

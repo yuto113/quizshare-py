@@ -492,6 +492,14 @@ body[dir="rtl"] .qs-s-tab { flex-direction:row-reverse; text-align:right; }
   </div>
 </div>
 
+{% if test_mode %}
+<div style="position:fixed;top:0;left:0;right:0;z-index:400;background:#7b1fa2;color:#fff;
+  padding:7px 16px;font-size:12px;text-align:center;font-weight:600;letter-spacing:.03em;">
+  🧪 テスト環境 — この画面は管理者専用です（本番: <a href="/qstart" style="color:#fff;text-decoration:underline;">/qstart</a>）
+</div>
+<style>body{padding-top:30px !important;}</style>
+{% endif %}
+
 <!-- メンテナンス予告バナー -->
 <div id="qs-maint-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:255;
   padding:11px 18px;font-size:13px;background:#fff6e5;color:#8a5a00;
@@ -810,6 +818,7 @@ body[dir="rtl"] .qs-s-tab { flex-direction:row-reverse; text-align:right; }
 
 <script>
 // ===== Qstart フロントエンド =====
+var currentChatId = null;
 let currentModel = 'equi';
 let currentEffort = 'mid';
 let usageCount = 0;
@@ -882,7 +891,7 @@ function renderModelMenu() {
   }
 
   // --- モデル(ファミリー)選択 ---
-  ['pure','equi','zin','apex'].forEach(function(fam){
+  ['pure','equi','zin','apex'].forEach(function(fam){   // voto は API専用なので出さない
     var list = byFam[fam];
     if (!list || !list.length) return;
     var top = list.filter(function(m){ return Number(m.is_latest); })[0] || list[0];
@@ -1610,6 +1619,7 @@ async function boot() {
 
     // --- 残高 ---
     QS_QUOTA = d.quota || {};
+    clearOldHistory();
     QS_CHATS = d.chats || [];
     var sr = document.getElementById('qs-search-row');
     if (sr) sr.style.display = (!d.guest && QS_CHATS.length >= 3) ? 'block' : 'none';
@@ -1619,6 +1629,8 @@ async function boot() {
   // 使用量は別建て(送信のたびに変わるので)
   fetchServerUsage();
   loadMaintNotice();
+  applyTestLinks();
+  restoreFromUrl();
 }
 
 var QS_QUOTA = {};
@@ -1854,6 +1866,25 @@ function hideMaintBanner() {
   document.body.style.paddingTop = (ab && ab.style.display === 'flex') ? '44px' : '';
 }
 
+// ===== テスト環境 =====
+var QS_TEST = {{ 'true' if test_mode else 'false' }};
+
+function qsPath(p) {
+  // テスト環境なら /admin/qstart 配下に付け替える
+  if (!QS_TEST) return p;
+  if (p === '/qstart') return '/admin/qstart';
+  if (p.indexOf('/qstart/') === 0) return '/admin' + p;
+  return p;
+}
+
+function applyTestLinks() {
+  if (!QS_TEST) return;
+  document.querySelectorAll('a[href^="/qstart"]').forEach(function(a){
+    var h = a.getAttribute('href');
+    if (h && h.indexOf('/admin') !== 0) a.setAttribute('href', qsPath(h));
+  });
+}
+
 function qsTab(name) {
   if (name === 'admin' && (!QS_ME || QS_ME.role !== 'admin')) return;
   document.querySelectorAll('.qs-s-tab').forEach(function(t){
@@ -2013,7 +2044,7 @@ async function sendMsg() {
   // 最初のメッセージでURLを変更
   if (!currentChatId) {
     currentChatId = generateChatId();
-    history.pushState({chatId: currentChatId}, '', '/qstart/chat/' + currentChatId);
+    history.pushState({chatId: currentChatId}, '', qsPath('/qstart/chat/' + currentChatId));
   }
   // 使用量はサーバーで管理
 
@@ -2071,6 +2102,12 @@ function collectMessages() {
   return out;
 }
 
+function histKey() {
+  // ユーザーごとにキーを分ける(他人の履歴が見えないように)
+  var u = (QS_ME && QS_ME.user_id) ? QS_ME.user_id : 'guest';
+  return 'qstart_history_' + u;
+}
+
 function saveChatToHistory() {
   // ログイン中はサーバーに保存済み(チャットAPIが保存する)
   if (QS_ME && !QS_ME.guest) { return; }
@@ -2078,12 +2115,12 @@ function saveChatToHistory() {
   var msgs = collectMessages();
   if (!msgs.length) return;
   try {
-    var history = JSON.parse(localStorage.getItem('qstart_history') || '[]');
+    var history = JSON.parse(localStorage.getItem(histKey()) || '[]');
     var t = msgs[0].text.substring(0, 24) + (msgs[0].text.length > 24 ? '…' : '');
     var entry = { id: currentChatId, title: t, messages: msgs, time: Date.now() };
     var idx = history.findIndex(function(h){ return h.id === currentChatId; });
     if (idx >= 0) history[idx] = entry; else history.unshift(entry);
-    localStorage.setItem('qstart_history', JSON.stringify(history.slice(0, 20)));
+    localStorage.setItem(histKey(), JSON.stringify(history.slice(0, 20)));
   } catch(e) {}
   renderHistory();
 }
@@ -2093,11 +2130,12 @@ function renderHistory() {
   if (!el) return;
   var list;
   if (QS_ME && !QS_ME.guest) {
+    // ★ログイン中はサーバーの履歴のみ。localStorageは一切見ない
     list = QS_CHATS.map(function(c){
       return { id: c.chat_id, title: c.title || '無題のチャット' };
     });
   } else {
-    try { list = JSON.parse(localStorage.getItem('qstart_history') || '[]'); }
+    try { list = JSON.parse(localStorage.getItem(histKey()) || '[]'); }
     catch(e) { list = []; }
   }
   if (!list.length) {
@@ -2127,7 +2165,7 @@ function renderHistory() {
 
 async function loadChat(chatId) {
   currentChatId = chatId;
-  window.history.pushState({chatId: chatId}, '', '/qstart/chat/' + chatId);
+  window.history.pushState({chatId: chatId}, '', qsPath('/qstart/chat/' + chatId));
   var el = document.getElementById('qs-chat');
   el.innerHTML = '';
 
@@ -2135,13 +2173,19 @@ async function loadChat(chatId) {
     try {
       var r = await fetch('/qstart/api/v1/chats/' + encodeURIComponent(chatId));
       var d = await r.json();
-      if (d.ok) {
-        (d.messages || []).forEach(function(m){ addMsg(m.role, m.content); });
+      if (d.ok && d.messages && d.messages.length) {
+        d.messages.forEach(function(m){ addMsg(m.role, m.content); });
+      } else {
+        // 自分のチャットではない/存在しない → 新規として扱う
+        currentChatId = null;
+        window.history.replaceState({}, '', qsPath('/qstart'));
+        el.innerHTML = '<div class="qs-welcome" id="qs-welcome"><h1>Qstart</h1>'
+          + '<p>ゼロから作ったTransformerと会話しよう。<br>12歳の開発者が手書きしたAIがここにいる。</p></div>';
       }
     } catch(e) {}
   } else {
     try {
-      var hist = JSON.parse(localStorage.getItem('qstart_history') || '[]');
+      var hist = JSON.parse(localStorage.getItem(histKey()) || '[]');
       var c = hist.find(function(h){ return h.id === chatId; });
       if (c) c.messages.forEach(function(m){ addMsg(m.role, m.text); });
     } catch(e) {}
@@ -2156,8 +2200,8 @@ async function deleteChat(chatId) {
     QS_CHATS = QS_CHATS.filter(function(c){ return c.chat_id !== chatId; });
   } else {
     try {
-      var h = JSON.parse(localStorage.getItem('qstart_history') || '[]');
-      localStorage.setItem('qstart_history', JSON.stringify(h.filter(function(x){ return x.id !== chatId; })));
+      var h = JSON.parse(localStorage.getItem(histKey()) || '[]');
+      localStorage.setItem(histKey(), JSON.stringify(h.filter(function(x){ return x.id !== chatId; })));
     } catch(e) {}
   }
   if (currentChatId === chatId) newChat();
@@ -2183,7 +2227,12 @@ function touchChat(title) {
 function newChat() {
   saveChatToHistory();
   currentChatId = null;
-  window.history.pushState({}, '', '/qstart');
+  QS_FILE = null;
+  var fi = document.getElementById('qs-file');
+  if (fi) fi.value = '';
+  var fa = document.getElementById('qs-file-area');
+  if (fa) fa.innerHTML = '';
+  window.history.pushState({}, '', qsPath('/qstart'));
   document.getElementById('qs-chat').innerHTML = '<div class="qs-welcome" id="qs-welcome"><h1>Qstart</h1><p>ゼロから作ったTransformerと会話しよう。<br>12歳の開発者が手書きしたAIがここにいる。</p><div class="qs-status" id="qs-ai-status">✅ <span id="qs-status-text">Equi 1 — 稼働中!</span></div></div>';
   renderHistory();
 }
@@ -2331,7 +2380,15 @@ async function refreshUser() {
   } catch(e) {}
 }
 
+function clearOldHistory() {
+  // 旧形式(ユーザー区別なし)のキーを削除
+  try { localStorage.removeItem('qstart_history'); } catch(e) {}
+}
+
 async function doLogout() {
+  clearOldHistory();
+  QS_CHATS = [];
+  currentChatId = null;
   await fetch('/api/qstart/logout', {method:'POST'});
   refreshUser();
 }
@@ -2525,25 +2582,31 @@ function hideLimitReached() {
 
 // --- チャットURL管理 ---
 function generateChatId() {
-  return 'xxxxxxxx-xxxx-4xxx'.replace(/x/g, function() {
-    return Math.floor(Math.random() * 16).toString(16);
-  });
+  // 32桁(128bit相当)にして衝突・推測を防ぐ
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  var a = new Uint8Array(16);
+  if (window.crypto && crypto.getRandomValues) crypto.getRandomValues(a);
+  else for (var i=0;i<16;i++) a[i] = Math.floor(Math.random()*256);
+  return Array.from(a).map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
 }
-
-var currentChatId = null;
 
 function startNewChat() {
   currentChatId = generateChatId();
-  history.pushState({chatId: currentChatId}, '', '/qstart/chat/' + currentChatId);
+  history.pushState({chatId: currentChatId}, '', qsPath('/qstart/chat/' + currentChatId));
 }
 
-// ページ読み込み時: /qstart/chat/xxxならIDを取得するだけ
-(function() {
-  var path = window.location.pathname;
+// ページ読み込み時: URLにchat_idがあれば復元(bootの後に中身も読む)
+function restoreFromUrl() {
+  var path = window.location.pathname.replace(/^\/admin/, '');
   if (path.indexOf('/qstart/chat/') === 0) {
-    currentChatId = path.replace('/qstart/chat/', '');
+    var cid = path.replace('/qstart/chat/', '').split('?')[0];
+    if (cid) {
+      currentChatId = cid;
+      // 自分のチャットかサーバーに確認してから表示する
+      if (QS_ME && !QS_ME.guest) loadChat(cid);
+    }
   }
-})();
+}
 
 // --- サイドバー開閉 ---
 function isMobile() { return window.innerWidth <= 768; }

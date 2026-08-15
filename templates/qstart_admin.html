@@ -379,7 +379,7 @@ button.red { background:#b03a3a; }
     </div>
     <div style="font-size:11px;color:#a09a8a;margin-top:8px;line-height:1.8;">
       通常の予約は24時間以上先から。緊急メンテは即座に開始され、24時間ルールを飛ばします。<br>
-      メンテナンス中は管理者以外 Qstart にアクセスできなくなります（テスト用: <a href="/admin/qzero" target="_blank" style="color:#b8860b;">/admin/qzero</a>）。
+      メンテナンス中は管理者以外 Qstart にアクセスできなくなります（テスト用: <a href="/admin/qstart" target="_blank" style="color:#b8860b;">/admin/qstart</a>）。
     </div>
   </div>
 
@@ -850,9 +850,15 @@ async function createMaint(emergency){
   var s = document.getElementById('mtStart').value;
   var e = document.getElementById('mtEnd').value;
   var m = document.getElementById('mtMsg');
-  if (emergency && !s) {
-    // 緊急は今から2時間を既定に
-    var now = new Date(); var end = new Date(now.getTime() + 2*3600*1000);
+  if (emergency) {
+    // 緊急は入力欄を無視して必ず「今から」開始
+    var now = new Date();
+    var mins = prompt('緊急メンテナンスを何分間おこないますか？', '120');
+    if (mins === null) return;
+    mins = parseInt(mins, 10);
+    if (!mins || mins < 1) { m.style.color='#c0392b'; m.textContent='分数が正しくありません'; return; }
+    now.setMinutes(now.getMinutes() - 1);   // 1分前から有効にする(即時反映)
+    var end = new Date(now.getTime() + mins*60*1000);
     s = fmtDT(now); e = fmtDT(end);
   }
   if (!s || !e) { m.style.color='#c0392b'; m.textContent='開始と終了を指定してください'; return; }

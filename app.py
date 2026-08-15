@@ -703,6 +703,7 @@ def api_answer_quiz(quiz_id):
         is_correct = check_answer(user_answer, row_dict)
         # 採点詳細を取得
         match_reason = 'wrong'
+        voto_reason = None
         ua = normalize_answer(user_answer)
         answers_json2 = row_dict.get('answers')
         try:
@@ -715,20 +716,45 @@ def api_answer_quiz(quiz_id):
                 match_reason = reason2
                 break
 
+        # ★ ルールで判定できなかったら Voto(AI) に聞く
+        voto_reason = None
+        if match_reason == 'wrong' and not row_dict.get('has_options'):
+            try:
+                import qstart_core as _qc_v
+                _v, _r = _qc_v.voto_judge(dec(row_dict.get('question') or ''),
+                                          correct_answer, user_answer)
+                if _v == '正解':
+                    is_correct = True
+                    match_reason = 'voto'
+                    voto_reason = _r
+                elif _v == '部分正解':
+                    match_reason = 'voto_partial'
+                    voto_reason = _r
+                elif _v == '不正解':
+                    voto_reason = _r
+            except Exception:
+                pass
+
         if USE_POSTGRES:
             cur.execute(q('INSERT INTO attempts (quiz_id, correct, time_ms) VALUES (%s, %s, %s)'),
                         (quiz_id, 1 if is_correct else 0, time_ms))
         else:
-            cur.execute(q('INSERT INTO attempts (id, quiz_id, correct, time_ms) VALUES (%s, %s, %s, %s)'),
-                        (new_id(), quiz_id, 1 if is_correct else 0, time_ms))
+            cur.execute(q('''INSERT INTO attempts (id, quiz_id, correct, time_ms,
+                        user_answer, judged_by, judge_detail)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)'''),
+                        (new_id(), quiz_id, 1 if is_correct else 0, time_ms,
+                         (user_answer or '')[:200], match_reason, (voto_reason or '')[:200]))
 
     reason_msg = {
         'exact': None,
         'synonym': '💡 類義語として正解！',
         'typo': '💡 タイポを許容して正解！',
-        'partial': '💡 部分一致で正解！',
+        'voto': '🤖 AIが言い換えと判断して正解！',
+        'voto_partial': '🤖 AI判定: おしい！',
         'wrong': None,
     }.get(match_reason)
+    if match_reason in ('voto', 'voto_partial') and voto_reason:
+        reason_msg = (reason_msg or '') + ' ' + voto_reason
     return ok(correct=is_correct, correct_answer=correct_answer, time_ms=time_ms,
               explanation=dec(row_dict.get('explanation') or ''),
               hint=dec(row_dict.get('hint') or ''),

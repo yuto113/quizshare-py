@@ -512,17 +512,18 @@ def is_synonym(a, b):
     return False
 
 def smart_check(ua, correct):
+    # ① 完全一致
     if ua == correct:
         return True, 'exact'
+    # ② 類義語
     if is_synonym(ua, correct):
         return True, 'synonym'
+    # ③ タイポ(誤字1〜2文字まで)
     threshold = 1 if len(correct) <= 4 else 2
     if len(correct) >= 2 and edit_distance(ua, correct) <= threshold:
         return True, 'typo'
-    if len(correct) >= 4 and correct in ua:
-        return True, 'partial'
-    if len(ua) >= 4 and ua in correct and len(ua) >= len(correct) * 0.7:
-        return True, 'partial'
+    # ★部分一致は廃止(「東京」に「東」や説明文が通ってしまうため)
+    #   代わりに Voto(AI) が意味を見て判定する
     return False, 'wrong'
 
 def check_answer(user_answer, quiz_row):

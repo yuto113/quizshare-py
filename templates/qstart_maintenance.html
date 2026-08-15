@@ -33,9 +33,47 @@ a{display:inline-block;margin-top:16px;padding:10px 20px;background:#14213d;colo
   {% endif %}
   {% if m.body %}<p style="white-space:pre-wrap;">{{ m.body }}</p>{% endif %}
   <p>ご不便をおかけしますが、しばらくお待ちください。</p>
-  <a href="/">QuizShareに戻る</a>
+  <div id="recovered" style="display:none;background:#e8f5e9;color:#2e7d32;
+  border-radius:10px;padding:14px;margin:16px 0;font-size:14px;font-weight:600;">
+  ✅ メンテナンスが終了しました。まもなく戻ります…
+</div>
+<a href="/">QuizShareに戻る</a>
   <div class="note">
     最新の状況は<a href="/qstart/status" style="background:none;color:#b8860b;padding:0;">稼働状況ページ</a>でご確認いただけます。
   </div>
 </div>
+<script>
+// 元いたページを覚えておく
+var BACK = sessionStorage.getItem('qs_back') || '/qstart';
+try {
+  if (document.referrer && document.referrer.indexOf(location.host) > 0) {
+    var r = new URL(document.referrer).pathname;
+    if (r.indexOf('/qstart') === 0 && r !== '/qstart/maintenance') {
+      BACK = r; sessionStorage.setItem('qs_back', r);
+    }
+  }
+} catch(e) {}
+
+var checking = false;
+async function checkRecovered() {
+  if (checking) return;
+  checking = true;
+  try {
+    var r = await fetch('/qstart/api/v1/maintenance?t=' + Date.now(), {cache:'no-store'});
+    var d = await r.json();
+    if (d.ok && !d.active) {
+      // 復旧した → 元いたページに戻る
+      var el = document.getElementById('recovered');
+      if (el) el.style.display = 'block';
+      setTimeout(function(){ location.href = BACK; }, 1500);
+    }
+  } catch(e) {}
+  checking = false;
+}
+setInterval(checkRecovered, 60000);   // 1分ごと
+setTimeout(checkRecovered, 3000);     // 開いて3秒後にも1回
+document.addEventListener('visibilitychange', function(){
+  if (!document.hidden) checkRecovered();   // タブに戻ったとき
+});
+</script>
 </body></html>
