@@ -754,7 +754,10 @@ def api_answer_quiz(quiz_id):
         'wrong': None,
     }.get(match_reason)
     if match_reason in ('voto', 'voto_partial') and voto_reason:
-        reason_msg = (reason_msg or '') + ' ' + voto_reason
+        # ルールで拾えなかった＝完全一致ではないので、その文言は使わない
+        if '完全に一致' in voto_reason or '一致しています' in voto_reason:
+            voto_reason = '書き方は違いますが、同じ意味だと判断しました。'
+        reason_msg = (reason_msg or '') + '\n' + voto_reason
     return ok(correct=is_correct, correct_answer=correct_answer, time_ms=time_ms,
               explanation=dec(row_dict.get('explanation') or ''),
               hint=dec(row_dict.get('hint') or ''),

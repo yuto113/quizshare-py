@@ -165,10 +165,34 @@ body{font-family:'SF Mono','Consolas','Menlo',monospace;background:#0a0a0a;color
 <h2>使用量</h2>
 <p>無料枠: 月10万トークン。Qstartアカウント連携で+50万トークン/月（$10相当）。QstartとAPIの使用量は共有です。</p>
 <h2>モデル</h2>
-<div class="model-card"><div class="model-icon" style="background:#1a1a3a">⚖️</div><div class="model-info"><div class="model-name">Equi 1</div><div class="model-desc">バランス型。精度92.3%。普段使いに最適。</div></div><span class="badge badge-train">学習中</span></div>
-<div class="model-card"><div class="model-icon" style="background:#0a2a1a">⚡</div><div class="model-info"><div class="model-name">Pure 1</div><div class="model-desc">軽量・高速。reden対応。</div></div><span class="badge badge-plan">予定</span></div>
-<div class="model-card"><div class="model-icon" style="background:#2a1a0a">🧘</div><div class="model-info"><div class="model-name">zin 1</div><div class="model-desc">思考型。じっくり高品質な回答。</div></div><span class="badge badge-plan">予定</span></div>
-<div class="model-card"><div class="model-icon" style="background:#2a0a1a">👑</div><div class="model-info"><div class="model-name">Apex 1</div><div class="model-desc">最強モデル。全力で回答。</div></div><span class="badge badge-plan">予定</span></div>
+<div class="model-card"><div class="model-icon" style="background:#2a0a1a">🔥</div><div class="model-info"><div class="model-name">Apex 3 <code>apex3</code></div><div class="model-desc">最高性能・96.3M パラメータ。Wikipedia 2.5億トークンで学習。知らないことは「わからない」と正直に答えます。</div></div><span class="badge badge-live">利用可能</span></div>
+<div class="model-card"><div class="model-icon" style="background:#2a1a1a">🔥</div><div class="model-info"><div class="model-name">Apex 2 <code>apex</code></div><div class="model-desc">旧バージョン・81.1M パラメータ。</div></div><span class="badge badge-live">利用可能</span></div>
+<div class="model-card"><div class="model-icon" style="background:#2a1a0a">💭</div><div class="model-info"><div class="model-name">zin 1 <code>zin</code></div><div class="model-desc">思考型・28.6M パラメータ。じっくり考えて答えます。</div></div><span class="badge badge-live">利用可能</span></div>
+<div class="model-card"><div class="model-icon" style="background:#1a1a3a">⚙️</div><div class="model-info"><div class="model-name">Equi 1 <code>equi</code></div><div class="model-desc">バランス型・11.9M パラメータ。軽くて速い普段使い向け。</div></div><span class="badge badge-live">利用可能</span></div>
+<div class="model-card"><div class="model-icon" style="background:#0a2a1a">⚡</div><div class="model-info"><div class="model-name">Pure 1 <code>pure</code></div><div class="model-desc">軽量・高速。2026年秋 公開予定。</div></div><span class="badge badge-plan">予定</span></div>
+<div class="model-card"><div class="model-icon" style="background:#2a2a0a">🎯</div><div class="model-info"><div class="model-name">Voto 1 <code>voto</code></div><div class="model-desc">クイズ採点専用。正解／部分正解／不正解を理由つきで判定します。判定精度99.6%。チャットには使えません。</div></div><span class="badge badge-live">API専用</span></div>
+
+<h2>採点API</h2>
+<p><span class="method method-post">POST</span><span class="endpoint">/qstart/api/v1/grade</span></p>
+<p>答え合わせをします。表記ゆれや言い換えもAIが判定します。</p>
+<div class="code-block">
+{<br>
+&nbsp;&nbsp;<span class="string">"question"</span>: <span class="string">"日本の首都は？"</span>,<br>
+&nbsp;&nbsp;<span class="string">"correct"</span>: <span class="string">"東京"</span>,<br>
+&nbsp;&nbsp;<span class="string">"answer"</span>: <span class="string">"とうきょう"</span><br>
+}
+</div>
+<p>返り値:</p>
+<div class="code-block">
+{<br>
+&nbsp;&nbsp;<span class="string">"ok"</span>: true,<br>
+&nbsp;&nbsp;<span class="string">"verdict"</span>: <span class="string">"正解"</span>,<br>
+&nbsp;&nbsp;<span class="string">"reason"</span>: <span class="string">"ひらがなですが同じ場所です。"</span>,<br>
+&nbsp;&nbsp;<span class="string">"stage"</span>: 4,<br>
+&nbsp;&nbsp;<span class="string">"by"</span>: <span class="string">"voto"</span><br>
+}
+</div>
+<p><code>verdict</code> は「正解」「部分正解」「不正解」のいずれか。<code>stage</code> はどの段階で判定したか（1=完全一致 / 2=表記ゆれ / 3=別解 / 4=AI）。</p>
 <h2>Python サンプルコード</h2>
 <div class="code-block">
 <span class="key">import</span> requests<br><br>
@@ -352,18 +376,9 @@ async function loadModels(){
 
 // ===== 連携 =====
 async function doLink(){
-  var u=prompt('連携するQuizShareのグループIDを入力');if(!u)return;
-  var r=await fetch('/qstart/api/v1/link/request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({quizshare_user:u})});
-  var d=await r.json();
-  if(d.ok){
-    var code=prompt('認証コード: '+d.code+'\n\nこのコードを管理者に伝えてください。\n確認後、コードをここにもう一度入力:');
-    if(!code)return;
-    var pw=prompt('管理者パスワードを入力');
-    if(!pw)return;
-    var r2=await fetch('/qstart/api/v1/link/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code,admin_password:pw})});
-    var d2=await r2.json();
-    if(d2.ok){alert(d2.message);loadDashboard()}else{alert(d2.error)}
-  }else{alert(d.error)}
+  // 連携は不要になりました(Qstartアカウントがそのまま使えます)
+  alert('Qstartアカウントでログインすれば、そのままAPIをご利用いただけます。\n'
+      + '追加の連携手続きは必要ありません。');
 }
 
 // ===== 起動時チェック =====

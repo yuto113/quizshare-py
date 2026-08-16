@@ -718,8 +718,14 @@ def load_voto():
     return _VOTO
 
 
+_VOTO_CACHE = {}
+
 def voto_judge(question, correct, user_answer):
     """採点する。(判定, 理由) を返す"""
+    # 同じ問題×同じ答えは計算し直さない
+    key = (question or '')[:60] + '|' + (correct or '')[:40] + '|' + (user_answer or '')[:40]
+    if key in _VOTO_CACHE:
+        return _VOTO_CACHE[key]
     m = load_voto()
     if not m:
         return None, None
@@ -737,6 +743,9 @@ def voto_judge(question, correct, user_answer):
     else:
         return None, out
     reason = out.split('。', 1)[1].strip() if '。' in out else ''
+    if len(_VOTO_CACHE) > 3000:
+        _VOTO_CACHE.clear()
+    _VOTO_CACHE[key] = (v, reason)
     return v, reason
 
 

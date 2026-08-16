@@ -72,8 +72,21 @@ def get_monthly_usage(uid):
     return used
 
 def user_is_linked(uid):
-    """社員とQstart両方でログインしたことがあるか"""
-    return bool(session.get('qstart_user')) and bool(session.get('qstart_staff') or session.get('has_staff_login'))
+    """Qstartアカウントを持っているか(月間枠の対象)
+    以前は社員ログインとの連携が必要だったが、
+    Qstartアカウント自体が本人確認になるので簡素化した"""
+    if session.get('qstart_staff'):
+        return True
+    u = uid or session.get('qstart_user')
+    if not u or str(u).startswith('guest_'):
+        return False
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        r = conn.execute('SELECT 1 FROM qstart_users WHERE user_id=?', (u,)).fetchone()
+        conn.close()
+        return bool(r)
+    except Exception:
+        return False
 
 def get_perm_bonus(uid):
     """持続性アリで付与された恒久ボーナス"""

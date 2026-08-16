@@ -109,16 +109,29 @@ def api_ai_score():
     import sqlite3 as _sq3
     _conn3 = _sq3.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
     _row3 = _conn3.execute('SELECT ai_provider, ai_api_key, cf_account_id, cf_api_token, is_official FROM groups WHERE id=?', (grp['id'],)).fetchone()
+
+    def _dec_key(v):
+        """暗号化されていれば復号、平文ならそのまま(移行期の互換)"""
+        v = v or ''
+        if not v: return ''
+        if v.startswith('gAAAA'):
+            try:
+                from qz_common import dec as _d
+                return _d(v)
+            except Exception:
+                return ''
+        return v
+
     _conn3.close()
     _has_admin_config = bool(_row3[2] and _row3[3]) if _row3 else False
     if _has_admin_config:
         ai_provider = 'cloudflare'
-        ai_api_key = (_row3[3] if _row3 else '') or ''
+        ai_api_key = _dec_key(_row3[3] if _row3 else '')
         cf_account = (_row3[2] if _row3 else '') or os.environ.get('CLOUDFLARE_ACCOUNT_ID', '')
         cf_token = (_row3[3] if _row3 else '') or os.environ.get('CLOUDFLARE_AI_TOKEN', '')
     else:
         ai_provider = (_row3[0] if _row3 and _row3[0] else 'cloudflare')
-        ai_api_key = (_row3[1] if _row3 and _row3[1] else '') or ''
+        ai_api_key = _dec_key(_row3[1] if _row3 else '')
         cf_account = os.environ.get('CLOUDFLARE_ACCOUNT_ID', '')
         cf_token = os.environ.get('CLOUDFLARE_AI_TOKEN', '')
     prompt = (
