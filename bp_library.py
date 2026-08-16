@@ -105,99 +105,38 @@ def api_ai_score():
     user_ans = (data.get('user_answer') or '').strip()
     if not question or not correct or not user_ans:
         return err('必要なパラメータが不足しているよ')
-    # グループのAI設定を取得（管理者設定を優先）
-    import sqlite3 as _sq3
-    _conn3 = _sq3.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
-    _row3 = _conn3.execute('SELECT ai_provider, ai_api_key, cf_account_id, cf_api_token, is_official FROM groups WHERE id=?', (grp['id'],)).fetchone()
-
-    def _dec_key(v):
-        """暗号化されていれば復号、平文ならそのまま(移行期の互換)"""
-        v = v or ''
-        if not v: return ''
-        if v.startswith('gAAAA'):
-            try:
-                from qz_common import dec as _d
-                return _d(v)
-            except Exception:
-                return ''
-        return v
-
-    _conn3.close()
-    _has_admin_config = bool(_row3[2] and _row3[3]) if _row3 else False
-    if _has_admin_config:
-        ai_provider = 'cloudflare'
-        ai_api_key = _dec_key(_row3[3] if _row3 else '')
-        cf_account = (_row3[2] if _row3 else '') or os.environ.get('CLOUDFLARE_ACCOUNT_ID', '')
-        cf_token = (_row3[3] if _row3 else '') or os.environ.get('CLOUDFLARE_AI_TOKEN', '')
-    else:
-        ai_provider = (_row3[0] if _row3 and _row3[0] else 'cloudflare')
-        ai_api_key = _dec_key(_row3[1] if _row3 else '')
-        cf_account = os.environ.get('CLOUDFLARE_ACCOUNT_ID', '')
-        cf_token = os.environ.get('CLOUDFLARE_AI_TOKEN', '')
-    prompt = (
-        'あなたはクイズ採点者です\n'
-        f'問題: {question}\n'
-        f'正解: {correct}\n'
-        f'生徒の答え: {user_ans}\n'
-        '採点してください\n'
-        'correct=完全正解 partial=惜しい wrong=不正解\n'
-        '{"result":"correct/partial/wrong","reason":"理由"} の形式のみで返してください'
-    )
+    # ===== AI採点: Voto 1(自作モデル) =====
+    # 以前は外部API(Gemini / OpenAI / Claude / Cloudflare)を使っていたが、
+    # 自作の Voto 1 に置き換えた。外部キー不要・無料・すべて自前で動く。
     try:
-        if ai_provider == 'openai':
-            if not ai_api_key:
-                return err('OpenAI APIキーが設定されていないよ', 500)
-            payload = _json.dumps({'model':'gpt-4o-mini','messages':[{'role':'system','content':'You are a quiz grader. Reply only in JSON format.'},{'role':'user','content':prompt}],'max_tokens':200}).encode('utf-8')
-            req = _req.Request('https://api.openai.com/v1/chat/completions', data=payload, headers={'Authorization':f'Bearer {ai_api_key}','Content-Type':'application/json'})
-            with _req.urlopen(req, timeout=15) as res:
-                raw = _json.loads(res.read().decode('utf-8'))
-            text = raw.get('choices',[{}])[0].get('message',{}).get('content','{}')
-        elif ai_provider == 'gemini':
-            if not ai_api_key:
-                return err('Gemini APIキーが設定されていないよ', 500)
-            payload = _json.dumps({'contents':[{'parts':[{'text':prompt}]}],'generationConfig':{'maxOutputTokens':200}}).encode('utf-8')
-            req = _req.Request(f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={ai_api_key}',data=payload,headers={'Content-Type':'application/json'})
-            with _req.urlopen(req, timeout=15) as res:
-                raw = _json.loads(res.read().decode('utf-8'))
-            text = raw.get('candidates',[{}])[0].get('content',{}).get('parts',[{}])[0].get('text','{}')
-        elif ai_provider == 'anthropic':
-            if not ai_api_key:
-                return err('Anthropic APIキーが設定されていないよ', 500)
-            payload = _json.dumps({'model':'claude-haiku-4-5-20251001','max_tokens':200,'messages':[{'role':'user','content':prompt}]}).encode('utf-8')
-            req = _req.Request('https://api.anthropic.com/v1/messages',data=payload,headers={'x-api-key':ai_api_key,'anthropic-version':'2023-06-01','Content-Type':'application/json'})
-            with _req.urlopen(req, timeout=15) as res:
-                raw = _json.loads(res.read().decode('utf-8'))
-            text = raw.get('content',[{}])[0].get('text','{}')
-        else:
-            if not cf_token or not cf_account:
-                return err('Cloudflare AIが設定されていないよ', 500)
-            payload = _json.dumps({'messages':[{'role':'system','content':'You are a quiz grader. Reply only in JSON format.'},{'role':'user','content':prompt}]}).encode('utf-8')
-            url = f'https://api.cloudflare.com/client/v4/accounts/{cf_account}/ai/run/@cf/meta/llama-3-8b-instruct'
-            req = _req.Request(url,data=payload,headers={'Authorization':f'Bearer {cf_token}','Content-Type':'application/json'})
-            with _req.urlopen(req, timeout=15) as res:
-                cf_data = _json.loads(res.read().decode('utf-8'))
-            text = cf_data.get('result', {}).get('response', '{}')
-        match = _re.search(r'\{[^}]+\}', text)
-        if match:
-            result = _json.loads(match.group())
-        else:
-            result = {'result': 'unknown', 'reason': text[:100]}
-        # トークン使用量を記録
-        tokens = len(prompt) // 4 + 50
-        try:
-            import sqlite3 as _sq2
-            conn2 = _sq2.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
-            conn2.execute(
-                'INSERT INTO ai_usage (group_id, tokens_used) VALUES (?, ?)',
-                (grp['id'], tokens)
-            )
-            conn2.commit()
-            conn2.close()
-        except Exception as rec_err:
-            print(f'ai_usage記録エラー: {rec_err}')
-        return ok(ai_result=result.get('result', 'unknown'), ai_reason=result.get('reason', ''), tokens_used=tokens)
-    except Exception as e:
-        return err(f'AI採点エラー: {str(e)}', 500)
+        import qstart_core as _qc_ai
+        _v, _r = _qc_ai.voto_judge(question, correct, user_ans)
+    except Exception as _e:
+        print(f'Voto採点エラー: {_e}')
+        _v, _r = None, None
+
+    if not _v:
+        return err('AI採点が一時的に利用できないよ。もう一度試してね', 503)
+
+    _label = {'正解': 'correct', '部分正解': 'partial', '不正解': 'wrong'}.get(_v, 'unknown')
+    _icon  = {'正解': '⭕', '部分正解': '🔺', '不正解': '❌'}.get(_v, '')
+    _reason = _r or {'正解': '正解です。',
+                     '部分正解': 'おしい！もう少しくわしく書けると良いです。',
+                     '不正解': f'正しい答えは「{correct}」です。'}.get(_v, '')
+
+    # 使用量の記録(トークン相当。Votoは自前なので概算)
+    _tok = len(question) + len(correct) + len(user_ans) + len(_reason)
+    try:
+        import sqlite3 as _sqv
+        _cv = _sqv.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+        _cv.execute('INSERT INTO ai_usage (group_id, tokens_used) VALUES (?, ?)',
+                    (grp['id'], _tok))
+        _cv.commit(); _cv.close()
+    except Exception as rec_err:
+        print(f'ai_usage記録エラー: {rec_err}')
+
+    return ok(ai_result=_label, ai_reason=f'{_icon} {_reason}',
+              verdict=_v, tokens_used=_tok, model='voto-1')
 
 @bp.route('/api/admin/ai-scoring/<group_id>', methods=['POST'])
 def api_admin_ai_scoring(group_id):
