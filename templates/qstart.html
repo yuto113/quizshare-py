@@ -348,6 +348,16 @@ body[dir="rtl"] .qs-s-tab { flex-direction:row-reverse; text-align:right; }
   /* サイドバーを全画面に */
   .qs-sidebar { width:84%; max-width:300px; box-shadow:4px 0 24px rgba(0,0,0,.3); }
   .qs-sidebar-link { padding:12px 10px; font-size:14px; }
+  /* モデルメニューが背面に行かないように */
+  .qs-model-menu {
+    position:fixed !important;
+    left:8px !important; right:8px !important; top:56px !important;
+    width:auto !important; max-width:none !important;
+    z-index:300 !important;
+    max-height:70vh; overflow-y:auto;
+    box-shadow:0 12px 40px rgba(0,0,0,.25);
+  }
+  .qs-model-option { padding:14px 16px; }
   /* ハンバーガーを表示 */
   #qs-sidebar-open { display:block !important; }
   .qs-sidebar {

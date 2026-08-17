@@ -361,15 +361,27 @@ async function createKey(){
 // ===== モデル一覧 =====
 async function loadModels(){
   try{
-    const r=await fetch('/qstart/api/v1/models');
+    const r=await fetch('/qstart/api/v1/models?scope=api');
     if(!r.ok)return;
     const d=await r.json();
-    const icons={'equi-1':'⚖️','pure-1':'⚡','zin-1':'🧘','apex-1':'👑'};
+    const icons={equi:'⚙️', pure:'⚡', zin:'💭', apex:'🔥', apex3:'🔥', voto:'🎯'};
+    function esc(s){ var e=document.createElement('div'); e.textContent=(s==null?'':s); return e.innerHTML; }
     const el=document.getElementById('models-list');
     el.innerHTML=d.models.map(function(m){
-      var b=m.status==='training'?'badge-train':m.status==='live'?'badge-live':'badge-plan';
-      var l=m.status==='training'?'学習中':m.status==='live'?'利用可能':'予定';
-      return '<div class="model-card"><div class="model-icon" style="background:#1a1a2a">'+(icons[m.id]||'🤖')+'</div><div class="model-info"><div class="model-name">'+m.name+'</div><div class="model-desc">'+m.description+'</div></div><span class="badge '+b+'">'+l+'</span></div>';
+      // 新形式(enabled/maintenance)と旧形式(status)の両対応
+      var st = m.status;
+      if (st === undefined) {
+        st = Number(m.maintenance) ? 'maintenance' : (Number(m.enabled) ? 'live' : 'coming');
+      }
+      var b = st==='training'?'badge-train' : st==='live'?'badge-live'
+            : st==='maintenance'?'badge-train' : 'badge-plan';
+      var l = st==='training'?'学習中' : st==='live'?'利用可能'
+            : st==='maintenance'?'メンテナンス中' : '予定';
+      var mid = m.id || m.model || '';
+      var mname = m.name || ('Qstart ' + (m.display || mid));
+      var mdesc = m.description || m.note || '';
+      if (m.params) mdesc += (mdesc ? ' / ' : '') + m.params + ' パラメータ';
+      return '<div class="model-card"><div class="model-icon" style="background:#1a1a2a">'+(icons[mid]||'🤖')+'</div><div class="model-info"><div class="model-name">'+esc(mname)+' <code style="font-size:11px;opacity:.6;">'+esc(mid)+'</code></div><div class="model-desc">'+esc(mdesc)+'</div></div><span class="badge '+b+'">'+l+'</span></div>';
     }).join('');
   }catch(e){console.error('models error',e)}
 }
