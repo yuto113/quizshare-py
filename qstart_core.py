@@ -732,7 +732,7 @@ def voto_judge(question, correct, user_answer):
         return None, None
     prompt = f'問題「{question[:80]}」正解「{correct[:60]}」回答「{user_answer[:60]}」'
     try:
-        out = (m.chat(prompt) or '').strip()
+        out = (m.chat(prompt, max_tokens=50, greedy=True) or '').strip()
     except Exception:
         return None, None
     if out.startswith('部分'):

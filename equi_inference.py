@@ -273,44 +273,49 @@ class EquiInference:
         choice = np.random.choice(len(top_idx), p=probs)
         return int(top_idx[choice])
 
-    def chat(self, question, max_tokens=30):
-        """★ キャッシュ付きチャット"""
-        # レスポンスキャッシュをチェック
-        cache_key = hashlib.md5(question.encode()).hexdigest()
+    def chat(self, question, max_tokens=30, greedy=False):
+        """★ キャッシュ付きチャット
+        greedy=True にすると常に最も確率が高いトークンを選ぶ。
+        採点のように答えがぶれてはいけない用途で使う。
+        """
+        cache_key = hashlib.md5((question + ('|G' if greedy else '')).encode()).hexdigest()
         if cache_key in self._cache:
             return self._cache[cache_key]
 
+        def pick(lg):
+            if greedy:
+                return int(np.argmax(lg))
+            return self.topk_sample(lg)
+
         tok = [self.BOS, self.QM] + self.hybrid_tokenize(question) + [self.AN]
 
-        # プリフィル（入力全体を一括処理）
         logits, kv_cache, pos = self.forward_prefill(tok)
         next_logits = logits[-1].astype(np.float32)
-        nxt = self.topk_sample(next_logits)
+        nxt = pick(next_logits)
 
         result_ids = []
         for _ in range(max_tokens):
             if nxt in (self.EOS, self.PAD) or pos >= self.MAXLEN:
                 break
             result_ids.append(nxt)
-            # 1トークンずつ生成（KVキャッシュで高速）
             logits = self.forward_one(nxt, pos, kv_cache)
             next_logits = logits[0].astype(np.float32)
-            nxt = self.topk_sample(next_logits)
+            nxt = pick(next_logits)
             pos += 1
 
         reply = self.decode(result_ids)
 
-        # キャッシュに保存
-        if len(self._cache) >= self._cache_max:
-            oldest = next(iter(self._cache))
-            del self._cache[oldest]
-        # 作者名を置換
         reply = reply.replace('yutoが作った自作の', 'Qzero会社が作った')
         reply = reply.replace('yutoが作りました', 'Qzero会社が作りました')
         reply = reply.replace('yutoが作った', 'Qzero会社が作った')
-        self._cache[cache_key] = reply
+
+        if self._cache_max > 0:
+            while len(self._cache) >= self._cache_max:
+                del self._cache[next(iter(self._cache))]
+            self._cache[cache_key] = reply
 
         return reply
+
 
     def generate(self, start, max_tokens=30):
         tok = [self.BOS] + self.hybrid_tokenize(start)
