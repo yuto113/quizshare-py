@@ -128,9 +128,16 @@ def api_ai_score():
     _tok = len(question) + len(correct) + len(user_ans) + len(_reason)
     try:
         import sqlite3 as _sqv
+        from flask import session as _ss
         _cv = _sqv.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+        # グループ単位の記録(従来どおり)
         _cv.execute('INSERT INTO ai_usage (group_id, tokens_used) VALUES (?, ?)',
                     (grp['id'], _tok))
+        # ★Qstartの使用量とも共有する(ログイン中のみ)
+        _qu = _ss.get('qstart_user')
+        if _qu:
+            _cv.execute('''INSERT INTO qstart_api_usage(user_id, source, model, tokens_used)
+                           VALUES(?, ?, ?, ?)''', (_qu, 'grade', 'voto', _tok))
         _cv.commit(); _cv.close()
     except Exception as rec_err:
         print(f'ai_usage記録エラー: {rec_err}')

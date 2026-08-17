@@ -266,8 +266,16 @@ def get_usage():
 def api_chat():
     data = request.get_json()
     msg = data.get('message','')
-    model = data.get('model','equi-1')
-    available = ['pure-1','equi-1','zin-1','apex-1']
+    model = data.get('model','equi')
+    # 別名を正規化(equi-1 → equi など)
+    _alias = {'equi-1':'equi','pure-1':'pure','zin-1':'zin',
+              'apex-1':'apex','apex-2':'apex','apex2':'apex','apex-3':'apex3'}
+    model = _alias.get(model, model)
+    # APIで使えるモデルをDBから取得
+    _c = sqlite3.connect(DB_PATH)
+    available = [r[0] for r in _c.execute(
+        "SELECT model FROM qstart_model_scope WHERE scope='api' AND enabled=1 AND maintenance=0")]
+    _c.close()
     if model not in available:
         return jsonify({'error':f'モデル"{model}"は利用できません','available':available}), 400
     equi = get_equi()
@@ -440,11 +448,20 @@ def promo_use():
     return jsonify({'ok': True, 'message': result_msg, 'type': promo_type, 'value': value})
 
 # ===== モデル一覧 =====
-@qstart_api.route('/qstart/api/v1/models')
-def list_models():
-    return jsonify({'models':[
-        {'id':'equi-1','name':'Qstart Equi 1','status':'live','description':'バランス型。精度92.3%。'},
-        {'id':'pure-1','name':'Qstart Pure 1','status':'coming','description':'軽量・高速。2026年秋公開予定。'},
-        {'id':'zin-1','name':'Qstart zin 1','status':'live','description':'思考型モデル。87.7%精度。'},
-        {'id':'apex-1','name':'Qstart Apex 1','status':'coming','description':'最強モデル。2026年秋公開予定。'},
-    ]})
+# ★ /qstart/api/v1/models は qstart_core.py に一本化した(DBから取得)
+#   ここでは API 専用の一覧を別パスで提供する
+@qstart_api.route('/qstart/api/v1/models/api')
+def list_models_api():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("""SELECT f.model, f.display, f.note, f.params,
+        s.enabled, s.maintenance FROM qstart_model_flags f
+        JOIN qstart_model_scope s ON s.model=f.model AND s.scope='api'
+        ORDER BY f.family, f.version DESC""").fetchall()
+    conn.close()
+    return jsonify({'models': [{
+        'id': r['model'],
+        'name': 'Qstart ' + (r['display'] or r['model']),
+        'status': ('maintenance' if r['maintenance'] else ('live' if r['enabled'] else 'coming')),
+        'params': r['params'] or '',
+        'description': r['note'] or ''} for r in rows]})

@@ -1868,7 +1868,8 @@ def _qstart_maintenance_gate():
             return None
     try:
         import qstart_core as _qc_m
-        if not _qc_m.in_maintenance():
+        _scope = 'api' if (p.startswith('/qstart/api') or '/api/v1/' in p) else 'chat'
+        if not _qc_m.in_maintenance(_scope):
             return None
         if _qc_m.qstart_role() == 'admin':
             return None   # 管理者は通常どおり使える

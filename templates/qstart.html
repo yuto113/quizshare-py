@@ -612,6 +612,7 @@ body[dir="rtl"] .qs-s-tab { flex-direction:row-reverse; text-align:right; }
           <option value="equi">Equi 1 — バランス</option>
           <option value="zin">zin 1 — 思考</option>
           <option value="apex">Apex 2 — 最高性能</option>
+          <option value="apex">Apex 3 — 誠実に答えるモデル</option>
         </select>
         <div class="qs-s-desc" id="qs-model-soon">Pure 1 / Apex 1 は2026年秋に公開予定です</div></div>
       <div class="qs-s-section"><div class="qs-s-label">既定のエフォート</div>
@@ -619,7 +620,7 @@ body[dir="rtl"] .qs-s-tab { flex-direction:row-reverse; text-align:right; }
           <option value="low">⚡ 低 — 速い</option><option value="mid">⚙️ 中 — 標準</option>
           <option value="high">🔥 高 — じっくり</option>
         </select></div>
-      <div class="qs-s-section"><div class="qs-s-label">現在のモデル</div><div class="qs-s-value" id="qs-s-model">Qstart Equi 1</div></div>
+      <div class="qs-s-section"><div class="qs-s-label">現在のモデル</div><div class="qs-s-value" id="qs-s-model">—</div></div>
       <div class="qs-s-section"><div class="qs-s-label">現在のエフォート</div><div class="qs-s-value" id="qs-s-effort">中</div></div>
     </div>
 
@@ -1084,7 +1085,7 @@ function applyDefaults() {
   var dm = QS_SET.default_model;
   if (dm && modelUsable(dm) && dm !== currentModel) {
     currentModel = dm;
-    var names = { equi:'Equi 1', zin:'zin 1', pure:'Pure 1', apex:'Apex 2' };
+    var names = { equi:'Equi 1', zin:'zin 1', pure:'Pure 1', apex:'Apex 2', apex:'Apex 3' };
     var b = document.getElementById('qs-model-btn');
     if (b) b.textContent = (names[dm]||dm) + ' ∨';
     var sm = document.getElementById('qs-s-model');

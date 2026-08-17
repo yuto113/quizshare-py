@@ -409,6 +409,7 @@ def get_announcements():
         WHERE active=1
           AND (starts_at IS NULL OR starts_at<=?)
           AND (ends_at IS NULL OR ends_at>=?)
+          AND COALESCE(scope,'chat') IN ('chat','both')
         ORDER BY id DESC LIMIT 30""", (now(), now())).fetchall()
 
     read = set()
@@ -882,9 +883,13 @@ def current_maintenance():
     return (dict(active) if active else None), (dict(upcoming) if upcoming else None)
 
 
-def in_maintenance():
+def in_maintenance(scope='chat'):
+    """scope: 'chat' か 'api'。both のメンテは両方に効く"""
     a, _ = current_maintenance()
-    return a is not None
+    if not a:
+        return False
+    sc = (a.get('scope') or 'both')
+    return sc == 'both' or sc == scope
 
 
 @qstart_core.route('/qstart/api/v1/maintenance')
@@ -929,15 +934,16 @@ def admin_maintenance():
                         'need_force': True}), 400
 
     conn.execute("""INSERT INTO qstart_maintenance
-        (starts_at,ends_at,title,body,status,created_by,created_at,is_emergency,compensate)
-        VALUES(?,?,?,?,?,?,?,?,?)""",
+        (starts_at,ends_at,title,body,status,created_by,created_at,is_emergency,compensate,scope)
+        VALUES(?,?,?,?,?,?,?,?,?,?)""",
         (_s.strftime('%Y-%m-%d %H:%M'), _e.strftime('%Y-%m-%d %H:%M'),
          (d.get('title') or 'メンテナンスのお知らせ')[:120],
          (d.get('body') or '')[:2000],
          'active' if d.get('emergency') else 'scheduled',
          cur_uid() or session.get('staff_id','admin'), now(),
          1 if d.get('emergency') else 0,
-         int(d.get('compensate', 0) or 0)))
+         int(d.get('compensate', 0) or 0),
+         (d.get('scope') or 'both')))
     conn.commit(); conn.close()
     alog('maintenance_create', st + '〜' + en)
     return jsonify({'ok': True})
@@ -1177,9 +1183,10 @@ def log_error(exc, kind='500'):
                          (now(), tr, r['id']))
         else:
             conn.execute('''INSERT INTO qstart_errors
-                (kind,path,method,message,trace,user_id,ip_hash,first_at,last_at,fingerprint)
-                VALUES(?,?,?,?,?,?,?,?,?,?)''',
-                (kind, path, method, msg, tr, cur_uid() or '', ih, now(), now(), fp))
+                (kind,path,method,message,trace,user_id,ip_hash,first_at,last_at,fingerprint,scope)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?)''',
+                (kind, path, method, msg, tr, cur_uid() or '', ih, now(), now(), fp,
+                 'api' if ('/qstart/api/' in path or '/api/v1/' in path) else 'chat'))
         # 100件を超えたら古いものを消す
         conn.execute('''DELETE FROM qstart_errors WHERE id NOT IN
             (SELECT id FROM qstart_errors ORDER BY last_at DESC LIMIT 200)''')
@@ -1192,8 +1199,13 @@ def log_error(exc, kind='500'):
 @require_admin
 def admin_errors():
     conn = db()
-    rows = conn.execute('''SELECT id,kind,path,method,message,user_id,count,first_at,last_at
-        FROM qstart_errors ORDER BY last_at DESC LIMIT 100''').fetchall()
+    _src = (request.args.get('source') or 'all').lower()
+    _sw = ""
+    if _src == 'api':  _sw = " WHERE COALESCE(scope,'chat')='api' "
+    elif _src == 'chat': _sw = " WHERE COALESCE(scope,'chat')='chat' "
+    rows = conn.execute(f'''SELECT id,kind,path,method,message,user_id,count,first_at,last_at,
+        COALESCE(scope,'chat') scope
+        FROM qstart_errors {_sw} ORDER BY last_at DESC LIMIT 100''').fetchall()
     n24 = conn.execute("""SELECT COALESCE(SUM(count),0) FROM qstart_errors
         WHERE last_at > datetime('now','-1 day','localtime')""").fetchone()[0]
     conn.close()
@@ -1368,7 +1380,11 @@ def bootstrap():
 
     # --- モデル ---
     out['models'] = [dict(r) for r in conn.execute(
-        'SELECT model,enabled,maintenance,note,min_role,family,version,display,is_latest,params FROM qstart_model_flags ORDER BY family, version DESC')]
+        "SELECT f.model, f.note, f.family, f.version, f.display, f.is_latest, f.params, "
+        "s.enabled, s.maintenance, s.min_role "
+        "FROM qstart_model_flags f "
+        "JOIN qstart_model_scope s ON s.model=f.model AND s.scope='chat' "
+        "ORDER BY f.family, f.version DESC")]
 
     # --- お知らせ ---
     anns = conn.execute("""SELECT * FROM qstart_announcements
@@ -1492,10 +1508,23 @@ def admin_model_source():
 
 
 # ========== モデル一覧(誰でも読める) ==========
+def model_state(model, scope="chat"):
+    """そのモデルが、その提供先で使えるか"""
+    conn = db()
+    r = conn.execute("SELECT enabled, maintenance, min_role FROM qstart_model_scope WHERE model=? AND scope=?", (model, scope)).fetchone()
+    conn.close()
+    if r:
+        return {'enabled': bool(r['enabled']), 'maintenance': bool(r['maintenance']),
+                'min_role': r['min_role'] or 'user'}
+    return {'enabled': False, 'maintenance': False, 'min_role': 'user'}
+
+
 @qstart_core.route('/qstart/api/v1/models')
 def public_models():
     conn = db()
-    rows = conn.execute('SELECT model,enabled,maintenance,note,min_role,family,version,display,is_latest,params FROM qstart_model_flags ORDER BY family, version DESC').fetchall()
+    _sc = (request.args.get('scope') or 'chat').lower()
+    if _sc not in ('chat','api'): _sc = 'chat'
+    rows = conn.execute("SELECT f.model, f.note, f.family, f.version, f.display, f.is_latest, f.params, s.enabled, s.maintenance, s.min_role, s.scope FROM qstart_model_flags f JOIN qstart_model_scope s ON s.model=f.model AND s.scope=? ORDER BY f.family, f.version DESC", (_sc,)).fetchall()
     conn.close()
     return jsonify({'ok': True, 'models': [dict(r) for r in rows]})
 
@@ -1686,24 +1715,43 @@ def admin_invite_edit(code):
     return jsonify({'ok': True})
 
 
+def _usage_src_filter(src='all'):
+    """?source=chat / api / all でSQLの条件を作る"""
+    if src == 'chat':
+        return " AND source IN ('chat','qstart') ", []
+    if src == 'api':
+        return " AND source IN ('api','grade') ", []
+    return " ", []
+
+
 @qstart_core.route('/qstart/api/v1/admin/stats')
 @require_admin
 def admin_stats():
     conn = db(); s = {}
+    _src = (request.args.get('source') or 'all').lower()
+    _w, _ = _usage_src_filter(_src)
+    s['source'] = _src
+
     s['users_total'] = conn.execute('SELECT COUNT(*) FROM qstart_users').fetchone()[0]
     s['users_today'] = conn.execute("SELECT COUNT(*) FROM qstart_users WHERE date(created_at)=date('now')").fetchone()[0]
     s['projects'] = conn.execute('SELECT COUNT(*) FROM qstart_projects').fetchone()[0]
     s['chats'] = conn.execute('SELECT COUNT(*) FROM qstart_chats').fetchone()[0]
-    s['tokens_24h'] = conn.execute("SELECT COALESCE(SUM(tokens_used),0) FROM qstart_api_usage WHERE timestamp>=strftime('%s','now','-1 day')").fetchone()[0]
-    s['tokens_total'] = conn.execute('SELECT COALESCE(SUM(tokens_used),0) FROM qstart_api_usage').fetchone()[0]
+    s['tokens_24h'] = conn.execute(
+        f"SELECT COALESCE(SUM(tokens_used),0) FROM qstart_api_usage WHERE timestamp>=strftime('%s','now','-1 day'){_w}").fetchone()[0]
+    s['tokens_total'] = conn.execute(
+        f"SELECT COALESCE(SUM(tokens_used),0) FROM qstart_api_usage WHERE 1=1{_w}").fetchone()[0]
     s['by_model'] = [dict(r) for r in conn.execute(
-        "SELECT model, COUNT(*) n, COALESCE(SUM(tokens_used),0) tokens FROM qstart_api_usage GROUP BY model ORDER BY tokens DESC")]
+        f"SELECT model, COUNT(*) n, COALESCE(SUM(tokens_used),0) tokens FROM qstart_api_usage WHERE 1=1{_w} GROUP BY model ORDER BY tokens DESC")]
     s['by_lang'] = [dict(r) for r in conn.execute(
         "SELECT COALESCE(lang,'ja') lang, COUNT(*) n FROM qstart_users GROUP BY lang ORDER BY n DESC")]
     s['daily'] = [dict(r) for r in conn.execute(
-        """SELECT date(timestamp,'unixepoch') d, COALESCE(SUM(tokens_used),0) tokens, COUNT(DISTINCT user_id) users
-           FROM qstart_api_usage WHERE timestamp>=strftime('%s','now','-14 day')
+        f"""SELECT date(timestamp,'unixepoch') d, COALESCE(SUM(tokens_used),0) tokens, COUNT(DISTINCT user_id) users
+           FROM qstart_api_usage WHERE timestamp>=strftime('%s','now','-14 day'){_w}
            GROUP BY d ORDER BY d""")]
+    # 内訳(常に全部返す。切替の比較用)
+    s['by_source'] = [dict(r) for r in conn.execute(
+        """SELECT COALESCE(source,'other') source, COUNT(*) n, COALESCE(SUM(tokens_used),0) tokens
+           FROM qstart_api_usage GROUP BY source ORDER BY tokens DESC""")]
     s['reports_open'] = conn.execute("SELECT COUNT(*) FROM qstart_reports WHERE status='open'").fetchone()[0]
     try:
         s['errors_24h'] = conn.execute("""SELECT COALESCE(SUM(count),0) FROM qstart_errors
@@ -1725,9 +1773,16 @@ def admin_users():
         where = 'WHERE u.user_id LIKE ? OR u.nickname LIKE ? OR u.email LIKE ?'
         vals = [f'%{qs}%'] * 3
     total = conn.execute(f'SELECT COUNT(*) FROM qstart_users u {where}', vals).fetchone()[0]
+    _src = (request.args.get('source') or 'all').lower()
+    _w, _ = _usage_src_filter(_src)
     rows = conn.execute(f'''SELECT u.user_id, u.nickname, u.email, u.lang, u.created_at,
         COALESCE(f.role,'user') role, COALESCE(f.status,'active') status,
-        (SELECT COALESCE(SUM(tokens_used),0) FROM qstart_api_usage a WHERE a.user_id=u.user_id) tokens
+        (SELECT COALESCE(SUM(tokens_used),0) FROM qstart_api_usage a
+         WHERE a.user_id=u.user_id{_w}) tokens,
+        (SELECT COALESCE(SUM(tokens_used),0) FROM qstart_api_usage a
+         WHERE a.user_id=u.user_id AND a.source IN ('chat','qstart')) tok_chat,
+        (SELECT COALESCE(SUM(tokens_used),0) FROM qstart_api_usage a
+         WHERE a.user_id=u.user_id AND a.source IN ('api','grade')) tok_api
         FROM qstart_users u LEFT JOIN qstart_user_flags f ON f.user_id=u.user_id
         {where} ORDER BY u.created_at DESC LIMIT ? OFFSET ?''',
         vals + [per, (page-1)*per]).fetchall()
@@ -1789,17 +1844,45 @@ def admin_announce_edit(aid):
 @require_admin
 def admin_models():
     conn = db()
+    _sc = (request.args.get('source') or request.args.get('scope') or 'all').lower()
     if request.method == 'GET':
-        rows = conn.execute('SELECT * FROM qstart_model_flags').fetchall()
+        if _sc in ('chat','api'):
+            rows = conn.execute(
+                "SELECT f.model, f.note, f.family, f.version, f.display, f.is_latest, "
+                "f.params, s.scope, s.enabled, s.maintenance, s.min_role "
+                "FROM qstart_model_flags f "
+                "JOIN qstart_model_scope s ON s.model=f.model AND s.scope=? "
+                "ORDER BY f.family, f.version DESC", (_sc,)).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT f.model, f.note, f.family, f.version, f.display, f.is_latest, f.params, "
+                "MAX(CASE WHEN s.scope='chat' THEN s.enabled END) chat_enabled, "
+                "MAX(CASE WHEN s.scope='chat' THEN s.maintenance END) chat_maint, "
+                "MAX(CASE WHEN s.scope='api' THEN s.enabled END) api_enabled, "
+                "MAX(CASE WHEN s.scope='api' THEN s.maintenance END) api_maint, "
+                "MAX(s.min_role) min_role "
+                "FROM qstart_model_flags f "
+                "LEFT JOIN qstart_model_scope s ON s.model=f.model "
+                "GROUP BY f.model ORDER BY f.family, f.version DESC").fetchall()
         conn.close()
+        return jsonify({'ok': True, 'models': [dict(r) for r in rows], 'scope': _sc})
         return jsonify({'ok': True, 'models': [dict(r) for r in rows]})
     d = request.get_json(silent=True) or {}
-    conn.execute('''INSERT INTO qstart_model_flags(model,enabled,maintenance,note,min_role,updated_at)
-                    VALUES(?,?,?,?,?,?) ON CONFLICT(model) DO UPDATE SET
-                    enabled=excluded.enabled, maintenance=excluded.maintenance,
-                    note=excluded.note, min_role=excluded.min_role, updated_at=excluded.updated_at''',
-                 (d.get('model'), 1 if d.get('enabled') else 0, 1 if d.get('maintenance') else 0,
-                  d.get('note',''), d.get('min_role','user'), now()))
+    _m = d.get('model')
+    _targets = [d.get('scope')] if d.get('scope') in ('chat','api') else ['chat','api']
+    for _t in _targets:
+        conn.execute(
+            "INSERT INTO qstart_model_scope(model,scope,enabled,maintenance,min_role,note,updated_at) "
+            "VALUES(?,?,?,?,?,?,?) ON CONFLICT(model,scope) DO UPDATE SET "
+            "enabled=excluded.enabled, maintenance=excluded.maintenance, "
+            "min_role=excluded.min_role, note=excluded.note, updated_at=excluded.updated_at",
+            (_m, _t, 1 if d.get('enabled') else 0, 1 if d.get('maintenance') else 0,
+             d.get('min_role','user'), d.get('note',''), now()))
+    # 共通の情報(メモ)は元テーブルにも反映
+    conn.execute(
+        "INSERT INTO qstart_model_flags(model,note,updated_at) VALUES(?,?,?) "
+        "ON CONFLICT(model) DO UPDATE SET note=excluded.note, updated_at=excluded.updated_at",
+        (_m, d.get('note',''), now()))
     conn.commit(); conn.close()
     alog('model_flag', d.get('model',''), json.dumps(d, ensure_ascii=False))
     return jsonify({'ok': True})

@@ -12,6 +12,22 @@ body { font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif; back
 .hd .badge { font-size:11px; background:#b8860b; padding:3px 8px; border-radius:20px; }
 .hd a { margin-left:auto; color:#aab; font-size:13px; text-decoration:none; }
 .tabs { display:flex; flex-wrap:wrap; gap:2px; background:#fff; padding:0 16px; border-bottom:1px solid #e8e4da; }
+/* ソース切替バー */
+.srcbar { display:flex; gap:6px; background:#14213d; padding:8px 16px; align-items:center; }
+.srcbtn { padding:7px 18px; border-radius:20px; font-size:13px; cursor:pointer;
+  background:rgba(255,255,255,.08); color:#aab; border:1px solid transparent;
+  display:flex; align-items:center; gap:6px; white-space:nowrap; transition:.15s; }
+.srcbtn:hover { background:rgba(255,255,255,.16); color:#fff; }
+.srcbtn.on { background:#b8860b; color:#fff; font-weight:600; }
+.srcbtn.dim { opacity:.35; cursor:not-allowed; }
+.srcbtn.dim:hover { background:rgba(255,255,255,.08); color:#aab; }
+.srcbtn .n { font-size:11px; opacity:.8; }
+.srcnote { font-size:11px; color:#8a93a8; margin-left:auto; }
+@media (max-width:600px){
+  .srcbar { padding:7px 10px; gap:4px; overflow-x:auto; }
+  .srcbtn { padding:6px 12px; font-size:12px; }
+  .srcnote { display:block; width:100%; margin:4px 0 0; font-size:10.5px; }
+}
 .tab { padding:13px 16px; font-size:14px; color:#7a7362; cursor:pointer; white-space:nowrap; border-bottom:2px solid transparent; }
 .tab:hover { color:#14213d; }
 .tab.active { color:#14213d; font-weight:600; border-bottom-color:#b8860b; }
@@ -88,6 +104,16 @@ button.red { background:#b03a3a; }
   <a href="#" onclick="adminLogout();return false;" style="margin-left:16px;color:#e88;">ログアウト</a>
 </div>
 
+<div class="srcbar">
+  <div class="srcbtn on" data-src="all" onclick="setSource('all')">
+    <span>📊</span><span>合計</span><span class="n" id="srcN-all"></span></div>
+  <div class="srcbtn" data-src="chat" onclick="setSource('chat')">
+    <span>💬</span><span>チャット</span><span class="n" id="srcN-chat"></span></div>
+  <div class="srcbtn" data-src="api" onclick="setSource('api')">
+    <span>🔑</span><span>API</span><span class="n" id="srcN-api"></span></div>
+  <div class="srcnote">チャットとAPIは同じ使用量枠を共有しています</div>
+</div>
+
 <div class="tabs">
   <div class="tab active" data-p="dash" onclick="tab('dash')">📊 ダッシュボード</div>
   <div class="tab" data-p="users" onclick="tab('users')">👥 ユーザー</div>
@@ -100,6 +126,7 @@ button.red { background:#b03a3a; }
   <div class="tab" data-p="contacts" onclick="tab('contacts')">📮 問い合わせ</div>
   <div class="tab" data-p="reports" onclick="tab('reports')">🚨 通報</div>
   <div class="tab" data-p="maint" onclick="tab('maint')">🔧 メンテナンス</div>
+  <div class="tab" data-p="apitest" onclick="tab('apitest')">🧪 APIテスト</div>
   <div class="tab" data-p="errors" onclick="tab('errors')">🐛 エラー</div>
   <div class="tab" data-p="logs" onclick="tab('logs')">📜 監査ログ</div>
 </div>
@@ -156,7 +183,7 @@ button.red { background:#b03a3a; }
 
 <div class="pane" id="p-models">
   <h2>モデル制御</h2>
-  <table><thead><tr><th>モデル</th><th>公開</th><th>メンテ</th><th>最低権限</th><th>メモ</th><th></th></tr></thead>
+  <table><thead><tr><th>モデル</th><th>提供先</th><th>公開</th><th>メンテ</th><th>最低権限</th><th>メモ</th><th></th></tr></thead>
   <tbody id="mBody"></tbody></table>
 </div>
 
@@ -367,6 +394,12 @@ button.red { background:#b03a3a; }
         <input id="mtStart" type="datetime-local"></div>
       <div><label style="font-size:11px;color:#8a8270;">終了</label><br>
         <input id="mtEnd" type="datetime-local"></div>
+      <div><label style="font-size:11px;color:#8a8270;">対象</label><br>
+        <select id="mtScope">
+          <option value="both">両方（チャット + API）</option>
+          <option value="chat">チャットのみ</option>
+          <option value="api">APIのみ</option>
+        </select></div>
     </div>
     <label style="font-size:11px;color:#8a8270;">タイトル</label>
     <input id="mtTitle" placeholder="例: システム更新のためのメンテナンス" style="width:100%">
@@ -403,6 +436,63 @@ button.red { background:#b03a3a; }
   </div>
 </div>
 
+<div class="pane" id="p-apitest">
+  <h2>APIテスト</h2>
+  <div class="form">
+    <div style="font-size:12px;color:#6b6555;margin-bottom:12px;line-height:1.8;">
+      APIキーとモデルを選んで、実際にリクエストを送って動作を確認できます。<br>
+      <span style="color:#a09a8a;">キーは画面に保存されません。テストのたびに入力してください。</span>
+    </div>
+    <label style="font-size:11px;color:#8a8270;">APIキー</label>
+    <input id="atKey" type="password" placeholder="qsk_..." style="width:100%;font-family:monospace;">
+    <div class="row" style="margin:12px 0 0;">
+      <div><label style="font-size:11px;color:#8a8270;">モデル</label><br>
+        <select id="atModel" style="min-width:180px;"></select></div>
+      <div><label style="font-size:11px;color:#8a8270;">エンドポイント</label><br>
+        <select id="atEp" onchange="atSwitch()">
+          <option value="chat">/v1/chat — チャット</option>
+          <option value="grade">/v1/grade — 採点</option>
+        </select></div>
+    </div>
+
+    <div id="atChatBox">
+      <label style="font-size:11px;color:#8a8270;margin-top:12px;display:block;">メッセージ</label>
+      <input id="atMsg" value="こんにちは" style="width:100%;">
+    </div>
+
+    <div id="atGradeBox" style="display:none;">
+      <div class="row" style="margin-top:12px;">
+        <div style="flex:1;"><label style="font-size:11px;color:#8a8270;">問題</label><br>
+          <input id="atQ" value="日本の首都はどこ？" style="width:100%;"></div>
+      </div>
+      <div class="row">
+        <div><label style="font-size:11px;color:#8a8270;">正解</label><br>
+          <input id="atC" value="東京" style="width:160px;"></div>
+        <div><label style="font-size:11px;color:#8a8270;">生徒の回答</label><br>
+          <input id="atA" value="とうきょう" style="width:200px;"></div>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:16px;">
+      <button class="gold" onclick="runApiTest()">▶ 送信</button>
+      <button class="ghost" onclick="document.getElementById('atOut').textContent='';">クリア</button>
+      <span id="atMsgOut" style="font-size:13px;"></span>
+    </div>
+  </div>
+
+  <div style="background:#14213d;border-radius:12px;padding:16px;margin-top:14px;">
+    <div style="font-size:11px;color:#8a93a8;margin-bottom:8px;">レスポンス</div>
+    <pre id="atOut" style="color:#7ee787;font-size:12px;white-space:pre-wrap;
+      word-break:break-all;margin:0;line-height:1.7;min-height:60px;"></pre>
+  </div>
+
+  <div style="background:#fff;border:1px solid #ece9e2;border-radius:12px;padding:16px;margin-top:14px;">
+    <div style="font-size:13px;font-weight:600;margin-bottom:8px;">curl で試す</div>
+    <pre id="atCurl" style="background:#faf9f5;padding:12px;border-radius:8px;font-size:11px;
+      overflow-x:auto;margin:0;line-height:1.7;"></pre>
+  </div>
+</div>
+
 <div class="pane" id="p-errors">
   <h2>エラー監視</h2>
   <div class="cards" id="erCards"></div>
@@ -433,6 +523,62 @@ button.red { background:#b03a3a; }
 
 <script>
 var A='/qstart/api/v1/admin/';
+var SRC = 'all';   // all / chat / api
+
+// タブごとに固定されるソース(切替できないタブ用)
+var SRC_FIXED = {
+  announce: 'chat',    // お知らせはチャット画面のみ
+  features: 'chat',    // 機能フラグはチャット画面の機能
+  reports:  'chat',    // 通報はチャット画面から
+  users:    'all',     // アカウントは共通
+  promo:    'all',     // 優待コードは共通の枠
+  pricing:  'all',     // 料金は共通
+  signup:   'all',     // 登録は共通
+  contacts: 'all',     // 問い合わせ窓口はひとつ
+  logs:     'all',     // 管理操作の記録は共通
+  apitest:  'api'      // APIのテストなのでAPI固定
+};
+
+// 切替バーを使うタブ(それ以外では固定表示)
+var SRC_TABS = {
+  dash:   true,   // 使用量を分けて見る
+  models: true,   // チャットとAPIで別々に設定できる
+  maint:  true,   // チャットだけ止める等
+  errors: true,   // どちらで出たエラーか
+  users:  false,  // アカウントは共通なので合計
+  announce: false, features: false, promo: false,
+  pricing: false, signup: false, contacts: false,
+  reports: false, logs: false
+};
+
+// タブごとの対象を表示する注記
+var SRC_NOTE = {
+  announce: '📢 お知らせはチャット画面にのみ表示されるため、分ける必要がありません',
+  features: '🚩 機能フラグはチャット画面の機能を制御するため、APIには影響しません',
+  promo:    '🎟 優待コードはチャットとAPIで同じ枠に加算されるため、共通です',
+  pricing:  '💰 料金はチャットとAPIで同じ枠のため、共通です',
+  signup:   '🎫 アカウントを作ると両方で使えるため、共通です',
+  users:    '👥 アカウントはチャットとAPIで共通です（使用量の内訳は各行に表示）',
+  contacts: '📮 お問い合わせ窓口はひとつのため、共通です',
+  reports:  '🚨 通報はチャット画面から送られるため、分ける必要がありません',
+  logs:     '📜 管理操作の記録は共通です'
+};
+
+function setSource(s){
+  var btn = document.querySelector('.srcbtn[data-src="'+s+'"]');
+  if (btn && btn.classList.contains('dim')) return;   // 対象外のタブでは切替不可
+  SRC = s;
+  document.querySelectorAll('.srcbtn').forEach(function(b){
+    b.classList.toggle('on', b.dataset.src === s);
+  });
+  // 今開いているタブを再読み込み
+  var cur = document.querySelector('.tab.active');
+  if (cur) tab(cur.dataset.p);
+}
+
+function srcQ(base){
+  return base + (base.indexOf('?') >= 0 ? '&' : '?') + 'source=' + SRC;
+}
 var uPage=1;
 function esc(s){var d=document.createElement('div');d.textContent=(s==null?'':s);return d.innerHTML;}
 function num(n){return (n||0).toLocaleString();}
@@ -444,16 +590,53 @@ async function api(p,m,b){
 function tab(n){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.p===n));
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active',p.id==='p-'+n));
-  ({dash:loadStats,users:()=>loadUsers(1),announce:loadAnnounce,models:loadModels,features:loadFeatures,promo:loadPromo,pricing:loadPricing,signup:loadSignup,contacts:loadContacts,reports:loadReports,maint:loadMaint,errors:loadErrors,logs:function(){loadLogs();loadBackup();}}[n]||function(){})();
+  // 切替バーの出し入れ
+  var bar = document.querySelector('.srcbar');
+  if (bar) {
+    bar.style.display = 'flex';   // ★常に表示
+    var use = !!SRC_TABS[n];
+    // 対象外のタブでは、そのタブに対応するソースを選んで固定表示
+    if (!use) {
+      var fix = SRC_FIXED[n] || 'all';
+      if (SRC !== fix) SRC = fix;
+      document.querySelectorAll('.srcbtn').forEach(function(b){
+        b.classList.toggle('on', b.dataset.src === fix);
+        if (b.dataset.src !== fix) b.classList.add('dim');
+        else b.classList.remove('dim');
+      });
+      var nt = document.querySelector('.srcnote');
+      if (nt) nt.textContent = SRC_NOTE[n] ||
+        (fix === 'all' ? 'このページはチャットとAPIで共通です'
+                       : 'このページは' + ({chat:'チャット', api:'API'}[fix]) + '専用です');
+    } else {
+      document.querySelectorAll('.srcbtn').forEach(function(b){ b.classList.remove('dim'); });
+      var nt2 = document.querySelector('.srcnote');
+      if (nt2) nt2.textContent = 'チャットとAPIは同じ使用量枠を共有しています';
+    }
+  }
+  // 注記
+  // 注記は切替バーに表示するのでここでは何もしない
+  ({dash:loadStats,users:()=>loadUsers(1),announce:loadAnnounce,models:loadModels,features:loadFeatures,promo:loadPromo,pricing:loadPricing,signup:loadSignup,contacts:loadContacts,reports:loadReports,maint:loadMaint,apitest:loadApiTest,errors:loadErrors,logs:function(){loadLogs();loadBackup();}}[n]||function(){})();
 }
 function bars(el,items,key,val){
   var max=Math.max(1,...items.map(i=>i[val]));
   el.innerHTML=items.map(i=>'<div class="bar"><div class="t">'+esc(i[key])+'</div><div class="g"><i style="width:'+(i[val]/max*100)+'%"></i></div><div style="width:80px;text-align:right;">'+num(i[val])+'</div></div>').join('')||'<div style="color:#aaa;font-size:12px;">データなし</div>';
 }
 async function loadStats(){
-  var d=await api('stats'); if(!d.ok)return; var s=d.stats;
+  var d=await api(srcQ('stats')); if(!d.ok)return; var s=d.stats;
   var C=[['総ユーザー',s.users_total],['今日の登録',s.users_today],['プロジェクト',s.projects],['チャット',s.chats],['24hトークン',s.tokens_24h],['累計トークン',s.tokens_total],['未対応通報',s.reports_open],['24hエラー',s.errors_24h||0]];
   document.getElementById('statCards').innerHTML=C.map(c=>'<div class="card"><div class="k">'+c[0]+'</div><div class="v">'+num(c[1])+'</div></div>').join('');
+  // 切替バーに内訳を表示
+  var bs = {}; (s.by_source||[]).forEach(function(x){ bs[x.source] = x.tokens; });
+  var tChat = (bs.chat||0) + (bs.qstart||0);
+  var tApi  = (bs.api||0) + (bs.grade||0);
+  var eAll = document.getElementById('srcN-all');
+  var eC = document.getElementById('srcN-chat');
+  var eA = document.getElementById('srcN-api');
+  if (eAll) eAll.textContent = num(tChat + tApi);
+  if (eC) eC.textContent = num(tChat);
+  if (eA) eA.textContent = num(tApi);
+
   bars(document.getElementById('byModel'),s.by_model,'model','tokens');
   bars(document.getElementById('byLang'),s.by_lang,'lang','n');
 }
@@ -464,7 +647,11 @@ async function loadUsers(p){
   document.getElementById('uTotal').textContent=num(d.total)+'人';
   document.getElementById('uPage').textContent=d.page+' / '+Math.max(1,Math.ceil(d.total/d.per));
   document.getElementById('uBody').innerHTML=d.users.map(u=>
-    '<tr><td>'+esc(u.user_id)+'</td><td>'+esc(u.nickname)+'</td><td>'+esc(u.lang||'ja')+'</td><td>'+num(u.tokens)+'</td>'+
+    '<tr><td>'+esc(u.user_id)+'</td><td>'+esc(u.nickname)+'</td><td>'+esc(u.lang||'ja')+'</td>'+
+    '<td>'+num(u.tokens)+
+      (SRC==='all' && (u.tok_chat||u.tok_api)
+        ? '<br><span style="font-size:10px;color:#999;">💬'+num(u.tok_chat)+' 🔑'+num(u.tok_api)+'</span>' : '')
+    +'</td>'+
     '<td><select onchange="setUser(\''+esc(u.user_id)+'\',\'role\',this.value)">'+
     ['user','moderator','admin'].map(r=>'<option value="'+r+'"'+(u.role===r?' selected':'')+'>'+r+'</option>').join('')+'</select></td>'+
     '<td><span class="pill '+(u.status==='active'?'on':'off')+'">'+esc(u.status)+'</span></td>'+
@@ -493,18 +680,51 @@ async function createAnnounce(){
 async function togAn(id,v){await api('announce/'+id,'PATCH',{active:v});loadAnnounce();}
 async function delAn(id){if(!confirm('削除しますか？'))return;await api('announce/'+id,'DELETE');loadAnnounce();}
 async function loadModels(){
-  var d=await api('models'); if(!d.ok)return;
-  document.getElementById('mBody').innerHTML=d.models.map(m=>
-    '<tr><td style="font-weight:600;">'+esc(m.model)+'</td>'+
-    '<td><input type="checkbox" id="me-'+m.model+'"'+(m.enabled?' checked':'')+'></td>'+
-    '<td><input type="checkbox" id="mm-'+m.model+'"'+(m.maintenance?' checked':'')+'></td>'+
-    '<td><select id="mr-'+m.model+'">'+['user','staff','admin'].map(r=>'<option value="'+r+'"'+(m.min_role===r?' selected':'')+'>'+r+'</option>').join('')+'</select></td>'+
-    '<td><input id="mn-'+m.model+'" value="'+esc(m.note)+'" style="width:180px"></td>'+
-    '<td><button onclick="saveModel(\''+m.model+'\')">保存</button></td></tr>').join('');
+  var d=await api(srcQ('models')); if(!d.ok)return;
+  var el = document.getElementById('mBody');
+  var head = document.querySelector('#p-models table thead tr');
+
+  if (SRC === 'all') {
+    // 合計: チャットとAPIの状態を並べて表示(閲覧のみ)
+    head.innerHTML = '<th>モデル</th><th>💬 チャット</th><th>🔑 API</th><th>メモ</th>';
+    el.innerHTML = d.models.map(function(m){
+      var badge = function(on, mt){
+        if (Number(mt)) return '<span class="pill" style="background:#fff3e0;color:#e65100;">メンテ中</span>';
+        return Number(on) ? '<span class="pill on">公開</span>'
+                          : '<span class="pill off">停止</span>';
+      };
+      return '<tr><td style="font-weight:600;">'+esc(m.display||m.model)
+        +'<br><span style="font-size:10px;color:#999;font-family:monospace;">'+esc(m.model)+'</span></td>'
+        +'<td>'+badge(m.chat_enabled, m.chat_maint)+'</td>'
+        +'<td>'+badge(m.api_enabled, m.api_maint)+'</td>'
+        +'<td style="font-size:12px;color:#777;">'+esc(m.note||'')+'</td></tr>';
+    }).join('');
+    return;
+  }
+
+  // chat / api: その提供先の設定を編集できる
+  var L = {chat:'チャット', api:'API'}[SRC];
+  head.innerHTML = '<th>モデル</th><th>公開</th><th>メンテ</th><th>最低権限</th><th>メモ</th><th></th>';
+  el.innerHTML = d.models.map(function(m){
+    return '<tr><td style="font-weight:600;">'+esc(m.display||m.model)
+      +'<br><span style="font-size:10px;color:#999;font-family:monospace;">'+esc(m.model)+'</span></td>'
+      +'<td><input type="checkbox" id="me-'+m.model+'"'+(Number(m.enabled)?' checked':'')+'></td>'
+      +'<td><input type="checkbox" id="mm-'+m.model+'"'+(Number(m.maintenance)?' checked':'')+'></td>'
+      +'<td><select id="mr-'+m.model+'">'
+      +['user','staff','admin'].map(function(r){
+          return '<option value="'+r+'"'+(m.min_role===r?' selected':'')+'>'+r+'</option>';
+        }).join('')+'</select></td>'
+      +'<td><input id="mn-'+m.model+'" value="'+esc(m.note||'')+'" style="width:180px"></td>'
+      +'<td><button onclick="saveModel(\''+m.model+'\')">保存</button></td></tr>';
+  }).join('');
 }
+
 async function saveModel(m){
-  await api('models','POST',{model:m,enabled:document.getElementById('me-'+m).checked,
-    maintenance:document.getElementById('mm-'+m).checked,min_role:document.getElementById('mr-'+m).value,
+  if (SRC === 'all') { alert('「チャット」か「API」を選んでから編集してください'); return; }
+  await api('models','POST',{model:m, scope:SRC,
+    enabled:document.getElementById('me-'+m).checked,
+    maintenance:document.getElementById('mm-'+m).checked,
+    min_role:document.getElementById('mr-'+m).value,
     note:document.getElementById('mn-'+m).value});
   loadModels();
 }
@@ -836,7 +1056,9 @@ async function loadMaint(){
   document.getElementById('mtBody2').innerHTML = (d.list||[]).map(function(m){
     return '<tr><td style="font-size:12px;">'+esc(m.starts_at)+'<br>〜 '+esc(m.ends_at)+'</td>'
       +'<td style="font-size:12.5px;">'+esc(m.title||'')+'</td>'
-      +'<td>'+(TYPE[Number(m.is_emergency)]||'')+'</td>'
+      +'<td>'+(TYPE[Number(m.is_emergency)]||'')
+      +'<br><span style="font-size:10px;color:#999;">'
+      +({both:'両方',chat:'チャット',api:'API'}[m.scope||'both'])+'</span></td>'
       +'<td><span class="pill '+(m.status==='done'?'on':'off')+'">'+(STAT[m.status]||m.status)+'</span></td>'
       +'<td style="font-size:12px;">'+(m.compensated_at
           ? '<span style="color:#2e7d32;">✅ '+num(m.compensate)+'</span>'
@@ -868,6 +1090,7 @@ async function createMaint(emergency){
     ends_at: e.replace('T',' ').slice(0,16),
     title: document.getElementById('mtTitle').value,
     body: document.getElementById('mtBody').value,
+    scope: document.getElementById('mtScope').value,
     emergency: emergency });
   if (d.ok) { m.style.color='#2e7d32'; m.textContent='✅ 登録しました'; loadMaint(); }
   else { m.style.color='#c0392b'; m.textContent=d.error||'失敗しました'; }
@@ -927,8 +1150,83 @@ async function doCompensate(){
   else { m.style.color='#c0392b'; m.textContent=d.error||'失敗しました'; }
 }
 
+function atSwitch(){
+  var ep = document.getElementById('atEp').value;
+  document.getElementById('atChatBox').style.display  = ep === 'chat'  ? 'block' : 'none';
+  document.getElementById('atGradeBox').style.display = ep === 'grade' ? 'block' : 'none';
+  atCurlUpdate();
+}
+
+async function loadApiTest(){
+  var d = await api('models?source=api');
+  var sel = document.getElementById('atModel');
+  if (d.ok) {
+    sel.innerHTML = d.models.map(function(m){
+      var ok = Number(m.enabled) && !Number(m.maintenance);
+      return '<option value="'+m.model+'"'+(ok?'':' disabled')+'>'
+        + (m.display||m.model) + (ok?'':' (停止中)') + '</option>';
+    }).join('');
+  }
+  atSwitch();
+}
+
+function atCurlUpdate(){
+  var ep = document.getElementById('atEp').value;
+  var model = document.getElementById('atModel').value;
+  var body;
+  if (ep === 'chat') {
+    body = JSON.stringify({message: document.getElementById('atMsg').value, model: model});
+  } else {
+    body = JSON.stringify({question: document.getElementById('atQ').value,
+      correct: document.getElementById('atC').value,
+      answer: document.getElementById('atA').value});
+  }
+  var url = 'https://yuto113.pythonanywhere.com/qstart/api/v1/' + ep;
+  document.getElementById('atCurl').textContent =
+    'curl -X POST ' + url + ' \\\n'
+    + "  -H 'Authorization: Bearer あなたのAPIキー' \\\n"
+    + "  -H 'Content-Type: application/json' \\\n"
+    + "  -d '" + body + "'";
+}
+
+async function runApiTest(){
+  var key = document.getElementById('atKey').value.trim();
+  var ep = document.getElementById('atEp').value;
+  var model = document.getElementById('atModel').value;
+  var out = document.getElementById('atOut');
+  var msg = document.getElementById('atMsgOut');
+  if (!key) { msg.style.color='#c0392b'; msg.textContent='APIキーを入力してください'; return; }
+  msg.style.color='#8a8270'; msg.textContent='送信中…';
+  out.textContent = '';
+
+  var body = ep === 'chat'
+    ? {message: document.getElementById('atMsg').value, model: model}
+    : {question: document.getElementById('atQ').value,
+       correct: document.getElementById('atC').value,
+       answer: document.getElementById('atA').value};
+
+  var t0 = Date.now();
+  try {
+    var r = await fetch('/qstart/api/v1/' + ep, {
+      method:'POST',
+      headers:{'Authorization':'Bearer '+key, 'Content-Type':'application/json'},
+      body: JSON.stringify(body)});
+    var txt = await r.text();
+    var ms = Date.now() - t0;
+    try { txt = JSON.stringify(JSON.parse(txt), null, 2); } catch(e) {}
+    out.style.color = r.ok ? '#7ee787' : '#ff7b72';
+    out.textContent = 'HTTP ' + r.status + '  (' + ms + 'ms)\n\n' + txt;
+    msg.style.color = r.ok ? '#2e7d32' : '#c0392b';
+    msg.textContent = r.ok ? '✅ 成功' : '❌ エラー';
+  } catch(e) {
+    out.style.color='#ff7b72'; out.textContent = String(e);
+    msg.style.color='#c0392b'; msg.textContent='通信エラー';
+  }
+  atCurlUpdate();
+}
+
 async function loadErrors(){
-  var d = await api('errors'); if(!d.ok) return;
+  var d = await api(srcQ('errors')); if(!d.ok) return;
   var tot = d.errors.reduce(function(a,e){return a+(e.count||0);},0);
   document.getElementById('erCards').innerHTML =
     [['24時間のエラー', d.count_24h],['種類', d.errors.length],['累計', tot]]
