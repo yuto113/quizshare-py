@@ -837,6 +837,89 @@ def api_grade_batch():
     return jsonify({'ok': True, 'results': out, 'stats': stats, 'n': len(out)})
 
 
+# ========== モデルのライフサイクル ==========
+def model_lifecycle(model):
+    """そのモデルの提供状況を返す
+    status: active / deprecated / sunset
+    """
+    conn = db()
+    r = conn.execute("""SELECT deprecated_at, sunset_at, successor, sunset_note, display
+        FROM qstart_model_flags WHERE model=?""", (model,)).fetchone()
+    conn.close()
+    if not r:
+        return {'status': 'unknown'}
+    n = now()[:10]
+    dep, sun = r['deprecated_at'], r['sunset_at']
+    out = {'status': 'active', 'deprecated_at': dep, 'sunset_at': sun,
+           'successor': r['successor'], 'note': r['sunset_note'],
+           'display': r['display']}
+    if sun and n >= sun[:10]:
+        out['status'] = 'sunset'
+    elif dep and n >= dep[:10]:
+        out['status'] = 'deprecated'
+    if sun:
+        try:
+            import datetime as _d
+            days = (_d.datetime.strptime(sun[:10], '%Y-%m-%d')
+                    - _d.datetime.strptime(n, '%Y-%m-%d')).days
+            out['days_left'] = days
+        except Exception:
+            pass
+    return out
+
+
+def resolve_model(model):
+    """終了したモデルは後継に自動で切り替える。(実際に使うモデル名, 案内文)"""
+    lc = model_lifecycle(model)
+    if lc.get('status') == 'sunset' and lc.get('successor'):
+        return lc['successor'], (
+            f"「{lc.get('display') or model}」は{lc['sunset_at'][:10]}で提供を終了しました。"
+            f"自動的に後継モデルでお答えしています。")
+    return model, None
+
+
+@qstart_core.route('/qstart/api/v1/models/<model>/lifecycle')
+def model_lifecycle_api(model):
+    return jsonify(dict({'ok': True, 'model': model}, **model_lifecycle(model)))
+
+
+@qstart_core.route('/qstart/api/v1/admin/lifecycle', methods=['POST'])
+@require_admin
+def admin_set_lifecycle():
+    """提供終了の予定を設定する"""
+    d = request.get_json(silent=True) or {}
+    m = (d.get('model') or '').strip()
+    if not m:
+        return jsonify({'ok': False, 'error': 'model_required'}), 400
+    conn = db()
+    conn.execute("""UPDATE qstart_model_flags SET
+        deprecated_at=?, sunset_at=?, successor=?, sunset_note=?, updated_at=?
+        WHERE model=?""",
+        (d.get('deprecated_at') or None, d.get('sunset_at') or None,
+         d.get('successor') or None, d.get('sunset_note') or None, now(), m))
+
+    # 提供終了の6ヶ月前告知を自動でお知らせに登録する
+    if d.get('announce') and d.get('sunset_at'):
+        disp = conn.execute('SELECT display FROM qstart_model_flags WHERE model=?',
+                            (m,)).fetchone()
+        name = (disp['display'] if disp else m)
+        succ = d.get('successor') or ''
+        body = (d.get('sunset_note') or
+            f"{d['sunset_at'][:10]}をもって「{name}」の提供を終了します。\n\n"
+            + (f"後継モデル「{succ}」をご利用ください。\n" if succ else "")
+            + "APIをお使いの方は model の指定を変更してください。\n"
+              "変更されない場合は、終了後に自動で後継モデルへ切り替わります。\n\n"
+              "ご不便をおかけしますが、よろしくお願いします。\n\n[Qzero会社]")
+        conn.execute("""INSERT INTO qstart_announcements
+            (title,body,level,lang,target,active,created_by,created_at,scope)
+            VALUES(?,?,?,?,?,1,?,?,?)""",
+            (f'{name} の提供終了について', body, 'warn', 'all', 'all',
+             cur_uid() or 'admin', now(), 'both'))
+    conn.commit(); conn.close()
+    alog('lifecycle', m, f"deprecated={d.get('deprecated_at')} sunset={d.get('sunset_at')}")
+    return jsonify({'ok': True})
+
+
 # ========== メンテナンス ==========
 def init_maintenance():
     _mk_compensation_cols()

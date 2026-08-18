@@ -2012,6 +2012,8 @@ def api_qstart_chat():
 
         if model not in ('equi', 'equi-1', 'zin', 'zin-1'):
             import qstart_core as _qc_ap
+            # 提供終了したモデルは後継に自動で切り替える
+            model, _lc_note = _qc_ap.resolve_model(model)
             _u = _qc_ap.get_model_source(model)
             if not _u:
                 raise RuntimeError(f'{model} はまだ準備中です')
@@ -2021,6 +2023,8 @@ def api_qstart_chat():
             if effort == 'low':
                 _s = reply.split('。')
                 reply = _s[0] + '。' if _s[0] else reply
+            if _lc_note:
+                reply = reply + '\n\n※ ' + _lc_note
         elif model in ('zin', 'zin-1'):
             if _zin_model is None:
                 _zin_model = EquiInference(

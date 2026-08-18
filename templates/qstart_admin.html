@@ -419,6 +419,33 @@ button.red { background:#b03a3a; }
   <table><thead><tr><th>期間</th><th>タイトル</th><th>種類</th><th>状態</th><th>補償</th><th></th></tr></thead>
   <tbody id="mtBody2"></tbody></table>
 
+  <div id="lcBox" style="background:#fff;border:1px solid #ece9e2;border-radius:12px;
+    padding:18px;margin-top:16px;">
+    <div style="font-size:14px;font-weight:600;margin-bottom:6px;">📅 提供終了の予定</div>
+    <div style="font-size:11.5px;color:#8a8270;line-height:1.8;margin-bottom:14px;">
+      新しい世代に切り替えるとき、古いモデルの終了日を決めておきます。<br>
+      終了日を過ぎると、そのモデルへのリクエストは自動で後継モデルに切り替わります。
+    </div>
+    <div class="row">
+      <div><label style="font-size:11px;color:#8a8270;">対象モデル</label><br>
+        <select id="lcModel" style="min-width:150px;"></select></div>
+      <div><label style="font-size:11px;color:#8a8270;">非推奨にする日</label><br>
+        <input id="lcDep" type="date"></div>
+      <div><label style="font-size:11px;color:#8a8270;">提供を終了する日</label><br>
+        <input id="lcSun" type="date"></div>
+      <div><label style="font-size:11px;color:#8a8270;">移行先</label><br>
+        <select id="lcSucc" style="min-width:150px;"><option value="">（なし）</option></select></div>
+    </div>
+    <label style="font-size:11px;color:#8a8270;margin-top:12px;display:block;">お知らせ本文（空欄なら自動生成）</label>
+    <textarea id="lcNote" style="min-height:70px;" placeholder="例: 画像を理解できる新モデルに刷新するため…"></textarea>
+    <div class="row" style="margin-top:14px;">
+      <label style="font-size:12.5px;display:flex;align-items:center;gap:6px;">
+        <input type="checkbox" id="lcAnnounce" checked> 同時にお知らせを配信する</label>
+      <button class="gold" onclick="saveLifecycle()">保存</button>
+      <span id="lcMsg" style="font-size:13px;"></span>
+    </div>
+  </div>
+
   <div id="mtComp" style="display:none;background:#fff;border:1px solid #ece9e2;
     border-radius:12px;padding:18px;margin-top:16px;">
     <div style="display:flex;align-items:center;margin-bottom:12px;">
@@ -717,6 +744,7 @@ async function loadModels(){
       +'<td><input id="mn-'+m.model+'" value="'+esc(m.note||'')+'" style="width:180px"></td>'
       +'<td><button onclick="saveModel(\''+m.model+'\')">保存</button></td></tr>';
   }).join('');
+  fillLifecycleSelects(d.models);
 }
 
 async function saveModel(m){
@@ -1223,6 +1251,31 @@ async function runApiTest(){
     msg.style.color='#c0392b'; msg.textContent='通信エラー';
   }
   atCurlUpdate();
+}
+
+async function saveLifecycle(){
+  var m = document.getElementById('lcMsg');
+  var d = await api('lifecycle','POST',{
+    model: document.getElementById('lcModel').value,
+    deprecated_at: document.getElementById('lcDep').value,
+    sunset_at: document.getElementById('lcSun').value,
+    successor: document.getElementById('lcSucc').value,
+    sunset_note: document.getElementById('lcNote').value,
+    announce: document.getElementById('lcAnnounce').checked});
+  if(d.ok){ m.style.color='#2e7d32'; m.textContent='✅ 保存しました'; loadModels(); }
+  else { m.style.color='#c0392b'; m.textContent=d.error||'失敗しました'; }
+  setTimeout(function(){m.textContent='';}, 4000);
+}
+
+function fillLifecycleSelects(models){
+  var a = document.getElementById('lcModel');
+  var b = document.getElementById('lcSucc');
+  if (!a || !b) return;
+  var opts = models.map(function(m){
+    return '<option value="'+m.model+'">'+(m.display||m.model)+'</option>';
+  }).join('');
+  a.innerHTML = opts;
+  b.innerHTML = '<option value="">（なし）</option>' + opts;
 }
 
 async function loadErrors(){
