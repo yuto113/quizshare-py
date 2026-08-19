@@ -107,8 +107,7 @@ let pagesData = [];
 let customPagesData = [];
 
 function doLogin() {
-  adminPw = (document.getElementById('admin-pw')||{}).value || '';
-  if (!adminPw && !window.__EMBED_ADMIN) { alert('パスワードを入力してね'); return; }
+  adminPw = '';
   document.getElementById('login-section').style.display = 'none';
   document.getElementById('main-section').style.display = 'block';
   loadAll();

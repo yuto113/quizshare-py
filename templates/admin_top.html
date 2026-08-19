@@ -127,10 +127,10 @@ window.toggleAutoTheme2 = function() {
 {% block scripts %}
 <script>
 let adminPw = '';
+// 管理センター経由ならパスワード不要(サーバーがセッションで判定する)
 
 window.loadGroups = async function() {
-  const pw = (document.getElementById('admin-pw')||{}).value || '';
-  if (!pw && !window.__EMBED_ADMIN) { window.toast('パスワードを入力してね', 'error'); return; }
+  const pw = '';
   try {
     const r = await fetch('/api/admin/groups?pw=' + encodeURIComponent(pw));
     const data = await r.json();
@@ -242,7 +242,7 @@ function goSetting(groupName) {
 }
 
 function openFeedback() {
-  window.open('/feedback/list?pw=' + encodeURIComponent(adminPw), '_blank');
+  window.open('/feedback/list', '_blank');
 }
 
 async function saveEventSchedule(eventId) {

@@ -260,16 +260,11 @@ def page_admin_top():
     return render_template('admin_top.html')
 
 def admin_pw_ok(pw=None):
-    """管理者として認めるか。
-    ・管理センターでログイン済み(qz_staff の admin) → パスワード不要
-    ・そうでなければ ADMIN_PASSWORD と一致すること
+    """管理者かどうか。
+    管理センター(/admin)でログインしている場合のみ許可する。
+    ※以前の管理者パスワード方式は廃止した
     """
-    if admin_center_role() == 'admin':
-        return True
-    if pw is None:
-        pw = request.args.get('pw', '') or (request.get_json(silent=True) or {}).get('pw', '')
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
-    return bool(admin_pw) and pw == admin_pw
+    return admin_center_role() == 'admin'
 
 
 @app.route('/api/admin/groups', methods=['GET'])

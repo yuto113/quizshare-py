@@ -64,24 +64,19 @@ def page_theme():
     return render_template('theme.html')
 
 def _admin_ok(pw=None):
-    """管理者として認めるか(管理センターでログイン済みならパスワード不要)"""
+    """管理者かどうか。管理センターでログインしている場合のみ許可する"""
     try:
         from flask import session as _ss
         sid = _ss.get('staff_id')
-        if sid:
-            import sqlite3 as _sq
-            _c = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
-            r = _c.execute('SELECT role, status FROM qz_staff WHERE staff_id=?', (sid,)).fetchone()
-            _c.close()
-            if r and r[0] == 'admin' and (r[1] or 'active') == 'active':
-                return True
+        if not sid:
+            return False
+        import sqlite3 as _sq
+        _c = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+        r = _c.execute('SELECT role, status FROM qz_staff WHERE staff_id=?', (sid,)).fetchone()
+        _c.close()
+        return bool(r and r[0] == 'admin' and (r[1] or 'active') == 'active')
     except Exception:
-        pass
-    if pw is None:
-        d = request.get_json(silent=True) or {}
-        pw = d.get('password') or d.get('pw') or request.args.get('pw', '')
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
-    return bool(admin_pw) and pw == admin_pw
+        return False
 
 
 @bp.route('/api/ai/score', methods=['POST'])
