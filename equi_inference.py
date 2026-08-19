@@ -96,6 +96,7 @@ class EquiInference:
         # ★ レスポンスキャッシュ
         self._cache = {}
         self._cache_max = 200
+        self.model_name = 'Apex'   # 表示名(load時に上書きできる)
 
         total = sum(v.size for v in self.W.values())
         print(f'  語彙: {self.V}, パラメータ: {total:,} (float32)')
@@ -305,9 +306,16 @@ class EquiInference:
 
         reply = self.decode(result_ids)
 
+        # 作者名を会社名に置き換える
         reply = reply.replace('yutoが作った自作の', 'Qzero会社が作った')
         reply = reply.replace('yutoが作りました', 'Qzero会社が作りました')
         reply = reply.replace('yutoが作った', 'Qzero会社が作った')
+        # モデル名を実際のものに置き換える(Pure が Apex と名乗らないように)
+        if getattr(self, 'model_name', 'Apex') not in ('', 'Apex'):
+            _mn = self.model_name
+            reply = reply.replace('Qstart Apex', 'Qstart ' + _mn)
+            reply = reply.replace('Apexです', _mn + 'です')
+            reply = reply.replace('Apexといい', _mn + 'といい')
 
         if self._cache_max > 0:
             while len(self._cache) >= self._cache_max:

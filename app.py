@@ -2019,6 +2019,17 @@ def api_qstart_chat():
                 raise RuntimeError(f'{model} はまだ準備中です')
             if model not in _MODEL_CACHE:
                 _MODEL_CACHE[model] = EquiInference(_u['weights'], _u['config'])
+                # モデルの表示名をセット(自己紹介で正しい名前を名乗る)
+                try:
+                    import sqlite3 as _sqn
+                    _cn = _sqn.connect('/home/yuto113/quizshare.db')
+                    _rn = _cn.execute('SELECT display FROM qstart_model_flags WHERE model=?',
+                                      (model,)).fetchone()
+                    _cn.close()
+                    if _rn and _rn[0]:
+                        _MODEL_CACHE[model].model_name = _rn[0].split()[0]
+                except Exception:
+                    pass
             reply = _MODEL_CACHE[model].chat(message)
             if effort == 'low':
                 _s = reply.split('。')
