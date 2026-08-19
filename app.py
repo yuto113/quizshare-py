@@ -254,7 +254,9 @@ def admin_center_logout():
 
 @app.route('/setting/')
 def page_admin_top():
-    # 管理者トップページ（グループ一覧）
+    # 管理センターに統合したので、直接アクセスはそちらへ転送する
+    if request.args.get('embed') != '1':
+        return redirect('/admin')
     return render_template('admin_top.html')
 
 def admin_pw_ok(pw=None):
