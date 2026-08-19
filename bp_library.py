@@ -63,6 +63,27 @@ def page_quizclub_login():
 def page_theme():
     return render_template('theme.html')
 
+def _admin_ok(pw=None):
+    """管理者として認めるか(管理センターでログイン済みならパスワード不要)"""
+    try:
+        from flask import session as _ss
+        sid = _ss.get('staff_id')
+        if sid:
+            import sqlite3 as _sq
+            _c = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+            r = _c.execute('SELECT role, status FROM qz_staff WHERE staff_id=?', (sid,)).fetchone()
+            _c.close()
+            if r and r[0] == 'admin' and (r[1] or 'active') == 'active':
+                return True
+    except Exception:
+        pass
+    if pw is None:
+        d = request.get_json(silent=True) or {}
+        pw = d.get('password') or d.get('pw') or request.args.get('pw', '')
+    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
+    return bool(admin_pw) and pw == admin_pw
+
+
 @bp.route('/api/ai/score', methods=['POST'])
 def api_ai_score():
     import urllib.request as _req, json as _json, re as _re
@@ -149,9 +170,8 @@ def api_ai_score():
 def api_admin_ai_scoring(group_id):
     data = request.get_json(silent=True) or {}
     # 管理者パスワードで認証（setting_ai/からの呼び出し）
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
     pw = data.get('password', '')
-    if pw and pw == admin_pw:
+    if _admin_ok(pw):
         # パスワード認証でUUID直接指定
         with get_db() as conn:
             cur = make_cursor(conn)
@@ -182,8 +202,7 @@ def api_admin_ai_scoring(group_id):
 @bp.route('/api/admin/check_password', methods=['POST'])
 def api_check_admin_password():
     data = request.get_json(silent=True) or {}
-    admin_pw = os.environ.get('ADMIN_PASSWORD','')
-    if data.get('password') == admin_pw:
+    if _admin_ok(data.get('password')):
         return ok(valid=True)
     return err('パスワードが違うよ', 403)
 
@@ -198,8 +217,7 @@ def api_get_custom_themes():
 @bp.route('/api/custom_themes', methods=['POST'])
 def api_add_custom_theme():
     data = request.get_json(silent=True) or {}
-    admin_pw = os.environ.get('ADMIN_PASSWORD','')
-    if data.get('password') != admin_pw:
+    if not _admin_ok(data.get('password')):
         return err('管理者パスワードが違うよ', 403)
     key = (data.get('key') or '').strip().replace(' ','_')
     name = (data.get('name') or '').strip()
@@ -223,8 +241,7 @@ def api_add_custom_theme():
 @bp.route('/api/custom_themes/<int:theme_id>', methods=['DELETE','POST'])
 def api_delete_custom_theme(theme_id):
     data = request.get_json(silent=True) or {}
-    admin_pw = os.environ.get('ADMIN_PASSWORD','')
-    if data.get('password') != admin_pw:
+    if not _admin_ok(data.get('password')):
         return err('管理者パスワードが違うよ', 403)
     import sqlite3 as _sq
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
@@ -244,8 +261,7 @@ def api_get_special_days():
 @bp.route('/api/special_days', methods=['POST'])
 def api_add_special_day():
     pw = request.get_json(silent=True) or {}
-    admin_pw = os.environ.get('ADMIN_PASSWORD','')
-    if pw.get('password') != admin_pw:
+    if not _admin_ok(pw.get('password')):
         return err('管理者パスワードが違うよ', 403)
     data = pw
     month = int(data.get('month',0))
@@ -270,8 +286,7 @@ def api_add_special_day():
 @bp.route('/api/special_days/<int:day_id>', methods=['DELETE','POST'])
 def api_delete_special_day(day_id):
     data = request.get_json(silent=True) or {}
-    admin_pw = os.environ.get('ADMIN_PASSWORD','')
-    if data.get('password') != admin_pw:
+    if not _admin_ok(data.get('password')):
         return err('管理者パスワードが違うよ', 403)
     import sqlite3 as _sq
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))

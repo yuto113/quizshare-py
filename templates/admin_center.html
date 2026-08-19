@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理センター — Qzero</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;
+  background:#faf9f6;color:#14213d;min-height:100vh;display:flex;flex-direction:column}
+.hd{display:flex;align-items:center;gap:12px;padding:12px 20px;background:#14213d;color:#fff}
+.logo{font-size:17px;font-weight:700}.logo span{color:#e0b84a}
+.who{font-size:12px;color:#8a93a8;margin-left:auto}
+.hd a{color:#e88;font-size:13px;text-decoration:none;margin-left:16px;cursor:pointer}
+.tabs{display:flex;gap:2px;background:#1c2d52;padding:0 16px;overflow-x:auto}
+.tab{padding:12px 20px;font-size:14px;color:#aab;cursor:pointer;white-space:nowrap;
+  border-bottom:2px solid transparent;display:flex;align-items:center;gap:7px}
+.tab:hover{color:#fff;background:rgba(255,255,255,.05)}
+.tab.on{color:#fff;border-bottom-color:#e0b84a;background:rgba(255,255,255,.08)}
+.subtabs{display:flex;gap:2px;background:#fff;padding:0 16px;overflow-x:auto;
+  border-bottom:1px solid #ece9e2}
+.sub{padding:10px 14px;font-size:12.5px;color:#8a8270;cursor:pointer;white-space:nowrap;
+  border-bottom:2px solid transparent}
+.sub:hover{color:#14213d;background:#faf9f5}
+.sub.on{color:#14213d;border-bottom-color:#b8860b;font-weight:600}
+.sub.adm{color:#b8860b}
+.sub.adm::before{content:'👑';font-size:10px;margin-right:3px;opacity:.7}
+.sub.adm.on{color:#8a5a00;border-bottom-color:#b8860b}
+.body{flex:1;position:relative;background:#fff}
+iframe{width:100%;height:100%;border:none;display:block;position:absolute;inset:0}
+.note{padding:40px 24px;text-align:center;color:#8a8270;font-size:13.5px;line-height:2}
+@media (max-width:600px){
+  .tab{padding:11px 13px;font-size:13px}
+  .who{display:none}
+}
+</style></head><body>
+
+<div class="hd">
+  <div class="logo">Qzero <span>管理センター</span></div>
+  <div class="who">{{ staff_name }}（{{ '管理者' if role == 'admin' else '社員' }}）</div>
+  <a onclick="doLogout()">ログアウト</a>
+</div>
+
+<div class="tabs">
+  <div class="tab on" data-g="staff" onclick="grp(this)">🏢 社員</div>
+  {% if role == 'admin' %}
+  <div class="tab" data-g="quiz" onclick="grp(this)">📚 QuizShare</div>
+  <div class="tab" data-g="qstart" onclick="grp(this)">⚙️ Qstart</div>
+  {% endif %}
+</div>
+
+<div class="subtabs" id="subtabs"></div>
+
+<div class="body">
+  <iframe id="fr" src="about:blank"></iframe>
+</div>
+
+<script>
+var IS_ADMIN = {{ 'true' if role == 'admin' else 'false' }};
+
+var MENU = {
+  staff: [
+    ['📋 掲示板',      '/staff/board'],
+    ['📁 ファイル',    '/staff/files'],
+    ['📅 カレンダー',  '/staff/calendar'],
+    ['✅ タスク',      '/staff/tasks'],
+    ['📖 ハンドブック','/staff/handbook'],
+    ['👤 プロフィール','/staff/profile'],
+    ['👥 人事',        '/staff/hr',         'admin'],
+    ['🐛 エラー',      '/staff/errors',     'admin'],
+    ['🛡 モデレーション','/staff/moderation', 'admin'],
+    ['💬 会話パターン', '/staff/qzero-patterns', 'admin'],
+    ['📊 統計',        '/staff/dashboard',  'admin'],
+  ],
+  quiz: [
+    ['📋 グループ一覧','/setting/'],
+    ['🤖 AI採点管理', '/setting_ai/'],
+    ['📅 ページ公開', '/setting_schedule/'],
+    ['🎨 テーマ',     '/theme'],
+  ],
+  qstart: [
+    ['⚙️ 管理画面',   '/qstart/admin'],
+    ['🩺 稼働状況',   '/qstart/status'],
+    ['🔑 API',        '/qstart/api'],
+    ['🧪 テスト環境', '/admin/qstart'],
+  ],
+};
+
+function grp(el){
+  document.querySelectorAll('.tab').forEach(function(t){ t.classList.toggle('on', t===el); });
+  var g = el.dataset.g;
+  var items = (MENU[g]||[]).filter(function(x){ return !x[2] || IS_ADMIN; });
+  var sb = document.getElementById('subtabs');
+  sb.innerHTML = items.map(function(x, i){
+    var admin = x[2] === 'admin' ? ' adm' : '';
+    return '<div class="sub'+(i===0?' on':'')+admin+'" data-u="'+x[1]+'" onclick="go(this)">'+x[0]+'</div>';
+  }).join('');
+  if (items.length) setFrame(items[0][1]);
+}
+
+function setFrame(u){
+  // embed=1 を付けて、埋め込み用の表示にする(ヘッダー・バナーを隠す)
+  document.getElementById('fr').src = u + (u.indexOf('?')>=0 ? '&' : '?') + 'embed=1';
+}
+
+function go(el){
+  document.querySelectorAll('.sub').forEach(function(t){ t.classList.toggle('on', t===el); });
+  setFrame(el.dataset.u);
+}
+
+grp(document.querySelector('.tab'));
+async function doLogout(){
+  if(!confirm('ログアウトしますか？')) return;
+  await fetch('/api/admin/logout',{method:'POST'});
+  location.href='/admin/login';
+}
+</script></body></html>

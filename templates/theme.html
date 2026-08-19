@@ -613,3 +613,24 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
+
+<script>
+(function(){
+  if (new URLSearchParams(location.search).get('embed') === '1') {
+    document.documentElement.classList.add('embedded');
+  }
+})();
+</script>
+<style>
+html.embedded, html.embedded body { background:#0f172a !important; color:#e2e8f0 !important; }
+html.embedded .container, html.embedded main { background:transparent !important; }
+html.embedded [style*="background:#f5f5f5"],
+html.embedded [style*="background:#fff"],
+html.embedded [style*="background: #fff"],
+html.embedded [style*="background:white"] {
+  background:#1e293b !important; color:#e2e8f0 !important; border-color:#334155 !important; }
+html.embedded h1, html.embedded h2, html.embedded h3,
+html.embedded p, html.embedded label, html.embedded span { color:#e2e8f0 !important; }
+html.embedded [style*="background:#fff3e0"] { background:#3a2f1a !important; color:#fbbf24 !important; }
+html.embedded a { color:#93c5fd !important; }
+</style>

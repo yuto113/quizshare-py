@@ -97,6 +97,15 @@ button.red { background:#b03a3a; }
 </head>
 <body>
 
+<script>
+(function(){
+  if (new URLSearchParams(location.search).get('embed') === '1') {
+    document.documentElement.classList.add('embedded');
+  }
+})();
+</script>
+<style>html.embedded .hd { display:none !important; }</style>
+
 <div class="hd">
   <div class="logo">Q<span>start</span></div>
   <div class="badge">ADMIN</div><div style="font-size:11px;color:#8a93a8;">v1.6</div>

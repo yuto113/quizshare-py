@@ -188,17 +188,84 @@ def page_answer(quiz_id):
                            ai_scoring=bool(grp.get('ai_scoring', 0)) or _has_key)
 
 
+# ========== 統合管理センター /admin ==========
+def admin_center_role():
+    """統合管理の権限を返す: admin / staff / None"""
+    sid = session.get('staff_id')
+    if not sid:
+        return None
+    try:
+        import sqlite3 as _sqa
+        _c = _sqa.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+        r = _c.execute('SELECT role, status FROM qz_staff WHERE staff_id=?', (sid,)).fetchone()
+        _c.close()
+    except Exception:
+        return None
+    if not r:
+        return None
+    if (r[1] or 'active') != 'active':
+        return None
+    return 'admin' if r[0] == 'admin' else 'staff'
+
+
+@app.route('/admin')
+def admin_center():
+    """統合管理センター"""
+    role = admin_center_role()
+    if not role:
+        return redirect('/admin/login')
+    return render_template('admin_center.html',
+                           role=role,
+                           staff_id=session.get('staff_id'),
+                           staff_name=session.get('staff_name') or session.get('staff_id'))
+
+
+@app.route('/admin/login')
+def admin_center_login():
+    if admin_center_role():
+        return redirect('/admin')
+    return render_template('admin_center_login.html')
+
+
+@app.route('/api/admin/whoami')
+def admin_center_whoami():
+    role = admin_center_role()
+    if not role:
+        return jsonify({'ok': False, 'error': 'not_logged_in'}), 401
+    return jsonify({'ok': True, 'role': role,
+                    'staff_id': session.get('staff_id'),
+                    'name': session.get('staff_name')})
+
+
+@app.route('/api/admin/logout', methods=['POST'])
+def admin_center_logout():
+    for k in ('staff_id', 'staff_name'):
+        session.pop(k, None)
+    return jsonify({'ok': True})
+
+
 @app.route('/setting/')
 def page_admin_top():
     # 管理者トップページ（グループ一覧）
     return render_template('admin_top.html')
 
+def admin_pw_ok(pw=None):
+    """管理者として認めるか。
+    ・管理センターでログイン済み(qz_staff の admin) → パスワード不要
+    ・そうでなければ ADMIN_PASSWORD と一致すること
+    """
+    if admin_center_role() == 'admin':
+        return True
+    if pw is None:
+        pw = request.args.get('pw', '') or (request.get_json(silent=True) or {}).get('pw', '')
+    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
+    return bool(admin_pw) and pw == admin_pw
+
+
 @app.route('/api/admin/groups', methods=['GET'])
 def api_admin_groups():
     # 全グループ一覧を返す（管理者パスワード必須）
-    pw = request.args.get('pw', '')
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
-    if not admin_pw or pw != admin_pw:
+    if not admin_pw_ok():
         return err('管理者パスワードが違うよ', 403)
     with get_db() as conn:
         cur = make_cursor(conn)
@@ -866,9 +933,11 @@ def api_admin_login(group_id):
         return err('パスワードを入力してね')
 
     admin_password = os.environ.get('ADMIN_PASSWORD', '')
-    if not admin_password:
+    if admin_center_role() == 'admin':
+        pass
+    elif not admin_password:
         return err('管理者パスワードが設定されていないよ', 403)
-    if not hmac.compare_digest(password, admin_password):
+    elif not hmac.compare_digest(password, admin_password):
         return err('パスワードが違うよ', 401)
 
     with get_db() as conn:
@@ -1456,8 +1525,7 @@ def feedback_list():
     # 管理者だけが見られるフィードバック一覧ページ
     import sqlite3 as _sq
     admin_pw  = request.args.get("pw", "")
-    correct_pw = os.environ.get("ADMIN_PASSWORD", "")
-    if admin_pw != correct_pw:
+    if not admin_pw_ok(admin_pw):
         # パスワードが違ったら403エラー
         return "管理者パスワードが違います", 403
     # DBに直接つないで一覧を取得する
@@ -1516,9 +1584,7 @@ def page_setting_ai():
 
 @app.route('/api/ai_usage/summary')
 def api_ai_usage_summary():
-    pw = request.args.get('pw', '')
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
-    if not admin_pw or pw != admin_pw:
+    if not admin_pw_ok():
         return err('管理者パスワードが違うよ', 403)
     import sqlite3 as _sq
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
@@ -1559,8 +1625,7 @@ def api_ai_usage_summary():
 def api_set_ai_limit(group_id):
     data = request.get_json(silent=True) or {}
     pw = data.get('password', '')
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
-    if not admin_pw or pw != admin_pw:
+    if not admin_pw_ok(pw):
         return err('管理者パスワードが違うよ', 403)
     daily_limit = int(data.get('daily_limit', 100))
     total_limit = int(data.get('total_limit', 10000))
@@ -1627,9 +1692,7 @@ def sitemap_xml():
 # ===== ページスケジュール管理 =====
 @app.route('/api/page_schedules', methods=['GET'])
 def api_get_page_schedules():
-    pw = request.args.get('pw', '')
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
-    if not admin_pw or pw != admin_pw:
+    if not admin_pw_ok():
         return err('管理者パスワードが違うよ', 403)
     import sqlite3 as _sq
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
@@ -1640,8 +1703,7 @@ def api_get_page_schedules():
 @app.route('/api/page_schedules/<page_key>', methods=['POST'])
 def api_update_page_schedule(page_key):
     data = request.get_json(silent=True) or {}
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
-    if data.get('password') != admin_pw:
+    if not admin_pw_ok(data.get('password')):
         return err('管理者パスワードが違うよ', 403)
     schedules = data.get('schedules', [])
     is_active = 1 if data.get('is_active', True) else 0
@@ -1662,8 +1724,7 @@ def api_update_page_schedule(page_key):
 @app.route('/api/page_schedules/<page_key>/delete', methods=['POST'])
 def api_delete_page_schedule(page_key):
     data = request.get_json(silent=True) or {}
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
-    if data.get('password') != admin_pw:
+    if not admin_pw_ok(data.get('password')):
         return err('管理者パスワードが違うよ', 403)
     import sqlite3 as _sq
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
@@ -1716,9 +1777,8 @@ def api_set_group_ai_config():
 
     # 公式グループの場合は管理者パスワードが必要
     if is_official:
-        admin_pw = os.environ.get('ADMIN_PASSWORD', '')
         pw = data.get('admin_password', '')
-        if pw != admin_pw:
+        if not admin_pw_ok(pw):
             return err('公式グループはサイト管理者のみAI設定できます', 403)
 
     cf_account = (data.get('cf_account_id') or '').strip()
@@ -1769,8 +1829,7 @@ def api_get_group_ai_config():
 @app.route('/api/admin/set_official', methods=['POST'])
 def api_set_official():
     data = request.get_json(silent=True) or {}
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
-    if data.get('password') != admin_pw:
+    if not admin_pw_ok(data.get('password')):
         return err('管理者パスワードが違うよ', 403)
     group_id = data.get('group_id', '')
     is_official = 1 if data.get('is_official') else 0
@@ -1921,8 +1980,7 @@ def daily_db_backup():
 @app.route('/reden')
 def page_reden():
     # 管理者のみアクセス可能
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
-    is_admin = session.get('admin_auth') == True
+    is_admin = (session.get('admin_auth') == True) or (admin_center_role() == 'admin')
     if not is_admin:
         return redirect(url_for('page_home'))
     return render_template('reden.html')

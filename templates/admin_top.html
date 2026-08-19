@@ -741,3 +741,15 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<script>
+// ADMIN_CENTER_AUTO: 管理センターから開いたら自動でログイン扱いにする
+document.addEventListener('DOMContentLoaded', function(){
+  if (new URLSearchParams(location.search).get('embed') !== '1') return;
+  document.documentElement.classList.add('embedded');
+  fetch('/api/admin/whoami').then(function(r){ return r.json(); }).then(function(d){
+    if (d.ok && d.role === 'admin' && typeof window.loadGroups === 'function') {
+      window.loadGroups();   // APIがセッションを見て通してくれる
+    }
+  }).catch(function(){});
+});
+</script>

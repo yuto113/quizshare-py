@@ -45,11 +45,31 @@ def api_access_logs():
 
 # ===== カスタムページ管理 =====
 
+def _admin_ok(pw=None):
+    """管理者として認めるか(管理センターでログイン済みならパスワード不要)"""
+    try:
+        from flask import session as _ss
+        sid = _ss.get('staff_id')
+        if sid:
+            import sqlite3 as _sq
+            _c = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+            r = _c.execute('SELECT role, status FROM qz_staff WHERE staff_id=?', (sid,)).fetchone()
+            _c.close()
+            if r and r[0] == 'admin' and (r[1] or 'active') == 'active':
+                return True
+    except Exception:
+        pass
+    if pw is None:
+        d = request.get_json(silent=True) or {}
+        pw = d.get('password') or d.get('pw') or request.args.get('pw', '')
+    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
+    return bool(admin_pw) and pw == admin_pw
+
+
 @bp.route('/api/custom_pages', methods=['GET'])
 def api_get_custom_pages():
     pw = request.args.get('pw', '')
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
-    if not admin_pw or pw != admin_pw:
+    if not _admin_ok(pw):
         return err('管理者パスワードが違うよ', 403)
     import sqlite3 as _sq
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
@@ -60,8 +80,7 @@ def api_get_custom_pages():
 @bp.route('/api/custom_pages', methods=['POST'])
 def api_create_custom_page():
     data = request.get_json(silent=True) or {}
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
-    if data.get('password') != admin_pw:
+    if not _admin_ok(data.get('password')):
         return err('管理者パスワードが違うよ', 403)
     page_key = (data.get('page_key') or '').strip()
     page_name = (data.get('page_name') or '').strip()
@@ -86,8 +105,7 @@ def api_create_custom_page():
 @bp.route('/api/custom_pages/<page_key>', methods=['POST'])
 def api_update_custom_page(page_key):
     data = request.get_json(silent=True) or {}
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
-    if data.get('password') != admin_pw:
+    if not _admin_ok(data.get('password')):
         return err('管理者パスワードが違うよ', 403)
     content = data.get('content') or {}
     page_name = (data.get('page_name') or '').strip()
@@ -104,8 +122,7 @@ def api_update_custom_page(page_key):
 @bp.route('/api/custom_pages/<page_key>/delete', methods=['POST'])
 def api_delete_custom_page(page_key):
     data = request.get_json(silent=True) or {}
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
-    if data.get('password') != admin_pw:
+    if not _admin_ok(data.get('password')):
         return err('管理者パスワードが違うよ', 403)
     import sqlite3 as _sq
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
@@ -186,8 +203,7 @@ def api_teacher_login():
 def api_teacher_register_first():
     # 管理者が最初の先生を登録
     data = request.get_json(silent=True) or {}
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
-    if data.get('admin_password') != admin_pw:
+    if not _admin_ok(data.get('admin_password')):
         return err('管理者パスワードが違うよ', 403)
     group_id = (data.get('group_id') or '').strip()
     password = data.get('password') or ''
@@ -401,8 +417,7 @@ def api_teacher_count():
 @bp.route('/api/admin/teachers/<group_id>', methods=['GET'])
 def api_admin_get_teachers(group_id):
     pw = request.args.get('pw', '')
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
-    if not admin_pw or pw != admin_pw:
+    if not _admin_ok(pw):
         return err('管理者パスワードが違うよ', 403)
     import sqlite3 as _sq
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
@@ -414,8 +429,7 @@ def api_admin_get_teachers(group_id):
 @bp.route('/api/admin/teacher/add', methods=['POST'])
 def api_admin_add_teacher():
     data = request.get_json(silent=True) or {}
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
-    if data.get('password') != admin_pw:
+    if not _admin_ok(data.get('password')):
         return err('管理者パスワードが違うよ', 403)
     group_id = data.get('group_id', '')
     name = (data.get('name') or '先生').strip()
@@ -445,8 +459,7 @@ def api_admin_add_teacher():
 @bp.route('/api/admin/teacher/delete', methods=['POST'])
 def api_admin_delete_teacher():
     data = request.get_json(silent=True) or {}
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
-    if data.get('password') != admin_pw:
+    if not _admin_ok(data.get('password')):
         return err('管理者パスワードが違うよ', 403)
     teacher_id = data.get('teacher_id')
     import sqlite3 as _sq
@@ -683,8 +696,7 @@ def page_event(event_key):
 @bp.route('/api/events', methods=['GET'])
 def api_get_events():
     pw = request.args.get('pw', '')
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
-    if not admin_pw or pw != admin_pw:
+    if not _admin_ok(pw):
         return err('管理者パスワードが違うよ', 403)
     import sqlite3 as _sq
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
@@ -695,8 +707,7 @@ def api_get_events():
 @bp.route('/api/events', methods=['POST'])
 def api_create_event():
     data = request.get_json(silent=True) or {}
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
-    if data.get('password') != admin_pw:
+    if not _admin_ok(data.get('password')):
         return err('管理者パスワードが違うよ', 403)
     event_key = (data.get('event_key') or '').strip()
     title = (data.get('title') or '').strip()
@@ -722,8 +733,7 @@ def api_create_event():
 @bp.route('/api/events/<int:event_id>/publish', methods=['POST'])
 def api_publish_event(event_id):
     data = request.get_json(silent=True) or {}
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
-    if data.get('password') != admin_pw:
+    if not _admin_ok(data.get('password')):
         return err('管理者パスワードが違うよ', 403)
     is_published = 1 if data.get('is_published') else 0
     import sqlite3 as _sq
@@ -849,8 +859,7 @@ def api_event_ranking(event_key):
     event_id, result_date = event
     # 結果発表日チェック
     pw = request.args.get('pw', '')
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
-    is_admin = pw == admin_pw
+    is_admin = _admin_ok(pw)
     if result_date and not is_admin:
         now = _dt.now(_pytz.timezone('Asia/Tokyo')).replace(tzinfo=None)
         rd = _dt.fromisoformat(result_date.replace('T',' '))
@@ -897,8 +906,7 @@ def api_event_ip_restrict():
 @bp.route('/api/events/<int:event_id>/schedule', methods=['POST'])
 def api_update_event_schedule(event_id):
     data = request.get_json(silent=True) or {}
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
-    if data.get('password') != admin_pw:
+    if not _admin_ok(data.get('password')):
         return err('管理者パスワードが違うよ', 403)
     start_date = (data.get('start_date') or '').strip()
     end_date = (data.get('end_date') or '').strip()
@@ -914,8 +922,7 @@ def api_update_event_schedule(event_id):
 @bp.route('/api/events/<event_key>/add_quiz', methods=['POST'])
 def api_event_add_quiz(event_key):
     data = request.get_json(silent=True) or {}
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
-    if data.get('admin_password') != admin_pw:
+    if not _admin_ok(data.get('admin_password')):
         return err('管理者パスワードが違うよ', 403)
     import sqlite3 as _sq
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
@@ -1061,8 +1068,7 @@ def api_get_banner():
 @bp.route('/api/banner', methods=['POST'])
 def api_set_banner():
     data = request.get_json(silent=True) or {}
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
-    if data.get('password') != admin_pw:
+    if not _admin_ok(data.get('password')):
         return err('管理者パスワードが違うよ', 403)
     message = (data.get('message') or '').strip()
     color = (data.get('color') or '#667eea').strip()
@@ -1127,8 +1133,7 @@ def api_beta_status():
 @bp.route('/api/beta/update', methods=['POST'])
 def api_beta_update():
     data = request.get_json(silent=True) or {}
-    admin_pw = os.environ.get('ADMIN_PASSWORD', '')
-    if data.get('password') != admin_pw:
+    if not _admin_ok(data.get('password')):
         return err('管理者パスワードが違うよ', 403)
     feature = (data.get('feature_key') or 'ai_scoring').strip()
     start_date = (data.get('start_date') or '').strip() or None

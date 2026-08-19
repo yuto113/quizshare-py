@@ -284,5 +284,30 @@ document.getElementById('admin-pw').addEventListener('keydown', e => {
   if (e.key === 'Enter') loadData();
 });
 </script>
+
 </body>
 </html>
+
+<script>
+// 管理センターから開いたときはパスワード入力を省いて自動で表示する
+document.addEventListener('DOMContentLoaded', function(){
+  if (new URLSearchParams(location.search).get('embed') !== '1') return;
+  document.documentElement.classList.add('embedded');
+  fetch('/api/admin/whoami').then(function(r){ return r.json(); }).then(function(d){
+    if (!d.ok || d.role !== 'admin') return;
+    // パスワード欄を隠す
+    ['admin-pw','login-section'].forEach(function(id){
+      var e = document.getElementById(id);
+      if (!e) return;
+      var box = (id === 'login-section') ? e : e.closest('div');
+      if (box) box.style.display = 'none';
+    });
+    // 一覧を読み込む
+    ['loadData','loadBetaStatus'].forEach(function(fn){
+      if (typeof window[fn] === 'function') { try { window[fn](); } catch(e){} }
+    });
+    var sec = document.getElementById('groups-section');
+    if (sec) sec.style.display = 'block';
+  }).catch(function(){});
+});
+</script>

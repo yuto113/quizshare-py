@@ -80,6 +80,20 @@
 <body class="{% block body_class %}{% endblock %}">
 
 <!-- サイトバナー -->
+<script>
+// 管理センターに埋め込まれているときは、重複するUIを隠す
+(function(){
+  if (new URLSearchParams(location.search).get('embed') === '1') {
+    document.documentElement.classList.add('embedded');
+  }
+})();
+</script>
+<style>
+html.embedded #site-banner { display:none !important; }
+html.embedded header, html.embedded .site-header, html.embedded nav.main-nav { display:none !important; }
+html.embedded .qz-snav { display:none !important; }
+html.embedded body { padding-top:0 !important; }
+</style>
 <div id="site-banner" style="display:none; padding:12px 20px; text-align:center; font-weight:bold; font-size:14px; position:relative;">
   <span id="site-banner-msg"></span>
   <button onclick="document.getElementById('site-banner').style.display='none'"
