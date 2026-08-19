@@ -92,26 +92,6 @@ window.toggleAutoTheme2 = function() {
     <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
       <h1 style="color:#fff; font-size:22px; margin:0;">📋 グループ一覧</h1>
       <div style="display:flex; gap:6px; flex-wrap:wrap;">
-        <a href="/theme" class="btn"
-          style="background:rgba(102,126,234,0.2); color:#a5b4fc; border:1px solid rgba(102,126,234,0.3); font-size:0.85rem; text-decoration:none; display:inline-flex; align-items:center;">
-          🎨 テーマ設定
-        </a>
-        <a href="/setting_ai/" class="btn"
-          style="background:rgba(249,115,22,0.2); color:#fb923c; border:1px solid rgba(249,115,22,0.3); font-size:0.85rem; text-decoration:none; display:inline-flex; align-items:center;">
-          🤖 AI採点管理
-        </a>
-        <a href="/setting_schedule/" class="btn"
-          style="background:rgba(52,211,153,0.2); color:#34d399; border:1px solid rgba(52,211,153,0.3); font-size:0.85rem; text-decoration:none; display:inline-flex; align-items:center;">
-          📅 ページ公開設定
-        </a>
-        <a href="/qstart/admin" class="btn"
-          style="background:rgba(184,134,11,0.2); color:#e0b84a; border:1px solid rgba(184,134,11,0.35); font-size:0.85rem; text-decoration:none; display:inline-flex; align-items:center;">
-          ⚙️ Qstart設定
-        </a>
-        <a href="/staff/login" class="btn"
-          style="background:rgba(148,163,184,0.18); color:#cbd5e1; border:1px solid rgba(148,163,184,0.3); font-size:0.85rem; text-decoration:none; display:inline-flex; align-items:center;">
-          🏢 社員ページ
-        </a>
         <button onclick="openFeedback()" class="btn"
           style="background:rgba(251,191,36,0.2); color:#FCD34D; border:1px solid rgba(251,191,36,0.3); font-size:0.85rem;">
           💬 フィードバック
@@ -124,11 +104,7 @@ window.toggleAutoTheme2 = function() {
           style="background:rgba(52,211,153,0.2); color:#34d399; border:1px solid rgba(52,211,153,0.3); font-size:0.85rem;">
           📢 バナー管理
         </button>
-        <button onclick="logout()" class="btn"
-          style="background:rgba(255,255,255,0.05); color:#9CA3AF; border:1px solid rgba(255,255,255,0.1); font-size:0.85rem;">
-          ← ログアウト
-        </button>
-      </div>
+        </div>
     </div>
 
     <div id="group-stats" style="color:#9CA3AF; font-size:0.85rem; margin-bottom:12px;"></div>
@@ -153,8 +129,8 @@ window.toggleAutoTheme2 = function() {
 let adminPw = '';
 
 window.loadGroups = async function() {
-  const pw = document.getElementById('admin-pw').value;
-  if (!pw) { window.toast('パスワードを入力してね', 'error'); return; }
+  const pw = (document.getElementById('admin-pw')||{}).value || '';
+  if (!pw && !window.__EMBED_ADMIN) { window.toast('パスワードを入力してね', 'error'); return; }
   try {
     const r = await fetch('/api/admin/groups?pw=' + encodeURIComponent(pw));
     const data = await r.json();
@@ -516,6 +492,8 @@ async function addAdminTeacher() {
   else { alert(data.error || 'エラー'); }
 }
 
+function __EMBED_START(){ if (typeof window.loadGroups==='function') window.loadGroups(); }
+
 async function deleteTeacher(teacherId) {
   if (!confirm('この先生を削除しますか？')) return;
   const r = await fetch('/api/admin/teacher/delete', {
@@ -527,6 +505,22 @@ async function deleteTeacher(teacherId) {
   else { alert(data.error || 'エラー'); }
 }
 </script>
+
+<script>
+// 管理センターから開いたときはパスワードを省いて自動表示
+document.addEventListener('DOMContentLoaded', function(){
+  if (new URLSearchParams(location.search).get('embed') !== '1') return;
+  document.documentElement.classList.add('embedded');
+  fetch('/api/admin/whoami').then(function(r){ return r.json(); }).then(function(d){
+    if (!d.ok || d.role !== 'admin') return;
+    window.__EMBED_ADMIN = true;
+    var ls = document.getElementById('login-section');
+    if (ls) ls.style.display = 'none';
+    __EMBED_START();
+  }).catch(function(){});
+});
+</script>
+
 <!-- 先生管理モーダル -->
 <div id="teacher-admin-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:1000; overflow-y:auto;">
   <div style="background:#1e1e2e; margin:40px auto; padding:28px; border-radius:20px; max-width:560px; width:90%; color:#e0e0ff;">
@@ -741,15 +735,3 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
-<script>
-// ADMIN_CENTER_AUTO: 管理センターから開いたら自動でログイン扱いにする
-document.addEventListener('DOMContentLoaded', function(){
-  if (new URLSearchParams(location.search).get('embed') !== '1') return;
-  document.documentElement.classList.add('embedded');
-  fetch('/api/admin/whoami').then(function(r){ return r.json(); }).then(function(d){
-    if (d.ok && d.role === 'admin' && typeof window.loadGroups === 'function') {
-      window.loadGroups();   // APIがセッションを見て通してくれる
-    }
-  }).catch(function(){});
-});
-</script>

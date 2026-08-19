@@ -220,6 +220,14 @@ def admin_center():
                            staff_name=session.get('staff_name') or session.get('staff_id'))
 
 
+@app.route('/admin/quiz')
+def admin_quiz_page():
+    """管理センター用のQuizShare画面"""
+    if admin_center_role() != 'admin':
+        return '<div style="padding:40px;text-align:center;color:#888;">管理者のみ</div>', 403
+    return render_template('admin_quiz.html')
+
+
 @app.route('/admin/login')
 def admin_center_login():
     if admin_center_role():

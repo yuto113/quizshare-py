@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuizShare管理</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;
+  background:#0f172a;color:#e2e8f0;padding:20px}
+h2{font-size:17px;margin-bottom:4px}
+.sub{font-size:12px;color:#94a3b8;margin-bottom:18px}
+.card{background:#1e293b;border:1px solid #334155;border-radius:12px;
+  padding:16px;margin-bottom:12px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:9px 10px;color:#94a3b8;font-weight:500;
+  border-bottom:1px solid #334155;font-size:11.5px}
+td{padding:10px;border-bottom:1px solid #1e293b}
+tr:hover td{background:#1e293b}
+.pill{display:inline-block;padding:2px 9px;border-radius:12px;font-size:11px}
+.on{background:#064e3b;color:#6ee7b7}
+.off{background:#1e293b;color:#64748b}
+.gold{background:#78350f;color:#fbbf24}
+.blue{background:#1e3a5f;color:#93c5fd}
+button{padding:6px 13px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;
+  border-radius:7px;font-size:12px;cursor:pointer;font-family:inherit}
+button:hover{background:#334155}
+button.p{background:#b8860b;border-color:#b8860b;color:#fff}
+.load{padding:40px;text-align:center;color:#64748b;font-size:13px}
+a{color:#93c5fd;text-decoration:none}
+</style></head><body>
+<div id="app"><div class="load">読み込み中…</div></div>
+<script>
+var TAB = new URLSearchParams(location.search).get('tab') || 'groups';
+
+async function api(p){
+  var r = await fetch(p);
+  return r.json();
+}
+function esc(s){ var d=document.createElement('div'); d.textContent=(s==null?'':s); return d.innerHTML; }
+function num(n){ return Number(n||0).toLocaleString(); }
+
+async function loadGroups(){
+  var d = await api('/api/admin/groups');
+  if(!d.ok){ document.getElementById('app').innerHTML='<div class="load">読み込めませんでした</div>'; return; }
+  var total = d.groups.reduce(function(s,g){ return s + (g.quiz_count||0); }, 0);
+  document.getElementById('app').innerHTML =
+    '<h2>グループ一覧</h2><div class="sub">'+d.groups.length+'グループ / クイズ '+num(total)+'問</div>'
+    + '<div class="card"><table><thead><tr><th>名前</th><th>クイズ</th><th>種別</th><th>作成日</th><th></th></tr></thead><tbody>'
+    + d.groups.map(function(g){
+        var tags = [];
+        if (g.is_official) tags.push('<span class="pill gold">公式</span>');
+        if (g.school_mode) tags.push('<span class="pill blue">学校</span>');
+        if (g.view_only)   tags.push('<span class="pill off">閲覧のみ</span>');
+        return '<tr><td><span style="display:inline-block;width:9px;height:9px;border-radius:50%;'
+          + 'background:'+esc(g.color)+';margin-right:7px;"></span>'+esc(g.name)+'</td>'
+          + '<td>'+num(g.quiz_count)+'</td>'
+          + '<td>'+(tags.join(' ')||'<span class="pill off">通常</span>')+'</td>'
+          + '<td style="color:#64748b;font-size:11.5px;">'+esc(String(g.created_at).slice(0,10))+'</td>'
+          + '<td><a href="/setting/" target="_blank">開く ↗</a></td></tr>';
+      }).join('')
+    + '</tbody></table></div>';
+}
+
+async function loadPages(){
+  var d = await api('/api/custom_pages?pw=');
+  if(!d.ok){ document.getElementById('app').innerHTML='<div class="load">読み込めませんでした</div>'; return; }
+  document.getElementById('app').innerHTML =
+    '<h2>ページ公開設定</h2><div class="sub">'+(d.pages||[]).length+'ページ</div>'
+    + '<div class="card"><table><thead><tr><th>名前</th><th>URL</th><th>種類</th><th>公開</th><th>トップ表示</th></tr></thead><tbody>'
+    + (d.pages||[]).map(function(p){
+        return '<tr><td>'+esc(p.name)+'</td>'
+          + '<td style="font-family:monospace;font-size:11.5px;color:#93c5fd;">'+esc(p.url||('/'+p.key))+'</td>'
+          + '<td style="color:#64748b;">'+esc(p.template_type||'')+'</td>'
+          + '<td><span class="pill '+(p.is_published?'on':'off')+'">'+(p.is_published?'公開中':'非公開')+'</span></td>'
+          + '<td><span class="pill '+(p.show_on_home?'on':'off')+'">'+(p.show_on_home?'表示':'なし')+'</span></td></tr>';
+      }).join('')
+    + '</tbody></table></div>'
+    + '<div class="card" style="font-size:12.5px;color:#94a3b8;">'
+    + '編集や新規作成は <a href="/setting_schedule/" target="_blank">ページ公開設定 ↗</a> から行えます。</div>';
+}
+
+async function loadAI(){
+  var d = await api('/api/admin/groups');
+  if(!d.ok){ document.getElementById('app').innerHTML='<div class="load">読み込めませんでした</div>'; return; }
+  document.getElementById('app').innerHTML =
+    '<h2>AI採点管理</h2><div class="sub">Voto 2 による採点。外部APIは使っていません</div>'
+    + '<div class="card" style="font-size:12.5px;color:#94a3b8;line-height:1.9;">'
+    + '採点の流れ: ① 完全一致 → ② 類義語・誤字 → ③ 別解 → ④ Voto 2（AI）<br>'
+    + 'ルールで判定できない場合のみ AI が動くため、サーバーの負荷を抑えています。</div>'
+    + '<div class="card"><table><thead><tr><th>グループ</th><th>クイズ数</th><th>AI採点</th></tr></thead><tbody>'
+    + d.groups.map(function(g){
+        return '<tr><td>'+esc(g.name)+'</td><td>'+num(g.quiz_count)+'</td>'
+          + '<td><span class="pill on">有効</span></td></tr>';
+      }).join('')
+    + '</tbody></table></div>'
+    + '<div class="card" style="font-size:12.5px;color:#94a3b8;">'
+    + '上限や個別設定は <a href="/setting_ai/" target="_blank">AI採点管理 ↗</a> から。</div>';
+}
+
+({groups:loadGroups, pages:loadPages, ai:loadAI}[TAB] || loadGroups)();
+</script></body></html>

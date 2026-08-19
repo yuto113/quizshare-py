@@ -107,16 +107,31 @@ let pagesData = [];
 let customPagesData = [];
 
 function doLogin() {
-  adminPw = document.getElementById('admin-pw').value;
-  if (!adminPw) { alert('パスワードを入力してね'); return; }
+  adminPw = (document.getElementById('admin-pw')||{}).value || '';
+  if (!adminPw && !window.__EMBED_ADMIN) { alert('パスワードを入力してね'); return; }
   document.getElementById('login-section').style.display = 'none';
   document.getElementById('main-section').style.display = 'block';
   loadAll();
 }
 
-document.getElementById('admin-pw').addEventListener('keydown', e => {
-  if (e.key === 'Enter') doLogin();
+function __EMBED_START(){ doLogin(); }
+var _pwEl2 = document.getElementById('admin-pw');
+if (_pwEl2) _pwEl2.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  if (new URLSearchParams(location.search).get('embed') !== '1') return;
+  document.documentElement.classList.add('embedded');
+  fetch('/api/admin/whoami').then(function(r){ return r.json(); }).then(function(d){
+    if (!d.ok || d.role !== 'admin') return;
+    window.__EMBED_ADMIN = true;
+    var ls = document.getElementById('login-section');
+    if (ls) ls.style.display = 'none';
+    __EMBED_START();
+  }).catch(function(){});
 });
+</script>
+<script>
 
 function switchTab(tab) {
   document.getElementById('section-pages').classList.toggle('active', tab === 'pages');
@@ -346,26 +361,3 @@ function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 </body>
 </html>
 
-<script>
-// 管理センターから開いたときはパスワード入力を省いて自動で表示する
-document.addEventListener('DOMContentLoaded', function(){
-  if (new URLSearchParams(location.search).get('embed') !== '1') return;
-  document.documentElement.classList.add('embedded');
-  fetch('/api/admin/whoami').then(function(r){ return r.json(); }).then(function(d){
-    if (!d.ok || d.role !== 'admin') return;
-    // パスワード欄を隠す
-    ['admin-pw','login-section'].forEach(function(id){
-      var e = document.getElementById(id);
-      if (!e) return;
-      var box = (id === 'login-section') ? e : e.closest('div');
-      if (box) box.style.display = 'none';
-    });
-    // 一覧を読み込む
-    ['loadAll'].forEach(function(fn){
-      if (typeof window[fn] === 'function') { try { window[fn](); } catch(e){} }
-    });
-    var sec = document.getElementById('groups-section');
-    if (sec) sec.style.display = 'block';
-  }).catch(function(){});
-});
-</script>
