@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}課題一覧 - {{ group.name }}{% endblock %}
+{% block content %}
+<div style="max-width:800px; margin:0 auto; padding:20px 16px;">
+  <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
+    <a href="/group" style="color:#9CA3AF; text-decoration:none; font-size:14px;">← クイズ一覧へ</a>
+    <h1 style="margin:0; font-size:22px; font-weight:900;">📝 課題一覧</h1>
+    <button onclick="loadTasks()" style="margin-left:auto; background:#f3f4f6; border:none; border-radius:8px; padding:6px 14px; cursor:pointer; font-size:13px;">🔄 更新</button>
+  </div>
+
+  <!-- 先生用：課題追加ボタン -->
+  <div id="add-task-btn-wrap" style="display:none; margin-bottom:16px;">
+    <button onclick="document.getElementById('add-task-modal').style.display='flex'"
+      style="padding:12px 24px; background:linear-gradient(135deg,#f59e0b,#d97706); color:white; border:none; border-radius:12px; font-weight:900; cursor:pointer; font-size:15px;">
+      ➕ 新しい課題を出す
+    </button>
+  </div>
+
+  <!-- 課題一覧 -->
+  <div id="task-list">
+    <div style="padding:48px; text-align:center; color:#9CA3AF;">読み込み中...</div>
+  </div>
+</div>
+
+<!-- 課題追加モーダル -->
+<div id="add-task-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+  <div style="background:white; border-radius:16px; padding:28px; max-width:520px; width:100%;">
+    <h3 style="margin:0 0 20px; font-size:18px; font-weight:900;">📝 新しい課題を出す</h3>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px; font-weight:900; color:#374151; display:block; margin-bottom:4px;">📌 課題タイトル</label>
+      <input type="text" id="task-title" style="width:100%; padding:10px; border:2px solid #e5e7eb; border-radius:10px; font-size:14px; box-sizing:border-box;" placeholder="例: 英単語クイズを作ろう">
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px; font-weight:900; color:#374151; display:block; margin-bottom:4px;">📄 説明</label>
+      <textarea id="task-desc" rows="4" style="width:100%; padding:10px; border:2px solid #e5e7eb; border-radius:10px; font-size:14px; box-sizing:border-box; resize:vertical;" placeholder="課題の内容・条件などを書いてね"></textarea>
+    </div>
+    <div style="margin-bottom:20px;">
+      <label style="font-size:12px; font-weight:900; color:#374151; display:block; margin-bottom:4px;">📅 締切日（任意）</label>
+      <input type="datetime-local" id="task-due" style="width:100%; padding:10px; border:2px solid #e5e7eb; border-radius:10px; font-size:14px; box-sizing:border-box;">
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button onclick="createTask()" style="flex:2; padding:12px; background:#f59e0b; color:white; border:none; border-radius:10px; font-weight:900; cursor:pointer; font-size:15px;">📝 課題を出す</button>
+      <button onclick="document.getElementById('add-task-modal').style.display='none'" style="flex:1; padding:12px; background:#f3f4f6; color:#333; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let isTeacher = false;
+
+async function init() {
+  const r = await fetch('/api/teacher/status');
+  const data = await r.json();
+  if (data.ok && data.is_teacher) {
+    isTeacher = true;
+    document.getElementById('add-task-btn-wrap').style.display = 'block';
+  }
+  loadTasks();
+}
+
+async function loadTasks() {
+  const r = await fetch('/api/tasks');
+  const data = await r.json();
+  const list = document.getElementById('task-list');
+  if (!data.ok || data.tasks.length === 0) {
+    list.innerHTML = '<div style="padding:64px; text-align:center; color:#9CA3AF;"><div style="font-size:64px; margin-bottom:16px;">📭</div><div style="font-weight:bold;">まだ課題がありません</div></div>';
+    return;
+  }
+  list.innerHTML = data.tasks.map(t => {
+    const isOverdue = t.due_date && new Date(t.due_date.replace(' ','T')) < new Date();
+    const dueColor = isOverdue ? '#ef4444' : '#f59e0b';
+    return `
+    <div onclick="location.href='/tasks/${t.id}'"
+      style="background:white; border-radius:16px; padding:20px; margin-bottom:12px; box-shadow:0 2px 12px rgba(0,0,0,0.08); cursor:pointer; border-left:4px solid #f59e0b; transition:transform 0.15s;"
+      onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+        <h3 style="margin:0; font-size:17px; font-weight:900; color:#1a1a1a;">${esc(t.title)}</h3>
+        ${t.due_date ? `<span style="font-size:12px; color:${dueColor}; font-weight:bold; flex-shrink:0; margin-left:8px;">${isOverdue?'⚠️ 締切済':'📅 '+t.due_date}</span>` : ''}
+      </div>
+      <p style="margin:0 0 12px; color:#6b7280; font-size:14px; line-height:1.6;">${esc(t.description.substring(0,100))}${t.description.length>100?'...':''}</p>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:12px; color:#9CA3AF;">👩‍🏫 ${esc(t.teacher_name)}</span>
+        <span style="font-size:13px; color:#f59e0b; font-weight:bold;">詳細を見る →</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function createTask() {
+  const title = document.getElementById('task-title').value.trim();
+  const description = document.getElementById('task-desc').value.trim();
+  const due_date = document.getElementById('task-due').value;
+  if (!title || !description) { alert('タイトルと説明を入力してね'); return; }
+  const r = await fetch('/api/tasks', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({title, description, due_date})
+  });
+  const data = await r.json();
+  if (data.ok) {
+    document.getElementById('add-task-modal').style.display = 'none';
+    document.getElementById('task-title').value = '';
+    document.getElementById('task-desc').value = '';
+    document.getElementById('task-due').value = '';
+    loadTasks();
+  } else { alert(data.error || 'エラー'); }
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+init();
+</script>
+{% endblock %}

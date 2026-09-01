@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}プライバシーポリシー - QuizShare{% endblock %}
+{% block robots %}<meta name="robots" content="index,follow">{% endblock %}
+{% block seo %}
+<meta name="description" content="QuizShareのプライバシーポリシーです。個人情報の取り扱いについて説明しています。">
+{% endblock %}
+
+{% block content %}
+<div class="container-narrow" style="padding:32px 16px; max-width:800px; margin:0 auto;">
+  <h1 style="font-size:1.8rem; margin-bottom:4px;">🔒 プライバシーポリシー</h1>
+  <p style="color:#888; margin-bottom:32px;">最終更新日: 2026年5月21日</p>
+
+  <div style="background:#e8f5e9; border:1px solid #a5d6a7; border-radius:12px; padding:14px 16px; margin-bottom:24px; color:#2e7d32; font-size:0.9rem;">
+    ✅ QuizShareはユーザーの個人情報（氏名・メールアドレス・電話番号など）を収集しません。
+  </div>
+
+  {% for title, content in [
+    ('第1条（収集する情報）', 'グループID（ハッシュ化して保存）、グループ名・カラー設定、投稿したクイズ・解説・タグ、クイズへの挑戦記録（正誤・タイム）、フィードバック内容、AI採点の使用量（トークン数のみ）を収集します。'),
+    ('第2条（収集しない情報）', '氏名・メールアドレス・電話番号・住所などの個人を特定できる情報は収集しません。IPアドレスはログとして記録される場合がありますが、ユーザーの識別には使用しません。'),
+    ('第3条（利用目的）', '収集した情報は、サービスの提供・改善、不正利用の防止、統計情報の作成に使用します。第三者への販売・提供は行いません。'),
+    ('第4条（グループIDの管理）', 'グループIDはHMAC-SHA256でハッシュ化して保存します。元のグループIDは復元できません。グループIDを知っている人のみがグループにアクセスできます。'),
+    ('第5条（ローカルストレージ）', 'テーマ設定・著作権同意状態はお使いのデバイスのローカルストレージに保存されます。サーバーには送信されません。ブラウザの設定からいつでも削除できます。'),
+    ('第6条（Cookie）', '本サービスはセッション管理のためにCookieを使用します。ログイン状態の維持に必要なCookieのみ使用し、追跡目的のCookieは使用しません。'),
+    ('第7条（AI採点機能）', 'AI採点機能（β）を使用する場合、問題文・正解・ユーザーの回答がCloudflare Workers AI（米国）に送信されます。個人情報は含まれません。Cloudflareのプライバシーポリシーが適用されます。'),
+    ('第8条（引用ライブラリ）', '引用ライブラリはAI（Claude by Anthropic）が生成したコンテンツを使用しています。'),
+    ('第9条（第三者サービス）', '本サービスはPythonAnywhere（英国）でホスティングされています。サービス運営に必要な範囲でデータが保存されます。'),
+    ('第10条（データの保管）', 'グループを削除した場合、関連するクイズ・挑戦記録・感想はすべて削除されます。AI採点の使用ログは一定期間後に削除されます。'),
+    ('第11条（未成年者の利用）', '13歳未満の方は保護者の同意のもとでご利用ください。個人情報を投稿しないよう、保護者の方がご確認ください。'),
+    ('第12条（安全管理）', 'パスワードはscryptで安全にハッシュ化して保存します。グループIDはHMAC-SHA256でハッシュ化します。通信はHTTPSで暗号化されます。'),
+    ('第13条（統計情報）', '個人を特定できない統計情報（クイズの正解率・挑戦回数など）をサービス改善に使用することがあります。'),
+    ('第14条（ポリシーの変更）', '本ポリシーは予告なく変更することがあります。重要な変更がある場合はサービス内でお知らせします。'),
+    ('第15条（お問い合わせ）', 'プライバシーに関するお問い合わせはフィードバックページからお願いします。'),
+  ] %}
+  <div style="margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid #f0f0f0;">
+    <h2 style="font-size:1.05rem; color:#333; margin-bottom:8px;">{{ title }}</h2>
+    <p style="color:#555; line-height:1.8; margin:0; font-size:0.92rem;">{{ content }}</p>
+  </div>
+  {% endfor %}
+
+  <div style="background:#f5f5f5; border-radius:12px; padding:16px; margin-top:24px;">
+    <p style="color:#888; font-size:0.85rem; margin:0;">
+      お問い合わせは <a href="/feedback" style="color:#e91e63;">フィードバックページ</a> からお願いします。<br>
+      運営: QuizShare / yuto113.pythonanywhere.com
+    </p>
+  </div>
+</div>
+{% endblock %}

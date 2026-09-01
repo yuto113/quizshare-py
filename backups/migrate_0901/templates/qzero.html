@@ -1,0 +1,618 @@
+{% extends "base.html" %}
+{% block title %}QZERO - QZERO AI{% endblock %}
+{% block content %}
+<style>
+body { background:#ffffff !important; margin:0; }
+.site-header { display:none !important; }
+#qz-app { display:flex; height:100vh; font-family:sans-serif; }
+
+/* サイドバー */
+#qz-side { width:260px; background:#f7f6f3; border-right:1px solid #e8e5df; display:flex; flex-direction:column; flex-shrink:0; }
+#qz-side .qz-logo { padding:16px; font-weight:800; letter-spacing:0.15em; color:#111; border-bottom:1px solid #e8e5df; }
+#qz-new { margin:12px; padding:10px; background:#111; color:white; border:none; border-radius:10px; cursor:pointer; font-size:0.9rem; }
+#qz-threads { flex:1; overflow-y:auto; padding:0 8px; }
+.qz-thread { padding:10px 12px; border-radius:8px; cursor:pointer; font-size:0.85rem; color:#444; display:flex; justify-content:space-between; align-items:center; margin-bottom:2px; }
+.qz-thread:hover { background:#ecece7; }
+.qz-thread.on { background:#e4e2db; font-weight:700; }
+.qz-thread .del { color:#bbb; font-size:0.8rem; opacity:0; }
+.qz-thread:hover .del { opacity:1; }
+.qz-side-foot { padding:12px; border-top:1px solid #e8e5df; font-size:0.8rem; }
+
+/* メイン */
+#qz-main { flex:1; display:flex; flex-direction:column; min-width:0; }
+#qz-head { padding:14px 20px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center; }
+#qz-head h1 { margin:0; font-size:1.1rem; letter-spacing:0.15em; color:#111; }
+#qz-log { flex:1; overflow-y:auto; padding:24px; max-width:760px; margin:0 auto; width:100%; box-sizing:border-box; }
+.cb-msg { margin-bottom:20px; }
+.cb-msg .who { font-size:0.75rem; color:#999; margin-bottom:4px; }
+.cb-bubble { font-size:0.98rem; line-height:1.7; white-space:pre-wrap; color:#1a1a1a; }
+.cb-msg.me .cb-bubble { background:#f4f4f2; padding:12px 16px; border-radius:12px; }
+#qz-input-area { border-top:1px solid #eee; padding:16px; max-width:760px; margin:0 auto; width:100%; box-sizing:border-box; }
+#qz-input-row { display:flex; gap:8px; }
+#cb-input { flex:1; padding:12px; border:1px solid #ddd; border-radius:10px; font-size:1rem; }
+#qz-mode-btn { padding:8px 14px; background:transparent; color:#555; border:1px solid #e3e3e3; border-radius:999px; cursor:pointer; font-size:0.85rem; white-space:nowrap; align-self:center; }
+#qz-mode-btn:hover { background:#f5f5f5; }
+
+/* 世代セレクタ(Claude風ドロップダウン) */
+#qz-ver-menu {
+  display: none;
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  background: #fff;
+  border: 1px solid #e6e6e8;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+  min-width: 180px;
+  z-index: 70;
+  padding: 6px 0;
+  font-size: 14px;
+}
+#qz-ver-menu.open { display: block; }
+.qz-ver-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  cursor: pointer;
+  color: #14213d;
+  transition: background .1s;
+}
+.qz-ver-item:hover { background: #f5f5f7; }
+.qz-ver-item.active { font-weight: 600; }
+.qz-ver-check { color: #14213d; font-size: 16px; width: 20px; text-align: right; }
+.qz-ver-sep {
+  height: 1px;
+  background: #e6e6e8;
+  margin: 4px 12px;
+}
+.qz-ver-label {
+  padding: 6px 16px 4px;
+  font-size: 11px;
+  color: #a0a0a6;
+  letter-spacing: .06em;
+}
+#cb-send { padding:12px 20px; background:#111; color:white; border:none; border-radius:10px; cursor:pointer; }
+
+/* ログインパネル */
+#cb-login-panel { position:fixed; inset:0; background:rgba(0,0,0,0.4); display:none; align-items:center; justify-content:center; z-index:100; }
+#cb-login-inner { background:white; border-radius:14px; padding:24px; width:90%; max-width:360px; }
+#cb-login-inner input { width:100%; padding:11px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; margin-bottom:8px; }
+.cb-tabs { display:flex; gap:6px; margin-bottom:12px; }
+.cb-tabs button { flex:1; padding:8px; border:none; border-radius:8px; cursor:pointer; font-size:0.8rem; }
+#qz-menu-btn { display:none; background:none; border:none; font-size:1.4rem; cursor:pointer; }
+@media (max-width:720px) {
+  #qz-side { position:fixed; left:-260px; top:0; bottom:0; z-index:50; transition:left 0.2s; }
+  #qz-side.open { left:0; }
+  #qz-menu-btn { display:block; }
+}
+#site-banner, .site-banner, .banner, [class*='banner'] { display: none !important; }
+</style>
+<script src="{{ url_for('static', filename='qzero_mini.js') }}"></script>
+<script>
+function cbStrip(){try{const b=document.body;Array.from(b.classList).forEach(c=>{if(c.indexOf('theme')!==-1||c==='halloween-dark')b.classList.remove(c);});b.style.background='#ffffff';document.querySelectorAll('.seasonal-emoji').forEach(e=>e.remove());}catch(e){}}
+window.applyTheme=cbStrip;window.checkAutoTheme=cbStrip;setInterval(cbStrip,2000);cbStrip();
+</script>
+
+<div id="qz-app">
+  <div id="qz-side">
+    <div class="qz-logo">◉ QZERO</div>
+    <button id="qz-new" onclick="newThread()">+ 新しいチャット</button>
+    <div id="qz-threads"></div>
+    <div class="qz-side-foot" id="qz-account"></div>
+  </div>
+
+  <div id="qz-main">
+    <div id="qz-head">
+      <button id="qz-menu-btn" onclick="document.getElementById('qz-side').classList.toggle('open')">☰</button>
+      <h1>QZERO</h1>
+      <div style="position:relative;">
+        
+        
+      </div>
+    </div>
+    <div id="qz-log"></div>
+    <div id="qz-input-area">
+      <div id="qz-input-row">
+        <div style="position:relative; align-self:center;">
+          <button id="qz-mode-btn" onclick="toggleModeMenu()">Core 2 ∨</button>
+          <div id="qz-ver-menu">
+            <div class="qz-ver-item" onclick="event.stopPropagation(); document.getElementById('qz-ver-menu').classList.remove('open'); toggleModeMenu();" style="color:#a0a0a6; font-size:13px;">← モード選択に戻る</div>
+            <div class="qz-ver-sep"></div>
+            <div class="qz-ver-label">モデル</div>
+            <div class="qz-ver-item" data-ver="12" onclick="pickVer('12')"><span>🧠 Mini 12 天才版</span><span class="qz-ver-check"></span></div>
+            <div class="qz-ver-sep"></div>
+            <div class="qz-ver-label">旧バージョン</div>
+            <div class="qz-ver-item" data-ver="11" onclick="pickVer('11')"><span>Mini 11</span><span class="qz-ver-check"></span></div>
+            <div class="qz-ver-item" data-ver="10" onclick="pickVer('10')"><span>Mini 10</span><span class="qz-ver-check"></span></div>
+            <div class="qz-ver-item" data-ver="9" onclick="pickVer('9')"><span>Mini 9</span><span class="qz-ver-check"></span></div>
+            <div class="qz-ver-sep"></div>
+<div id="qz-legacy-vers" style="display:none;">
+            <div class="qz-ver-label">旧バージョン</div>
+            <div class="qz-ver-item" data-ver="8" onclick="pickVer('8')"><span>Mini 8</span><span class="qz-ver-check"></span></div>
+            <div class="qz-ver-item" data-ver="7" onclick="pickVer('7')"><span>Mini 7</span><span class="qz-ver-check"></span></div>
+            <div class="qz-ver-item" data-ver="6" onclick="pickVer('6')"><span>Mini 6</span><span class="qz-ver-check"></span></div>
+            <div class="qz-ver-item" data-ver="5" onclick="pickVer('5')"><span>Mini 5</span><span class="qz-ver-check"></span></div>
+            <div class="qz-ver-item" data-ver="4.1" onclick="pickVer('4.1')"><span>Mini 4.1</span><span class="qz-ver-check"></span></div>
+            <div class="qz-ver-item" data-ver="3" onclick="pickVer('3')"><span>Mini 3</span><span class="qz-ver-check"></span></div>
+</div>
+          </div>
+          <div id="qz-mode-menu" style="display:none; position:absolute; left:0; bottom:110%; background:white; border:1px solid #ddd; border-radius:10px; box-shadow:0 4px 12px rgba(0,0,0,0.08); min-width:230px; z-index:60;">
+          <div onclick="setAiMode('search')" style="padding:10px 14px; cursor:pointer;">
+            <b style="font-size:0.85rem;">Search</b><br><span style="font-size:0.72rem; color:#999;">インターネットから調べて答える(天気など)</span>
+          </div>
+          <div onclick="setAiMode('core')" style="padding:10px 14px; cursor:pointer;">
+            <b style="font-size:0.85rem;">Core</b><br><span style="font-size:0.72rem; color:#999;">クイズとAI自身の知識で答える</span>
+          </div>
+          <div onclick="setAiMode('guide')" style="padding:10px 14px; cursor:pointer;">
+            <b style="font-size:0.85rem;">Guide</b><br><span style="font-size:0.72rem; color:#999;">やりたいことに合うページを案内する</span>
+          </div>
+          <div id="qz-mini-item" onclick="window.toast('Miniは!','success')" style="padding:10px 14px; cursor:pointer;">
+            <b style="font-size:0.85rem;">Mini</b><br><span style="font-size:0.72rem; color:#999;" id="qz-mini-desc">自作トランスフォーマーが文章を作る</span>
+          </div>
+          <div onclick="setAiMode('reden')" style="padding:10px 14px; cursor:pointer;">
+            <b style="font-size:0.85rem;">reden</b> <span style="font-size:0.65rem; color:#b8860b;">(β)</span><br><span style="font-size:0.72rem; color:#999;">自作Transformerと会話する</span>
+          </div>
+        </div>
+        </div>
+<div id="qz-usage-banner" style="display:none; background:#e24b4a; color:#fff; text-align:center; padding:8px; font-size:13px; font-weight:700; border-radius:8px; margin-bottom:6px;"></div>
+<div id="qz-usage-wrap" style="display:none; margin-bottom:6px;">
+  <div style="display:flex; justify-content:space-between; font-size:11px; color:#8a8270; margin-bottom:2px;">
+    <span>今日の使用量</span><span id="qz-usage-pct">0%</span>
+  </div>
+  <div style="background:#eee; border-radius:99px; height:5px; overflow:hidden;">
+    <div id="qz-usage-bar" style="width:0%; height:100%; background:#111; border-radius:99px; transition:width 0.4s;"></div>
+  </div>
+</div>
+        <input id="cb-input" placeholder="メッセージを入力(例: これ何科? 光合成)" onkeydown="if(event.key==='Enter')cbSend()">
+        <button id="cb-send" onclick="cbSend()">送信</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="cb-login-panel">
+  <div id="cb-login-inner">
+    <div class="cb-tabs">
+      <button id="tab-login" onclick="showTab('login')">ログイン</button>
+      <button id="tab-reg" onclick="showTab('reg')">新規登録</button>
+      <button id="tab-staff" onclick="showTab('staff')">社員</button>
+    </div>
+    <input id="acc-id" placeholder="ユーザーID">
+    <input id="acc-nick" placeholder="ニックネーム(登録時のみ)" style="display:none;">
+    <input id="acc-pw" type="password" placeholder="パスワード">
+    <button id="acc-submit" onclick="accSubmit()" style="width:100%; padding:12px; background:#111; color:white; border:none; border-radius:8px; cursor:pointer;">ログイン</button>
+    <p style="text-align:center; margin:10px 0 0;"><a href="#" onclick="closePanel();return false;" style="color:#999; font-size:0.8rem;">閉じる</a></p>
+  </div>
+</div>
+
+<script>
+let currentThread = null;
+let weatherDays = 1, awaitingPlace = false;
+let aiMode = localStorage.getItem('qzAiMode') || 'reden';  // いまの答え方モード(前回の続き、初回はreden)
+
+function pickVer(v) {
+  window.qzMiniVer = v;
+  document.getElementById('qz-ver-menu').classList.remove('open');
+  // チェックマーク更新
+  document.querySelectorAll('.qz-ver-item').forEach(function(el) {
+    var ck = el.querySelector('.qz-ver-check'); if (ck) ck.textContent = el.dataset.ver === v ? '✓' : '';
+    el.classList.toggle('active', el.dataset.ver === v);
+  });
+  // ボタン表示を更新(モード切替メッセージは出さない)
+  document.getElementById('qz-mode-btn').textContent = 'Mini ' + v + ' ∨';
+}
+
+// Miniモード選択時に世代メニューを表示
+function showVerMenu() {
+  var m = document.getElementById('qz-ver-menu');
+  m.classList.toggle('open');
+  // 現在の世代にチェック
+  var cur = String(window.qzMiniVer || 12);
+  document.querySelectorAll('.qz-ver-item').forEach(function(el) {
+    var ck2 = el.querySelector('.qz-ver-check'); if (ck2) ck2.textContent = el.dataset.ver === cur ? '✓' : '';
+    el.classList.toggle('active', el.dataset.ver === cur);
+  });
+}
+
+// 外クリックで閉じる
+document.addEventListener('click', function(e) {
+  var vm = document.getElementById('qz-ver-menu');
+  if (vm && !vm.contains(e.target) && e.target.id !== 'qz-mode-btn') {
+    vm.classList.remove('open');
+  }
+});
+
+function toggleModeMenu() {
+  const m = document.getElementById('qz-mode-menu');
+  m.style.display = m.style.display === 'none' ? 'block' : 'none';
+}
+async function unlockMini() {
+  // yutoで社員ログインしてたらMiniを解禁する
+window.checkMiniStatus = async function() {
+  try {
+    const r = await fetch('/api/qzero/mini/status');
+    const data = await r.json();
+    const lv = document.getElementById('qz-legacy-vers');
+    if (data.legacy) { if (lv) lv.style.display = 'block'; }
+    else { if (lv) lv.style.display = 'none'; }
+    if (data.ok && data.allowed) {
+      const item = document.getElementById('qz-mini-item');
+      if (item) { item.style.opacity = '1'; item.onclick = () => setAiMode('mini'); }
+      const desc = document.getElementById('qz-mini-desc');
+      if (desc) desc.textContent = '自作トランスフォーマーが文章を作る';
+    }
+  } catch (e) {}
+};
+  try { await window.checkMiniStatus(); } catch (e) {}
+}
+unlockMini();
+
+function setAiMode(mode) {
+  if (window._qzSending) return;  // 考え中はモード切替も禁止
+  localStorage.setItem('qzAiMode', mode);  // 前回のモードを覚えておく
+  aiMode = mode;
+  const QZ_VERSIONS = { core: 2, search: 1, guide: 1, mini: (window.qzMiniVer || 12), reden: 1 };
+  const label = mode === 'search' ? 'Search' : (mode === 'guide' ? 'Guide' : (mode === 'mini' ? 'Mini' : (mode === 'reden' ? 'reden' : 'Core')));
+  document.getElementById('qz-mode-btn').textContent = label + ' ' + (mode === 'mini' ? (window.qzMiniVer || 12) : QZ_VERSIONS[mode]) + ' ∨';
+  // Miniモードならボタンにクリックで世代メニューを開く機能を付ける
+  var btn = document.getElementById('qz-mode-btn');
+  if (mode === 'mini') {
+    btn.onclick = function(e) { e.stopPropagation(); showVerMenu(); };
+  } else if (mode === 'reden') {
+    btn.onclick = function() { toggleModeMenu(); };
+  } else {
+    btn.onclick = function() { toggleModeMenu(); };
+    document.getElementById('qz-ver-menu').classList.remove('open');
+  }
+  document.getElementById('qz-mode-menu').style.display = 'none';
+  const msgs = {
+    search: 'Searchモードだよ。インターネットから調べて答える(いまは天気と場所が得意。情報源はだんだん増えていくよ)',
+    guide: 'Guideモードだよ。「クイズを作りたい」「タイピングしたい」みたいに、やりたいことを教えて。ぴったりのページと使い方を案内するよ!',
+    reden: 'redenモード(β)だよ。自作Transformerと会話できる...ただいま学習中! もう少し待っててね!',
+    mini: 'Miniモードだよ。私の中の自作トランスフォーマーが文章の続きを作る。「ねこ が」みたいな書き出しをちょうだい!',
+    core: 'Coreモードだよ。クイズ6331問とAI自身の知識で答える!'
+  };
+  addMsg('ai', msgs[mode] || msgs.core, true);
+}
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('qz-mode-menu');
+  const btn = document.getElementById('qz-mode-btn');
+  if (menu && btn && !menu.contains(e.target) && !btn.contains(e.target)) menu.style.display = 'none';
+});
+let lastTopic = null;  // 直前の話題を覚えておく('weather'など)。流れを読むために使う
+
+// ===== 表示 =====
+function addMsg(who, text, skipSave) {
+  const log = document.getElementById('qz-log');
+  const div = document.createElement('div');
+  div.className = 'cb-msg ' + who;
+  div.innerHTML = '<div class="who"></div><div class="cb-bubble"></div>';
+  div.querySelector('.who').textContent = who === 'me' ? 'あなた' : 'QZERO';
+  div.querySelector('.cb-bubble').textContent = text;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  if (!skipSave) saveHistory(who === 'me' ? 'me' : 'ai', text);
+}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ===== アカウント =====
+let accTab='login';
+function showTab(t){accTab=t;
+  ['login','reg','staff'].forEach(x=>{const b=document.getElementById('tab-'+x);b.style.background=x===t?'#111':'#eee';b.style.color=x===t?'#fff':'#333';});
+  document.getElementById('acc-nick').style.display=t==='reg'?'block':'none';
+  document.getElementById('acc-id').placeholder=t==='staff'?'社員ID':'ユーザーID';
+  document.getElementById('acc-submit').textContent=t==='reg'?'登録する':'ログイン';
+}
+function openPanel(){document.getElementById('cb-login-panel').style.display='flex';showTab('login');}
+function closePanel(){document.getElementById('cb-login-panel').style.display='none';}
+async function accSubmit(){
+  const id=document.getElementById('acc-id').value.trim(),pw=document.getElementById('acc-pw').value,nick=document.getElementById('acc-nick').value.trim();
+  let url,body;
+  if(accTab==='reg'){url='/api/qzero/register';body={user_id:id,nickname:nick,password:pw};}
+  else if(accTab==='staff'){url='/api/qzero/staff-login';body={staff_id:id,password:pw};}
+  else{url='/api/qzero/login';body={user_id:id,password:pw};}
+  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const data=await r.json();
+  if(data.ok){closePanel();document.getElementById('acc-pw').value='';refreshAccount();loadThreads();if(window.checkMiniStatus)window.checkMiniStatus();}
+  else window.toast(data.error||'エラー','error');
+}
+async function qzLogout(){await fetch('/api/qzero/logout',{method:'POST'});location.reload();}
+async function refreshAccount(){
+  const r=await fetch('/api/qzero/me');const data=await r.json();
+  const box=document.getElementById('qz-account');
+  if(data.logged_in){box.innerHTML='👤 '+esc(data.nickname)+'<br><a href="#" onclick="qzLogout();return false;" style="color:#999;">ログアウト</a>';}
+  else{box.innerHTML='<a href="#" onclick="openPanel();return false;" style="color:#111;font-weight:700;">ログインして会話を保存</a>';}
+}
+
+// ===== スレッド =====
+async function loadThreads(){
+  const r=await fetch('/api/qzero/threads');const data=await r.json();
+  const box=document.getElementById('qz-threads');
+  if(!data.threads||data.threads.length===0){box.innerHTML='';return;}
+  box.innerHTML=data.threads.map(t=>`
+    <div class="qz-thread ${t.thread_id===currentThread?'on':''}" onclick="openThread(${t.thread_id}, '${t.url_key||''}', '${t.mode||'core'}')">
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(t.title)}</span>
+      <span class="del" onclick="event.stopPropagation();delThread(${t.thread_id})">🗑</span>
+    </div>`).join('');
+}
+async function openThread(tid, urlKey, mode){
+  currentThread=tid;
+  const r=await fetch('/api/qzero/threads/'+tid);const data=await r.json();
+  document.getElementById('qz-log').innerHTML='';
+  if(data.ok&&data.history)data.history.forEach(h=>addMsg(h.role==='me'?'me':'ai',h.text,true));
+  if(urlKey) history.pushState(null, '', '/qzero/chat/' + (mode||'core') + '/' + urlKey);
+  loadThreads();
+  document.getElementById('qz-side').classList.remove('open');
+}
+function newThread(){
+  history.pushState(null, '', '/qzero');
+  currentThread=null;
+  document.getElementById('qz-log').innerHTML='';
+  greet();
+  loadThreads();
+  document.getElementById('qz-side').classList.remove('open');
+}
+async function delThread(tid){
+  if(!confirm('この会話を消す？'))return;
+  await fetch('/api/qzero/threads/'+tid+'/delete',{method:'POST'});
+  if(currentThread===tid)newThread();
+  loadThreads();
+}
+async function saveHistory(role,text){
+  try{
+    const r=await fetch('/api/qzero/history/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role,text,thread_id:currentThread,mode:document.getElementById('qz-mode-btn').textContent.split(' ')[0].toLowerCase()})});
+    const d=await r.json();
+    if(d.ok&&d.thread_id){const isNew=(currentThread===null);currentThread=d.thread_id;if(isNew)loadThreads();}
+  }catch(e){}
+}
+function greet(){addMsg('ai','こんにちは! 私はQZERO。教科あて、天気、クイズ探しができるよ。',true);}
+
+// ===== 天気(前と同じ) =====
+const WEATHER_CODES={0:'快晴',1:'晴れ',2:'晴れときどき曇り',3:'曇り',45:'霧',48:'霧',51:'弱い霧雨',53:'霧雨',55:'強い霧雨',61:'弱い雨',63:'雨',65:'強い雨',71:'弱い雪',73:'雪',75:'強い雪',80:'にわか雨',81:'にわか雨',82:'激しいにわか雨',95:'雷雨',96:'雷雨(ひょう)',99:'激しい雷雨'};
+function looksLikeWeather(t){if(/週間|しゅうかん|これから|今週|一週間/.test(t))weatherDays=7;else if(/あさって|明後日/.test(t))weatherDays=3;else if(/明日|あした|あす/.test(t))weatherDays=2;else weatherDays=1;return /天気|てんき|気温|きおん|weather|暑い|寒い|雨|晴れ|くもり|雪|予報/.test(t);}
+async function fetchWeather(lat,lon,placeName){
+  const url='https://api.open-meteo.com/v1/forecast?latitude='+lat+'&longitude='+lon+'&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=Asia%2FTokyo&forecast_days=7';
+  const d=await(await fetch(url)).json();
+  const desc=WEATHER_CODES[d.current.weather_code]||'不明';const labels=['今日','明日','あさって'];const wd=['日','月','火','水','木','金','土'];
+  let lines=placeName+'の天気だよ。いまは「'+desc+'」、気温'+Math.round(d.current.temperature_2m)+'度。\n';
+  for(let i=0;i<weatherDays&&i<d.daily.time.length;i++){const dt=new Date(d.daily.time[i]);const label=labels[i]||((dt.getMonth()+1)+'/'+dt.getDate()+'('+wd[dt.getDay()]+')');lines+='・'+label+': '+(WEATHER_CODES[d.daily.weather_code[i]]||'不明')+' ('+Math.round(d.daily.temperature_2m_max[i])+'/'+Math.round(d.daily.temperature_2m_min[i])+'度)\n';}
+  return lines.trim();
+}
+function isLikelyPlace(t){
+  // 短くて、天気ワードを含まず、地名っぽい入力か(「じゃあ大阪は?」「東京」など)
+  const cleaned=t.replace(/^(じゃあ|では|それなら|あと|次は|つぎは)/,'').replace(/(は|の天気|は？|は\?|？|\?)$/,'').trim();
+  if(cleaned.length<2||cleaned.length>10)return false;
+  if(/天気|てんき|気温|クイズ|何科|こんにち|ありがと/.test(t))return false;  // 他の意図は除外
+  return true;
+}
+async function searchWikipedia(query){
+  // Wikipediaの公式API(無料・登録不要)で調べる
+  // まずキーワードでページを探す
+  const q = query.replace(/(って何|とは|について|おしえて|教えて|調べて|って誰|とは何|？|\?)/g,'').trim();
+  if(q.length < 1) return null;
+  const searchUrl = 'https://ja.wikipedia.org/w/api.php?action=query&list=search&srsearch=' +
+    encodeURIComponent(q) + '&srlimit=1&format=json&origin=*';
+  const sr = await (await fetch(searchUrl)).json();
+  if(!sr.query || !sr.query.search || sr.query.search.length === 0) return null;
+  const hit = sr.query.search[0];
+  const title = hit.title;
+  // ★暴走ガード: 検索語とタイトルにつながりがあるかチェック
+  // 「検索語の一部がタイトルに入ってる」or「タイトルが検索語に入ってる」でなければ不採用
+  const qNorm = q.toLowerCase();
+  const tNorm = title.toLowerCase();
+  let related = tNorm.includes(qNorm) || qNorm.includes(tNorm);
+  if(!related){
+    // 2文字ずつに刻んで、共通のかけらの「割合」で判定(半分以上でないと不採用)
+    let common = 0;
+    let total = 0;
+    for(let i = 0; i < qNorm.length - 1; i++){
+      total++;
+      if(tNorm.includes(qNorm.slice(i, i + 2))) common++;
+    }
+    related = total > 0 && (common / total) >= 0.5;
+  }
+  if(!related) return null;
+  // 見つかったページの要約(最初の部分)を取る
+  const sumUrl = 'https://ja.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(title);
+  const sm = await (await fetch(sumUrl)).json();
+  if(!sm.extract) return null;
+  // 長すぎたら3文くらいに切る
+  let text = sm.extract;
+  const sentences = text.split('。');
+  if(sentences.length > 3) text = sentences.slice(0,3).join('。') + '。';
+  return {title: title, text: text};
+}
+
+async function geocode(place){const d=await(await fetch('https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(place)+'&count=1&language=ja')).json();if(d.results&&d.results.length>0){const g=d.results[0];return{lat:g.latitude,lon:g.longitude,name:g.name};}return null;}
+async function handleWeather(text){
+  lastTopic='weather';  // 天気の話に入った(現在地でも地名でも、これで続きを読める)
+  const cleaned=text.replace(/の?(天気|てんき|気温|きおん|weather|をおしえて|教えて|は|？|\?)/g,'').trim();
+  if(cleaned.length>=2){const geo=await geocode(cleaned);if(geo){addMsg('ai',await fetchWeather(geo.lat,geo.lon,geo.name));return;}}
+  if(navigator.geolocation){addMsg('ai','位置情報を確認するね…(許可を押してね)');navigator.geolocation.getCurrentPosition(async(pos)=>{try{addMsg('ai',await fetchWeather(pos.coords.latitude,pos.coords.longitude,'現在地'));}catch(e){addMsg('ai','天気の取得に失敗したよ');}},()=>{awaitingPlace=true;addMsg('ai','どこの天気が知りたい？ 地名を教えてね。');});}
+  else{awaitingPlace=true;addMsg('ai','どこの天気が知りたい？ 地名を教えてね。');}
+}
+
+// ===== 送信 =====
+async function cbSend(){
+  // 考え中ロック: 処理中は送信もモード切替もできない
+  if (window._qzSending) return;
+  window._qzSending = true;
+  const _inp = document.getElementById('cb-input');
+  const _btn = document.getElementById('cb-send');
+  if (_inp) _inp.disabled = true;
+  if (_btn) { _btn.disabled = true; _btn.style.opacity = '0.4'; }
+  try {
+  const inp=document.getElementById('cb-input');const text=inp.value.trim();if(text==='')return;
+  addMsg('me',text);inp.value='';setTimeout(window.refreshUsage, 1200);
+  if(awaitingPlace){awaitingPlace=false;const geo=await geocode(text.replace(/の天気.*$/,'').trim());if(geo){try{addMsg('ai',await fetchWeather(geo.lat,geo.lon,geo.name));}catch(e){addMsg('ai','取得失敗');}}else addMsg('ai','その地名が見つからなかった…');return;}
+  // Miniモード: 自作トランスフォーマーで文章生成
+  if(aiMode==='reden'){
+    addMsg('ai','redenは現在学習中だよ! もう少し待っててね! (Colabで学習中...)');
+    return;
+  }
+  if(aiMode==='mini'){
+    try{
+      let data;
+      if (parseFloat(window.qzMiniVer || 12) >= 9) {
+        // エッジ推論: v9はブラウザ内で計算(サーバーCPU=0!)
+        // 考え中メッセージ(計算中に止まって見えないように)
+        addMsg('ai', '🧠 考え中…', true);
+        // 先払い: 1回100トークンをサーバーに申告してから生成する
+        const pay = await (await fetch('/api/qzero/mini/spend', {method: 'POST'})).json();
+        // v12以上: 4文字以上の入力は会話モード、1-3文字は文章生成(書き出し)
+        const isChat = parseFloat(window.qzMiniVer || 12) >= 12 && text.replace(/\s/g, '').length >= 4;
+
+
+        if (!pay.ok) {
+          addMsg('ai', pay.error || '使用量がいっぱいだよ');
+          return;
+        }
+        const loaded = await QzeroMini.load(window.qzMiniVer || 12);  // 初回だけ脳みそDL(キャッシュされる)
+        if (!loaded) {
+          data = { ok: false, error: '脳みそのダウンロードに失敗したよ' };
+        } else {
+          const result = isChat ? QzeroMini.chat(text) : QzeroMini.generate(text);
+          if (result.ok) {
+            const inf = QzeroMini.info();
+            const prefix = isChat ? '' : '続きを作ったよ:\n\n「';
+            const suffix = isChat ? '' : '」';
+            data = { ok: true, reply: prefix + result.text.replace(/ /g, '') + suffix + '\n\n' + (isChat ? '(QZERO Mini 天才版・会話モード⚡)' : '(語彙' + inf.vocab + '語・DIM' + inf.dim + 'の自作トランスフォーマー⚡)') };
+          } else if (result.unknown && result.unknown.length) {
+            const vocab = QzeroMini.vocabulary();
+            data = { ok: true, reply: 'ごめん、「' + result.unknown.join(' ') + '」はまだ知らない言葉なんだ。\n\n私が知ってる' + vocab.length + '語はこれだよ:\n' + vocab.join(' ') + '\n\nこの言葉で「ねこが」みたいに書き出しをくれたら、続きを作るよ!' };
+          } else {
+            data = { ok: true, reply: '「ねこ が」みたいに、単語をスペースで区切った短い書き出しをちょうだい(4語まで)。\n\n使える言葉:\n' + QzeroMini.vocabulary().join(' ') };
+          }
+        }
+      } else {
+        const r=await fetch('/api/qzero/mini',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text, version: qzMiniVer})});
+        data=await r.json();
+      }
+      // 考え中メッセージを消す
+      document.querySelectorAll('#qz-log .cb-msg').forEach(m => { if (m.textContent.includes('考え中')) m.remove(); });
+      addMsg('ai', data.ok ? data.reply : (data.error||'エラーだよ'));
+    }catch(e){addMsg('ai','生成に失敗したよ');}
+    return;
+  }
+  // Guideモード: やりたいことに合うページを案内
+  if(aiMode==='guide'){
+    try{
+      const r=await fetch('/api/qzero/guide',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+      const data=await r.json();
+      if(data.ok && data.found){
+        addMsg('ai', data.reply);
+        // リンクボタンを最後のメッセージに付ける
+        const log=document.getElementById('qz-log');
+        const last=log.lastElementChild.querySelector('.cb-bubble');
+        const a=document.createElement('a');
+        a.href=data.url;
+        a.textContent='➡️ ' + data.name + ' を開く';
+        a.style.cssText='display:inline-block; margin-top:8px; padding:8px 14px; background:#111; color:white; border-radius:8px; text-decoration:none; font-size:0.85rem;';
+        last.appendChild(document.createElement('br'));
+        last.appendChild(a);
+      } else {
+        addMsg('ai', data.reply || data.error || '見つからなかったよ');
+      }
+    }catch(e){addMsg('ai','案内に失敗したよ');}
+    return;
+  }
+  // Searchモード: 天気っぽければ天気、それ以外はWikipediaで調べる
+  if(aiMode==='search'){
+    if(looksLikeWeather(text)){
+      lastTopic='weather';
+      try{await handleWeather(text);}catch(e){addMsg('ai','天気の取得に失敗したよ');}
+      return;
+    }
+    if(lastTopic==='weather' && isLikelyPlace(text)){
+      const place=text.replace(/^(じゃあ|では|それなら|あと|次は|つぎは)/,'').replace(/(は|の天気|は？|は\?|？|\?)$/,'').trim();
+      const geo=await geocode(place);
+      if(geo){try{addMsg('ai',await fetchWeather(geo.lat,geo.lon,geo.name));}catch(e){addMsg('ai','天気の取得に失敗したよ');}return;}
+    }
+    lastTopic=null;
+    addMsg('ai','しらべてるよ…', true);
+    try{
+      const wiki=await searchWikipedia(text);
+      if(wiki){
+        addMsg('ai','「'+wiki.title+'」について調べたよ。\n\n'+wiki.text+'\n\n(出典: Wikipedia)');
+      }else{
+        addMsg('ai','ごめん、それについては見つからなかった…。別の言葉で試してみて。');
+      }
+    }catch(e){addMsg('ai','調べるのに失敗したよ。もう一度試してみて。');}
+    return;
+  }
+  if(looksLikeWeather(text)){lastTopic='weather';try{await handleWeather(text);}catch(e){addMsg('ai','天気の取得に失敗したよ');}return;}
+
+  // ★流れを読む: 直前が天気の話で、今回が地名っぽい短い入力なら「その場所の天気」と判断
+  if(lastTopic==='weather' && isLikelyPlace(text)){
+    const place=text.replace(/^(じゃあ|では|それなら|あと|次は|つぎは)/,'').replace(/(は|の天気|は？|は\?|？|\?)$/,'').trim();
+    const geo=await geocode(place);
+    if(geo){try{addMsg('ai',await fetchWeather(geo.lat,geo.lon,geo.name));}catch(e){addMsg('ai','天気の取得に失敗したよ');}return;}
+    else{addMsg('ai','「'+place+'」の場所が見つからなかった…。別の言い方で試してみて。');return;}
+  }
+  try{
+    const r=await fetch('/qzero/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+    const data=await r.json();
+    lastTopic=(data.intent==='classify')?'classify':null;  // 話題を更新(天気モードから抜ける)
+    addMsg('ai',data.ok?data.reply:(data.error||'エラー'));
+  }catch(e){addMsg('ai','通信エラーが起きたよ');}
+  } finally {
+    window._qzSending = false;
+    const _inp2 = document.getElementById('cb-input');
+    const _btn2 = document.getElementById('cb-send');
+    if (_inp2) _inp2.disabled = false;
+    if (_btn2) { _btn2.disabled = false; _btn2.style.opacity = ''; }
+  }
+}
+
+// ===== 起動 =====
+greet();
+refreshAccount();
+loadThreads();
+
+// URLからスレッドを開く
+(function(){
+  var openTid = {{ open_thread_id|default(0) }};
+  var openMode = '{{ open_mode|default("") }}';
+  if (openTid) {
+    if (openMode === 'mini') { setAiMode('mini'); }
+    else if (openMode === 'search') { setAiMode('search'); }
+    else if (openMode === 'guide') { setAiMode('guide'); }
+    openThread(openTid);
+  }
+
+// ===== 使用量ゲージ+上限ロック =====
+window.refreshUsage = async function(){ if (!navigator.onLine) return;  // オフラインなら叩かない
+  try{
+    const d = await (await fetch('/api/qzero/usage/me')).json();
+    if(!d.ok) return;
+    const wrap = document.getElementById('qz-usage-wrap');
+    const bar = document.getElementById('qz-usage-bar');
+    const pct = document.getElementById('qz-usage-pct');
+    const banner = document.getElementById('qz-usage-banner');
+    const inp = document.getElementById('cb-input');
+    const btn = document.getElementById('cb-send');
+    wrap.style.display = 'block';
+    pct.textContent = d.percent + '% (' + d.used + '/' + d.limit + ')';
+    bar.style.width = Math.min(100, d.percent) + '%';
+    bar.style.background = d.percent >= 90 ? '#e24b4a' : (d.percent >= 70 ? '#ef9f27' : '#111');
+    if(d.full){
+      banner.textContent = '使用量がいっぱいになりました。0時0分にリセットします。';
+      banner.style.display = 'block';
+      if(inp){ inp.disabled = true; inp.placeholder = '今日の使用量はいっぱいです'; }
+      if(btn){ btn.disabled = true; btn.style.opacity = '0.4'; }
+    } else {
+      banner.style.display = 'none';
+      if(inp){ inp.disabled = false; }
+      if(btn){ btn.disabled = false; btn.style.opacity = ''; }
+    }
+  }catch(e){}
+}
+window.refreshUsage();
+setInterval(window.refreshUsage, 30000);
+
+setAiMode(aiMode);  // 復元したモードをボタンと挨拶に反映
+
+})();
+</script>
+{% endblock %}

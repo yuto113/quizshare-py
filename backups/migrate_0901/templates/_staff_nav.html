@@ -1,0 +1,80 @@
+<script>
+(function(){
+  if (new URLSearchParams(location.search).get('embed') === '1') {
+    document.documentElement.classList.add('embedded');
+  }
+})();
+</script>
+<style>
+html.embedded .qz-snav { display:none !important; }
+/* スタッフページ共通メニュー(この部品1つを全ページで使い回す) */
+.qz-snav { background:#14213d; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+.qz-snav-logo { font-size:0.85rem; letter-spacing:0.2em; color:#fb6f5b; font-weight:700; white-space:nowrap; }
+.qz-snav-links { display:flex; gap:8px 16px; flex-wrap:wrap; justify-content:flex-end; align-items:center; }
+.qz-snav-links a { color:rgba(255,255,255,0.6); font-size:0.8rem; text-decoration:none; white-space:nowrap; }
+.qz-snav-links a:hover { color:white; }
+.qz-snav details { position:relative; }
+.qz-snav summary { color:#FCD34D; font-size:0.8rem; cursor:pointer; list-style:none; white-space:nowrap; }
+.qz-snav summary::-webkit-details-marker { display:none; }
+.qz-snav .qz-snav-menu { position:absolute; right:0; top:26px; background:#1d2b4d; border:1px solid rgba(255,255,255,0.15); border-radius:10px; padding:8px 0; min-width:140px; z-index:50; }
+.qz-snav .qz-snav-menu a { display:block; padding:7px 16px; }
+</style>
+<nav class="qz-snav">
+  <a href="/staff/board" style="text-decoration:none;"><span class="qz-snav-logo">QZERO STAFF</span></a>
+  <div class="qz-snav-links">
+    <a href="/staff/cipher">🔐 暗号</a>
+      <a href="/reden" style="color:#b8860b; font-weight:bold;">🤖 reden</a>
+      <a href="/staff/board">💬 掲示板</a>
+    <a href="/staff/files">📁 ファイル</a>
+    <a href="/staff/calendar">📅 カレンダー</a>
+    <a href="/staff/tasks">✅ タスク</a>
+    <a href="/staff/handbook">📖 ハンドブック</a>
+    <a href="/staff/profile">👤 プロフィール</a>
+    {% if staff_nav_kouan %}<a href="/staff/kouan" style="color:#9aa7ff;">🕶️ 公安</a>{% endif %}
+    {% if staff_nav_is_admin %}
+    <details>
+      <summary>⚙️ 管理 ▾</summary>
+      <div class="qz-snav-menu">
+        <a href="/staff/hr">👑 人事</a>
+        <a href="/staff/errors">🚨 エラー</a>
+        <a href="/staff/moderation">🛡️ モデレーション</a>
+        <a href="/staff/qzero-school">📝 QZERO教室</a>
+        <a href="/staff/qzero-patterns">💬 会話パターン</a>
+        <a href="/staff/dashboard">📊 統計</a>
+      </div>
+    </details>
+    {% endif %}
+    <a href="/homepage">← QZEROトップへ</a>
+    <a href="#" onclick="qzStaffNavLogout(); return false;">ログアウト</a>
+  </div>
+</nav>
+<script>
+async function qzStaffNavLogout() {
+  try { await fetch('/api/staff/logout', {method: 'POST'}); } catch (e) {}
+  window.location.href = '/staff/login';
+}
+
+// ============================================
+// スタッフエリアはサイトテーマの対象外にする仕組み
+// テーマはbodyに「theme-dark」などのクラスを付けて色を塗り替えるので、
+// そのクラスを見つけしだい外し続ける
+// ============================================
+function qzStripTheme() {
+  try {
+    const b = document.body;
+    if (b === null) return;
+    Array.from(b.classList).forEach(c => {
+      if (c.indexOf('theme') !== -1 || c === 'halloween-dark') b.classList.remove(c);
+    });
+    b.style.background = '';  // テーマが直接塗った背景も消す(各ページのCSSに任せる)
+    document.querySelectorAll('.seasonal-emoji').forEach(e => e.remove());
+  } catch (e) {}
+}
+// テーマ機能の関数を乗っ取って、呼ばれても掃除だけするようにする
+window.applyTheme = qzStripTheme;
+window.checkAutoTheme = qzStripTheme;
+qzStripTheme();
+document.addEventListener('DOMContentLoaded', qzStripTheme);
+// テーマ側が後から塗り直してきても、2秒ごとの見張りが掃除する
+setInterval(qzStripTheme, 2000);
+</script>

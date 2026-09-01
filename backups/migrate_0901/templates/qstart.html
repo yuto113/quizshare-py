@@ -1,0 +1,3714 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Qstart — ゼロから作ったAIと、話そう</title>
+<meta name="description" content="Qstart - 12歳の開発者がゼロから手書きしたTransformerベースのAIチャットサービス">
+<meta property="og:title" content="Qstart">
+<meta property="og:description" content="ゼロから作ったAIと、話そう。">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/svg+xml" href="/static/qstart_icon.svg">
+<link rel="manifest" href="/static/qstart_manifest.json">
+<meta name="theme-color" content="#14213d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Qstart">
+<link rel="apple-touch-icon" href="/static/qstart_icon.svg">
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+
+/* ===== ダークテーマ ===== */
+body[data-theme="dark"] { background:#1a1815; color:#e8e4da; }
+body[data-theme="dark"] .qs-main { background:#1a1815; }
+body[data-theme="dark"] .qs-chat { background:#1a1815; }
+body[data-theme="dark"] .qs-sidebar { background:#0e1524; }
+body[data-theme="dark"] .qs-topbar { background:#232019; border-color:#332e26; }
+body[data-theme="dark"] .qs-input-area { background:#232019; border-color:#332e26; }
+body[data-theme="dark"] .qs-input { background:#2b2721; border-color:#3d382e; color:#e8e4da; }
+body[data-theme="dark"] .qs-input::placeholder { color:#8a8270; }
+body[data-theme="dark"] .qs-model-btn { background:#2b2721; border-color:#3d382e; color:#e8e4da; }
+body[data-theme="dark"] .qs-model-menu { background:#2b2721; border-color:#3d382e; }
+body[data-theme="dark"] .qs-model-option { color:#e8e4da; }
+body[data-theme="dark"] .qs-model-option:hover { background:#332e26; }
+body[data-theme="dark"] .qs-effort-btn { background:#2b2721; border-color:#3d382e; color:#c8c2b4; }
+body[data-theme="dark"] .qs-effort-btn.active { background:#b8860b; color:#fff; }
+body[data-theme="dark"] .qs-settings-btn { background:#2b2721; border-color:#3d382e; color:#e8e4da; }
+body[data-theme="dark"] .qs-file-btn { background:#2b2721; border-color:#3d382e; }
+body[data-theme="dark"] .qs-welcome h1 { color:#e8e4da; }
+body[data-theme="dark"] .qs-welcome p { color:#a8a294; }
+body[data-theme="dark"] .qs-bubble { background:#2b2721; color:#e8e4da; }
+body[data-theme="dark"] .qs-msg-user .qs-bubble { background:#14213d; color:#fff; }
+body[data-theme="dark"] .qs-label { color:#8a8270; }
+body[data-theme="dark"] .qs-status { background:#2b2721; border-color:#3d382e; }
+/* 設定モーダル */
+body[data-theme="dark"] .qs-s-modal { background:#232019; }
+body[data-theme="dark"] .qs-s-nav { background:#1e1b16; border-color:#332e26; }
+body[data-theme="dark"] .qs-s-nav h2 { color:#e8e4da; }
+body[data-theme="dark"] .qs-s-tab { color:#a8a294; }
+body[data-theme="dark"] .qs-s-tab:hover { background:#2b2721; }
+body[data-theme="dark"] .qs-s-tab.active { background:#332e26; color:#e8e4da; }
+body[data-theme="dark"] .qs-s-pane h3 { color:#e8e4da; }
+body[data-theme="dark"] .qs-s-section { border-color:#2f2b23; }
+body[data-theme="dark"] .qs-s-value { color:#e8e4da; }
+body[data-theme="dark"] .qs-s-label,
+body[data-theme="dark"] .qs-s-desc { color:#8a8270; }
+body[data-theme="dark"] .qs-s-pane select,
+body[data-theme="dark"] .qs-btn { background:#2b2721; border-color:#3d382e; color:#e8e4da; }
+body[data-theme="dark"] .qs-btn:hover { background:#332e26; }
+body[data-theme="dark"] .qs-btn.gold { background:#b8860b; color:#fff; }
+body[data-theme="dark"] .qs-code { background:#2b2721; border-color:#3d382e; color:#e8e4da; }
+body[data-theme="dark"] .qs-usebar-g { background:#332e26; }
+body[data-theme="dark"] .qs-sw span { background:#3d382e; }
+body[data-theme="dark"] .qs-s-close { color:#8a8270; }
+body[data-theme="dark"] .qs-s-close:hover { background:#332e26; }
+/* モーダル全般 */
+body[data-theme="dark"] #qs-ann-modal > div,
+body[data-theme="dark"] #qs-promo-modal > div,
+body[data-theme="dark"] #qs-login-modal > div { background:#232019; color:#e8e4da; }
+
+/* ===== 文字サイズ ===== */
+body[data-fs="sm"] .qs-chat, body[data-fs="sm"] .qs-input { font-size:13px; }
+body[data-fs="sm"] .qs-bubble { font-size:13px; }
+body[data-fs="lg"] .qs-chat, body[data-fs="lg"] .qs-input { font-size:16.5px; }
+body[data-fs="lg"] .qs-bubble { font-size:16.5px; line-height:1.85; }
+body[data-fs="lg"] .qs-s-value, body[data-fs="lg"] .qs-s-pane select { font-size:15.5px; }
+
+/* ===== 動きを減らす ===== */
+body[data-motion="off"] *,
+body[data-motion="off"] *::before,
+body[data-motion="off"] *::after {
+  animation-duration:0.001s !important;
+  transition-duration:0.001s !important;
+}
+
+/* ===== 高コントラスト ===== */
+body[data-contrast="on"] { color:#000; }
+body[data-contrast="on"] .qs-s-label,
+body[data-contrast="on"] .qs-s-desc,
+body[data-contrast="on"] .qs-usage { color:#3a3630 !important; }
+body[data-contrast="on"] .qs-bubble { border:1px solid #14213d; }
+body[data-contrast="on"] .qs-input { border-width:2px; border-color:#14213d; }
+body[data-contrast="on"] .qs-btn { border-width:2px; }
+body[data-theme="dark"][data-contrast="on"] { color:#fff; }
+body[data-theme="dark"][data-contrast="on"] .qs-s-label,
+body[data-theme="dark"][data-contrast="on"] .qs-s-desc { color:#d8d2c4 !important; }
+body { font-family: 'Segoe UI','Hiragino Sans',sans-serif; background:#faf9f6; color:#14213d; height:100vh; display:flex; }
+
+/* サイドバー */
+.qs-sidebar {
+  width: 260px; background:#14213d; color:#fff; display:flex; flex-direction:column;
+  padding: 20px 16px; flex-shrink:0;
+}
+.qs-logo { font-size:24px; font-weight:700; margin-bottom:4px; }
+.qs-logo span { color:#b8860b; }
+.qs-sub { font-size:11px; color:#8a8a9a; margin-bottom:24px; }
+.qs-new-chat {
+  background:#2a2a4a; border:1px solid #3a3a5a; border-radius:10px;
+  color:#fff; padding:10px 14px; cursor:pointer; font-size:14px;
+  margin-bottom:20px; text-align:center;
+}
+.qs-new-chat:hover { background:#3a3a5a; }
+.qs-history { flex:1; overflow-y:auto; font-size:13px; color:#8a8a9a; }
+.qs-history-item {
+  padding:8px 10px; border-radius:8px; cursor:pointer; margin-bottom:2px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.qs-history-item:hover { background:#2a2a4a; }
+.qs-sidebar-bottom { border-top:1px solid #2a2a4a; padding-top:12px; margin-top:12px; }
+.qs-sidebar-link {
+  display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:8px;
+  font-size:13px; color:#ccc; cursor:pointer; text-decoration:none;
+}
+.qs-sidebar-link:hover { background:#2a2a4a; color:#fff; }
+
+/* メインエリア */
+.qs-main { flex:1; display:flex; flex-direction:column; min-width:0; }
+.qs-topbar {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:12px 24px; border-bottom:1px solid #e8e4da; flex-wrap:wrap; gap:8px;
+}
+.qs-model-btn {
+  background:transparent; border:1px solid #d0ccc0; border-radius:8px;
+  padding:6px 14px; font-size:14px; cursor:pointer; color:#14213d;
+}
+.qs-model-btn:hover { background:#f0ede6; }
+.qs-topbar-right { display:flex; align-items:center; gap:12px; }
+.qs-file-btn { display:flex; align-items:center; justify-content:center; width:40px; height:40px; border-radius:8px; background:#f0ede6; cursor:pointer; font-size:18px; border:1px solid #d0ccc0; flex-shrink:0; }
+.qs-file-btn:hover { background:#e0ddd6; }
+.qs-file-preview { max-width:200px; max-height:150px; border-radius:8px; margin:4px 0; }
+.qs-thinking { display:flex; align-items:center; gap:8px; padding:10px 14px; }
+.qs-think-dot { width:8px; height:8px; border-radius:50%; background:#e07a2f; animation:qs-pulse 1.2s infinite; }
+.qs-think-text { color:#8a8270; font-size:13px; font-style:italic; }
+@keyframes qs-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.8)} }
+.qs-effort-group { display:flex; border:1px solid #d0ccc0; border-radius:8px; overflow:hidden; }
+.qs-effort-btn {
+  padding:5px 12px; font-size:12px; cursor:pointer; background:transparent;
+  border:none; color:#666;
+}
+.qs-effort-btn.active { background:#14213d; color:#fff; }
+.qs-settings-btn {
+  background:transparent; border:none; font-size:20px; cursor:pointer; color:#666;
+}
+
+/* チャットエリア */
+.qs-chat { flex:1; overflow-y:auto; padding:24px; max-width:700px; margin:0 auto; width:100%; box-sizing:border-box; }
+.qs-welcome {
+  text-align:center; margin-top:12vh; padding:0 20px; max-width:600px; margin-left:auto; margin-right:auto;
+}
+.qs-welcome h1 { font-size:28px; font-weight:600; margin-bottom:8px; }
+.qs-welcome p { font-size:15px; color:#8a8270; line-height:1.7; }
+.qs-welcome .qs-status {
+  display:inline-block; margin-top:16px; padding:6px 16px;
+  background:#fff8e7; border:1px solid #e8d5a0; border-radius:20px;
+  font-size:13px; color:#b8860b;
+}
+.qs-msg { margin-bottom:16px; display:flex; gap:10px; }
+.qs-msg-user { justify-content:flex-end; }
+.qs-msg-ai { justify-content:flex-start; }
+.qs-bubble {
+  max-width:70%; padding:10px 16px; border-radius:12px;
+  font-size:14px; line-height:1.7;
+}
+.qs-msg-user .qs-bubble { background:#14213d; color:#fff; }
+.qs-msg-ai .qs-bubble { background:#f0ede6; color:#14213d; }
+.qs-msg-ai .qs-label { font-size:11px; color:#b8b09e; margin-bottom:2px; }
+
+/* 入力エリア */
+.qs-input-area {
+  padding:16px 24px; border-top:1px solid #e8e4da;
+  max-width:700px; margin:0 auto; width:100%; box-sizing:border-box;
+}
+.qs-input-row { display:flex; gap:8px; }
+.qs-input {
+  flex:1; padding:10px 16px; border:1px solid #d0ccc0; border-radius:10px;
+  font-size:14px; outline:none; background:#fff;
+}
+.qs-input:focus { border-color:#14213d; }
+.qs-send {
+  padding:10px 20px; background:#14213d; color:#fff; border:none;
+  border-radius:10px; font-size:14px; cursor:pointer; font-weight:600;
+}
+.qs-send:hover { background:#1a2a50; }
+.qs-usage {
+  text-align:center; font-size:12px; color:#b8b09e; margin-top:8px;
+}
+
+/* モデル選択メニュー */
+.qs-model-menu {
+  display:none; position:absolute; top:50px; left:24px;
+  background:#fff; border:1px solid #e0dcd0; border-radius:12px;
+  box-shadow:0 4px 20px rgba(0,0,0,0.1); padding:8px 0; z-index:100; min-width:260px;
+}
+.qs-model-menu.open { display:block; }
+.qs-model-option {
+  padding:10px 16px; cursor:pointer; font-size:14px;
+}
+.qs-model-option:hover { background:#f8f7f4; }
+.qs-model-option .qs-m-name { font-weight:600; }
+.qs-model-option .qs-m-desc { font-size:12px; color:#8a8270; margin-top:2px; }
+.qs-model-option .qs-m-badge {
+  font-size:10px; padding:2px 8px; border-radius:10px; margin-left:6px;
+}
+.qs-m-available { background:#e8f5e9; color:#2e7d32; }
+.qs-m-soon { background:#fff3e0; color:#e65100; }
+.qs-m-locked { background:#f0f0f0; color:#999; }
+
+/* 設定パネル */
+/* ===== Claude風 設定モーダル ===== */
+.qs-settings-panel {
+  display:none; position:fixed; inset:0; z-index:300;
+  background:rgba(30,28,24,0.45); backdrop-filter:blur(2px);
+  align-items:center; justify-content:center; padding:24px;
+}
+.qs-settings-panel.open { display:flex; }
+.qs-s-modal {
+  width:100%; max-width:780px; height:min(560px, 88vh);
+  background:#fff; border-radius:16px; overflow:hidden;
+  display:flex; box-shadow:0 24px 60px rgba(0,0,0,0.25);
+  animation:qsPop .16s ease-out;
+}
+@keyframes qsPop { from{opacity:0; transform:scale(.97);} to{opacity:1; transform:scale(1);} }
+
+/* 左タブ */
+.qs-s-nav {
+  width:210px; flex-shrink:0; background:#faf9f5;
+  border-right:1px solid #ece9e2; padding:20px 12px; overflow-y:auto;
+}
+.qs-s-nav h2 { font-size:17px; font-weight:600; color:#14213d; margin:4px 8px 16px; }
+.qs-s-tab {
+  display:flex; align-items:center; gap:9px;
+  padding:9px 11px; margin-bottom:2px; border-radius:8px;
+  font-size:14px; color:#5c5647; cursor:pointer; user-select:none;
+  transition:background .12s;
+}
+.qs-s-tab:hover { background:#f0ede5; }
+.qs-s-tab.active { background:#ece7dc; color:#14213d; font-weight:600; }
+.qs-s-tab span.ic { font-size:15px; width:18px; text-align:center; }
+
+/* 追加パーツ */
+.qs-s-nav { padding-bottom:14px; }
+.qs-s-desc { font-size:11.5px; color:#9a9384; margin-top:5px; line-height:1.6; }
+.qs-s-row { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.qs-s-pane select { padding:8px 12px; border:1px solid #ddd8cc; border-radius:8px;
+  font-size:14px; background:#fff; min-width:200px; font-family:inherit; }
+.qs-btn { display:inline-block; padding:8px 14px; margin:4px 6px 0 0; border-radius:8px;
+  font-size:13px; text-decoration:none; cursor:pointer; border:1px solid #ddd8cc;
+  background:#fff; color:#14213d; }
+.qs-btn:hover { background:#faf9f5; }
+.qs-btn.gold { background:#b8860b; color:#fff; border-color:#b8860b; }
+.qs-btn.danger { color:#b03a3a; border-color:#e8d0d0; }
+.qs-code { display:inline-block; background:#f5f3ed; border:1px solid #e8e4da;
+  border-radius:6px; padding:6px 10px; font-size:12px; font-family:monospace; margin-top:6px; }
+/* トグルスイッチ */
+.qs-sw { position:relative; display:inline-block; width:42px; height:24px; flex-shrink:0; }
+.qs-sw input { opacity:0; width:0; height:0; }
+.qs-sw span { position:absolute; inset:0; background:#ddd8cc; border-radius:24px;
+  cursor:pointer; transition:.2s; }
+.qs-sw span:before { content:""; position:absolute; height:18px; width:18px; left:3px; top:3px;
+  background:#fff; border-radius:50%; transition:.2s; }
+.qs-sw input:checked + span { background:#b8860b; }
+.qs-sw input:checked + span:before { transform:translateX(18px); }
+/* 使用量バー */
+.qs-usebar { display:flex; align-items:center; gap:10px; }
+.qs-usebar-g { flex:1; height:8px; background:#ece9e2; border-radius:4px; overflow:hidden; }
+.qs-usebar-g > div { height:100%; background:#b8860b; width:0%; transition:width .3s; }
+.qs-usebar > span { font-size:12px; color:#8a8270; min-width:44px; text-align:right; }
+/* 保存トースト */
+.qs-s-saved { position:absolute; top:14px; left:32px; font-size:12px; color:#2e7d32;
+  background:#e8f5e9; padding:4px 10px; border-radius:20px; opacity:0;
+  transition:opacity .3s; pointer-events:none; }
+.qs-s-saved.show { opacity:1; }
+
+/* 右コンテンツ */
+.qs-s-body { flex:1; padding:28px 32px; overflow-y:auto; position:relative; }
+.qs-s-pane { display:none; }
+.qs-s-pane.active { display:block; }
+.qs-s-pane h3 { font-size:16px; font-weight:600; color:#14213d; margin:0 0 18px; }
+
+.qs-s-section {
+  padding:14px 0; border-bottom:1px solid #f0ede5;
+}
+.qs-s-section:last-child { border-bottom:none; }
+.qs-s-label { font-size:12px; color:#8a8270; margin-bottom:5px; letter-spacing:.02em; }
+.qs-s-value { font-size:14px; font-weight:500; color:#2b2820; }
+.qs-s-bar { height:6px; background:#ece9e2; border-radius:4px; margin-top:8px; overflow:hidden; }
+.qs-s-bar-fill { height:100%; background:#b8860b; border-radius:4px; transition:width .3s; }
+.qs-s-close {
+  position:absolute; top:14px; right:16px; background:none; border:none;
+  font-size:22px; line-height:1; cursor:pointer; color:#9a9384;
+  width:32px; height:32px; border-radius:8px;
+}
+.qs-s-close:hover { background:#f0ede5; color:#444; }
+
+@media (max-width:640px) {
+  .qs-settings-panel { padding:0; }
+  .qs-s-modal { max-width:none; height:100vh; border-radius:0; flex-direction:column; }
+  .qs-s-nav {
+    width:100%; height:auto; border-right:none; border-bottom:1px solid #ece9e2;
+    display:flex; gap:4px; overflow-x:auto; padding:12px; align-items:center;
+  }
+  .qs-s-nav h2 { display:none; }
+  .qs-s-tab { margin-bottom:0; white-space:nowrap; padding:8px 12px; }
+  .qs-s-body { padding:20px; }
+}
+
+/* ===== RTL(アラビア語など) ===== */
+body[dir="rtl"] { direction: rtl; }
+body[dir="rtl"] .qs-sidebar { order:2; }
+body[dir="rtl"] .qs-main { order:1; }
+body[dir="rtl"] .qs-msg-user { justify-content:flex-start; }
+body[dir="rtl"] .qs-msg-ai { justify-content:flex-end; }
+body[dir="rtl"] .qs-s-nav { border-right:none; border-left:1px solid #ece9e2; }
+body[dir="rtl"] .qs-s-close { right:auto; left:16px; }
+body[dir="rtl"] .qs-s-tab { flex-direction:row-reverse; text-align:right; }
+@media (max-width:768px) {
+  body[dir="rtl"] .qs-sidebar { transform:translateX(100%); left:auto; right:0; }
+  body[dir="rtl"] .qs-sidebar.open { transform:translateX(0); }
+}
+
+/* ===== モバイル強化 (1.5.2) ===== */
+@media (max-width: 768px) {
+  /* チャット */
+  .qs-chat { padding:14px 12px; }
+  .qs-bubble { max-width:88%; font-size:14px; line-height:1.75; }
+  .qs-welcome h1 { font-size:26px; }
+  .qs-welcome p { font-size:13px; padding:0 12px; }
+  .qs-topbar { padding:9px 12px; gap:8px; flex-wrap:nowrap; overflow-x:auto; }
+  .qs-model-btn { font-size:13px; padding:7px 11px; white-space:nowrap; }
+  .qs-effort-btn { padding:6px 8px; font-size:12px; }
+  .qs-effort-group { flex-shrink:0; }
+  /* 入力欄をタップしやすく */
+  .qs-input-area { padding:10px 12px; }
+  .qs-input { font-size:16px !important; padding:12px 14px; }  /* iOSの自動ズーム防止 */
+  body[data-fs] .qs-input { font-size:16px !important; }
+  .qs-send { padding:12px 16px; font-size:14px; }
+  .qs-file-btn { width:44px; height:44px; }
+  /* サイドバーを全画面に */
+  .qs-sidebar { width:84%; max-width:300px; box-shadow:4px 0 24px rgba(0,0,0,.3); }
+  .qs-sidebar-link { padding:12px 10px; font-size:14px; }
+  /* モデルメニューが背面に行かないように */
+  .qs-model-menu {
+    position:fixed !important;
+    left:8px !important; right:8px !important; top:56px !important;
+    width:auto !important; max-width:none !important;
+    z-index:300 !important;
+    max-height:70vh; overflow-y:auto;
+    box-shadow:0 12px 40px rgba(0,0,0,.25);
+  }
+  .qs-model-option { padding:14px 16px; }
+  /* ハンバーガーを表示 */
+  #qs-sidebar-open { display:block !important; }
+  .qs-sidebar {
+    position:fixed; left:0; top:0; bottom:0; z-index:210;
+    transform:translateX(-100%); transition:transform .22s ease;
+  }
+  .qs-sidebar.open { transform:translateX(0); }
+  .qs-main { width:100%; }
+  .qs-new-chat { padding:13px; font-size:14px; }
+  /* お知らせバナー */
+  #qs-ann-banner { padding:9px 12px; font-size:12.5px; gap:8px; }
+  #qs-ann-banner a { font-size:11px; }
+}
+
+@media (max-width: 480px) {
+  .qs-bubble { max-width:92%; }
+  .qs-welcome h1 { font-size:23px; }
+  .qs-model-btn { max-width:120px; overflow:hidden; text-overflow:ellipsis; }
+  .qs-effort-btn { padding:6px; font-size:11px; }
+  .qs-s-tab { padding:8px 10px; font-size:12.5px; }
+  .qs-s-body { padding:18px 16px; }
+  .qs-s-pane select { min-width:100%; }
+  .qs-btn { display:block; width:100%; text-align:center; margin:6px 0 0; }
+}
+
+/* 横向き・小さい高さ */
+@media (max-height: 500px) and (orientation: landscape) {
+  .qs-welcome { padding:12px 0; }
+  .qs-welcome h1 { font-size:19px; margin-bottom:4px; }
+  .qs-welcome p { font-size:12px; }
+  .qs-s-modal { height:96vh; }
+}
+
+
+</style>
+</head>
+<body>
+
+<!-- サイドバー -->
+<div class="qs-sidebar">
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div class="qs-logo">Q<span>start</span></div>
+      <button onclick="if(isMobile())closeSidebar();else toggleSidebar();" style="background:none; border:none; color:#888; font-size:20px; cursor:pointer; padding:4px 8px;">✕</button>
+    </div>
+  <div class="qs-sub">ゼロから作ったAIと、話そう。</div>
+  <div class="qs-new-chat" onclick="newChat()">+ 新しいチャット</div>
+  <a class="qs-sidebar-link" href="/qstart/projects" style="display:block;margin:8px 0 4px;">📁 プロジェクト</a>
+  <div id="qs-search-row" style="display:none;padding:0 2px 8px;">
+    <input id="qs-search" placeholder="🔍 チャットを検索" oninput="doSearch()"
+      style="width:100%;padding:8px 11px;border:1px solid #2a2a4a;border-radius:8px;
+      background:#1a2338;color:#ddd;font-size:12.5px;font-family:inherit;">
+  </div>
+  <div class="qs-history" id="qs-history">
+    <div style="color:#666; font-size:12px; padding:8px;"><span id="qs-t-history">チャット履歴はここに表示されます</span></div>
+  </div>
+  <div class="qs-sidebar-bottom">
+    <div id="qs-account-area" style="margin-bottom:10px;">
+      <a class="qs-sidebar-link" onclick="openLogin()" id="qs-login-link">🔑 ログイン</a>
+    </div>
+    <a class="qs-sidebar-link" onclick="openAnnList()" id="qs-t-ann-link">🔔 お知らせ<span id="qs-ann-dot" style="display:none;background:#e53935;color:#fff;font-size:10px;border-radius:10px;padding:1px 6px;margin-left:6px;"></span></a>
+    <a class="qs-sidebar-link" onclick="openSettings()" id="qs-t-settings-link">⚙️ 設定</a>
+    <a class="qs-sidebar-link" href="/qstart/terms"><span id="qs-t-terms">📄 利用規約</span></a>
+    <a class="qs-sidebar-link" href="/qstart/contact">📮 お問い合わせ</a>
+    <a class="qs-sidebar-link" href="/qstart/status">🩺 稼働状況</a>
+    <a class="qs-sidebar-link" href="/qstart/privacy"><span id="qs-t-privacy">🔒 プライバシー</span></a>
+    <a class="qs-sidebar-link" href="/" id="qs-t-back">🏠 QuizShareに戻る</a>
+    <a class="qs-sidebar-link" href="#" onclick="openPromoModal();return false;" style="color:#c9a227;" id="qs-promo-link">🎟 優待コード入力</a>
+  </div>
+</div>
+
+<!-- メインエリア -->
+<div class="qs-main">
+  <!-- トップバー -->
+  <div class="qs-topbar" style="position:relative;">
+    <button id="qs-sidebar-open" onclick="toggleSidebar()" style="background:none; border:none; font-size:20px; cursor:pointer; color:#14213d; display:none; margin-right:12px;">☰</button>
+    <button class="qs-model-btn" id="qs-model-btn" onclick="toggleModelMenu()">Equi 1 ∨</button>
+    <div class="qs-model-menu" id="qs-model-menu"></div>
+    <div class="qs-topbar-right">
+      <div class="qs-effort-group">
+        <button class="qs-effort-btn" id="eff-low" onclick="setEffort('low',this)" data-eff="low">⚡低</button>
+        <button class="qs-effort-btn active" id="eff-mid" onclick="setEffort('mid',this)" data-eff="mid">⚙️中</button>
+        <button class="qs-effort-btn" id="eff-high" onclick="setEffort('high',this)" data-eff="high">🔥高</button>
+      </div>
+      <button class="qs-settings-btn" onclick="exportChat()" title="この会話を書き出す">⬇</button>
+      <button class="qs-settings-btn" onclick="openSettings()">⚙</button>
+    </div>
+  </div>
+
+  <!-- チャット -->
+  <div class="qs-chat" id="qs-chat">
+    <div class="qs-welcome" id="qs-welcome">
+      <h1>Qstart</h1>
+      <p>ゼロから作ったTransformerと会話しよう。<br>12歳の開発者が手書きしたAIがここにいる。</p>
+      <div class="qs-status" id="qs-ai-status">✅ <span id="qs-status-text">AI稼働中!</span></div>
+    </div>
+  </div>
+
+  <!-- 入力 -->
+  <div class="qs-input-area">
+    <div class="qs-input-row">
+      <input class="qs-input" id="qs-input" placeholder="Equi 1に何でも聞いてみよう！">
+      <label class="qs-file-btn" title="ファイルを添付">
+        <input type="file" id="qs-file" accept="image/*,.txt,.pdf,.csv" style="display:none" onchange="handleFile(this)">
+        📎
+      </label>
+      <button class="qs-send" onclick="sendMsg()">送信</button>
+    </div>
+    <div id="qs-ai-lang-note" style="display:none;font-size:11px;color:#b8860b;text-align:center;margin-bottom:2px;"></div>
+    <div class="qs-usage" id="qs-usage">使用量: 0%</div>
+  </div>
+</div>
+
+<!-- 通報モーダル -->
+<div id="qs-report-modal" style="display:none;position:fixed;inset:0;z-index:320;
+  background:rgba(30,28,24,.45);align-items:center;justify-content:center;padding:20px;"
+  onclick="if(event.target===this)closeReport()">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:460px;padding:26px;
+    box-shadow:0 24px 60px rgba(0,0,0,.28);">
+    <h2 style="font-size:17px;margin-bottom:6px;">🚩 この回答を報告</h2>
+    <div style="font-size:11.5px;color:#a09a8a;margin-bottom:16px;line-height:1.7;">
+      問題のある回答を教えてください。今後の改善に使わせていただきます。</div>
+    <div style="background:#faf9f5;border:1px solid #ece9e2;border-radius:9px;padding:10px 12px;
+      font-size:12px;color:#6b6555;margin-bottom:14px;line-height:1.6;" id="qs-report-preview"></div>
+    <label style="display:block;font-size:12px;color:#8a8270;margin-bottom:5px;">種類</label>
+    <select id="qs-report-cat" style="width:100%;padding:9px 12px;border:1px solid #e0dcd2;
+      border-radius:9px;font-size:14px;font-family:inherit;">
+      <option value="wrong">事実と違う</option>
+      <option value="broken">文章が壊れている</option>
+      <option value="harmful">不適切・有害</option>
+      <option value="offtopic">質問と関係ない</option>
+      <option value="other">その他</option>
+    </select>
+    <label style="display:block;font-size:12px;color:#8a8270;margin:14px 0 5px;">詳しく</label>
+    <textarea id="qs-report-body" maxlength="2000" placeholder="何が問題でしたか？"
+      style="width:100%;min-height:90px;padding:10px 13px;border:1px solid #e0dcd2;
+      border-radius:9px;font-size:13.5px;font-family:inherit;line-height:1.6;resize:vertical;"></textarea>
+    <div id="qs-report-msg" style="font-size:12.5px;margin-top:10px;min-height:18px;"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+      <a class="qs-btn" onclick="closeReport()">キャンセル</a>
+      <a class="qs-btn gold" onclick="sendReport()">報告する</a>
+    </div>
+  </div>
+</div>
+
+{% if test_mode %}
+<div style="position:fixed;top:0;left:0;right:0;z-index:400;background:#7b1fa2;color:#fff;
+  padding:7px 16px;font-size:12px;text-align:center;font-weight:600;letter-spacing:.03em;">
+  🧪 テスト環境 — この画面は管理者専用です（本番: <a href="/qstart" style="color:#fff;text-decoration:underline;">/qstart</a>）
+</div>
+<style>body{padding-top:30px !important;}</style>
+{% endif %}
+
+<!-- メンテナンス予告バナー -->
+<div id="qs-maint-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:255;
+  padding:11px 18px;font-size:13px;background:#fff6e5;color:#8a5a00;
+  display:none;align-items:center;gap:12px;box-shadow:0 2px 12px rgba(0,0,0,.12);">
+  <span>🔧</span>
+  <div style="flex:1;min-width:0;line-height:1.6;" id="qs-maint-text"></div>
+  <button onclick="dismissMaint()" style="background:none;border:none;font-size:17px;
+    cursor:pointer;color:inherit;opacity:.6;padding:0 4px;">✕</button>
+</div>
+
+<!-- お知らせバナー -->
+<div id="qs-ann-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:250;
+  padding:11px 18px;font-size:13.5px;display:flex;align-items:center;gap:12px;
+  box-shadow:0 2px 12px rgba(0,0,0,.12);">
+  <span id="qs-ann-icon">📢</span>
+  <div style="flex:1;min-width:0;">
+    <b id="qs-ann-title"></b>
+    <span id="qs-ann-body" style="opacity:.9;margin-left:8px;"></span>
+  </div>
+  <a onclick="openAnnList()" style="cursor:pointer;text-decoration:underline;font-size:12px;white-space:nowrap;">詳しく</a>
+  <button onclick="dismissAnn()" style="background:none;border:none;font-size:17px;
+    cursor:pointer;color:inherit;opacity:.6;padding:0 4px;">✕</button>
+</div>
+
+<!-- お知らせ一覧モーダル -->
+<div id="qs-ann-modal" style="display:none;position:fixed;inset:0;z-index:310;
+  background:rgba(30,28,24,.45);align-items:center;justify-content:center;padding:20px;"
+  onclick="if(event.target===this)closeAnnList()">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:520px;
+    max-height:78vh;overflow-y:auto;padding:26px;box-shadow:0 24px 60px rgba(0,0,0,.28);">
+    <div style="display:flex;align-items:center;margin-bottom:18px;">
+      <h2 style="font-size:18px;flex:1;">🔔 お知らせ</h2>
+      <button onclick="closeAnnList()" style="background:none;border:none;font-size:22px;
+        cursor:pointer;color:#9a9384;">×</button>
+    </div>
+    <div id="qs-ann-list"></div>
+  </div>
+</div>
+
+<!-- 設定パネル -->
+<div class="qs-settings-panel" id="qs-settings" onclick="if(event.target===this)closeSettings()">
+ <div class="qs-s-modal">
+
+  <div class="qs-s-nav">
+    <h2 id="qs-t-settings-title">設定</h2>
+    <div class="qs-s-tab active" data-pane="general" onclick="qsTab('general')"><span class="ic">⚙️</span><span>一般</span></div>
+    <div class="qs-s-tab" data-pane="account" onclick="qsTab('account')"><span class="ic">👤</span><span>アカウント</span></div>
+    <div class="qs-s-tab" data-pane="model" onclick="qsTab('model')"><span class="ic">🤖</span><span>モデル</span></div>
+    <div class="qs-s-tab" data-pane="feature" onclick="qsTab('feature')"><span class="ic">✨</span><span>機能</span></div>
+    <div class="qs-s-tab" data-pane="privacy" onclick="qsTab('privacy')"><span class="ic">🔒</span><span>プライバシー</span></div>
+    <div class="qs-s-tab" data-pane="usage" onclick="qsTab('usage')"><span class="ic">📊</span><span>使用量</span></div>
+    <div class="qs-s-tab" data-pane="billing" onclick="qsTab('billing')"><span class="ic">💳</span><span>請求</span></div>
+    <div class="qs-s-tab" data-pane="api" onclick="qsTab('api')"><span class="ic">🔑</span><span>API</span></div>
+    <div class="qs-s-tab" data-pane="notify" onclick="qsTab('notify')"><span class="ic">🔔</span><span>通知</span></div>
+    <div class="qs-s-tab" data-pane="a11y" onclick="qsTab('a11y')"><span class="ic">♿</span><span>アクセシビリティ</span></div>
+    <div class="qs-s-tab" data-pane="about" onclick="qsTab('about')"><span class="ic">ℹ️</span><span>Qstartについて</span></div>
+    <div class="qs-s-tab" data-pane="admin" id="qs-tab-admin" style="display:none" onclick="qsTab('admin')"><span class="ic">🛠</span><span>管理者</span></div>
+  </div>
+
+  <div class="qs-s-body">
+    <button class="qs-s-close" onclick="closeSettings()">×</button>
+    <div class="qs-s-saved" id="qs-s-saved">保存しました</div>
+
+    <!-- 一般 -->
+    <div class="qs-s-pane active" id="pane-general">
+      <h3>一般</h3>
+      <div class="qs-s-section"><div class="qs-s-label">言語</div>
+        <select id="qs-lang" onchange="setLang(this.value);saveSetting('lang',this.value)">
+          <option value="ja">日本語</option><option value="en">English</option>
+          <option value="zh">中文</option><option value="ko">한국어</option>
+          <option value="fr">Français</option><option value="de">Deutsch</option>
+          <option value="es">Español</option><option value="pt">Português</option>
+          <option value="ar">العربية</option><option value="hi">हिन्दी</option>
+          <option value="th">ไทย</option><option value="vi">Tiếng Việt</option>
+        </select></div>
+      <div class="qs-s-section"><div class="qs-s-label">テーマ</div>
+        <select id="set-theme" onchange="saveSetting('theme',this.value);applyTheme()">
+          <option value="light">ライト</option><option value="dark">ダーク</option>
+          <option value="system">システムに合わせる</option>
+        </select></div>
+      <div class="qs-s-section"><div class="qs-s-label">文字サイズ</div>
+        <select id="set-font_size" onchange="saveSetting('font_size',this.value);applyFont()">
+          <option value="sm">小</option><option value="md">標準</option><option value="lg">大</option>
+        </select></div>
+      <div class="qs-s-section" id="qs-install-row" style="display:none;">
+        <div class="qs-s-label">アプリとして使う</div>
+        <a class="qs-btn gold" onclick="installApp()">📱 ホーム画面に追加</a>
+        <div class="qs-s-desc">ブラウザを開かずにアプリのように使えます。</div>
+      </div>
+    </div>
+
+    <!-- アカウント -->
+    <div class="qs-s-pane" id="pane-account">
+      <h3>アカウント</h3>
+      <div class="qs-s-section"><div class="qs-s-label">表示名</div><div class="qs-s-value" id="qs-s-account">ゲスト</div></div>
+      <div class="qs-s-section"><div class="qs-s-label">メールアドレス</div><div class="qs-s-value" id="qs-s-email">—</div></div>
+      <div class="qs-s-section"><div class="qs-s-label">プラン</div><div class="qs-s-value" id="qs-s-plan">Free</div></div>
+      <div class="qs-s-section" id="qs-s-role-sec" style="display:none;"><div class="qs-s-label">権限</div><div class="qs-s-value" id="qs-s-role">—</div></div>
+      <div class="qs-s-section">
+        <a class="qs-btn ghost" href="/qstart/api">🔑 APIキーを管理</a>
+        <a class="qs-btn danger" onclick="closeSettings();doLogout();">ログアウト</a>
+      </div>
+    </div>
+
+    <!-- モデル -->
+    <div class="qs-s-pane" id="pane-model">
+      <h3>モデル</h3>
+      <div class="qs-s-section"><div class="qs-s-label">既定のモデル</div>
+        <select id="set-default_model" onchange="saveSetting('default_model',this.value)">
+          <option value="equi">Equi 1 — バランス</option>
+          <option value="zin">zin 1 — 思考</option>
+          <option value="apex">Apex 2 — 最高性能</option>
+          <option value="apex">Apex 3 — 誠実に答えるモデル</option>
+        </select>
+        <div class="qs-s-desc" id="qs-model-soon">Pure 1 / Apex 1 は2026年秋に公開予定です</div></div>
+      <div class="qs-s-section"><div class="qs-s-label">既定のエフォート</div>
+        <select id="set-default_effort" onchange="saveSetting('default_effort',this.value)">
+          <option value="low">⚡ 低 — 速い</option><option value="mid">⚙️ 中 — 標準</option>
+          <option value="high">🔥 高 — じっくり</option>
+        </select></div>
+      <div class="qs-s-section"><div class="qs-s-label">現在のモデル</div><div class="qs-s-value" id="qs-s-model">—</div></div>
+      <div class="qs-s-section"><div class="qs-s-label">現在のエフォート</div><div class="qs-s-value" id="qs-s-effort">中</div></div>
+    </div>
+
+    <!-- 機能 -->
+    <div class="qs-s-pane" id="pane-feature">
+      <h3>機能</h3>
+      <div class="qs-s-section qs-s-row">
+        <div><div class="qs-s-value">ファイル添付</div><div class="qs-s-desc">画像やテキストファイルを送れるようにします</div></div>
+        <label class="qs-sw"><input type="checkbox" id="set-enable_upload" onchange="saveSetting('set-enable_upload',this.checked?1:0)"><span></span></label>
+      </div>
+      <div class="qs-s-section qs-s-row">
+        <div><div class="qs-s-value">検索</div><div class="qs-s-desc">必要に応じてAIが情報を探します</div></div>
+        <label class="qs-sw"><input type="checkbox" id="set-enable_search" onchange="saveSetting('set-enable_search',this.checked?1:0)"><span></span></label>
+      </div>
+      <div class="qs-s-section qs-s-row">
+        <div><div class="qs-s-value">思考を表示</div><div class="qs-s-desc">zin 1 の考える過程を表示します</div></div>
+        <label class="qs-sw"><input type="checkbox" id="set-show_thinking" onchange="saveSetting('set-show_thinking',this.checked?1:0)"><span></span></label>
+      </div>
+      <div class="qs-s-section qs-s-row">
+        <div><div class="qs-s-value">ストリーミング応答</div><div class="qs-s-desc">回答を1文字ずつ表示します</div></div>
+        <label class="qs-sw"><input type="checkbox" id="set-streaming" onchange="saveSetting('set-streaming',this.checked?1:0)"><span></span></label>
+      </div>
+    </div>
+
+    <!-- プライバシー -->
+    <div class="qs-s-pane" id="pane-privacy">
+      <h3>プライバシー</h3>
+      <div class="qs-s-section qs-s-row">
+        <div><div class="qs-s-value">チャット履歴を保存</div><div class="qs-s-desc">オフにすると会話は保存されません</div></div>
+        <label class="qs-sw"><input type="checkbox" id="set-save_history" onchange="saveSetting('set-save_history',this.checked?1:0)"><span></span></label>
+      </div>
+      <div class="qs-s-section qs-s-row">
+        <div><div class="qs-s-value">AIの改善に利用することを許可</div><div class="qs-s-desc">会話をモデルの学習に使用します。いつでも変更できます</div></div>
+        <label class="qs-sw"><input type="checkbox" id="set-allow_training" onchange="saveSetting('set-allow_training',this.checked?1:0)"><span></span></label>
+      </div>
+      <div class="qs-s-section">
+        <div class="qs-s-label">データ</div>
+        <a class="qs-btn ghost" onclick="exportData()">📥 自分のデータを書き出す</a>
+        <a class="qs-btn ghost" onclick="deleteData('history')">🗑 チャット履歴をすべて削除</a>
+        <a class="qs-btn danger" onclick="deleteData('all')">⚠️ アカウントを削除</a>
+        <div class="qs-s-desc">削除は取り消せません。書き出しは JSON 形式です。</div>
+      </div>
+    </div>
+
+    <!-- 使用量 -->
+    <div class="qs-s-pane" id="pane-usage">
+      <h3>使用量</h3>
+
+      <div class="qs-s-section">
+        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:7px;">
+          <div style="font-size:13px;font-weight:600;color:#14213d;" id="qs-s-window-title">3時間枠</div>
+          <div style="font-size:12px;color:#8a8270;" id="qs-s-window-num">0 / 0</div>
+        </div>
+        <div class="qs-usebar"><div class="qs-usebar-g"><div id="qs-s-bar-window"></div></div><span id="qs-s-pct-window">0%</span></div>
+        <div id="qs-s-window-detail" style="font-size:11.5px;color:#8a8270;margin-top:8px;line-height:1.9;"></div>
+        <div id="qs-s-reset" class="qs-s-desc">3時間ごとにリセットされます</div>
+      </div>
+
+      <div class="qs-s-section">
+        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:7px;">
+          <div style="font-size:13px;font-weight:600;color:#14213d;" id="qs-s-monthly-title">月間枠</div>
+          <div style="font-size:12px;color:#8a8270;" id="qs-s-monthly-num">0 / 0</div>
+        </div>
+        <div class="qs-usebar"><div class="qs-usebar-g"><div id="qs-s-bar-monthly"></div></div><span id="qs-s-pct-monthly">0%</span></div>
+        <div id="qs-s-monthly-detail" style="font-size:11.5px;color:#8a8270;margin-top:8px;line-height:1.9;"></div>
+        <div id="qs-s-monthly-info" class="qs-s-desc">月初にリセットされます</div>
+      </div>
+
+      <div class="qs-s-section" id="qs-s-stock-sec" style="display:none;">
+        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:7px;">
+          <div style="font-size:13px;font-weight:600;color:#b8860b;">🎟 予備タンク</div>
+          <div style="font-size:12px;color:#8a8270;" id="qs-s-stock-num">0</div>
+        </div>
+        <div style="font-size:20px;font-weight:700;color:#b8860b;" id="qs-s-stock-big">0</div>
+        <div class="qs-s-desc">持続性ナシの優待でもらったトークンです。通常枠を使い切ったあとに消費され、なくなると復活しません。上限はなく、使うと減っていきます。</div>
+      </div>
+
+      <div class="qs-s-section">
+        <div id="qs-s-bonus" style="display:none;font-size:12px;color:#b8860b;padding:9px 11px;background:#fdf9ef;border-radius:8px;border:1px solid #efe4c8;line-height:1.8;"></div>
+        <div class="qs-s-bar" style="display:none;"><div class="qs-s-bar-fill" id="qs-s-bar"></div></div>
+        <div id="qs-s-usage-detail"></div>
+        <a class="qs-btn gold" style="margin-top:8px;" onclick="closeSettings();openPromoModal();">🎟 優待コードを入力</a>
+      </div>
+    </div>
+
+    <!-- 請求 -->
+    <div class="qs-s-pane" id="pane-billing">
+      <h3>請求</h3>
+      <div class="qs-s-section"><div class="qs-s-label">現在のプラン</div>
+        <div class="qs-s-value" id="qs-s-plan2">Free</div>
+        <div class="qs-s-desc">3時間ごとに 4,000 トークン</div></div>
+
+      <div class="qs-s-section">
+        <div class="qs-s-label">トークン残高</div>
+        <div class="qs-s-value" id="qs-bal-bonus">恒久ボーナス: 0</div>
+        <div class="qs-s-value" id="qs-bal-stock" style="margin-top:4px;">予備タンク: 0</div>
+        <div class="qs-s-desc">恒久ボーナスは枠のリセットごとに復活します。予備タンクは通常枠を使い切ったあとに消費され、なくなると復活しません。</div>
+      </div>
+
+      <div class="qs-s-section"><div class="qs-s-label">優待コード</div>
+        <a class="qs-btn gold" onclick="closeSettings();openPromoModal();">🎟 コードを入力</a></div>
+
+      <div class="qs-s-section">
+        <div class="qs-s-label">トークンを購入</div>
+        <div id="qs-buy-off" class="qs-s-desc">
+          現在、Qstartはすべての機能を<b>無料</b>で提供しています。<br>
+          将来トークンの購入を開始する場合は、事前にお知らせし、
+          <a href="/qstart/terms" style="color:#b8860b;">利用規約</a>を改定したうえで実施します。</div>
+        <div id="qs-buy-on" style="display:none;">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
+            <select id="qs-buy-amt" onchange="calcBuy()">
+              <option value="100000">10万トークン</option>
+              <option value="500000">50万トークン</option>
+              <option value="1000000" selected>100万トークン</option>
+              <option value="5000000">500万トークン</option>
+              <option value="10000000">1000万トークン</option>
+            </select>
+            <select id="qs-buy-cur" onchange="calcBuy()"></select>
+          </div>
+          <div id="qs-buy-price" style="font-size:18px;font-weight:700;color:#14213d;margin-bottom:4px;"></div>
+          <div id="qs-buy-usd" class="qs-s-desc" style="margin-top:0;"></div>
+          <a class="qs-btn gold" style="margin-top:10px;" onclick="doBuy()">購入する</a>
+          <div id="qs-buy-msg" class="qs-s-desc"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- API -->
+    <div class="qs-s-pane" id="pane-api">
+      <h3>API</h3>
+      <div class="qs-s-section"><div class="qs-s-desc">Qstart の API を使うと、自分のアプリから Equi や zin を呼び出せます。</div>
+        <a class="qs-btn ghost" href="/qstart/api">🔑 APIキーを管理</a></div>
+      <div class="qs-s-section"><div class="qs-s-label">エンドポイント</div>
+        <code class="qs-code">POST /qstart/api/v1/chat</code></div>
+    </div>
+
+    <!-- 通知 -->
+    <div class="qs-s-pane" id="pane-notify">
+      <h3>通知</h3>
+      <div class="qs-s-section qs-s-row">
+        <div><div class="qs-s-value">メール通知</div><div class="qs-s-desc">重要なお知らせをメールで受け取ります</div></div>
+        <label class="qs-sw"><input type="checkbox" id="set-notify_email" onchange="saveSetting('set-notify_email',this.checked?1:0)"><span></span></label>
+      </div>
+      <div class="qs-s-section qs-s-row">
+        <div><div class="qs-s-value">新機能のお知らせ</div><div class="qs-s-desc">新しいモデルや機能の情報を受け取ります</div></div>
+        <label class="qs-sw"><input type="checkbox" id="set-notify_news" onchange="saveSetting('set-notify_news',this.checked?1:0)"><span></span></label>
+      </div>
+    </div>
+
+    <!-- アクセシビリティ -->
+    <div class="qs-s-pane" id="pane-a11y">
+      <h3>アクセシビリティ</h3>
+      <div class="qs-s-section qs-s-row">
+        <div><div class="qs-s-value">動きを減らす</div><div class="qs-s-desc">アニメーションを最小限にします</div></div>
+        <label class="qs-sw"><input type="checkbox" id="set-reduce_motion" onchange="saveSetting('set-reduce_motion',this.checked?1:0)"><span></span></label>
+      </div>
+      <div class="qs-s-section qs-s-row">
+        <div><div class="qs-s-value">高コントラスト</div><div class="qs-s-desc">文字と背景のコントラストを強めます</div></div>
+        <label class="qs-sw"><input type="checkbox" id="set-high_contrast" onchange="saveSetting('set-high_contrast',this.checked?1:0)"><span></span></label>
+      </div>
+    </div>
+
+    <!-- Qstartについて -->
+    <div class="qs-s-pane" id="pane-about">
+      <h3>Qstartについて</h3>
+      <div class="qs-s-section"><div class="qs-s-label">バージョン</div>
+        <div class="qs-s-value">Qstart 1.6 — Guardian Update</div>
+        <div class="qs-s-desc">搭載モデル: Equi 1 / zin 1</div></div>
+      <div class="qs-s-section"><div class="qs-s-label">更新履歴</div>
+        <div style="font-size:12px;color:#6b6555;line-height:1.9;">
+          <b>1.6</b> チャット検索 / 書き出し / PWA / 全12言語対応<br>
+          <b>1.5</b> メール認証 / 通報機能 / アカウント保護 / 段階公開 / ダークテーマ<br>
+          <b>1.2</b> 料金システム / 優待コードの持続性 / お知らせ配信<br>
+          <b>1.1</b> プロジェクト / 設定11タブ / 管理者ページ<br>
+          <b>1.0</b> Equi 1・zin 1 公開 / API提供開始
+        </div></div>
+      <div class="qs-s-section"><div class="qs-s-label">開発</div><div class="qs-s-value">Qzero会社</div>
+        <div class="qs-s-desc" id="qs-footer-desc">ゼロから作ったAIサービス</div></div>
+      <div class="qs-s-section">
+        <a class="qs-btn ghost" href="/qstart/terms">📄 利用規約</a>
+        <a class="qs-btn ghost" href="/qstart/privacy">🔒 プライバシーポリシー</a>
+      </div>
+      <div class="qs-s-section"><div class="qs-s-desc">Qstart は事前学習モデルを一切使わず、ゼロから構築された Transformer で動作しています。</div></div>
+    </div>
+
+    <!-- 管理者 -->
+    <div class="qs-s-pane" id="pane-admin">
+      <h3>管理者</h3>
+      <div class="qs-s-section"><div class="qs-s-desc">Qstart 全体の統計・ユーザー管理・お知らせ配信を行います。</div>
+        <a class="qs-btn gold" href="/qstart/admin">🛠 管理者ページを開く</a></div>
+    </div>
+
+  </div>
+ </div>
+</div>
+
+<script>
+// ===== Qstart フロントエンド =====
+var currentChatId = null;
+let currentModel = 'equi';
+let currentEffort = 'mid';
+let usageCount = 0;
+const DAILY_LIMIT = 200000; // トークン上限
+
+// --- モデル選択 ---
+// ===== モデル選択(2階層: モデル → バージョン) =====
+var QS_MENU_VIEW = 'family';   // 'family' or 'version'
+var QS_MENU_FAM = null;
+
+var FAM_ICON = { pure:'⚡', equi:'⚙️', zin:'💭', apex:'🔥' };
+var FAM_NAME = { pure:'Pure', equi:'Equi', zin:'zin', apex:'Apex' };
+var FAM_DESC = { pure:'速い・軽量', equi:'バランス・普段使い',
+                 zin:'思考・じっくり考える', apex:'最高性能' };
+
+function familyOf(m) {
+  var f = QS_MODELS[m];
+  return (f && f.family) || m;
+}
+
+function modelsByFamily() {
+  var out = {};
+  Object.keys(QS_MODELS).forEach(function(k){
+    var m = QS_MODELS[k];
+    var fam = m.family || k;
+    if (!out[fam]) out[fam] = [];
+    out[fam].push(m);
+  });
+  Object.keys(out).forEach(function(f){
+    out[f].sort(function(a,b){ return (b.version||1) - (a.version||1); });
+  });
+  return out;
+}
+
+function renderModelMenu() {
+  var el = document.getElementById('qs-model-menu');
+  if (!el) return;
+  el.innerHTML = '';
+  var byFam = modelsByFamily();
+
+  if (QS_MENU_VIEW === 'version' && QS_MENU_FAM) {
+    // --- バージョン選択 ---
+    var back = document.createElement('div');
+    back.className = 'qs-model-back';
+    back.style.cssText = 'padding:11px 14px;font-size:12.5px;color:#8a8270;cursor:pointer;'
+      + 'border-bottom:1px solid #f0ede5;';
+    back.textContent = '← モデル選択に戻る';
+    back.onclick = function(e){ e.stopPropagation(); QS_MENU_VIEW='family'; renderModelMenu(); };
+    el.appendChild(back);
+
+    var hd = document.createElement('div');
+    hd.style.cssText = 'padding:10px 14px 5px;font-size:11px;color:#a09a8a;';
+    hd.textContent = 'バージョン';
+    el.appendChild(hd);
+
+    var list = byFam[QS_MENU_FAM] || [];
+    var latest = list.filter(function(m){ return Number(m.is_latest); });
+    var old = list.filter(function(m){ return !Number(m.is_latest); });
+
+    latest.forEach(function(m){ el.appendChild(versionRow(m)); });
+    if (old.length) {
+      var oh = document.createElement('div');
+      oh.style.cssText = 'padding:10px 14px 5px;font-size:11px;color:#a09a8a;'
+        + 'border-top:1px solid #f0ede5;margin-top:4px;';
+      oh.textContent = '旧バージョン';
+      el.appendChild(oh);
+      old.forEach(function(m){ el.appendChild(versionRow(m)); });
+    }
+    return;
+  }
+
+  // --- モデル(ファミリー)選択 ---
+  ['pure','equi','zin','apex'].forEach(function(fam){   // voto は API専用なので出さない
+    var list = byFam[fam];
+    if (!list || !list.length) return;
+    var top = list.filter(function(m){ return Number(m.is_latest); })[0] || list[0];
+    var usable = modelUsable(top.model);
+
+    var row = document.createElement('div');
+    row.className = 'qs-model-option';
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;'
+      + (usable ? '' : 'opacity:.5;');
+    if (familyOf(currentModel) === fam) row.style.background = '#faf9f5';
+
+    var ic = document.createElement('span');
+    ic.style.cssText = 'font-size:16px;';
+    ic.textContent = FAM_ICON[fam] || '🤖';
+
+    var mid = document.createElement('div');
+    mid.style.cssText = 'flex:1;min-width:0;';
+    var nm = document.createElement('div');
+    nm.innerHTML = '<span class="qs-m-name">' + esc2(top.display || FAM_NAME[fam]) + '</span>';
+    var bd = document.createElement('span');
+    bd.className = 'qs-m-badge';
+    if (Number(top.maintenance)) {
+      bd.textContent = 'メンテナンス中';
+      bd.style.cssText = 'background:#fff3e0;color:#e65100;';
+    } else if (usable) {
+      bd.textContent = '利用可能';
+      bd.style.cssText = 'background:#e8f5e9;color:#2e7d32;';
+    } else {
+      bd.textContent = '2026年秋公開';
+      bd.style.cssText = 'background:#f0ede5;color:#8a8270;';
+    }
+    nm.appendChild(document.createTextNode(' '));
+    nm.appendChild(bd);
+    var ds = document.createElement('div');
+    ds.className = 'qs-m-desc';
+    ds.textContent = FAM_DESC[fam] || (top.note || '');
+    mid.appendChild(nm); mid.appendChild(ds);
+
+    row.appendChild(ic); row.appendChild(mid);
+
+    if (list.length > 1) {
+      var ar = document.createElement('span');
+      ar.style.cssText = 'color:#c8c2b4;font-size:14px;';
+      ar.textContent = '›';
+      row.appendChild(ar);
+      row.onclick = function(e){
+        e.stopPropagation();
+        QS_MENU_FAM = fam; QS_MENU_VIEW = 'version'; renderModelMenu();
+      };
+    } else {
+      row.onclick = function(e){ e.stopPropagation(); pickModel(top.model); };
+    }
+    el.appendChild(row);
+  });
+}
+
+function versionRow(m) {
+  var row = document.createElement('div');
+  row.className = 'qs-model-option';
+  row.style.cssText = 'display:flex;align-items:center;gap:10px;'
+    + (modelUsable(m.model) ? '' : 'opacity:.5;');
+  var mid = document.createElement('div');
+  mid.style.cssText = 'flex:1;';
+  var nm = document.createElement('div');
+  nm.className = 'qs-m-name';
+  nm.textContent = m.display || m.model;
+  var ds = document.createElement('div');
+  ds.className = 'qs-m-desc';
+  ds.textContent = (m.params && m.params !== '—' ? m.params + ' パラメータ' : '')
+    + (Number(m.maintenance) ? ' ・メンテナンス中' : '');
+  mid.appendChild(nm);
+  if (ds.textContent) mid.appendChild(ds);
+  row.appendChild(mid);
+  if (currentModel === m.model) {
+    var ck = document.createElement('span');
+    ck.style.cssText = 'color:#b8860b;font-weight:700;';
+    ck.textContent = '✓';
+    row.appendChild(ck);
+  }
+  row.onclick = function(e){ e.stopPropagation(); pickModel(m.model); };
+  return row;
+}
+
+function esc2(s){ var d=document.createElement('div'); d.textContent=(s==null?'':s); return d.innerHTML; }
+
+function toggleModelMenu() {
+  var el = document.getElementById('qs-model-menu');
+  var opening = !el.classList.contains('open');
+  if (opening) {
+    QS_MENU_VIEW = 'family';
+    QS_MENU_FAM = null;
+    renderModelMenu();
+  }
+  el.classList.toggle('open');
+}
+
+function _oldToggleModelMenu() {
+  document.getElementById('qs-model-menu').classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.qs-topbar')) {
+    document.getElementById('qs-model-menu').classList.remove('open');
+  }
+});
+
+function pickModel(m) {
+  if (!modelUsable(m)) {
+    var f = QS_MODELS[m] || {};
+    alert(Number(f.maintenance)
+      ? m.toUpperCase() + ' は現在メンテナンス中です。'
+      : m.charAt(0).toUpperCase() + m.slice(1) + ' は準備中です。お楽しみに!');
+    document.getElementById('qs-model-menu').classList.remove('open');
+    return;
+  }
+  currentModel = m;
+  var mf = QS_MODELS[m] || {};
+  var disp = mf.display || m;
+  document.getElementById('qs-model-btn').textContent = disp + ' ∨';
+  var sm = document.getElementById('qs-s-model');
+  if (sm) sm.textContent = 'Qstart ' + disp;
+  QS_MENU_VIEW = 'family'; QS_MENU_FAM = null;
+  document.getElementById('qs-model-menu').classList.remove('open');
+}
+
+// --- エフォート ---
+function setEffort(level) {
+  currentEffort = level;
+  ['low','mid','high'].forEach(function(l) {
+    document.getElementById('eff-' + l).classList.toggle('active', l === level);
+  });
+  const labels = { low:'低', mid:'中', high:'高' };
+  document.getElementById('qs-s-effort').textContent = T('effort_' + level);
+}
+
+// --- 設定パネル ---
+var QS_SET = {};
+
+function saveSetting(id, val) {
+  var key = id.replace('set-','');
+  QS_SET[key] = val;
+  fetch('/qstart/api/v1/settings', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({[key]: val})
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (d.ok) toastSaved();
+  }).catch(function(){});
+  afterSave(key);
+}
+
+function toastSaved() {
+  var t = document.getElementById('qs-s-saved');
+  if (!t) return;
+  t.classList.add('show');
+  clearTimeout(window._qsToast);
+  window._qsToast = setTimeout(function(){ t.classList.remove('show'); }, 1400);
+}
+
+var QS_ME = {};
+
+async function loadMe() {
+  try {
+    var r = await fetch('/qstart/api/v1/me');
+    var d = await r.json();
+    if (!d.ok) return;
+    QS_ME = d;
+    var set = function(id, v){ var e=document.getElementById(id); if(e) e.textContent = v; };
+    if (d.guest) {
+      set('qs-s-account','ゲスト'); set('qs-s-email','—');
+      set('qs-s-plan','ログインしていません'); set('qs-s-plan2','ログインしていません');
+    } else {
+      set('qs-s-account', d.nickname || d.user_id);
+      set('qs-s-email', d.email || '未登録');
+      set('qs-s-plan', d.plan); set('qs-s-plan2', d.plan);
+      var rs = document.getElementById('qs-s-role-sec');
+      if (rs) {
+        if (d.role === 'admin' || d.role === 'moderator') {
+          rs.style.display = 'block';
+          set('qs-s-role', d.role === 'admin' ? '👑 管理者' : '🛡 モデレーター');
+        } else { rs.style.display = 'none'; }
+      }
+    }
+    if (d.role === 'admin') {
+      setAdminTab(d.role);
+    }
+  } catch(e) {}
+}
+
+// 設定の既定値を実際のチャットに反映
+function applyDefaults() {
+  var dm = QS_SET.default_model;
+  if (dm && modelUsable(dm) && dm !== currentModel) {
+    currentModel = dm;
+    var names = { equi:'Equi 1', zin:'zin 1', pure:'Pure 1', apex:'Apex 2', apex:'Apex 3' };
+    var b = document.getElementById('qs-model-btn');
+    if (b) b.textContent = (names[dm]||dm) + ' ∨';
+    var sm = document.getElementById('qs-s-model');
+    if (sm) sm.textContent = 'Qstart ' + (names[dm]||dm);
+  }
+  var de = QS_SET.default_effort;
+  if (de && de !== currentEffort) {
+    currentEffort = de;
+    document.querySelectorAll('[data-eff]').forEach(function(btn){
+      btn.classList.toggle('active', btn.getAttribute('data-eff') === de);
+    });
+    var labels = { low:'低', mid:'中', high:'高' };
+    var se = document.getElementById('qs-s-effort');
+    if (se) se.textContent = labels[de] || de;
+  }
+}
+
+async function loadSettings() {
+  try {
+    var r = await fetch('/qstart/api/v1/settings');
+    var d = await r.json();
+    if (!d.ok) return;
+    QS_SET = d.settings || {};
+    Object.keys(QS_SET).forEach(function(k){
+      var el = document.getElementById('set-' + k) || (k==='lang' ? document.getElementById('qs-lang') : null);
+      if (!el) return;
+      if (el.type === 'checkbox') el.checked = !!Number(QS_SET[k]);
+      else el.value = QS_SET[k];
+    });
+    if (QS_SET.lang) { currentLang = QS_SET.lang; applyDir(currentLang); if (window.applyLang) applyLang(); }
+    applyAll(); applyDefaults();
+  } catch(e) {}
+}
+
+function _sv(key, dflt) {
+  var el = document.getElementById('set-' + key);
+  if (el) return el.type === 'checkbox' ? (el.checked ? 1 : 0) : el.value;
+  return QS_SET[key] !== undefined ? QS_SET[key] : dflt;
+}
+
+function applyTheme() {
+  var v = _sv('theme', 'light');
+  if (v === 'system') v = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  document.body.setAttribute('data-theme', v);
+}
+
+function applyFont() {
+  document.body.setAttribute('data-fs', _sv('font_size', 'md'));
+}
+
+function applyA11y() {
+  document.body.setAttribute('data-motion', Number(_sv('reduce_motion', 0)) ? 'off' : 'on');
+  document.body.setAttribute('data-contrast', Number(_sv('high_contrast', 0)) ? 'on' : 'off');
+}
+
+function applyFeatures() {
+  // ファイル添付
+  var fb = document.querySelector('.qs-file-btn');
+  if (fb) fb.style.display = Number(_sv('enable_upload', 1)) ? 'flex' : 'none';
+  // 思考表示
+  document.querySelectorAll('.qs-think').forEach(function(e){
+    e.style.display = Number(_sv('show_thinking', 1)) ? 'block' : 'none';
+  });
+}
+
+function applyAll() {
+  applyTheme(); applyFont(); applyA11y(); applyFeatures();
+}
+
+// 設定が保存されたら即反映
+function afterSave(key) {
+  if (key === 'theme') applyTheme();
+  else if (key === 'font_size') applyFont();
+  else if (key === 'reduce_motion' || key === 'high_contrast') applyA11y();
+  else if (key === 'enable_upload' || key === 'show_thinking') applyFeatures();
+  else if (key === 'default_model' || key === 'default_effort') applyDefaults();
+}
+
+async function exportData() {
+  var r = await fetch('/qstart/api/v1/privacy/export', {method:'POST'});
+  var d = await r.json();
+  if (!d.ok) { alert('ログインが必要です'); return; }
+  var blob = new Blob([JSON.stringify(d.data, null, 2)], {type:'application/json'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'qstart-data-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+}
+
+async function deleteData(scope) {
+  var msg = scope === 'all'
+    ? 'アカウントとすべてのデータを削除します。取り消せません。\n\n続けるには DELETE と入力してください。'
+    : 'チャット履歴をすべて削除します。取り消せません。\n\n続けるには DELETE と入力してください。';
+  var v = prompt(msg);
+  if (v !== 'DELETE') return;
+  var r = await fetch('/qstart/api/v1/privacy/delete', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({confirm:'DELETE', scope: scope})
+  });
+  var d = await r.json();
+  if (d.ok) { alert('削除しました'); location.href = '/qstart'; }
+  else alert('失敗しました');
+}
+
+// ===== モデル制御(サーバーのフラグと連動) =====
+var QS_MODELS = {};
+
+async function loadModelFlags() {
+  try {
+    var r = await fetch('/qstart/api/v1/models');
+    var d = await r.json();
+    if (!d.ok || !d.models) return;
+    d.models.forEach(function(m){ QS_MODELS[m.model] = m; });
+    applyModelFlags();
+  } catch(e) {}
+}
+
+function modelUsable(m) {
+  var f = QS_MODELS[m];
+  if (!f) return (m === 'equi' || m === 'zin');
+  return !!Number(f.enabled) && !Number(f.maintenance);
+}
+
+function applyModelFlags() {
+  renderModelMenu();
+  // 既定モデルの選択肢
+  var sel = document.getElementById('set-default_model');
+  if (sel) Array.from(sel.options).forEach(function(o){ o.disabled = !modelUsable(o.value); });
+  if (!modelUsable(currentModel)) {
+    currentModel = 'equi';
+    var b = document.getElementById('qs-model-btn');
+    if (b) b.textContent = 'Equi 1 ∨';
+  }
+}
+
+function _oldApplyModelFlags() {
+  document.querySelectorAll('.qs-model-option').forEach(function(el){
+    var oc = el.getAttribute('onclick') || '';
+    var mm = oc.match(/pickModel\('([a-z]+)'\)/);
+    if (!mm) return;
+    var m = mm[1], ok = modelUsable(m);
+    el.style.opacity = ok ? '1' : '0.45';
+    el.style.cursor = ok ? 'pointer' : 'not-allowed';
+    var badge = el.querySelector('.qs-m-badge');
+    if (badge) {
+      var f = QS_MODELS[m] || {};
+      if (Number(f.maintenance)) { badge.textContent = 'メンテナンス中'; badge.style.background='#fff3e0'; badge.style.color='#e65100'; }
+      else if (!ok) { badge.textContent = '2026年秋公開'; badge.style.background='#f0ede5'; badge.style.color='#8a8270'; }
+      else { badge.textContent = '利用可能'; badge.style.background='#e8f5e9'; badge.style.color='#2e7d32'; }
+    }
+  });
+  // 既定モデルの選択肢
+  var sel = document.getElementById('set-default_model');
+  if (sel) Array.from(sel.options).forEach(function(o){ o.disabled = !modelUsable(o.value); });
+  // 今選んでるモデルが使えなくなってたら戻す
+  if (!modelUsable(currentModel)) {
+    currentModel = 'equi';
+    var b = document.getElementById('qs-model-btn');
+    if (b) b.textContent = 'Equi 1 ∨';
+  }
+}
+
+// ===== ファイル添付 =====
+var QS_FILE = null;
+
+function handleFile(input) {
+  var f = input.files && input.files[0];
+  if (!f) return;
+  if (f.size > 3 * 1024 * 1024) {
+    alert('ファイルは3MBまでです');
+    input.value = ''; return;
+  }
+  var area = document.getElementById('qs-file-area') || makeFileArea();
+  var isImg = f.type.indexOf('image/') === 0;
+  var rd = new FileReader();
+  rd.onload = function(e) {
+    QS_FILE = { name: f.name, type: f.type, size: f.size, data: e.target.result };
+    area.innerHTML = '';
+    var chip = document.createElement('div');
+    chip.style.cssText = 'display:inline-flex;align-items:center;gap:8px;background:#f0ede6;'
+      + 'border:1px solid #d0ccc0;border-radius:10px;padding:6px 10px;margin:6px 0;font-size:12px;';
+    if (isImg) {
+      var img = document.createElement('img');
+      img.src = e.target.result;
+      img.style.cssText = 'max-height:44px;border-radius:6px;';
+      chip.appendChild(img);
+    } else {
+      var ic = document.createElement('span'); ic.textContent = '\uD83D\uDCC4'; chip.appendChild(ic);
+    }
+    var nm = document.createElement('span');
+    nm.textContent = f.name + ' (' + Math.round(f.size/1024) + 'KB)';
+    chip.appendChild(nm);
+    var x = document.createElement('button');
+    x.textContent = '\u2715';
+    x.style.cssText = 'background:none;border:none;cursor:pointer;color:#888;font-size:14px;';
+    x.onclick = clearFile;
+    chip.appendChild(x);
+    area.appendChild(chip);
+  };
+  if (isImg) rd.readAsDataURL(f); else rd.readAsText(f);
+}
+
+function makeFileArea() {
+  var a = document.createElement('div');
+  a.id = 'qs-file-area';
+  a.style.cssText = 'padding:0 4px;';
+  var row = document.querySelector('.qs-input-row');
+  if (row && row.parentNode) row.parentNode.insertBefore(a, row);
+  return a;
+}
+
+function clearFile() {
+  QS_FILE = null;
+  var a = document.getElementById('qs-file-area');
+  if (a) a.innerHTML = '';
+  var i = document.getElementById('qs-file');
+  if (i) i.value = '';
+}
+
+// ===== 残高・購入 =====
+var QS_PRICE = null;
+
+async function loadBilling() {
+  try {
+    var r = await fetch('/qstart/api/v1/balance');
+    var d = await r.json();
+    if (d.ok) {
+      var q = d.quota;
+      var wb = q.window_bonus || 0, mb = q.monthly_bonus || 0;
+      document.getElementById('qs-bal-bonus').textContent =
+        '恒久ボーナス: 3時間枠 +' + wb.toLocaleString() + ' / 月間枠 +' + mb.toLocaleString();
+      document.getElementById('qs-bal-stock').textContent =
+        '予備タンク: ' + (q.stock||0).toLocaleString() + ' トークン';
+    }
+  } catch(e) {}
+
+  try {
+    var r2 = await fetch('/qstart/api/v1/pricing');
+    var p = await r2.json();
+    if (!p.ok) return;
+    QS_PRICE = p;
+    var on = document.getElementById('qs-buy-on');
+    var off = document.getElementById('qs-buy-off');
+    if (p.sale_on) {
+      on.style.display = 'block'; off.style.display = 'none';
+      var sel = document.getElementById('qs-buy-cur');
+      if (!sel.options.length) {
+        sel.innerHTML = (p.fx||[]).map(function(f){
+          return '<option value="' + f.currency + '">' + f.currency + '</option>';
+        }).join('');
+        var guess = { ja:'JPY', en:'USD', zh:'CNY', ko:'KRW', fr:'EUR', de:'EUR',
+                      es:'EUR', pt:'BRL', hi:'INR', th:'THB', vi:'VND' }[currentLang] || 'USD';
+        sel.value = guess;
+      }
+      calcBuy();
+    } else {
+      on.style.display = 'none'; off.style.display = 'block';
+    }
+  } catch(e) {}
+}
+
+function calcBuy() {
+  if (!QS_PRICE) return;
+  var tok = parseInt(document.getElementById('qs-buy-amt').value, 10);
+  var cur = document.getElementById('qs-buy-cur').value;
+  var usd = tok / 100 * QS_PRICE.usd_per_100_tokens;
+  var fx = (QS_PRICE.fx||[]).filter(function(f){ return f.currency === cur; })[0];
+  var local = fx ? usd * fx.rate : usd;
+  var sym = fx ? fx.symbol : '$';
+  var dec = fx ? fx.decimals : 2;
+  document.getElementById('qs-buy-price').textContent =
+    sym + local.toLocaleString(undefined, {minimumFractionDigits: dec, maximumFractionDigits: dec});
+  document.getElementById('qs-buy-usd').textContent =
+    (cur === 'USD' ? '' : 'お支払いは $' + usd.toFixed(2) + ' (USD) で確定します・') +
+    '100トークンあたり $' + QS_PRICE.usd_per_100_tokens;
+}
+
+async function doBuy() {
+  var tok = parseInt(document.getElementById('qs-buy-amt').value, 10);
+  var cur = document.getElementById('qs-buy-cur').value;
+  var m = document.getElementById('qs-buy-msg');
+  m.textContent = '処理中…';
+  try {
+    var r = await fetch('/qstart/api/v1/purchase', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({tokens: tok, currency: cur})
+    });
+    var d = await r.json();
+    m.textContent = d.ok ? (d.message || '受け付けました')
+      : (d.error === 'sale_off' ? '現在販売を停止しています'
+        : d.error === 'too_few' ? '最低 ' + (d.min||0).toLocaleString() + ' トークンから購入できます'
+        : '購入に失敗しました');
+  } catch(e) { m.textContent = '通信に失敗しました'; }
+}
+
+// ===== お知らせ =====
+var QS_ANN = [];
+var QS_ANN_BANNER = [];
+var QS_ANN_CUR = null;
+var QS_ANN_LOGGED = false;
+
+var ANN_STYLE = {
+  info:     {bg:'#eef3fb', fg:'#1b3a6b', ic:'\uD83D\uDCE2'},
+  warn:     {bg:'#fff6e5', fg:'#8a5a00', ic:'\u26A0\uFE0F'},
+  critical: {bg:'#fdecea', fg:'#a3211a', ic:'\uD83D\uDEA8'}
+};
+
+// ゲスト用: この端末で閉じたか
+function guestDismissed(id) {
+  try { return (localStorage.getItem('qs_ann_read')||'').split(',').indexOf(String(id)) >= 0; }
+  catch(e) { return false; }
+}
+function guestMark(id) {
+  try {
+    var a = (localStorage.getItem('qs_ann_read')||'').split(',').filter(Boolean);
+    if (a.indexOf(String(id)) < 0) a.push(String(id));
+    localStorage.setItem('qs_ann_read', a.join(','));
+  } catch(e) {}
+}
+
+// 既読にする(ログイン中はサーバー、ゲストは端末)
+async function markRead(id) {
+  if (QS_ANN_LOGGED) {
+    try { await fetch('/qstart/api/v1/announcements/' + id + '/read', {method:'POST'}); }
+    catch(e) {}
+  } else {
+    guestMark(id);
+  }
+  QS_ANN.forEach(function(a){ if (a.id === id) a.unread = false; });
+  QS_ANN_BANNER = QS_ANN_BANNER.filter(function(a){ return a.id !== id; });
+}
+
+async function loadAnnouncements() {
+  try {
+    var r = await fetch('/qstart/api/v1/announcements');
+    var d = await r.json();
+    if (!d.ok) return;
+    QS_ANN_LOGGED = !!d.logged_in;
+
+    var langOk = function(a){
+      return a && a.id && (a.title || a.body) &&
+             (!a.lang || a.lang === 'all' || a.lang === currentLang);
+    };
+    QS_ANN = (d.announcements || []).filter(langOk);
+    QS_ANN_BANNER = (d.banner || []).filter(langOk);
+
+    // ゲストは端末側の既読も反映
+    if (!QS_ANN_LOGGED) {
+      QS_ANN_BANNER = QS_ANN_BANNER.filter(function(a){ return !guestDismissed(a.id); });
+    }
+
+    updateAnnDot();
+    if (QS_ANN_BANNER.length) showAnnBanner(QS_ANN_BANNER[0]);
+    else hideAnnBanner();
+  } catch(e) {}
+}
+
+function updateAnnDot() {
+  var dot = document.getElementById('qs-ann-dot');
+  if (!dot) return;
+  var n = QS_ANN_LOGGED
+    ? QS_ANN.filter(function(a){ return a.unread; }).length
+    : QS_ANN_BANNER.length;
+  dot.style.display = n ? 'inline-block' : 'none';
+  dot.textContent = n;
+}
+
+function showAnnBanner(a) {
+  if (!a || !a.id) { hideAnnBanner(); return; }
+  QS_ANN_CUR = a;
+  var st = ANN_STYLE[a.level] || ANN_STYLE.info;
+  var b = document.getElementById('qs-ann-banner');
+  b.style.background = st.bg;
+  b.style.color = st.fg;
+  b.style.display = 'flex';
+  document.getElementById('qs-ann-icon').textContent = st.ic;
+  document.getElementById('qs-ann-title').textContent = a.title || '';
+  var body = (a.body || '').replace(/\n/g, ' ');
+  document.getElementById('qs-ann-body').textContent =
+    body.length > 70 ? body.slice(0, 70) + '\u2026' : body;
+  document.body.style.paddingTop = '44px';
+}
+
+function hideAnnBanner() {
+  var b = document.getElementById('qs-ann-banner');
+  if (b) b.style.display = 'none';
+  document.body.style.paddingTop = '';
+  QS_ANN_CUR = null;
+}
+
+async function dismissAnn() {
+  if (QS_ANN_CUR) await markRead(QS_ANN_CUR.id);
+  updateAnnDot();
+  if (QS_ANN_BANNER.length) showAnnBanner(QS_ANN_BANNER[0]);
+  else hideAnnBanner();
+}
+
+async function openAnnList() {
+  var el = document.getElementById('qs-ann-list');
+  el.innerHTML = '';
+  if (!QS_ANN.length) {
+    el.innerHTML = '<div style="text-align:center;padding:40px;color:#a09a8a;font-size:13px;">お知らせはありません</div>';
+  } else {
+    QS_ANN.forEach(function(a){
+      var st = ANN_STYLE[a.level] || ANN_STYLE.info;
+      var box = document.createElement('div');
+      box.style.cssText = 'border-left:3px solid ' + st.fg + ';background:' + st.bg
+        + ';border-radius:0 10px 10px 0;padding:13px 15px;margin-bottom:11px;';
+      var t = document.createElement('div');
+      t.style.cssText = 'font-weight:600;font-size:14px;color:' + st.fg + ';margin-bottom:5px;';
+      t.textContent = st.ic + ' ' + (a.title || '');
+      var bd = document.createElement('div');
+      bd.style.cssText = 'font-size:13px;line-height:1.7;color:#3a3630;white-space:pre-wrap;';
+      bd.textContent = a.body || '';
+      var dt = document.createElement('div');
+      dt.style.cssText = 'font-size:11px;color:#a09a8a;margin-top:7px;';
+      dt.textContent = (a.created_at || '').slice(0, 16);
+      box.appendChild(t); box.appendChild(bd); box.appendChild(dt);
+      el.appendChild(box);
+    });
+    // 一覧を開いたら全部既読
+    for (var i = 0; i < QS_ANN.length; i++) {
+      if (QS_ANN[i].unread !== false) await markRead(QS_ANN[i].id);
+    }
+    updateAnnDot();
+    hideAnnBanner();
+  }
+  document.getElementById('qs-ann-modal').style.display = 'flex';
+}
+
+function closeAnnList() {
+  document.getElementById('qs-ann-modal').style.display = 'none';
+}
+
+function setAdminTab(role) {
+  var t = document.getElementById('qs-tab-admin');
+  if (!t) return;
+  var isAdmin = (role === 'admin');
+  t.style.setProperty('display', isAdmin ? 'flex' : 'none', 'important');
+  if (!isAdmin) {
+    var p = document.getElementById('pane-admin');
+    if (p && p.classList.contains('active')) qsTab('general');
+  }
+}
+
+// ===== 凍結チェック =====
+async function checkStatus() {
+  try {
+    var r = await fetch('/qstart/api/v1/status');
+    var d = await r.json();
+    if (d.ok && d.suspended) {
+      document.body.innerHTML =
+        '<div style="display:flex;align-items:center;justify-content:center;height:100vh;'
+        + 'font-family:inherit;background:#faf9f6;text-align:center;padding:24px;">'
+        + '<div><div style="font-size:44px;margin-bottom:16px;">🔒</div>'
+        + '<h1 style="font-size:19px;color:#14213d;margin-bottom:10px;">ご利用いただけません</h1>'
+        + '<p style="font-size:13.5px;color:#6b6555;line-height:1.8;">'
+        + 'このアカウントは現在ご利用いただけない状態です。<br>'
+        + 'お心当たりがない場合はお問い合わせください。</p>'
+        + '<a href="/" style="display:inline-block;margin-top:20px;padding:9px 18px;'
+        + 'background:#14213d;color:#fff;border-radius:9px;text-decoration:none;font-size:13px;">'
+        + 'QuizShareに戻る</a></div></div>';
+    }
+  } catch(e) {}
+}
+
+// ===== 機能フラグ =====
+var QS_FEAT = {};
+async function loadFeatures() {
+  try {
+    var r = await fetch('/qstart/api/v1/features');
+    var d = await r.json();
+    if (d.ok) {
+      QS_FEAT = d.features || {};
+      var pl = document.querySelector('a[href="/qstart/projects"]');
+      if (pl) pl.style.display = QS_FEAT.projects ? 'block' : 'none';
+    }
+  } catch(e) {}
+}
+
+// ===== 起動: 必要な情報を1回で取る =====
+async function boot() {
+  try {
+    var r = await fetch('/qstart/api/v1/bootstrap');
+    var d = await r.json();
+    if (!d.ok) return;
+
+    // --- 凍結チェック(最優先) ---
+    if (d.me && d.me.suspended) { showSuspended(); return; }
+
+    // --- ユーザー情報 ---
+    QS_ME = d.me || {};
+    QS_ME.guest = d.guest;
+    applyMe(d);
+
+    // --- 設定 ---
+    QS_SET = d.settings || {};
+    Object.keys(QS_SET).forEach(function(k){
+      var el = document.getElementById('set-' + k) || (k==='lang' ? document.getElementById('qs-lang') : null);
+      if (!el) return;
+      if (el.type === 'checkbox') el.checked = !!Number(QS_SET[k]);
+      else el.value = QS_SET[k];
+    });
+    if (QS_SET.lang) { currentLang = QS_SET.lang; applyDir(currentLang); if (window.applyLang) applyLang(); }
+    applyAll();
+    applyDefaults();
+
+    // --- モデル ---
+    QS_MODELS = {};
+    (d.models || []).forEach(function(m){ QS_MODELS[m.model] = m; });
+    applyModelFlags();
+
+    // --- 機能フラグ ---
+    QS_FEAT = d.features || {};
+    var pl = document.querySelector('a[href="/qstart/projects"]');
+    if (pl) pl.style.display = QS_FEAT.projects ? 'block' : 'none';
+
+    // --- お知らせ ---
+    QS_ANN_LOGGED = !d.guest;
+    var langOk = function(a){
+      return a && a.id && (a.title || a.body) &&
+             (!a.lang || a.lang === 'all' || a.lang === currentLang);
+    };
+    QS_ANN = (d.announcements || []).filter(langOk);
+    QS_ANN_BANNER = (d.banner || []).filter(langOk);
+    if (!QS_ANN_LOGGED) {
+      QS_ANN_BANNER = QS_ANN_BANNER.filter(function(a){ return !guestDismissed(a.id); });
+    }
+    updateAnnDot();
+    if (QS_ANN_BANNER.length) showAnnBanner(QS_ANN_BANNER[0]); else hideAnnBanner();
+
+    // --- 残高 ---
+    QS_QUOTA = d.quota || {};
+    clearOldHistory();
+    QS_CHATS = d.chats || [];
+    var sr = document.getElementById('qs-search-row');
+    if (sr) sr.style.display = (!d.guest && QS_CHATS.length >= 3) ? 'block' : 'none';
+    renderHistory();
+
+  } catch(e) {}
+  // 使用量は別建て(送信のたびに変わるので)
+  fetchServerUsage();
+  loadMaintNotice();
+  applyTestLinks();
+  restoreFromUrl();
+}
+
+var QS_QUOTA = {};
+
+function applyMe(d) {
+  var set = function(id, v){ var e = document.getElementById(id); if (e) e.textContent = v; };
+  if (d.guest) {
+    set('qs-s-account','ゲスト'); set('qs-s-email','—');
+    set('qs-s-plan','ログインしていません'); set('qs-s-plan2','ログインしていません');
+  } else {
+    var m = d.me;
+    set('qs-s-account', m.nickname || m.user_id);
+    set('qs-s-account2', m.nickname || m.user_id);
+    set('qs-s-email', m.email || '未登録');
+    set('qs-s-plan', m.plan); set('qs-s-plan2', m.plan);
+    var rs = document.getElementById('qs-s-role-sec');
+    if (rs) {
+      if (m.role === 'admin' || m.role === 'moderator') {
+        rs.style.display = 'block';
+        set('qs-s-role', m.role === 'admin' ? '👑 管理者' : '🛡 モデレーター');
+      } else { rs.style.display = 'none'; }
+    }
+  }
+  setAdminTab(d.guest ? 'guest' : (d.me.role || 'user'));
+}
+
+function showSuspended() {
+  document.body.innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:center;height:100vh;'
+    + 'font-family:inherit;background:#faf9f6;text-align:center;padding:24px;">'
+    + '<div><div style="font-size:44px;margin-bottom:16px;">🔒</div>'
+    + '<h1 style="font-size:19px;color:#14213d;margin-bottom:10px;">ご利用いただけません</h1>'
+    + '<p style="font-size:13.5px;color:#6b6555;line-height:1.8;">'
+    + 'このアカウントは現在ご利用いただけない状態です。<br>'
+    + 'お心当たりがない場合はお問い合わせください。</p>'
+    + '<a href="/" style="display:inline-block;margin-top:20px;padding:9px 18px;'
+    + 'background:#14213d;color:#fff;border-radius:9px;text-decoration:none;font-size:13px;">'
+    + 'QuizShareに戻る</a></div></div>';
+}
+
+function applyUsageQuick(u) {
+  var pct = u.limit > 0 ? Math.min(100, Math.round(u.used / u.limit * 100)) : 0;
+  var ug = document.getElementById('qs-usage');
+  if (ug) {
+    if (pct >= 80) {
+      ug.style.display = 'block';
+      ug.style.color = pct >= 95 ? '#c0392b' : '#b8860b';
+      ug.textContent = (pct >= 95 ? '⚠️ ' : '') + '残り ' + (u.remaining||0).toLocaleString() + ' トークン (' + pct + '% 使用)';
+    } else { ug.style.display = 'none'; }
+  }
+  var bw = document.getElementById('qs-s-bar-window');
+  if (bw) bw.style.width = pct + '%';
+  var pw = document.getElementById('qs-s-pct-window');
+  if (pw) pw.textContent = pct + '%';
+  var wn = document.getElementById('qs-s-window-num');
+  if (wn) wn.textContent = (u.used||0).toLocaleString() + ' / ' + (u.limit||0).toLocaleString();
+}
+
+function openForgot() {
+  var b = document.getElementById('qs-forgot-box');
+  b.style.display = b.style.display === 'none' ? 'block' : 'none';
+}
+async function sendForgot() {
+  var e = document.getElementById('qs-forgot-email').value.trim();
+  var m = document.getElementById('qs-forgot-msg');
+  if (!e || e.indexOf('@') < 0) { m.style.color='#c0392b'; m.textContent='メールアドレスを入力してください'; return; }
+  var b = document.getElementById('qs-forgot-btn');
+  b.disabled = true; b.textContent = '送信中…';
+  try {
+    var r = await fetch('/qstart/api/v1/password/request', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({email: e}) });
+    var d = await r.json();
+    m.style.color = d.ok ? '#2e7d32' : '#c0392b';
+    m.textContent = d.message || d.error || '';
+  } catch(err) { m.style.color='#c0392b'; m.textContent='通信エラー'; }
+  b.disabled = false; b.textContent = '送信';
+}
+
+// ===== チャット検索 =====
+var QS_SEARCH_T = null;
+function doSearch() { clearTimeout(QS_SEARCH_T); QS_SEARCH_T = setTimeout(runSearch, 300); }
+
+async function runSearch() {
+  var q = (document.getElementById('qs-search').value || '').trim();
+  if (q.length < 2) { renderHistory(); return; }
+  try {
+    var r = await fetch('/qstart/api/v1/search?q=' + encodeURIComponent(q));
+    var d = await r.json();
+    if (!d.ok) return;
+    var el = document.getElementById('qs-history');
+    if (!d.results.length) {
+      el.textContent = '';
+      var nf = document.createElement('div');
+      nf.style.cssText = 'padding:14px 12px;color:#8a8a9a;font-size:12.5px;';
+      nf.textContent = '一致する会話はありません';
+      el.appendChild(nf); return;
+    }
+    el.innerHTML = '';
+    var hd = document.createElement('div');
+    hd.style.cssText = 'padding:8px 12px;color:#8a8a9a;font-size:11px;';
+    hd.textContent = d.results.length + '件 / ' + d.chats + 'チャット';
+    el.appendChild(hd);
+    d.results.forEach(function(x){
+      var row = document.createElement('div');
+      row.style.cssText = 'padding:10px 12px;cursor:pointer;border-bottom:1px solid #2a2a4a;';
+      row.onclick = function(){ loadChat(x.chat_id); document.getElementById('qs-search').value = ''; };
+      var t = document.createElement('div');
+      t.style.cssText = 'font-size:12px;color:#aab;margin-bottom:3px;';
+      t.textContent = (x.role === 'user' ? '\uD83E\uDDD1 ' : '\uD83E\uDD16 ') + (x.title || '無題');
+      var s = document.createElement('div');
+      s.style.cssText = 'font-size:12px;color:#ddd;line-height:1.6;';
+      s.textContent = x.snippet || '';
+      row.appendChild(t); row.appendChild(s);
+      el.appendChild(row);
+    });
+  } catch(e) {}
+}
+
+// ===== 会話の書き出し =====
+async function exportChat() {
+  if (!currentChatId) { alert('書き出す会話がありません'); return; }
+  if (!QS_ME || QS_ME.guest) {
+    // 未ログインは画面から直接作る
+    var msgs = collectMessages();
+    if (!msgs.length) { alert('書き出す会話がありません'); return; }
+    var lines = ['# Qstart の会話', '', '---', ''];
+    msgs.forEach(function(m){
+      lines.push('### ' + (m.role === 'user' ? 'あなた' : 'Qstart'));
+      lines.push(''); lines.push(m.text); lines.push('');
+    });
+    downloadText(lines.join('\n'), 'qstart-chat.md');
+    return;
+  }
+  try {
+    var r = await fetch('/qstart/api/v1/chats/' + encodeURIComponent(currentChatId) + '/export');
+    var d = await r.json();
+    if (!d.ok) { alert('書き出しに失敗しました'); return; }
+    var name = (d.title || 'chat').replace(/[\\/:*?"<>|]/g, '_').slice(0, 40);
+    downloadText(d.markdown, 'qstart-' + name + '.md');
+  } catch(e) { alert('通信エラー'); }
+}
+
+function downloadText(text, filename) {
+  var blob = new Blob([text], {type: 'text/markdown;charset=utf-8'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+}
+
+// ===== PWA =====
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('/static/qstart_sw.js')
+      .catch(function(){});
+  });
+}
+
+var QS_INSTALL = null;
+window.addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault();
+  QS_INSTALL = e;
+  var b = document.getElementById('qs-install-row');
+  if (b) b.style.display = 'block';
+});
+
+async function installApp() {
+  if (!QS_INSTALL) return;
+  QS_INSTALL.prompt();
+  await QS_INSTALL.userChoice;
+  QS_INSTALL = null;
+  var b = document.getElementById('qs-install-row');
+  if (b) b.style.display = 'none';
+}
+
+window.addEventListener('appinstalled', function(){
+  var b = document.getElementById('qs-install-row');
+  if (b) b.style.display = 'none';
+});
+
+// ===== メンテナンス予告 =====
+var QS_MAINT = null;
+
+async function loadMaintNotice() {
+  try {
+    var r = await fetch('/qstart/api/v1/maintenance');
+    var d = await r.json();
+    if (!d.ok || !d.upcoming) { hideMaintBanner(); return; }
+    var m = d.upcoming;
+    if (maintDismissed(m.id)) { hideMaintBanner(); return; }
+    QS_MAINT = m;
+    var b = document.getElementById('qs-maint-banner');
+    var t = document.getElementById('qs-maint-text');
+    t.textContent = fmtMaint(m.starts_at) + 'ごろから' + fmtMaintEnd(m.ends_at)
+      + 'ごろまでメンテナンスをする予定です。'
+      + 'AIが一時的に使用できなくなりますが、ご協力お願いします！';
+    b.style.display = 'flex';
+    document.body.style.paddingTop =
+      (document.getElementById('qs-ann-banner').style.display === 'flex' ? '88px' : '44px');
+  } catch(e) {}
+}
+
+function fmtMaint(s) {
+  // "2026-08-15 02:00" → "2026年8月15日の2時0分"
+  try {
+    var p = s.split(' ');
+    var d = p[0].split('-'), t = p[1].split(':');
+    return Number(d[0]) + '年' + Number(d[1]) + '月' + Number(d[2]) + '日の'
+         + Number(t[0]) + '時' + Number(t[1]) + '分';
+  } catch(e) { return s; }
+}
+function fmtMaintEnd(s) {
+  try {
+    var t = s.split(' ')[1].split(':');
+    return Number(t[0]) + '時' + Number(t[1]) + '分';
+  } catch(e) { return s; }
+}
+
+function maintDismissed(id) {
+  try { return localStorage.getItem('qs_maint_read') === String(id); }
+  catch(e) { return false; }
+}
+function dismissMaint() {
+  try { if (QS_MAINT) localStorage.setItem('qs_maint_read', String(QS_MAINT.id)); } catch(e) {}
+  hideMaintBanner();
+}
+function hideMaintBanner() {
+  var b = document.getElementById('qs-maint-banner');
+  if (b) b.style.display = 'none';
+  var ab = document.getElementById('qs-ann-banner');
+  document.body.style.paddingTop = (ab && ab.style.display === 'flex') ? '44px' : '';
+}
+
+// ===== テスト環境 =====
+var QS_TEST = {{ 'true' if test_mode else 'false' }};
+
+function qsPath(p) {
+  // テスト環境なら /admin/qstart 配下に付け替える
+  if (!QS_TEST) return p;
+  if (p === '/qstart') return '/admin/qstart';
+  if (p.indexOf('/qstart/') === 0) return '/admin' + p;
+  return p;
+}
+
+function applyTestLinks() {
+  if (!QS_TEST) return;
+  document.querySelectorAll('a[href^="/qstart"]').forEach(function(a){
+    var h = a.getAttribute('href');
+    if (h && h.indexOf('/admin') !== 0) a.setAttribute('href', qsPath(h));
+  });
+}
+
+function qsTab(name) {
+  if (name === 'admin' && (!QS_ME || QS_ME.role !== 'admin')) return;
+  document.querySelectorAll('.qs-s-tab').forEach(function(t){
+    t.classList.toggle('active', t.dataset.pane === name);
+  });
+  document.querySelectorAll('.qs-s-pane').forEach(function(p){
+    p.classList.toggle('active', p.id === 'pane-' + name);
+  });
+  if (name === 'billing') loadBilling();
+}
+
+function openSettings() {
+  document.getElementById('qs-settings').classList.add('open');
+  // bootで取得済みなので再取得しない
+  var a = document.getElementById('qs-s-account');
+  var a2 = document.getElementById('qs-s-account2');
+  if (a && a2) a2.textContent = a.textContent;
+}
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape') closeSettings();
+});
+function closeSettings() {
+  document.getElementById('qs-settings').classList.remove('open');
+}
+
+// --- チャット ---
+var QS_MSG_SEQ = 0;
+
+function addMsg(role, text) {
+  var welcome = document.getElementById('qs-welcome');
+  if (welcome) welcome.style.display = 'none';
+  var chat = document.getElementById('qs-chat');
+  var div = document.createElement('div');
+  div.className = 'qs-msg ' + (role === 'user' ? 'qs-msg-user' : 'qs-msg-ai');
+
+  if (role === 'ai') {
+    var names = { equi:'Equi 1', zin:'zin 1', pure:'Pure 1', apex:'Apex 2' };
+    var wrap = document.createElement('div');
+    var lb = document.createElement('div');
+    lb.className = 'qs-label';
+    lb.style.display = 'none';
+    var bb = document.createElement('div');
+    bb.className = 'qs-bubble';
+    bb.textContent = text;
+    var act = document.createElement('div');
+    act.style.cssText = 'display:flex;gap:10px;margin-top:5px;opacity:.45;font-size:11px;';
+    var id = 'm' + (++QS_MSG_SEQ);
+    bb.id = 'qs-bub-' + id;
+    var cp = document.createElement('a');
+    cp.textContent = '📋 コピー';
+    cp.style.cssText = 'cursor:pointer;';
+    cp.onclick = function(){ navigator.clipboard.writeText(text); cp.textContent = '✓ コピーしました';
+      setTimeout(function(){ cp.textContent = '📋 コピー'; }, 1500); };
+    var rp = document.createElement('a');
+    rp.textContent = '🚩 報告';
+    rp.style.cssText = 'cursor:pointer;';
+    rp.onclick = function(){ openReport(text); };
+    act.appendChild(cp); act.appendChild(rp);
+    wrap.appendChild(lb); wrap.appendChild(bb); wrap.appendChild(act);
+    div.appendChild(wrap);
+  } else {
+    var b2 = document.createElement('div');
+    b2.className = 'qs-bubble';
+    b2.textContent = text;
+    div.appendChild(b2);
+  }
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+// ===== 通報 =====
+var QS_REPORT_TEXT = '';
+
+function openReport(aiText) {
+  QS_REPORT_TEXT = aiText || '';
+  document.getElementById('qs-report-body').value = '';
+  document.getElementById('qs-report-msg').textContent = '';
+  document.getElementById('qs-report-preview').textContent =
+    QS_REPORT_TEXT.length > 120 ? QS_REPORT_TEXT.slice(0,120) + '…' : QS_REPORT_TEXT;
+  document.getElementById('qs-report-modal').style.display = 'flex';
+}
+function closeReport() {
+  document.getElementById('qs-report-modal').style.display = 'none';
+}
+async function sendReport() {
+  var cat = document.getElementById('qs-report-cat').value;
+  var body = document.getElementById('qs-report-body').value.trim();
+  var m = document.getElementById('qs-report-msg');
+  if (!body) { m.style.color = '#c0392b'; m.textContent = '内容を入力してください'; return; }
+  m.style.color = '#8a8270'; m.textContent = '送信中…';
+  try {
+    var r = await fetch('/qstart/api/v1/report', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ category: cat, body: body + '\n\n--- AIの返答 ---\n' + QS_REPORT_TEXT.slice(0,600),
+                             chat_id: (typeof currentChatId !== 'undefined' ? currentChatId : '') || '' })
+    });
+    var d = await r.json();
+    if (d.ok) {
+      m.style.color = '#2e7d32'; m.textContent = '報告しました。ありがとうございます。';
+      setTimeout(closeReport, 1500);
+    } else {
+      m.style.color = '#c0392b';
+      m.textContent = d.error === 'too_many' ? '報告が多すぎます。時間をおいてください。' : '送信に失敗しました';
+    }
+  } catch(e) { m.style.color = '#c0392b'; m.textContent = '通信に失敗しました'; }
+}
+
+function escH(s) {
+  var d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function updateUsage() {
+  var pct = Math.min(100, Math.round(usageCount / DAILY_LIMIT * 100));
+  // サーバーから取得
+  // サーバーから取得
+  // サーバーから取得
+}
+
+var QS_SENDING = false;
+
+function setSendingUI(on) {
+  QS_SENDING = on;
+  var btn = document.querySelector('.qs-send');
+  var inp = document.getElementById('qs-input');
+  if (btn) {
+    btn.disabled = on;
+    btn.style.opacity = on ? '.45' : '1';
+    btn.style.cursor = on ? 'not-allowed' : 'pointer';
+    btn.textContent = on ? '…' : (typeof T === 'function' ? T('send') || '送信' : '送信');
+  }
+  if (inp) {
+    inp.disabled = on;
+    inp.placeholder = on ? '返答を待っています…'
+      : (typeof T === 'function' ? T('input_placeholder') || 'メッセージを入力...' : 'メッセージを入力...');
+  }
+}
+
+async function sendMsg() {
+  if (QS_SENDING) return;   // ★連投を防ぐ
+  var input = document.getElementById('qs-input');
+  var text = input.value.trim();
+  if (!text) return;
+  // 使用量はサーバー側でチェック
+  input.value = '';
+  setSendingUI(true);
+  addMsg('user', text);
+  // 考え中インジケーター表示
+  var thinkId = 'thinking-' + Date.now();
+  var thinkDiv = document.createElement('div');
+  thinkDiv.id = thinkId;
+  thinkDiv.className = 'qs-msg qs-msg-ai';
+  thinkDiv.innerHTML = '<div class="qs-thinking"><span class="qs-think-dot"></span><span class="qs-think-text">考え中...</span></div>';
+  document.getElementById('qs-chat').appendChild(thinkDiv);
+  thinkDiv.scrollIntoView({behavior:'smooth'});
+  // 最初のメッセージでURLを変更
+  if (!currentChatId) {
+    currentChatId = generateChatId();
+    history.pushState({chatId: currentChatId}, '', qsPath('/qstart/chat/' + currentChatId));
+  }
+  // 使用量はサーバーで管理
+
+  // AIにリクエスト(現在は準備中メッセージ)
+  try {
+    var r = await fetch('/api/qstart/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ message: text, model: currentModel, effort: currentEffort, chat_id: currentChatId || '', file: (QS_FILE && QS_FILE.data) ? String(QS_FILE.data).substring(0, 500) : null, file_type: QS_FILE ? QS_FILE.type : null })
+    });
+    var data = await r.json();
+    if (data.ok) {
+      var te = document.getElementById(thinkId);
+      if (te) te.remove();
+      addMsg('ai', data.reply);
+      saveChatToHistory();
+      touchChat(text);
+      if (data.usage) applyUsageQuick(data.usage); else fetchServerUsage();
+      clearFile();
+      setSendingUI(false);
+    } else {
+      var teX = document.getElementById(thinkId);
+      if (teX) teX.remove();
+      setSendingUI(false);
+      if (data.error === 'limit_reached') {
+        showLimitReached(data.recovery_time, data.weekly_pct);
+      } else if (data.error === 'rate_limit') {
+        addMsg('ai', data.message || '送信が早すぎます。少し待ってからお試しください。');
+      } else if (data.error === 'suspended') {
+        addMsg('ai', data.message || 'このアカウントは現在ご利用いただけません。');
+      } else {
+        addMsg('ai', data.error || 'エラーが発生しました');
+      }
+    }
+  } catch(e) {
+    var te3 = document.getElementById(thinkId);
+    if (te3) te3.remove();
+    console.error('チャット送信エラー:', e);
+    addMsg('ai', '通信エラー: ' + (e && e.message ? e.message : e));
+  } finally {
+    setSendingUI(false);
+  }
+}
+
+// ===== 履歴(サーバー優先・未ログインは端末保存) =====
+var QS_CHATS = [];
+
+function collectMessages() {
+  var out = [];
+  document.querySelectorAll('.qs-msg').forEach(function(m){
+    var role = m.classList.contains('qs-msg-user') ? 'user' : 'ai';
+    var b = m.querySelector('.qs-bubble');
+    if (b) out.push({ role: role, text: b.textContent });
+  });
+  return out;
+}
+
+function histKey() {
+  // ユーザーごとにキーを分ける(他人の履歴が見えないように)
+  var u = (QS_ME && QS_ME.user_id) ? QS_ME.user_id : 'guest';
+  return 'qstart_history_' + u;
+}
+
+function saveChatToHistory() {
+  // ログイン中はサーバーに保存済み(チャットAPIが保存する)
+  if (QS_ME && !QS_ME.guest) { return; }
+  if (!currentChatId) return;
+  var msgs = collectMessages();
+  if (!msgs.length) return;
+  try {
+    var history = JSON.parse(localStorage.getItem(histKey()) || '[]');
+    var t = msgs[0].text.substring(0, 24) + (msgs[0].text.length > 24 ? '…' : '');
+    var entry = { id: currentChatId, title: t, messages: msgs, time: Date.now() };
+    var idx = history.findIndex(function(h){ return h.id === currentChatId; });
+    if (idx >= 0) history[idx] = entry; else history.unshift(entry);
+    localStorage.setItem(histKey(), JSON.stringify(history.slice(0, 20)));
+  } catch(e) {}
+  renderHistory();
+}
+
+function renderHistory() {
+  var el = document.getElementById('qs-history');
+  if (!el) return;
+  var list;
+  if (QS_ME && !QS_ME.guest) {
+    // ★ログイン中はサーバーの履歴のみ。localStorageは一切見ない
+    list = QS_CHATS.map(function(c){
+      return { id: c.chat_id, title: c.title || '無題のチャット' };
+    });
+  } else {
+    try { list = JSON.parse(localStorage.getItem(histKey()) || '[]'); }
+    catch(e) { list = []; }
+  }
+  if (!list.length) {
+    el.innerHTML = '<div style="padding:12px;color:#8a8a9a;font-size:13px;">'
+      + '<span id="qs-t-history">' + (typeof T === 'function' ? T('history_label') : 'チャット履歴はここに表示されます') + '</span></div>';
+    return;
+  }
+  el.innerHTML = '';
+  list.forEach(function(h){
+    var row = document.createElement('div');
+    row.className = 'qs-history-item';
+    row.style.cssText = 'padding:10px 12px;cursor:pointer;border-bottom:1px solid #2a2a4a;'
+      + 'font-size:13px;color:#ccc;display:flex;align-items:center;gap:6px;';
+    if (h.id === currentChatId) row.style.background = '#1d2a44';
+    var t = document.createElement('div');
+    t.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    t.textContent = h.title;
+    t.onclick = function(){ loadChat(h.id); };
+    var x = document.createElement('span');
+    x.textContent = '✕';
+    x.style.cssText = 'opacity:.35;font-size:11px;padding:2px 4px;';
+    x.onclick = function(e){ e.stopPropagation(); deleteChat(h.id); };
+    row.appendChild(t); row.appendChild(x);
+    el.appendChild(row);
+  });
+}
+
+async function loadChat(chatId) {
+  currentChatId = chatId;
+  window.history.pushState({chatId: chatId}, '', qsPath('/qstart/chat/' + chatId));
+  var el = document.getElementById('qs-chat');
+  el.innerHTML = '';
+
+  if (QS_ME && !QS_ME.guest) {
+    try {
+      var r = await fetch('/qstart/api/v1/chats/' + encodeURIComponent(chatId));
+      var d = await r.json();
+      if (d.ok && d.messages && d.messages.length) {
+        d.messages.forEach(function(m){ addMsg(m.role, m.content); });
+      } else {
+        // 自分のチャットではない/存在しない → 新規として扱う
+        currentChatId = null;
+        window.history.replaceState({}, '', qsPath('/qstart'));
+        el.innerHTML = '<div class="qs-welcome" id="qs-welcome"><h1>Qstart</h1>'
+          + '<p>ゼロから作ったTransformerと会話しよう。<br>12歳の開発者が手書きしたAIがここにいる。</p></div>';
+      }
+    } catch(e) {}
+  } else {
+    try {
+      var hist = JSON.parse(localStorage.getItem(histKey()) || '[]');
+      var c = hist.find(function(h){ return h.id === chatId; });
+      if (c) c.messages.forEach(function(m){ addMsg(m.role, m.text); });
+    } catch(e) {}
+  }
+  renderHistory();
+}
+
+async function deleteChat(chatId) {
+  if (!confirm('このチャットを削除しますか？')) return;
+  if (QS_ME && !QS_ME.guest) {
+    try { await fetch('/qstart/api/v1/chats/' + encodeURIComponent(chatId), {method:'DELETE'}); } catch(e) {}
+    QS_CHATS = QS_CHATS.filter(function(c){ return c.chat_id !== chatId; });
+  } else {
+    try {
+      var h = JSON.parse(localStorage.getItem(histKey()) || '[]');
+      localStorage.setItem(histKey(), JSON.stringify(h.filter(function(x){ return x.id !== chatId; })));
+    } catch(e) {}
+  }
+  if (currentChatId === chatId) newChat();
+  else renderHistory();
+}
+
+// 送信後にサイドバーへ即反映(サーバーに再取得しない)
+function touchChat(title) {
+  if (!QS_ME || QS_ME.guest || !currentChatId) return;
+  var i = QS_CHATS.findIndex(function(c){ return c.chat_id === currentChatId; });
+  if (i >= 0) {
+    QS_CHATS[i].updated_at = new Date().toISOString();
+    var c = QS_CHATS.splice(i, 1)[0];
+    QS_CHATS.unshift(c);
+  } else {
+    QS_CHATS.unshift({ chat_id: currentChatId,
+      title: (title || '').substring(0, 40) || '無題のチャット',
+      updated_at: new Date().toISOString() });
+  }
+  renderHistory();
+}
+
+function newChat() {
+  saveChatToHistory();
+  currentChatId = null;
+  QS_FILE = null;
+  var fi = document.getElementById('qs-file');
+  if (fi) fi.value = '';
+  var fa = document.getElementById('qs-file-area');
+  if (fa) fa.innerHTML = '';
+  window.history.pushState({}, '', qsPath('/qstart'));
+  document.getElementById('qs-chat').innerHTML = '<div class="qs-welcome" id="qs-welcome"><h1>Qstart</h1><p>ゼロから作ったTransformerと会話しよう。<br>12歳の開発者が手書きしたAIがここにいる。</p><div class="qs-status" id="qs-ai-status">✅ <span id="qs-status-text">Equi 1 — 稼働中!</span></div></div>';
+  renderHistory();
+}
+
+updateUsage();
+
+// --- ログイン ---
+var loginTab = 'login';
+var loginType = 'qstart';
+
+function openLogin() {
+  document.getElementById('qs-login-modal').style.display = 'flex';
+}
+function closeLogin() {
+  document.getElementById('qs-login-modal').style.display = 'none';
+  document.getElementById('qs-login-error').textContent = '';
+}
+
+function setLoginTab(t) {
+  loginTab = t;
+  var reg = (t === 'register');
+  document.getElementById('qs-tab-login').style.background = reg ? '#fff' : '#14213d';
+  document.getElementById('qs-tab-login').style.color = reg ? '#333' : '#fff';
+  document.getElementById('qs-tab-reg').style.background = reg ? '#14213d' : '#fff';
+  document.getElementById('qs-tab-reg').style.color = reg ? '#fff' : '#333';
+
+  document.getElementById('qs-reg-fields').style.display = reg ? 'block' : 'none';
+  document.getElementById('qs-login-terms').style.display = reg ? 'block' : 'none';
+  document.getElementById('qs-type-row').style.display = reg ? 'none' : 'flex';
+
+  var btn = document.getElementById('qs-submit-btn');
+  btn.style.display = 'block';
+  btn.textContent = reg ? 'アカウントを作成' : 'ログイン';
+
+  // 古い「準備中」表示が残っていたら消す
+  var soon = document.getElementById('qs-reg-soon');
+  if (soon) soon.remove();
+
+  var ts = document.getElementById('qs-turnstile-box');
+  if (ts) ts.style.display = 'none';
+  var fr = document.getElementById('qs-forgot-row');
+  if (fr) fr.style.display = reg ? 'none' : 'block';
+  var fb = document.getElementById('qs-forgot-box');
+  if (fb) fb.style.display = 'none';
+
+  if (reg) {
+    loadSignupConfig();
+  } else {
+    setLoginType(loginType);
+  }
+}
+
+function setLoginType(t) {
+  loginType = t;
+  document.getElementById('qs-type-qstart').style.background = t==='qstart' ? '#14213d' : '#fff';
+  document.getElementById('qs-type-qstart').style.color = t==='qstart' ? '#fff' : '#333';
+  document.getElementById('qs-type-staff').style.background = t==='staff' ? '#14213d' : '#fff';
+  document.getElementById('qs-type-staff').style.color = t==='staff' ? '#fff' : '#333';
+  document.getElementById('qs-login-id').placeholder = t==='staff' ? '社員ID' : 'ユーザーID';
+  // 社員ログインの場合、ログイン/新規作成タブを非表示(社員は新規作成できない)
+  var tabs = document.getElementById('qs-tab-login').parentNode;
+  tabs.style.display = t==='staff' ? 'none' : 'flex';
+  if (t==='staff') { loginTab='login'; document.getElementById('qs-reg-fields').style.display='none'; document.getElementById('qs-login-terms').style.display='none'; document.getElementById('qs-submit-btn').textContent='ログイン'; }
+}
+
+async function doLogin() {
+  var uid = document.getElementById('qs-login-id').value.trim();
+  var pw = document.getElementById('qs-login-pw').value;
+  var errEl = document.getElementById('qs-login-error');
+  errEl.textContent = '';
+
+  if (loginTab === 'register') {
+    if (loginType === 'staff') { errEl.textContent = '社員アカウントは新規作成できません'; return; }
+    if (QS_SIGNUP && !QS_SIGNUP.open) {
+      errEl.textContent = QS_SIGNUP.mode === 'closed'
+        ? '現在、新規登録の受付を停止しています。'
+        : '現在、アカウントの作成が込み合っています。後日の登録をお願いします。';
+      return;
+    }
+    var agree = document.getElementById('qs-agree');
+    if (!agree.checked) { errEl.textContent = '利用規約に同意してね'; return; }
+    var nick = document.getElementById('qs-reg-nick').value.trim();
+    var email = document.getElementById('qs-reg-email').value.trim();
+    var code = document.getElementById('qs-reg-code').value.trim();
+    var birthday = document.getElementById('qs-reg-birthday').value;
+    var purpose = document.getElementById('qs-reg-purpose').value;
+    var invEl = document.getElementById('qs-reg-invite');
+    var invite = invEl ? invEl.value.trim().toUpperCase() : '';
+    var needEmail = !QS_SIGNUP || QS_SIGNUP.require_email;
+
+    if (!nick) { errEl.textContent = 'ニックネームを入力してね'; return; }
+    if (QS_SIGNUP && QS_SIGNUP.mode === 'invite' && !invite) {
+      errEl.textContent = '招待コードを入力してね'; return; }
+    if (QS_SIGNUP && QS_SIGNUP.require_turnstile && !QS_TS_TOKEN) {
+      errEl.textContent = '「私は人間です」の確認を完了してね'; return; }
+    if (needEmail) {
+      if (!email) { errEl.textContent = 'メールアドレスを入力してね'; return; }
+      if (!code || code.length !== 6) { errEl.textContent = '6桁の認証コードを入力してね'; return; }
+    }
+    if (!birthday) { errEl.textContent = '生年月日を入力してね'; return; }
+    if (!purpose) { errEl.textContent = '用途を選んでね'; return; }
+
+    var url = needEmail ? '/api/qstart/verify-code' : '/api/qstart/signup';
+    var body = { user_id: uid, nickname: nick, password: pw, email: email,
+                 purpose: purpose, birthday: birthday,
+                 invite: invite, turnstile: QS_TS_TOKEN };
+    if (needEmail) body.code = code;
+
+    try {
+      var r = await fetch(url, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(body)
+      });
+      var data = await r.json();
+      if (data.ok) { closeLogin(); refreshUser(); }
+      else { errEl.textContent = data.error; resetTurnstile(); }
+    } catch(e) { errEl.textContent = '通信エラー'; }
+  } else {
+    try {
+      var r = await fetch('/api/qstart/login', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({user_id:uid, password:pw, type:loginType})
+      });
+      var data = await r.json();
+      if (data.ok) { closeLogin(); refreshUser(); }
+      else { errEl.textContent = data.error; }
+    } catch(e) { errEl.textContent = '通信エラー'; }
+  }
+}
+
+async function refreshUser() {
+  try {
+    var r = await fetch('/api/qstart/me');
+    var data = await r.json();
+    var area = document.getElementById('qs-account-area');
+    if (data.logged_in) {
+      var badge = data.is_staff ? ' 👑' : '';
+      area.innerHTML = '<div style="color:#fff; font-size:13px; padding:4px 10px;">👤 ' + data.nickname + badge + '</div>' +
+        '<a class="qs-sidebar-link" onclick="doLogout()" style="font-size:12px;" id="qs-t-logout">ログアウト</a>';
+      document.getElementById('qs-s-account').textContent = data.nickname + (data.is_staff ? ' (社員)' : '');
+    } else {
+      area.innerHTML = '<a class="qs-sidebar-link" onclick="openLogin()" id="qs-login-link">🔑 ログイン</a>';
+      document.getElementById('qs-s-account').textContent = 'ゲスト';
+    }
+  } catch(e) {}
+}
+
+function clearOldHistory() {
+  // 旧形式(ユーザー区別なし)のキーを削除
+  try { localStorage.removeItem('qstart_history'); } catch(e) {}
+}
+
+async function doLogout() {
+  clearOldHistory();
+  QS_CHATS = [];
+  currentChatId = null;
+  await fetch('/api/qstart/logout', {method:'POST'});
+  refreshUser();
+}
+
+
+// --- メール認証 ---
+// ===== 登録設定 =====
+var QS_SIGNUP = null;
+var QS_TS_ID = null;
+var QS_TS_TOKEN = '';
+
+async function loadSignupConfig() {
+  try {
+    var r = await fetch('/qstart/api/v1/signup-config');
+    var d = await r.json();
+    if (!d.ok) return;
+    QS_SIGNUP = d;
+
+    var closed = document.getElementById('qs-signup-closed');
+    var inv = document.getElementById('qs-invite-row');
+    var em = document.getElementById('qs-email-row');
+    var emOpt = document.getElementById('qs-email-opt');
+    var tsBox = document.getElementById('qs-turnstile-box');
+    var btn = document.getElementById('qs-submit-btn');
+
+    if (!d.open) {
+      closed.style.display = 'block';
+      closed.textContent = d.mode === 'closed'
+        ? '現在、新規登録の受付を停止しています。'
+        : '現在、アカウントの作成が込み合っています。後日の登録をお願いします。';
+      inv.style.display = 'none'; em.style.display = 'none';
+      tsBox.style.display = 'none';
+      if (btn) { btn.disabled = true; btn.style.opacity = '.5'; }
+      return;
+    }
+    closed.style.display = 'none';
+    var ah = document.getElementById('qs-age-hint');
+    if (ah && d.min_age) {
+      ah.innerHTML = '（' + d.min_age + '歳以上・' + d.min_age
+        + '歳未満の方は保護者の同意を得て招待コードをご使用ください）';
+    }
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+
+    // 招待制なら必須、全開放なら任意で表示
+    inv.style.display = (d.mode === 'closed') ? 'none' : 'block';
+    var invIn = document.getElementById('qs-reg-invite');
+    var invHint = document.getElementById('qs-invite-hint');
+    if (invIn) {
+      if (d.mode === 'invite') {
+        invIn.placeholder = '招待コード（必須）';
+        invIn.style.borderColor = '#c9a227';
+        if (invHint) invHint.textContent = '現在は招待制です。コードをお持ちの方のみ登録できます。';
+      } else {
+        invIn.placeholder = '招待コード（お持ちの方のみ）';
+        invIn.style.borderColor = '#d0ccc0';
+        if (invHint) invHint.textContent = 'コードをお持ちの方は入力してください。特典が受け取れます。';
+      }
+    }
+    em.style.display = d.require_email ? 'flex' : 'none';
+    emOpt.style.display = d.require_email ? 'none' : 'block';
+    if (!d.require_email) {
+      var optIn = document.getElementById('qs-reg-email');
+      if (optIn) { optIn.placeholder = 'メールアドレス（任意）'; }
+      em.style.display = 'flex';
+      var sb = document.getElementById('qs-send-code-btn');
+      if (sb) sb.style.display = 'none';
+    }
+
+    if (d.require_turnstile && d.site_key) {
+      tsBox.style.display = 'block';
+      renderTurnstile(d.site_key);
+    } else {
+      tsBox.style.display = 'none';
+    }
+  } catch(e) {}
+}
+
+function renderTurnstile(siteKey) {
+  if (!window.turnstile) { setTimeout(function(){ renderTurnstile(siteKey); }, 400); return; }
+  if (QS_TS_ID !== null) { window.turnstile.reset(QS_TS_ID); return; }
+  try {
+    QS_TS_ID = window.turnstile.render('#qs-turnstile', {
+      sitekey: siteKey,
+      language: (typeof currentLang !== 'undefined' ? currentLang : 'ja'),
+      callback: function(t){ QS_TS_TOKEN = t; },
+      'expired-callback': function(){ QS_TS_TOKEN = ''; },
+      'error-callback': function(){ QS_TS_TOKEN = ''; }
+    });
+  } catch(e) {}
+}
+
+function resetTurnstile() {
+  QS_TS_TOKEN = '';
+  if (QS_TS_ID !== null && window.turnstile) {
+    try { window.turnstile.reset(QS_TS_ID); } catch(e) {}
+  }
+}
+
+async function sendCode() {
+  var email = document.getElementById('qs-reg-email').value.trim();
+  var errEl = document.getElementById('qs-login-error');
+  errEl.style.color = '#e24b4a';
+  if (!email || email.indexOf('@') < 0) { errEl.textContent = 'メールアドレスを入力してね'; return; }
+
+  if (QS_SIGNUP && QS_SIGNUP.require_turnstile && !QS_TS_TOKEN) {
+    errEl.textContent = '「私は人間です」の確認を完了してね'; return;
+  }
+  var invEl = document.getElementById('qs-reg-invite');
+  if (QS_SIGNUP && QS_SIGNUP.mode === 'invite' && (!invEl || !invEl.value.trim())) {
+    errEl.textContent = '招待コードを入力してね'; return;
+  }
+
+  var btn = document.getElementById('qs-send-code-btn');
+  btn.disabled = true; btn.textContent = '送信中...';
+  try {
+    var r = await fetch('/api/qstart/send-code', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email: email,
+        turnstile: QS_TS_TOKEN,
+        invite: invEl ? invEl.value.trim().toUpperCase() : '',
+        lang: (typeof currentLang !== 'undefined' ? currentLang : 'ja') })
+    });
+    var data = await r.json();
+    if (data.ok) {
+      document.getElementById('qs-code-field').style.display = 'block';
+      btn.textContent = '再送信'; btn.disabled = false;
+      errEl.style.color = '#2e7d32';
+      errEl.textContent = 'メールを送ったよ！30分以内にコードを入力してね';
+    } else {
+      errEl.textContent = data.error || '送信できませんでした';
+      btn.textContent = 'コード送信'; btn.disabled = false;
+      resetTurnstile();
+    }
+  } catch(e) {
+    errEl.textContent = '通信エラー';
+    btn.textContent = 'コード送信'; btn.disabled = false;
+  }
+}
+
+
+// --- 使用量管理 ---
+async function fetchUsage() {
+  try {
+    var r = await fetch('/api/qstart/usage');
+    var data = await r.json();
+    if (data.ok) {
+      var pct = data.window_pct;
+      // サーバーから取得
+      document.getElementById('qs-s-usage-text').textContent = pct + '% / 週間: ' + data.weekly_pct + '%';
+      document.getElementById('qs-s-bar').style.width = pct + '%';
+      // 100%到達時
+      if (!data.allowed) { showLimitReached(data.recovery_time, data.weekly_pct); }
+      else { hideLimitReached(); }
+    }
+  } catch(e) {}
+}
+
+function showLimitReached(recoveryTime, weeklyPct) {
+  var input = document.getElementById('qs-input');
+  var btn = document.querySelector('.qs-send');
+  input.disabled = true;
+  input.placeholder = '使用量の上限に達しました';
+  input.style.opacity = '0.5';
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.3'; btn.style.cursor = 'not-allowed'; }
+  // 上限メッセージを表示
+  var existing = document.getElementById('qs-limit-msg');
+  if (!existing) {
+    var msg = document.createElement('div');
+    msg.id = 'qs-limit-msg';
+    msg.style.cssText = 'background:#fff8e7; border:1px solid #e8d5a0; border-radius:12px; padding:20px; text-align:center; margin:20px auto; max-width:400px;';
+    document.getElementById('qs-chat').appendChild(msg);
+  }
+  var el = document.getElementById('qs-limit-msg');
+  var timeText = recoveryTime ? recoveryTime + ' に回復します' : 'しばらくお待ちください';
+  el.innerHTML = '<div style="font-size:24px; margin-bottom:8px;">⏳</div>' +
+    '<div style="font-size:16px; font-weight:600; color:#14213d; margin-bottom:6px;">使用量の上限に達しました</div>' +
+    '<div style="font-size:14px; color:#b8860b; font-weight:600; margin-bottom:8px;">' + timeText + '</div>' +
+    '<div style="font-size:12px; color:#8a8270;">週間使用量: ' + weeklyPct + '%</div>';
+  el.style.display = 'block';
+}
+
+function hideLimitReached() {
+  var el = document.getElementById('qs-limit-msg');
+  if (el) el.style.display = 'none';
+}
+
+// 30秒ごとに使用量を更新
+// fetchUsage は fetchServerUsage に統合
+
+
+
+// --- チャットURL管理 ---
+function generateChatId() {
+  // 32桁(128bit相当)にして衝突・推測を防ぐ
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  var a = new Uint8Array(16);
+  if (window.crypto && crypto.getRandomValues) crypto.getRandomValues(a);
+  else for (var i=0;i<16;i++) a[i] = Math.floor(Math.random()*256);
+  return Array.from(a).map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+}
+
+function startNewChat() {
+  currentChatId = generateChatId();
+  history.pushState({chatId: currentChatId}, '', qsPath('/qstart/chat/' + currentChatId));
+}
+
+// ページ読み込み時: URLにchat_idがあれば復元(bootの後に中身も読む)
+function restoreFromUrl() {
+  var path = window.location.pathname.replace(/^\/admin/, '');
+  if (path.indexOf('/qstart/chat/') === 0) {
+    var cid = path.replace('/qstart/chat/', '').split('?')[0];
+    if (cid) {
+      currentChatId = cid;
+      // 自分のチャットかサーバーに確認してから表示する
+      if (QS_ME && !QS_ME.guest) loadChat(cid);
+    }
+  }
+}
+
+// --- サイドバー開閉 ---
+function isMobile() { return window.innerWidth <= 768; }
+
+function toggleSidebar() {
+  var sb = document.querySelector('.qs-sidebar');
+  if (!sb) return;
+  if (isMobile()) {
+    sb.classList.toggle('open');
+    toggleOverlay(sb.classList.contains('open'));
+  } else {
+    var openBtn = document.getElementById('qs-sidebar-open');
+    var hidden = sb.style.display === 'none';
+    sb.style.display = hidden ? 'flex' : 'none';
+    if (openBtn) openBtn.style.display = hidden ? 'none' : 'block';
+  }
+}
+
+function toggleOverlay(show) {
+  var ov = document.getElementById('qs-overlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'qs-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:205;display:none;';
+    ov.onclick = function(){ closeSidebar(); };
+    document.body.appendChild(ov);
+  }
+  ov.style.display = show ? 'block' : 'none';
+}
+
+function closeSidebar() {
+  var sb = document.querySelector('.qs-sidebar');
+  if (sb) sb.classList.remove('open');
+  toggleOverlay(false);
+}
+
+// モバイルではリンクを押したら閉じる
+document.addEventListener('click', function(e) {
+  if (!isMobile()) return;
+  var a = e.target.closest('.qs-sidebar-link, .qs-new-chat, .qs-history-item');
+  if (a) setTimeout(closeSidebar, 120);
+});
+
+// 画面幅が変わったら状態をリセット
+window.addEventListener('resize', function() {
+  var sb = document.querySelector('.qs-sidebar');
+  if (!sb) return;
+  if (!isMobile()) {
+    sb.classList.remove('open');
+    toggleOverlay(false);
+    if (sb.style.display === 'none') sb.style.display = 'flex';
+  }
+});
+
+// --- 言語 ---
+var QS_TEXTS = {
+  ja: {
+    welcome_title: 'Qstart',
+    welcome_desc: 'ゼロから作ったTransformerと会話しよう。\n12歳の開発者が手書きしたAIがここにいる。',
+    input_placeholder: 'メッセージを入力...',
+    send: '送信',
+    new_chat: '+ 新しいチャット',
+    history_label: 'チャット履歴はここに表示されます',
+    settings: '設定',
+    terms: '利用規約',
+    privacy: 'プライバシー',
+    back: 'QuizShareに戻る',
+    login: 'ログイン',
+    logout: 'ログアウト',
+    usage: '使用量',
+    reset_label: '3時間ごとにリセット',
+    limit_title: '使用量の上限に達しました',
+    limit_recovery: 'に回復します',
+    preparing: '準備中',
+    account: 'アカウント',
+    model_label: '現在のモデル',
+    effort_label: 'エフォート',
+    lang_label: '言語',
+    slogan: 'ゼロから作ったAIと、話そう。',
+    window_label: '3時間枠',
+    monthly_label: '月間枠',
+    used: '使用済み',
+    window_reset: '3時間ごとにリセット',
+    monthly_reset: '月初にリセット',
+    tokens: 'トークン',
+    running: '稼働中',
+    promo_btn: '優待コード入力',
+    promo_title: '優待コード入力',
+    promo_placeholder: 'コードを入力',
+    promo_apply: '適用する',
+    promo_desc: '優待コードを入力すると、トークン追加などの優待が受けられます。',
+    footer_desc: 'ゼロから作ったAIサービス',
+    plan: 'プラン',
+    tab_profile: 'プロフィール',
+    tab_appear: '外観',
+    tab_model: 'モデル',
+    tab_usage: '使用量',
+    tab_account: 'アカウント',
+    footer_dev: '開発: Qzero会社',
+    effort_low: '低',
+    effort_mid: '中',
+    effort_high: '高',
+    linked: '連携済み',
+    not_linked: '未連携',
+
+    model_pure_desc: '速い・軽量モデル',
+    model_equi_desc: 'バランス・普段使い',
+    model_zin_desc: '思考・じっくり考える',
+    model_apex_desc: '最強・全力モデル',
+    ai_lang_note: '',  },
+  en: {
+    welcome_title: 'Qstart',
+    welcome_desc: 'Chat with a Transformer built from scratch.\nCreated by a 12-year-old developer.',
+    input_placeholder: 'Type a message...',
+    send: 'Send',
+    new_chat: '+ New chat',
+    history_label: 'Chat history will appear here',
+    settings: 'Settings',
+    terms: 'Terms of Service',
+    privacy: 'Privacy Policy',
+    back: 'Back to QuizShare',
+    login: 'Login',
+    logout: 'Logout',
+    usage: 'Usage',
+    reset_label: 'Resets every 3 hours',
+    limit_title: 'Usage limit reached',
+    limit_recovery: 'Recovers at',
+    preparing: 'Preparing',
+    account: 'Account',
+    model_label: 'Current model',
+    effort_label: 'Effort',
+    lang_label: 'Language',
+    slogan: 'Chat with AI, built from zero.',
+    window_label: '3-Hour Window',
+    monthly_label: 'Monthly Quota',
+    used: 'used',
+    window_reset: 'Resets every 3 hours',
+    monthly_reset: 'Resets monthly',
+    tokens: 'tokens',
+    running: 'Running',
+    promo_btn: 'Promo Code',
+    promo_title: 'Enter Promo Code',
+    promo_placeholder: 'Enter code',
+    promo_apply: 'Apply',
+    promo_desc: 'Enter a promo code to receive bonus tokens or special features.',
+    footer_desc: 'AI service built from scratch',
+    plan: 'Plan',
+    tab_profile: 'Profile',
+    tab_appear: 'Appearance',
+    tab_model: 'Model',
+    tab_usage: 'Usage',
+    tab_account: 'Account',
+    footer_dev: 'Developed by Qzero Co.',
+    effort_low: 'Low',
+    effort_mid: 'Mid',
+    effort_high: 'High',
+    linked: 'Linked',
+    not_linked: 'Not linked',
+
+    model_pure_desc: 'Fast & lightweight',
+    model_equi_desc: 'Balanced & everyday',
+    model_zin_desc: 'Thinking & careful',
+    model_apex_desc: 'Most powerful',
+    ai_lang_note: 'Note: AI responds in Japanese.',  },
+  zh: {
+    welcome_title: 'Qstart',
+    welcome_desc: '与从零开始构建的Transformer对话。\n由12岁的开发者手写创建。',
+    input_placeholder: '输入消息...',
+    send: '发送',
+    new_chat: '+ 新对话',
+    history_label: '聊天记录将显示在这里',
+    settings: '设置',
+    terms: '使用条款',
+    privacy: '隐私政策',
+    back: '返回QuizShare',
+    login: '登录',
+    logout: '退出',
+    usage: '使用量',
+    reset_label: '每3小时重置',
+    limit_title: '已达到使用上限',
+    limit_recovery: '恢复时间',
+    preparing: '准备中',
+    account: '账户',
+    model_label: '当前模型',
+    effort_label: '努力程度',
+    lang_label: '语言',
+    slogan: '与从零构建的AI对话。',
+    window_label: '3小时配额',
+    monthly_label: '月度配额',
+    used: '已使用',
+    window_reset: '每3小时重置',
+    monthly_reset: '每月重置',
+    tokens: '令牌',
+    running: '运行中',
+    promo_btn: '优惠码',
+    promo_title: '输入优惠码',
+    promo_placeholder: '输入代码',
+    promo_apply: '应用',
+    promo_desc: '输入优惠码可获得额外令牌或特殊功能。',
+    footer_desc: '从零开始构建的AI服务',
+    plan: '方案',
+    tab_profile: '个人资料',
+    tab_appear: '外观',
+    tab_model: '模型',
+    tab_usage: '使用量',
+    tab_account: '账户',
+    footer_dev: '开发：Qzero公司',
+    effort_low: '低',
+    effort_mid: '中',
+    effort_high: '高',
+    linked: '已连接',
+    not_linked: '未连接',
+
+    model_pure_desc: '快速・轻量',
+    model_equi_desc: '平衡・日常使用',
+    model_zin_desc: '思考・深入分析',
+    model_apex_desc: '最强・全力',
+    ai_lang_note: '注意：AI以日语回答。',  },
+  ko: {
+    welcome_title: 'Qstart',
+    welcome_desc: '처음부터 만든 Transformer와 대화하세요.\n12세 개발자가 직접 만든 AI입니다.',
+    input_placeholder: '메시지를 입력하세요...',
+    send: '전송',
+    new_chat: '+ 새 채팅',
+    history_label: '채팅 기록이 여기에 표시됩니다',
+    settings: '설정',
+    terms: '이용약관',
+    privacy: '개인정보처리방침',
+    back: 'QuizShare로 돌아가기',
+    login: '로그인',
+    logout: '로그아웃',
+    usage: '사용량',
+    reset_label: '3시간마다 초기화',
+    limit_title: '사용량 한도에 도달했습니다',
+    limit_recovery: '에 복구됩니다',
+    preparing: '준비중',
+    account: '계정',
+    model_label: '현재 모델',
+    effort_label: '에포트',
+    lang_label: '언어',
+    slogan: '제로부터 만든 AI와 대화하세요.',
+    window_label: '3시간 할당량',
+    monthly_label: '월간 할당량',
+    used: '사용됨',
+    window_reset: '3시간마다 초기화',
+    monthly_reset: '매월 초기화',
+    tokens: '토큰',
+    running: '가동중',
+    promo_btn: '프로모 코드',
+    promo_title: '프로모 코드 입력',
+    promo_placeholder: '코드 입력',
+    promo_apply: '적용',
+    promo_desc: '프로모 코드를 입력하면 추가 토큰이나 특별 기능을 받을 수 있습니다.',
+    footer_desc: '제로부터 만든 AI 서비스',
+    plan: '플랜',
+    tab_profile: '프로필',
+    tab_appear: '외관',
+    tab_model: '모델',
+    tab_usage: '사용량',
+    tab_account: '계정',
+    footer_dev: '개발: Qzero사',
+    effort_low: '낮음',
+    effort_mid: '중간',
+    effort_high: '높음',
+    linked: '연결됨',
+    not_linked: '미연결',
+
+    model_pure_desc: '빠름・경량',
+    model_equi_desc: '균형・일상 사용',
+    model_zin_desc: '사고・깊이 분석',
+    model_apex_desc: '최강・전력',
+    ai_lang_note: '참고: AI는 일본어로 응답합니다.',  },
+  fr: {
+    plan: 'Forfait',
+    tab_profile: 'Profil',
+    tab_appear: 'Apparence',
+    tab_model: 'Modèle',
+    tab_usage: 'Utilisation',
+    tab_account: 'Compte',
+    welcome_title: 'Qstart',
+    welcome_desc: 'Discutez avec un Transformer construit de zéro.\nCréé par un développeur de 12 ans.',
+    input_placeholder: 'Tapez un message...',
+    send: 'Envoyer',
+    new_chat: '+ Nouvelle conversation',
+    history_label: "L'historique apparaîtra ici",
+    settings: 'Paramètres',
+    terms: "Conditions d'utilisation",
+    privacy: 'Politique de confidentialité',
+    back: 'Retour à QuizShare',
+    login: 'Connexion',
+    logout: 'Déconnexion',
+    usage: 'Utilisation',
+    reset_label: 'Réinitialisation toutes les 3 heures',
+    limit_title: "Limite d'utilisation atteinte",
+    limit_recovery: 'Récupération à',
+    preparing: 'En préparation',
+    account: 'Compte',
+    model_label: 'Modèle actuel',
+    effort_label: 'Effort',
+    lang_label: 'Langue',
+    slogan: "Discutez avec une IA construite de zéro.",
+    window_label: 'Quota 3 heures',
+    monthly_label: 'Quota mensuel',
+    used: 'utilisé',
+    window_reset: 'Réinitialisation toutes les 3h',
+    monthly_reset: 'Réinitialisation mensuelle',
+    tokens: 'jetons',
+    running: 'En service',
+    promo_btn: 'Code promo',
+    promo_title: 'Entrer un code promo',
+    promo_placeholder: 'Entrer le code',
+    promo_apply: 'Appliquer',
+    promo_desc: 'Entrez un code promo pour des jetons bonus ou des fonctions spéciales.',
+    footer_desc: 'Service IA construit de zéro',
+    footer_dev: 'Développé par Qzero Co.',
+    effort_low: 'Bas',
+    effort_mid: 'Moyen',
+    effort_high: 'Haut',
+    linked: 'Lié',
+    not_linked: 'Non lié',
+
+    model_pure_desc: 'Rapide et léger',
+    model_equi_desc: 'Équilibré et quotidien',
+    model_zin_desc: 'Réflexion approfondie',
+    model_apex_desc: 'Le plus puissant',
+    ai_lang_note: 'Note : l\'IA répond en japonais.',  },
+  de: {
+    plan: 'Tarif',
+    tab_profile: 'Profil',
+    tab_appear: 'Darstellung',
+    tab_model: 'Modell',
+    tab_usage: 'Nutzung',
+    tab_account: 'Konto',
+    welcome_title: 'Qstart',
+    welcome_desc: 'Chatte mit einem Transformer, der von Grund auf gebaut wurde.\nErstellt von einem 12-jährigen Entwickler.',
+    input_placeholder: 'Nachricht eingeben...',
+    send: 'Senden',
+    new_chat: '+ Neuer Chat',
+    history_label: 'Chatverlauf wird hier angezeigt',
+    settings: 'Einstellungen',
+    terms: 'Nutzungsbedingungen',
+    privacy: 'Datenschutzrichtlinie',
+    back: 'Zurück zu QuizShare',
+    login: 'Anmelden',
+    logout: 'Abmelden',
+    usage: 'Nutzung',
+    reset_label: 'Wird alle 3 Stunden zurückgesetzt',
+    limit_title: 'Nutzungslimit erreicht',
+    limit_recovery: 'Wiederherstellung um',
+    preparing: 'In Vorbereitung',
+    account: 'Konto',
+    model_label: 'Aktuelles Modell',
+    effort_label: 'Aufwand',
+    lang_label: 'Sprache',
+    slogan: 'Chatte mit einer KI, die von Grund auf gebaut wurde.',
+    window_label: '3-Stunden-Kontingent',
+    monthly_label: 'Monatliches Kontingent',
+    used: 'verwendet',
+    window_reset: 'Alle 3 Stunden zurückgesetzt',
+    monthly_reset: 'Monatlich zurückgesetzt',
+    tokens: 'Token',
+    running: 'Aktiv',
+    promo_btn: 'Promo-Code',
+    promo_title: 'Promo-Code eingeben',
+    promo_placeholder: 'Code eingeben',
+    promo_apply: 'Anwenden',
+    promo_desc: 'Geben Sie einen Promo-Code ein für Bonus-Token oder Sonderfunktionen.',
+    footer_desc: 'KI-Service von Grund auf gebaut',
+    footer_dev: 'Entwickelt von Qzero Co.',
+    effort_low: 'Niedrig',
+    effort_mid: 'Mittel',
+    effort_high: 'Hoch',
+    linked: 'Verknüpft',
+    not_linked: 'Nicht verknüpft',
+
+    model_pure_desc: 'Schnell & leicht',
+    model_equi_desc: 'Ausgewogen & alltäglich',
+    model_zin_desc: 'Tiefes Nachdenken',
+    model_apex_desc: 'Am leistungsstärksten',
+    ai_lang_note: 'Hinweis: Die KI antwortet auf Japanisch.',  },
+  es: {
+    plan: 'Plan',
+    tab_profile: 'Perfil',
+    tab_appear: 'Apariencia',
+    tab_model: 'Modelo',
+    tab_usage: 'Uso',
+    tab_account: 'Cuenta',
+    welcome_title: 'Qstart',
+    welcome_desc: 'Chatea con un Transformer construido desde cero.\nCreado por un desarrollador de 12 años.',
+    input_placeholder: 'Escribe un mensaje...',
+    send: 'Enviar',
+    new_chat: '+ Nueva conversación',
+    history_label: 'El historial de chat aparecerá aquí',
+    settings: 'Configuración',
+    terms: 'Términos de servicio',
+    privacy: 'Política de privacidad',
+    back: 'Volver a QuizShare',
+    login: 'Iniciar sesión',
+    logout: 'Cerrar sesión',
+    usage: 'Uso',
+    reset_label: 'Se reinicia cada 3 horas',
+    limit_title: 'Límite de uso alcanzado',
+    limit_recovery: 'Se recupera a las',
+    preparing: 'En preparación',
+    account: 'Cuenta',
+    model_label: 'Modelo actual',
+    effort_label: 'Esfuerzo',
+    lang_label: 'Idioma',
+    slogan: 'Chatea con una IA construida desde cero.',
+    window_label: 'Cuota de 3 horas',
+    monthly_label: 'Cuota mensual',
+    used: 'usado',
+    window_reset: 'Se reinicia cada 3 horas',
+    monthly_reset: 'Se reinicia mensualmente',
+    tokens: 'tokens',
+    running: 'En servicio',
+    promo_btn: 'Código promo',
+    promo_title: 'Ingresar código promo',
+    promo_placeholder: 'Ingresar código',
+    promo_apply: 'Aplicar',
+    promo_desc: 'Ingrese un código promo para recibir tokens o funciones especiales.',
+    footer_desc: 'Servicio de IA construido desde cero',
+    footer_dev: 'Desarrollado por Qzero Co.',
+    effort_low: 'Bajo',
+    effort_mid: 'Medio',
+    effort_high: 'Alto',
+    linked: 'Vinculado',
+    not_linked: 'No vinculado',
+
+    model_pure_desc: 'Rápido y ligero',
+    model_equi_desc: 'Equilibrado y diario',
+    model_zin_desc: 'Pensamiento profundo',
+    model_apex_desc: 'El más potente',
+    ai_lang_note: 'Nota: La IA responde en japonés.',  },
+  pt: {
+    plan: 'Plano',
+    tab_profile: 'Perfil',
+    tab_appear: 'Aparência',
+    tab_model: 'Modelo',
+    tab_usage: 'Uso',
+    tab_account: 'Conta',
+    welcome_title: 'Qstart',
+    welcome_desc: 'Converse com um Transformer construído do zero.\nCriado por um desenvolvedor de 12 anos.',
+    input_placeholder: 'Digite uma mensagem...',
+    send: 'Enviar',
+    new_chat: '+ Nova conversa',
+    history_label: 'O histórico de chat aparecerá aqui',
+    settings: 'Configurações',
+    terms: 'Termos de serviço',
+    privacy: 'Política de privacidade',
+    back: 'Voltar ao QuizShare',
+    login: 'Entrar',
+    logout: 'Sair',
+    usage: 'Uso',
+    reset_label: 'Reinicia a cada 3 horas',
+    limit_title: 'Limite de uso atingido',
+    limit_recovery: 'Recuperação às',
+    preparing: 'Em preparação',
+    account: 'Conta',
+    model_label: 'Modelo atual',
+    effort_label: 'Esforço',
+    lang_label: 'Idioma',
+    slogan: 'Converse com uma IA construída do zero.',
+    window_label: 'Cota de 3 horas',
+    monthly_label: 'Cota mensal',
+    used: 'usado',
+    window_reset: 'Reinicia a cada 3 horas',
+    monthly_reset: 'Reinicia mensalmente',
+    tokens: 'tokens',
+    running: 'Em serviço',
+    promo_btn: 'Código promo',
+    promo_title: 'Inserir código promo',
+    promo_placeholder: 'Inserir código',
+    promo_apply: 'Aplicar',
+    promo_desc: 'Insira um código promo para receber tokens bônus ou funções especiais.',
+    footer_desc: 'Serviço de IA construído do zero',
+    footer_dev: 'Desenvolvido por Qzero Co.',
+    effort_low: 'Baixo',
+    effort_mid: 'Médio',
+    effort_high: 'Alto',
+    linked: 'Vinculado',
+    not_linked: 'Não vinculado',
+
+    model_pure_desc: 'Rápido e leve',
+    model_equi_desc: 'Equilibrado e diário',
+    model_zin_desc: 'Pensamento profundo',
+    model_apex_desc: 'O mais poderoso',
+    ai_lang_note: 'Nota: A IA responde em japonês.',  },
+  ar: {
+    plan: 'الخطة',
+    tab_profile: 'الملف الشخصي',
+    tab_appear: 'المظهر',
+    tab_model: 'النموذج',
+    tab_usage: 'الاستخدام',
+    tab_account: 'الحساب',
+    welcome_title: 'Qstart',
+    welcome_desc: 'تحدث مع Transformer مبني من الصفر.\nصنعه مطور عمره 12 سنة.',
+    input_placeholder: 'اكتب رسالة...',
+    send: 'إرسال',
+    new_chat: '+ محادثة جديدة',
+    history_label: 'سيظهر سجل المحادثات هنا',
+    settings: 'الإعدادات',
+    terms: 'شروط الخدمة',
+    privacy: 'سياسة الخصوصية',
+    back: 'العودة إلى QuizShare',
+    login: 'تسجيل الدخول',
+    logout: 'تسجيل الخروج',
+    usage: 'الاستخدام',
+    reset_label: 'يتم إعادة التعيين كل 3 ساعات',
+    limit_title: 'تم الوصول إلى حد الاستخدام',
+    limit_recovery: 'يتم الاستعادة في',
+    preparing: 'قيد التحضير',
+    account: 'الحساب',
+    model_label: 'النموذج الحالي',
+    effort_label: 'الجهد',
+    lang_label: 'اللغة',
+    slogan: 'تحدث مع ذكاء اصطناعي مبني من الصفر.',
+    window_label: 'حصة 3 ساعات',
+    monthly_label: 'الحصة الشهرية',
+    used: 'مستخدم',
+    window_reset: 'إعادة تعيين كل 3 ساعات',
+    monthly_reset: 'إعادة تعيين شهرية',
+    tokens: 'رموز',
+    running: 'قيد التشغيل',
+    promo_btn: 'رمز ترويجي',
+    promo_title: 'أدخل الرمز الترويجي',
+    promo_placeholder: 'أدخل الرمز',
+    promo_apply: 'تطبيق',
+    promo_desc: 'أدخل رمزًا ترويجيًا للحصول على رموز إضافية أو ميزات خاصة.',
+    footer_desc: 'خدمة ذكاء اصطناعي مبنية من الصفر',
+    footer_dev: 'تطوير: شركة Qzero',
+    effort_low: 'منخفض',
+    effort_mid: 'متوسط',
+    effort_high: 'عالي',
+    linked: 'مرتبط',
+    not_linked: 'غير مرتبط',
+
+    model_pure_desc: 'سريع وخفيف',
+    model_equi_desc: 'متوازن ويومي',
+    model_zin_desc: 'تفكير عميق',
+    model_apex_desc: 'الأقوى',
+    ai_lang_note: 'ملاحظة: الذكاء الاصطناعي يرد باللغة اليابانية.',  },
+  hi: {
+    plan: 'योजना',
+    tab_profile: 'प्रोफ़ाइल',
+    tab_appear: 'दिखावट',
+    tab_model: 'मॉडल',
+    tab_usage: 'उपयोग',
+    tab_account: 'खाता',
+    welcome_title: 'Qstart',
+    welcome_desc: 'शून्य से बने Transformer से बात करें।\n12 साल के डेवलपर द्वारा बनाया गया।',
+    input_placeholder: 'संदेश टाइप करें...',
+    send: 'भेजें',
+    new_chat: '+ नई चैट',
+    history_label: 'चैट इतिहास यहाँ दिखाई देगा',
+    settings: 'सेटिंग्स',
+    terms: 'सेवा की शर्तें',
+    privacy: 'गोपनीयता नीति',
+    back: 'QuizShare पर वापस जाएँ',
+    login: 'लॉग इन',
+    logout: 'लॉग आउट',
+    usage: 'उपयोग',
+    reset_label: 'हर 3 घंटे में रीसेट',
+    limit_title: 'उपयोग सीमा पूरी हो गई',
+    limit_recovery: 'पर बहाल होगा',
+    preparing: 'तैयारी में',
+    account: 'खाता',
+    model_label: 'वर्तमान मॉडल',
+    effort_label: 'प्रयास',
+    lang_label: 'भाषा',
+    slogan: 'शून्य से बने AI से बात करें।',
+    window_label: '3 घंटे का कोटा',
+    monthly_label: 'मासिक कोटा',
+    used: 'उपयोग किया',
+    window_reset: 'हर 3 घंटे में रीसेट',
+    monthly_reset: 'मासिक रीसेट',
+    tokens: 'टोकन',
+    running: 'चालू',
+    promo_btn: 'प्रोमो कोड',
+    promo_title: 'प्रोमो कोड दर्ज करें',
+    promo_placeholder: 'कोड दर्ज करें',
+    promo_apply: 'लागू करें',
+    promo_desc: 'बोनस टोकन या विशेष सुविधाओं के लिए प्रोमो कोड दर्ज करें।',
+    footer_desc: 'शून्य से बनी AI सेवा',
+    footer_dev: 'विकास: Qzero कंपनी',
+    effort_low: 'कम',
+    effort_mid: 'मध्यम',
+    effort_high: 'उच्च',
+    linked: 'जुड़ा हुआ',
+    not_linked: 'नहीं जुड़ा',
+
+    model_pure_desc: 'तेज़ और हल्का',
+    model_equi_desc: 'संतुलित और दैनिक',
+    model_zin_desc: 'गहन सोच',
+    model_apex_desc: 'सबसे शक्तिशाली',
+    ai_lang_note: 'नोट: AI जापानी में जवाब देता है।',  },
+  th: {
+    plan: 'แพ็กเกจ',
+    tab_profile: 'โปรไฟล์',
+    tab_appear: 'ลักษณะที่ปรากฏ',
+    tab_model: 'โมเดล',
+    tab_usage: 'การใช้งาน',
+    tab_account: 'บัญชี',
+    welcome_title: 'Qstart',
+    welcome_desc: 'สนทนากับ Transformer ที่สร้างจากศูนย์\nสร้างโดยนักพัฒนาอายุ 12 ปี',
+    input_placeholder: 'พิมพ์ข้อความ...',
+    send: 'ส่ง',
+    new_chat: '+ แชทใหม่',
+    history_label: 'ประวัติแชทจะแสดงที่นี่',
+    settings: 'การตั้งค่า',
+    terms: 'ข้อกำหนดการใช้งาน',
+    privacy: 'นโยบายความเป็นส่วนตัว',
+    back: 'กลับไปที่ QuizShare',
+    login: 'เข้าสู่ระบบ',
+    logout: 'ออกจากระบบ',
+    usage: 'การใช้งาน',
+    reset_label: 'รีเซ็ตทุก 3 ชั่วโมง',
+    limit_title: 'ถึงขีดจำกัดการใช้งานแล้ว',
+    limit_recovery: 'จะกู้คืนเมื่อ',
+    preparing: 'กำลังเตรียม',
+    account: 'บัญชี',
+    model_label: 'โมเดลปัจจุบัน',
+    effort_label: 'ความพยายาม',
+    lang_label: 'ภาษา',
+    slogan: 'สนทนากับ AI ที่สร้างจากศูนย์',
+    window_label: 'โควตา 3 ชั่วโมง',
+    monthly_label: 'โควตารายเดือน',
+    used: 'ใช้แล้ว',
+    window_reset: 'รีเซ็ตทุก 3 ชั่วโมง',
+    monthly_reset: 'รีเซ็ตรายเดือน',
+    tokens: 'โทเค็น',
+    running: 'กำลังทำงาน',
+    promo_btn: 'โค้ดโปรโมชั่น',
+    promo_title: 'ใส่โค้ดโปรโมชั่น',
+    promo_placeholder: 'ใส่โค้ด',
+    promo_apply: 'ใช้งาน',
+    promo_desc: 'ใส่โค้ดโปรโมชั่นเพื่อรับโทเค็นพิเศษ',
+    footer_desc: 'บริการ AI ที่สร้างจากศูนย์',
+    footer_dev: 'พัฒนาโดย Qzero Co.',
+    effort_low: 'ต่ำ',
+    effort_mid: 'กลาง',
+    effort_high: 'สูง',
+    linked: 'เชื่อมต่อแล้ว',
+    not_linked: 'ยังไม่เชื่อมต่อ',
+
+    model_pure_desc: 'เร็วและเบา',
+    model_equi_desc: 'สมดุลและทั่วไป',
+    model_zin_desc: 'คิดอย่างลึกซึ้ง',
+    model_apex_desc: 'ทรงพลังที่สุด',
+    ai_lang_note: 'หมายเหตุ: AI ตอบเป็นภาษาญี่ปุ่น',  },
+  vi: {
+    plan: 'Gói',
+    tab_profile: 'Hồ sơ',
+    tab_appear: 'Giao diện',
+    tab_model: 'Mô hình',
+    tab_usage: 'Mức sử dụng',
+    tab_account: 'Tài khoản',
+    welcome_title: 'Qstart',
+    welcome_desc: 'Trò chuyện với Transformer được xây dựng từ đầu.\nĐược tạo bởi nhà phát triển 12 tuổi.',
+    input_placeholder: 'Nhập tin nhắn...',
+    send: 'Gửi',
+    new_chat: '+ Cuộc trò chuyện mới',
+    history_label: 'Lịch sử trò chuyện sẽ hiển thị ở đây',
+    settings: 'Cài đặt',
+    terms: 'Điều khoản dịch vụ',
+    privacy: 'Chính sách bảo mật',
+    back: 'Quay lại QuizShare',
+    login: 'Đăng nhập',
+    logout: 'Đăng xuất',
+    usage: 'Sử dụng',
+    reset_label: 'Đặt lại mỗi 3 giờ',
+    limit_title: 'Đã đạt giới hạn sử dụng',
+    limit_recovery: 'Phục hồi lúc',
+    preparing: 'Đang chuẩn bị',
+    account: 'Tài khoản',
+    model_label: 'Mô hình hiện tại',
+    effort_label: 'Nỗ lực',
+    lang_label: 'Ngôn ngữ',
+    slogan: 'Trò chuyện với AI được xây dựng từ đầu.',
+    window_label: 'Hạn mức 3 giờ',
+    monthly_label: 'Hạn mức hàng tháng',
+    used: 'đã dùng',
+    window_reset: 'Đặt lại mỗi 3 giờ',
+    monthly_reset: 'Đặt lại hàng tháng',
+    tokens: 'token',
+    running: 'Đang hoạt động',
+    promo_btn: 'Mã khuyến mãi',
+    promo_title: 'Nhập mã khuyến mãi',
+    promo_placeholder: 'Nhập mã',
+    promo_apply: 'Áp dụng',
+    promo_desc: 'Nhập mã khuyến mãi để nhận token thưởng hoặc tính năng đặc biệt.',
+    footer_desc: 'Dịch vụ AI được xây dựng từ đầu',
+    footer_dev: 'Phát triển bởi Qzero Co.',
+    effort_low: 'Thấp',
+    effort_mid: 'Trung bình',
+    effort_high: 'Cao',
+    linked: 'Đã liên kết',
+    not_linked: 'Chưa liên kết',
+
+    model_pure_desc: 'Nhanh và nhẹ',
+    model_equi_desc: 'Cân bằng và hàng ngày',
+    model_zin_desc: 'Suy nghĩ sâu sắc',
+    model_apex_desc: 'Mạnh nhất',
+    ai_lang_note: 'Lưu ý: AI trả lời bằng tiếng Nhật.',  }
+};
+
+var currentLang = localStorage.getItem('qstart_lang') || 'ja';
+
+function T(key) {
+  return (QS_TEXTS[currentLang] || QS_TEXTS['ja'])[key] || QS_TEXTS['ja'][key] || key;
+}
+
+function applyDir(lang) {
+  var rtl = ['ar', 'he', 'fa', 'ur'];
+  var d = rtl.indexOf(lang) >= 0 ? 'rtl' : 'ltr';
+  document.body.setAttribute('dir', d);
+  document.documentElement.setAttribute('lang', lang);
+}
+
+function setLang(lang) {
+  applyDir(lang);
+  currentLang = lang;
+  localStorage.setItem('qstart_lang', lang);
+  applyLang();
+renderHistory();
+}
+
+function applyLang() {
+  // ウェルカム画面
+  var welcome = document.getElementById('qs-welcome');
+  if (welcome) {
+    var desc = T('welcome_desc').replace(/\\n/g, '<br>');
+    welcome.innerHTML = '<h1>' + T('welcome_title') + '</h1><p>' + desc + '</p><div class="qs-status" id="qs-ai-status"><span id="qs-status-text">Equi 1 — ' + T('running') + '!</span></div>';
+  }
+  // 入力欄
+  var input = document.getElementById('qs-input');
+  if (input && !input.disabled) input.placeholder = T('input_placeholder');
+  // 送信ボタン
+  var sendBtn = document.querySelector('.qs-send');
+  if (sendBtn) sendBtn.textContent = T('send');
+  // 新しいチャット
+  var nc = document.querySelector('.qs-new-chat');
+  if (nc) nc.textContent = T('new_chat');
+  // スローガン
+  var slogan = document.querySelector('.qs-sidebar p');
+  if (slogan) slogan.textContent = T('slogan');
+  // サイドバー
+  try { document.getElementById('qs-t-logout').textContent = T('logout'); } catch(e) {}
+  try { document.getElementById('qs-t-settings').innerHTML = '⚙ ' + T('settings'); } catch(e) {}
+  try { document.getElementById('qs-t-terms').innerHTML = '📄 ' + T('terms'); } catch(e) {}
+  try { document.getElementById('qs-t-privacy').innerHTML = '🔒 ' + T('privacy'); } catch(e) {}
+  try { document.getElementById('qs-promo-link').innerHTML = '🎟 ' + T('promo_btn'); } catch(e) {}
+  // スローガン
+  try { document.getElementById('qs-t-slogan').textContent = T('slogan'); } catch(e) {}
+  // チャット履歴
+  try { document.getElementById('qs-t-history').textContent = T('history_label'); } catch(e) {}
+  // 設定リンク
+  try { document.getElementById('qs-t-settings-link').innerHTML = '⚙️ ' + T('settings'); } catch(e) {}
+  // QuizShareに戻る
+  try { document.getElementById('qs-t-back').innerHTML = '🏠 ' + T('back'); } catch(e) {}
+  // チャット履歴
+  try { document.getElementById('qs-t-history').textContent = T('history_label'); } catch(e) {}
+  // 設定パネル
+  var labelMap = ['account','model_label','effort_label','usage','lang_label'];
+  var labelById = {
+    'qs-s-account': 'account',
+    'qs-s-plan': 'plan',
+    'qs-s-model': 'model_label',
+    'qs-s-effort': 'effort_label',
+    'qs-s-account2': 'account'
+  };
+  Object.keys(labelById).forEach(function(id) {
+    var v = document.getElementById(id);
+    if (!v) return;
+    var lb = v.parentNode.querySelector('.qs-s-label');
+    if (lb) lb.textContent = T(labelById[id]);
+  });
+  // タブ名
+  var tabMap = {profile:'tab_profile', appear:'tab_appear', model:'tab_model', usage:'tab_usage', account:'tab_account'};
+  document.querySelectorAll('.qs-s-tab').forEach(function(t) {
+    var k = tabMap[t.dataset.pane];
+    if (!k) return;
+    var sp = t.querySelectorAll('span');
+    if (sp[1]) sp[1].textContent = T(k);
+  });
+  document.querySelectorAll('.qs-s-pane h3').forEach(function(h) {
+    var id = h.parentNode.id.replace('pane-','');
+    if (tabMap[id]) h.textContent = T(tabMap[id]);
+  });
+  // エフォート
+  try {
+    var effNames = {low: T('effort_low'), mid: T('effort_mid'), high: T('effort_high')};
+    document.getElementById('qs-s-effort').textContent = effNames[currentEffort || 'mid'];
+  } catch(e) {}
+  document.querySelectorAll('[data-eff]').forEach(function(btn) {
+    var e = btn.getAttribute('data-eff');
+    var icons = {low:'⚡', mid:'⚙️', high:'🔥'};
+    btn.textContent = (icons[e]||'') + T('effort_' + e);
+  });
+  // ステータス
+  try { document.getElementById('qs-status-text').textContent = 'Equi 1 — ' + T('running') + '!'; } catch(e) {}
+  // バッジ
+  var badgeTexts = {
+    'coming_2026': {ja:'2026年秋公開',en:'Fall 2026',zh:'2026年秋发布',ko:'2026년 가을 공개',fr:'Automne 2026',de:'Herbst 2026',es:'Otoño 2026',pt:'Outono 2026',ar:'خريف 2026',hi:'शरद 2026',th:'ฤดูใบไม้ร่วง 2026',vi:'Thu 2026'},
+    'available': {ja:'利用可能',en:'Available',zh:'可用',ko:'이용 가능',fr:'Disponible',de:'Verfügbar',es:'Disponible',pt:'Disponível',ar:'متاح',hi:'उपलब्ध',th:'พร้อมใช้',vi:'Có sẵn'}
+  };
+  for (var bk in badgeTexts) {
+    document.querySelectorAll('[data-i18n="'+bk+'"]').forEach(function(el) {
+      el.textContent = badgeTexts[bk][currentLang] || badgeTexts[bk]['en'];
+    });
+  }
+  // モデル説明
+  try {
+    document.getElementById('qs-desc-pure').textContent = T('model_pure_desc');
+    document.getElementById('qs-desc-equi').textContent = T('model_equi_desc');
+    document.getElementById('qs-desc-zin').textContent = T('model_zin_desc');
+    document.getElementById('qs-desc-apex').textContent = T('model_apex_desc');
+  } catch(e) {}
+  // 使用量
+  try {
+    document.getElementById('qs-s-window-title').textContent = T('window_label');
+    document.getElementById('qs-s-monthly-title').textContent = T('monthly_label');
+    document.getElementById('qs-s-reset').textContent = T('window_reset');
+  } catch(e) {}
+  // AI言語注意書き
+  try {
+    var _ln = document.getElementById('qs-ai-lang-note');
+    var _t = T('ai_lang_note');
+    _ln.textContent = _t;
+    _ln.style.display = _t ? 'block' : 'none';
+  } catch(e) {}
+  // フッター
+  try {
+    document.getElementById('qs-footer-desc').textContent = T('footer_desc');
+    document.getElementById('qs-footer-dev').textContent = T('footer_dev');
+  } catch(e) {}
+  // 使用量を再取得
+  fetchServerUsage();
+}
+
+// 初期化
+refreshUser();
+var savedLang = localStorage.getItem('qstart_lang');
+if (savedLang) {
+  currentLang = savedLang;
+  var sel = document.getElementById('qs-lang');
+  if (sel) sel.value = savedLang;
+}
+applyLang();
+
+
+async function fetchDetailedUsage() {
+  try {
+    var r = await fetch('/qstart/api/v1/usage');
+    if (!r.ok) return;
+    var d = await r.json();
+    var el = document.getElementById('qs-usage-detail');
+    if (!el) return;
+    var w = d.window;
+    var pct = w.limit > 0 ? Math.round(w.used / w.limit * 100) : 0;
+    var bonus = w.bonus > 0 ? ' +' + w.bonus.toLocaleString() + '優待により' : '';
+    el.innerHTML = '⚡ ' + w.used.toLocaleString() + ' / ' + w.limit.toLocaleString() + ' トークン (' + pct + '%)' + bonus;
+    if (d.is_linked) {
+      var m = d.monthly;
+      el.innerHTML += '<br>📊 月間: ' + m.used.toLocaleString() + ' / ' + m.limit.toLocaleString();
+    }
+  } catch(e) {}
+}
+// 30秒ごとに使用量更新
+// fetchDetailedUsage は fetchServerUsage に統合
+
+async function fetchServerUsage() {
+  try {
+    var r = await fetch('/qstart/api/v1/usage');
+    if (!r.ok) return;
+    var d = await r.json();
+    var w = d.window || {};
+    var m = d.monthly || {};
+    var stock = d.stock || 0;
+    var permW = w.permanent || 0;
+    var permM = m.permanent || 0;
+    var bonus = w.bonus || 0;
+    var n = function(x){ return (x||0).toLocaleString(); };
+
+    var wpct = w.limit > 0 ? Math.min(100, Math.round(w.used / w.limit * 100)) : 0;
+    var mpct = m.limit > 0 ? Math.min(100, Math.round(m.used / m.limit * 100)) : 0;
+
+    // --- 入力欄の下: 80%以上のときだけ警告として出す ---
+    var ug = document.getElementById('qs-usage');
+    if (ug) {
+      if (wpct >= 80) {
+        ug.style.display = 'block';
+        ug.style.color = wpct >= 95 ? '#c0392b' : '#b8860b';
+        ug.textContent = (wpct >= 95 ? '⚠️ ' : '') + '残り ' + n(w.remaining) + ' トークン (' + wpct + '% 使用)';
+      } else {
+        ug.style.display = 'none';
+      }
+    }
+
+    // --- 3時間枠 ---
+    var set = function(id, v, prop){
+      var e = document.getElementById(id);
+      if (!e) return;
+      if (prop === 'w') e.style.width = v; else e.textContent = v;
+    };
+    set('qs-s-bar-window', wpct + '%', 'w');
+    set('qs-s-pct-window', wpct + '%');
+    set('qs-s-window-num', n(w.used) + ' / ' + n(w.limit));
+    var wd = document.getElementById('qs-s-window-detail');
+    if (wd) {
+      var base = (w.limit || 0) - permW - bonus;
+      var rows = ['基本枠　　　　' + n(base)];
+      if (permW > 0) rows.push('<span style="color:#b8860b;">優待(持続性アリ) +' + n(permW) + '</span>');
+      if (bonus > 0) rows.push('<span style="color:#b8860b;">優待ボーナス　 +' + n(bonus) + '</span>');
+      rows.push('<b>残り　　　　　' + n(w.remaining) + '</b>');
+      wd.innerHTML = rows.join('<br>');
+    }
+
+    // --- 月間枠 ---
+    set('qs-s-bar-monthly', mpct + '%', 'w');
+    set('qs-s-pct-monthly', mpct + '%');
+    set('qs-s-monthly-num', n(m.used) + ' / ' + n(m.limit));
+    var md = document.getElementById('qs-s-monthly-detail');
+    if (md) {
+      if (m.limit > 0) {
+        var mbase = (m.limit || 0) - permM;
+        var mr = ['基本枠　　　　' + n(mbase)];
+        if (permM > 0) mr.push('<span style="color:#b8860b;">優待(持続性アリ) +' + n(permM) + '</span>');
+        mr.push('<b>残り　　　　　' + n(m.remaining) + '</b>');
+        md.innerHTML = mr.join('<br>');
+      } else {
+        md.innerHTML = '<span style="color:#a09a8a;">社員アカウントと連携すると月間枠が使えます</span>';
+      }
+    }
+
+    // --- 予備タンク(持続性ナシ) ---
+    var ss = document.getElementById('qs-s-stock-sec');
+    if (ss) {
+      if (stock > 0) {
+        ss.style.display = 'block';
+        set('qs-s-stock-big', n(stock) + ' トークン');
+        set('qs-s-stock-num', '');
+      } else {
+        ss.style.display = 'none';
+      }
+    }
+
+    // --- まとめ ---
+    var be = document.getElementById('qs-s-bonus');
+    if (be) {
+      var tot = permW + permM + stock + bonus;
+      if (tot > 0) {
+        be.style.display = 'block';
+        var lines = ['🎟 <b>優待でもらったトークン</b>'];
+        if (permW > 0) lines.push('　3時間枠 +' + n(permW) + '（毎回復活）');
+        if (permM > 0) lines.push('　月間枠 +' + n(permM) + '（毎月復活）');
+        if (stock > 0) lines.push('　予備タンク ' + n(stock) + '（使い切りで終了）');
+        if (bonus > 0) lines.push('　ボーナス +' + n(bonus));
+        be.innerHTML = lines.join('<br>');
+      } else {
+        be.style.display = 'none';
+      }
+    }
+  } catch(e) {}
+}
+setTimeout(fetchServerUsage, 500);
+setInterval(fetchServerUsage, 60000);
+
+function openPromoModal() {
+  document.getElementById('qs-promo-modal').style.display = 'flex';
+  document.getElementById('qs-promo-input').value = '';
+  document.getElementById('qs-promo-msg').innerHTML = '';
+}
+function closePromoModal() {
+  document.getElementById('qs-promo-modal').style.display = 'none';
+}
+async function usePromoCode() {
+  var code = document.getElementById('qs-promo-input').value.trim();
+  if (!code) { document.getElementById('qs-promo-msg').innerHTML = '<div style="color:#c44;font-size:13px;">コードを入力してください</div>'; return; }
+  try {
+    var r = await fetch('/qstart/api/v1/promo/use', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({code: code})
+    });
+    var d = await r.json();
+    if (d.ok) {
+      document.getElementById('qs-promo-msg').innerHTML = '<div style="color:#2a7;font-size:13px;padding:8px;background:#e8f5e9;border-radius:6px;">✅ ' + d.message + '</div>';
+      setTimeout(function() { closePromoModal(); }, 2000);
+    } else {
+      document.getElementById('qs-promo-msg').innerHTML = '<div style="color:#c44;font-size:13px;padding:8px;background:#fce4ec;border-radius:6px;">❌ ' + d.error + '</div>';
+    }
+  } catch(e) {
+    document.getElementById('qs-promo-msg').innerHTML = '<div style="color:#c44;font-size:13px;">通信エラー</div>';
+  }
+}
+boot();
+</script>
+
+<!-- 優待コードモーダル -->
+<div id="qs-promo-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;">
+  <div style="background:#fff;border-radius:16px;padding:32px;max-width:400px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <h3 style="font-size:18px;color:#14213d;margin:0;">🎟 優待コード入力</h3>
+      <button onclick="closePromoModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888;">✕</button>
+    </div>
+    <div id="qs-promo-msg" style="margin-bottom:12px;"></div>
+    <input type="text" id="qs-promo-input" placeholder="コードを入力（例: QS-A1B2C3D4）" style="width:100%;padding:12px;border:1px solid #d0ccc0;border-radius:8px;font-size:15px;margin-bottom:12px;box-sizing:border-box;">
+    <button onclick="usePromoCode()" style="width:100%;padding:12px;background:#14213d;color:#fff;border:none;border-radius:8px;font-size:15px;cursor:pointer;font-weight:600;">適用する</button>
+    <div style="margin-top:16px;font-size:12px;color:#888;line-height:1.6;">
+      優待コードを入力すると、トークン追加や特別な機能が利用できます。コードは管理者から発行されます。
+    </div>
+  </div>
+</div>
+
+<!-- ログインモーダル -->
+<div id="qs-login-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:300; align-items:center; justify-content:center;">
+  <div style="background:#fff; border-radius:16px; padding:30px; max-width:400px; width:90%; position:relative;">
+    <button onclick="closeLogin()" style="position:absolute; top:12px; right:16px; background:none; border:none; font-size:22px; cursor:pointer; color:#666;">×</button>
+    <h2 style="font-size:20px; margin-bottom:16px; color:#14213d;">Qstart にログイン</h2>
+
+    <div style="display:flex; gap:0; margin-bottom:16px; border:1px solid #d0ccc0; border-radius:8px; overflow:hidden;">
+      <button onclick="setLoginTab('login')" id="qs-tab-login" style="flex:1; padding:8px; border:none; background:#14213d; color:#fff; font-size:13px; cursor:pointer;">ログイン</button>
+      <button onclick="setLoginTab('register')" id="qs-tab-reg" style="flex:1; padding:8px; border:none; background:#fff; color:#333; font-size:13px; cursor:pointer;">新規作成</button>
+    </div>
+
+    <div id="qs-type-row" style="display:flex; gap:0; margin-bottom:12px; border:1px solid #d0ccc0; border-radius:8px; overflow:hidden;">
+      <button onclick="setLoginType('qstart')" id="qs-type-qstart" style="flex:1; padding:6px; border:none; background:#14213d; color:#fff; font-size:12px; cursor:pointer;">Qstartアカウント</button>
+      <button onclick="setLoginType('staff')" id="qs-type-staff" style="flex:1; padding:6px; border:none; background:#fff; color:#333; font-size:12px; cursor:pointer;">社員アカウント</button>
+    </div>
+
+    <div id="qs-reg-fields" style="display:none;">
+      <div id="qs-signup-closed" style="display:none; background:#fdf0ee; border:1px solid #f0d0c8;
+        border-radius:9px; padding:12px 14px; font-size:13px; color:#a3211a; line-height:1.7; margin-bottom:12px;"></div>
+
+      <div id="qs-invite-row" style="display:none; margin-bottom:10px;">
+        <input id="qs-reg-invite" placeholder="招待コード（QS-XXXXXX）" maxlength="20"
+          style="width:100%; padding:10px; border:1px solid #c9a227; border-radius:8px;
+          font-size:14px; text-transform:uppercase; background:#fdfaf2;">
+        <div id="qs-invite-hint" style="font-size:11px; color:#8a8270; margin-top:4px;">
+          コードをお持ちの方は入力してください。</div>
+      </div>
+
+      <input id="qs-reg-nick" placeholder="ニックネーム（呼ばれたい名前）" style="width:100%; padding:10px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px; margin-bottom:8px;">
+
+      <div id="qs-email-row" style="display:flex; gap:6px; margin-bottom:8px;">
+        <input id="qs-reg-email" placeholder="メールアドレス" type="email" style="flex:1; padding:10px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px;">
+        <button onclick="sendCode()" id="qs-send-code-btn" style="padding:8px 14px; background:#14213d; color:#fff; border:none; border-radius:8px; font-size:12px; cursor:pointer; white-space:nowrap;">コード送信</button>
+      </div>
+      <div id="qs-email-opt" style="display:none; font-size:11px; color:#8a8270; margin:-4px 0 8px 2px;">
+        メールアドレスは任意です。入力するとパスワードを忘れたときに復旧できます。</div>
+      <div id="qs-code-field" style="display:none; margin-bottom:8px;">
+        <input id="qs-reg-code" placeholder="6桁の認証コード" maxlength="6" style="width:100%; padding:10px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px; text-align:center; letter-spacing:8px; font-weight:bold;">
+        <div style="font-size:11px; color:#8a8270; margin-top:4px;">メールに届いた6桁のコードを入力してね</div>
+      </div>
+      <input id="qs-reg-birthday" type="date" style="width:100%; padding:10px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px; margin-bottom:8px; color:#333;">
+      <div style="font-size:11px; color:#8a8270; margin:-4px 0 8px 4px;">
+        生年月日<span id="qs-age-hint"></span></div>
+      <select id="qs-reg-purpose" style="width:100%; padding:10px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px; margin-bottom:8px; background:#fff; color:#333;">
+        <option value="" disabled selected>用途を選んでね</option>
+        <option value="study">勉強・学習</option>
+        <option value="fun">遊び・趣味</option>
+        <option value="work">仕事</option>
+        <option value="dev">開発・研究</option>
+        <option value="other">その他</option>
+      </select>
+    </div>
+    <input id="qs-login-id" placeholder="ユーザーID" style="width:100%; padding:10px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px; margin-bottom:8px;">
+    <input id="qs-login-pw" type="password" placeholder="パスワード" style="width:100%; padding:10px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px; margin-bottom:12px;">
+    <div id="qs-turnstile-box" style="display:none; margin-bottom:12px;">
+      <div id="qs-turnstile"></div>
+    </div>
+    <div id="qs-login-terms" style="display:none; margin-bottom:12px; font-size:12px; color:#8a8270;">
+      <label><input type="checkbox" id="qs-agree"> <a href="/qstart/terms" target="_blank">利用規約</a>と<a href="/qstart/privacy" target="_blank">プライバシーポリシー</a>に同意する</label>
+    </div>
+    <button id="qs-submit-btn" onclick="doLogin()" style="width:100%; padding:10px; background:#14213d; color:#fff; border:none; border-radius:8px; font-size:14px; cursor:pointer; font-weight:600;">ログイン</button>
+    <div id="qs-login-error" style="color:#e24b4a; font-size:13px; margin-top:8px; text-align:center;"></div>
+    <div id="qs-forgot-row" style="text-align:center; margin-top:12px;">
+      <a onclick="openForgot()" style="font-size:12.5px; color:#8a8270; cursor:pointer; text-decoration:underline;">パスワードを忘れた方</a>
+    </div>
+    <div id="qs-forgot-box" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid #eee;">
+      <div style="font-size:12px; color:#8a8270; margin-bottom:8px;">
+        登録したメールアドレスに再設定用のリンクを送ります。</div>
+      <div style="display:flex; gap:6px;">
+        <input id="qs-forgot-email" type="email" placeholder="メールアドレス"
+          style="flex:1; padding:9px; border:1px solid #d0ccc0; border-radius:8px; font-size:14px;">
+        <button onclick="sendForgot()" id="qs-forgot-btn"
+          style="padding:8px 14px; background:#14213d; color:#fff; border:none; border-radius:8px; font-size:12px; cursor:pointer; white-space:nowrap;">送信</button>
+      </div>
+      <div id="qs-forgot-msg" style="font-size:12px; margin-top:8px;"></div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

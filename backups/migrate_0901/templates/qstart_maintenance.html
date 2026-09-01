@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>メンテナンス中 — Qstart</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;background:#14213d;
+  color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.box{background:#fff;color:#14213d;border-radius:18px;padding:40px 34px;max-width:460px;
+  width:100%;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.4)}
+.ic{font-size:48px;margin-bottom:16px}
+.logo{font-size:22px;font-weight:700;margin-bottom:4px}.logo span{color:#b8860b}
+.sub{font-size:11px;color:#a09a8a;margin-bottom:24px}
+h1{font-size:19px;margin-bottom:12px}
+p{font-size:13.5px;color:#5c5647;line-height:1.9;margin-bottom:8px}
+.time{background:#faf9f5;border:1px solid #ece9e2;border-radius:10px;padding:14px;
+  margin:18px 0;font-size:13.5px;color:#14213d;line-height:1.9}
+.time b{color:#b8860b}
+a{display:inline-block;margin-top:16px;padding:10px 20px;background:#14213d;color:#fff;
+  border-radius:9px;text-decoration:none;font-size:13.5px}
+.note{font-size:11.5px;color:#a09a8a;margin-top:20px;line-height:1.8}
+</style></head><body>
+<div class="box">
+  <div class="ic">🔧</div>
+  <div class="logo">Q<span>start</span></div>
+  <div class="sub">by Qzero会社</div>
+  <h1>ただいまメンテナンス中です</h1>
+  <p>{{ m.title or 'システムの更新作業を行っています。' }}</p>
+  {% if m.starts_at %}
+  <div class="time">
+    <b>{{ m.starts_at }}</b> 〜 <b>{{ m.ends_at }}</b>
+  </div>
+  {% endif %}
+  {% if m.body %}<p style="white-space:pre-wrap;">{{ m.body }}</p>{% endif %}
+  <p>ご不便をおかけしますが、しばらくお待ちください。</p>
+  <div id="recovered" style="display:none;background:#e8f5e9;color:#2e7d32;
+  border-radius:10px;padding:14px;margin:16px 0;font-size:14px;font-weight:600;">
+  ✅ メンテナンスが終了しました。まもなく戻ります…
+</div>
+<a href="/">QuizShareに戻る</a>
+  <div class="note">
+    最新の状況は<a href="/qstart/status" style="background:none;color:#b8860b;padding:0;">稼働状況ページ</a>でご確認いただけます。
+  </div>
+</div>
+<script>
+// 元いたページを覚えておく
+var BACK = sessionStorage.getItem('qs_back') || '/qstart';
+try {
+  if (document.referrer && document.referrer.indexOf(location.host) > 0) {
+    var r = new URL(document.referrer).pathname;
+    if (r.indexOf('/qstart') === 0 && r !== '/qstart/maintenance') {
+      BACK = r; sessionStorage.setItem('qs_back', r);
+    }
+  }
+} catch(e) {}
+
+var checking = false;
+async function checkRecovered() {
+  if (checking) return;
+  checking = true;
+  try {
+    var r = await fetch('/qstart/api/v1/maintenance?t=' + Date.now(), {cache:'no-store'});
+    var d = await r.json();
+    if (d.ok && !d.active) {
+      // 復旧した → 元いたページに戻る
+      var el = document.getElementById('recovered');
+      if (el) el.style.display = 'block';
+      setTimeout(function(){ location.href = BACK; }, 1500);
+    }
+  } catch(e) {}
+  checking = false;
+}
+setInterval(checkRecovered, 60000);   // 1分ごと
+setTimeout(checkRecovered, 3000);     // 開いて3秒後にも1回
+document.addEventListener('visibilitychange', function(){
+  if (!document.hidden) checkRecovered();   // タブに戻ったとき
+});
+</script>
+</body></html>

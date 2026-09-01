@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block title %}お知らせ - {{ group.name }}{% endblock %}
+{% block content %}
+<div style="max-width:1100px; margin:0 auto; padding:20px 16px;">
+  <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+    <a href="/group" style="color:#9CA3AF; text-decoration:none; font-size:14px;">← クイズ一覧へ</a>
+    <h1 style="margin:0; font-size:22px; font-weight:900;">📨 お知らせ</h1>
+    <button onclick="loadNotices()" style="margin-left:auto; background:#f3f4f6; border:none; border-radius:8px; padding:6px 14px; cursor:pointer; font-size:13px;">🔄 更新</button>
+  </div>
+
+  <div style="display:flex; gap:0; background:white; border-radius:16px; box-shadow:0 2px 16px rgba(0,0,0,0.08); overflow:hidden; min-height:600px;">
+    
+    <!-- 左：一覧 -->
+    <div id="notice-list-panel" style="width:360px; flex-shrink:0; border-right:1px solid #f3f4f6; overflow-y:auto; max-height:80vh;">
+      <div style="background:linear-gradient(135deg,#7c3aed,#4f46e5); padding:14px 16px; display:flex; align-items:center; gap:8px;">
+        <span style="color:white; font-weight:900;">📬 受信トレイ</span>
+        <span id="notice-count" style="background:rgba(255,255,255,0.25); color:white; border-radius:999px; padding:1px 8px; font-size:12px; margin-left:auto;"></span>
+      </div>
+      <div id="notice-list">
+        <div style="padding:32px; text-align:center; color:#9CA3AF;">読み込み中...</div>
+      </div>
+    </div>
+
+    <!-- 右：本文 -->
+    <div id="notice-detail-panel" style="flex:1; overflow-y:auto; max-height:80vh;">
+      <div id="notice-empty" style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#9CA3AF; padding:48px;">
+        <div style="font-size:64px; margin-bottom:16px;">📭</div>
+        <div style="font-weight:bold; font-size:16px;">お知らせを選んでください</div>
+      </div>
+      <div id="notice-detail" style="display:none; padding:28px;">
+        <div style="margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid #f3f4f6;">
+          <h2 id="detail-title" style="margin:0 0 12px; font-size:20px; font-weight:900; color:#1a1a1a;"></h2>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div id="detail-avatar" style="width:40px; height:40px; border-radius:50%; background:linear-gradient(135deg,#7c3aed,#4f46e5); display:flex; align-items:center; justify-content:center; color:white; font-weight:900; font-size:16px; flex-shrink:0;"></div>
+            <div>
+              <div id="detail-teacher" style="font-weight:900; font-size:14px; color:#374151;"></div>
+              <div id="detail-date" style="font-size:12px; color:#9CA3AF;"></div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; margin-bottom:16px;" id="detail-actions"></div>
+        <div id="detail-body" style="white-space:pre-wrap; line-height:1.9; font-size:15px; color:#374151;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.notice-item { padding:14px 16px; border-bottom:1px solid #f9f9f9; cursor:pointer; transition:background 0.1s; }
+.notice-item:hover { background:#f9f5ff; }
+.notice-item.active { background:#ede9fe; border-left:3px solid #7c3aed; }
+@media (max-width:640px) {
+  #notice-list-panel { width:100%; border-right:none; }
+  #notice-detail-panel { display:none; }
+  #notice-detail-panel.mobile-show { display:block; position:fixed; inset:0; background:white; z-index:100; overflow-y:auto; padding:16px; }
+}
+</style>
+
+<!-- 編集モーダル -->
+<div id="edit-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:2000; align-items:center; justify-content:center; padding:20px;">
+  <div style="background:white; border-radius:16px; padding:24px; max-width:500px; width:100%;">
+    <h3 style="margin:0 0 16px; font-size:18px;">✏️ お知らせを編集</h3>
+    <input type="hidden" id="edit-notice-id">
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px; font-weight:900; color:#374151; display:block; margin-bottom:4px;">タイトル</label>
+      <input type="text" id="edit-title" style="width:100%; padding:10px; border:2px solid #e5e7eb; border-radius:10px; font-size:14px; box-sizing:border-box;">
+    </div>
+    <div style="margin-bottom:16px;">
+      <label style="font-size:12px; font-weight:900; color:#374151; display:block; margin-bottom:4px;">本文</label>
+      <textarea id="edit-body" rows="5" style="width:100%; padding:10px; border:2px solid #e5e7eb; border-radius:10px; font-size:14px; box-sizing:border-box; resize:vertical;"></textarea>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button onclick="saveEditNotice()" style="flex:1; padding:12px; background:#7c3aed; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">💾 保存</button>
+      <button onclick="document.getElementById('edit-modal').style.display='none'" style="flex:1; padding:12px; background:#f3f4f6; color:#333; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<script>
+async function saveEditNotice() {
+  const id = document.getElementById('edit-notice-id').value;
+  const title = document.getElementById('edit-title').value.trim();
+  const body = document.getElementById('edit-body').value.trim();
+  if (!title || !body) { alert('タイトルと本文を入力してね'); return; }
+  const r = await fetch('/api/teacher/notice/' + id + '/edit', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({title, body})
+  });
+  const data = await r.json();
+  if (data.ok) {
+    document.getElementById('edit-modal').style.display = 'none';
+    await loadNotices();
+    // 編集後も同じお知らせを選択状態に
+    const idx = notices.findIndex(n => String(n.id) === String(id));
+    if (idx >= 0) selectNotice(idx);
+  } else { alert(data.error || 'エラー'); }
+}
+</script>
+
+<script>
+let notices = [];
+let selectedIdx = -1;
+
+async function loadNotices() {
+  const r = await fetch('/api/group/notices');
+  const data = await r.json();
+  if (!data.ok) return;
+  notices = data.notices;
+  renderList();
+}
+
+function renderList() {
+  const list = document.getElementById('notice-list');
+  document.getElementById('notice-count').textContent = notices.length + '件';
+  if (notices.length === 0) {
+    list.innerHTML = '<div style="padding:48px 16px; text-align:center; color:#9CA3AF;"><div style="font-size:48px; margin-bottom:12px;">📭</div><div>まだありません</div></div>';
+    return;
+  }
+  list.innerHTML = notices.map((n, i) => `
+    <div class="notice-item ${i === selectedIdx ? 'active' : ''}" onclick="selectNotice(${i})">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div style="width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg,#7c3aed,#4f46e5); display:flex; align-items:center; justify-content:center; color:white; font-weight:900; font-size:13px; flex-shrink:0;">${esc(n.teacher_name[0])}</div>
+          <span style="font-weight:900; font-size:13px; color:#374151;">${esc(n.teacher_name)}</span>
+        </div>
+        <span style="font-size:11px; color:#9CA3AF;">${esc(n.notice_date)}</span>
+      </div>
+      <div style="font-weight:bold; font-size:13px; color:#1a1a1a; margin-bottom:2px; padding-left:40px;">${esc(n.title)}</div>
+      <div style="font-size:12px; color:#9CA3AF; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding-left:40px;">${esc(n.body.substring(0,60))}${n.body.length>60?'...':''}</div>
+    </div>
+  `).join('');
+}
+
+let isTeacher = false;
+let myTeacherId = -1;
+
+async function checkTeacher() {
+  try {
+    const r = await fetch('/api/teacher/status');
+    const data = await r.json();
+    if (data.ok && data.is_teacher) {
+      isTeacher = true;
+    }
+  } catch(e) {}
+}
+
+function selectNotice(i) {
+  selectedIdx = i;
+  renderList();
+  const n = notices[i];
+  document.getElementById('detail-title').textContent = n.title;
+  document.getElementById('detail-avatar').textContent = n.teacher_name[0];
+  document.getElementById('detail-teacher').textContent = n.teacher_name;
+  const raw = (n.created_at||'').replace(' ','T');
+  const jst = raw ? new Date(raw + '+00:00').toLocaleString('ja-JP', {timeZone:'Asia/Tokyo', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'}) : '';
+  document.getElementById('detail-date').textContent = n.notice_date + '  ·  ' + jst;
+  document.getElementById('detail-body').textContent = n.body;
+  document.getElementById('notice-empty').style.display = 'none';
+  document.getElementById('notice-detail').style.display = 'block';
+
+  // 先生なら編集・削除ボタン表示
+  const actions = document.getElementById('detail-actions');
+  if (isTeacher) {
+    actions.innerHTML = `
+      <button onclick="editNotice(${i})" style="padding:8px 16px; background:#f59e0b; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold; font-size:13px;">✏️ 編集</button>
+      <button onclick="deleteNotice(${i})" style="padding:8px 16px; background:#ef4444; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold; font-size:13px;">🗑️ 削除</button>
+    `;
+  } else {
+    actions.innerHTML = '';
+  }
+
+  if (window.innerWidth <= 640) {
+    document.getElementById('notice-detail-panel').classList.add('mobile-show');
+  }
+}
+
+async function deleteNotice(i) {
+  if (!confirm('このお知らせを削除しますか？')) return;
+  const n = notices[i];
+  const r = await fetch('/api/teacher/notice/' + n.id + '/delete', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}
+  });
+  const data = await r.json();
+  if (data.ok) {
+    notices.splice(i, 1);
+    selectedIdx = -1;
+    document.getElementById('notice-empty').style.display = 'flex';
+    document.getElementById('notice-detail').style.display = 'none';
+    renderList();
+  } else { alert(data.error || 'エラー'); }
+}
+
+function editNotice(i) {
+  const n = notices[i];
+  document.getElementById('edit-title').value = n.title;
+  document.getElementById('edit-body').value = n.body;
+  document.getElementById('edit-notice-id').value = n.id;
+  document.getElementById('edit-modal').style.display = 'flex';
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+checkTeacher();
+loadNotices();
+setInterval(loadNotices, 30000);
+</script>
+{% endblock %}

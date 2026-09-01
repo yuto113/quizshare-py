@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% block title %}クイズセット - クイズシェア{% endblock %}
+
+{% block content %}
+<div class="container">
+  <h1 class="page-title">📚 クイズセット</h1>
+  <p class="page-subtitle">複数のクイズをまとめて連続出題できるよ</p>
+  {% if not group.view_only %}
+  <button id="btn-create-set" class="btn btn-primary" style="margin-bottom:20px;">+ 新しいセットを作る</button>
+  {% endif %}
+  <div id="sets-list"><p style="color:#9CA3AF;">読み込み中...</p></div>
+</div>
+
+<div class="modal-overlay" id="modal-create-set" style="display:none;">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span>新しいセット</span>
+      <button class="modal-close" onclick="closeModal('modal-create-set')">x</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">セット名</label>
+        <input type="text" id="set-name" class="form-control" placeholder="例: 今週の復習" maxlength="50">
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+        <input type="text" id="set-search" class="form-control" placeholder="🔍 問題を検索..." oninput="renderSetQuizList(this.value, document.getElementById('set-tag-filter').value)" style="flex:1;min-width:150px;font-size:0.9rem;padding:8px 12px;">
+        <select id="set-tag-filter" class="form-control" onchange="renderSetQuizList(document.getElementById('set-search').value,this.value)" style="width:auto;font-size:0.9rem;padding:8px 12px;"><option value="all">🏷️ すべてのタグ</option></select>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
+        <button type="button" onclick="selectAllQuizzes()" class="btn btn-secondary" style="font-size:0.8rem;padding:4px 12px;">✅ 全選択</button>
+        <button type="button" onclick="clearAllQuizzes()" class="btn btn-secondary" style="font-size:0.8rem;padding:4px 12px;">❌ 全解除</button>
+        <span id="selected-count" style="font-size:0.82rem;color:#aaa;font-weight:bold;margin-left:auto;">0問選択中</span>
+      </div>
+      <div id="quiz-checklist" style="max-height:320px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:12px;padding:4px;"></div>
+      <button id="btn-save-set" class="btn btn-primary btn-block" style="margin-top:12px;">💾 保存する</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var allQuizzes = [];
+
+function loadAll() {
+  window.api.get('/api/sets').then(function(s) {
+    window.api.get('/api/quizzes').then(function(qz) {
+      allQuizzes = qz.quizzes;
+      renderSets(s.sets);
+      updateSetTagFilter();
+    });
+  }).catch(function(err) {
+    window.toast(err.message, 'error');
+  });
+}
+
+function renderSets(sets) {
+  var list = document.getElementById('sets-list');
+  if (sets.length === 0) {
+    list.innerHTML = '<p style="text-align:center; color:#9CA3AF; padding:40px;">まだセットがないよ</p>';
+    return;
+  }
+  var html = '';
+  for (var i = 0; i < sets.length; i++) {
+    var s = sets[i];
+    html += '<div style="background:#fff; border:1px solid #E5E7EB; border-radius:16px; padding:16px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">';
+    html += '<div><div style="font-weight:900; font-size:16px;">' + escapeHtml(s.name) + '</div>';
+    html += '<div style="font-size:12px; color:#9CA3AF;">' + s.count + '問</div></div>';
+    html += '<div style="display:flex; gap:6px;">';
+    html += '<button class="btn btn-primary play-btn" data-id="' + s.id + '" data-ids="' + escapeHtml(s.quiz_ids.join(',')) + '" style="font-size:12px; padding:6px 12px;">▶ 開始</button>';
+    html += '<button class="btn del-btn" data-id="' + s.id + '" style="font-size:12px; padding:6px 12px; background:#FEE2E2; color:#DC2626;">削除</button>';
+    html += '</div></div>';
+  }
+  list.innerHTML = html;
+
+  document.querySelectorAll('.play-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var ids = btn.dataset.ids.split(',').filter(function(x) { return x; });
+      if (ids.length === 0) { window.toast('クイズがないよ', 'error'); return; }
+      window.location.href = '/answer/' + encodeURIComponent(ids[0]) + '?set=' + encodeURIComponent(btn.dataset.ids) + '&idx=0';
+    });
+  });
+
+  document.querySelectorAll('.del-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      if (!confirm('削除する?')) return;
+      window.api.del('/api/sets/' + encodeURIComponent(btn.dataset.id)).then(function() {
+        window.toast('削除したよ', 'success');
+        loadAll();
+      }).catch(function(err) { window.toast(err.message, 'error'); });
+    });
+  });
+}
+
+var btnCreate = document.getElementById('btn-create-set');
+if (btnCreate) {
+  btnCreate.addEventListener('click', function() {
+    document.getElementById('set-name').value = '';
+    renderSetQuizList('', 'all');
+    window.openModal('modal-create-set');
+  });
+}
+
+// タグフィルターを更新
+function updateSetTagFilter() {
+  const allTags = new Set();
+  allQuizzes.forEach(q => (q.tags||[]).forEach(t => allTags.add(t)));
+  const sel = document.getElementById('set-tag-filter');
+  sel.innerHTML = '<option value="all">🏷️ すべてのタグ</option>' +
+    Array.from(allTags).sort().map(t =>
+      `<option value="${escapeHtml(t)}">#${escapeHtml(t)}</option>`
+    ).join('');
+}
+
+// クイズ一覧を描画
+function renderSetQuizList(search, tagFilter) {
+  search = (search || '').toLowerCase();
+  tagFilter = tagFilter || 'all';
+
+  let quizzes = allQuizzes.slice();
+
+  // タグフィルター
+  if (tagFilter !== 'all') {
+    quizzes = quizzes.filter(q => (q.tags||[]).includes(tagFilter));
+  }
+
+  // 検索フィルター
+  if (search) {
+    quizzes = quizzes.filter(q =>
+      q.question.toLowerCase().includes(search) ||
+      (q.name||'').toLowerCase().includes(search) ||
+      (q.tags||[]).some(t => t.toLowerCase().includes(search))
+    );
+  }
+
+  const checklist = document.getElementById('quiz-checklist');
+  if (quizzes.length === 0) {
+    checklist.innerHTML = '<div style="text-align:center;color:#aaa;padding:24px;">該当するクイズがありません</div>';
+    return;
+  }
+
+  const selectedIds = new Set(
+    Array.from(document.querySelectorAll('.qcb:checked')).map(c => c.value)
+  );
+
+  checklist.innerHTML = quizzes.map(q => {
+    const acc = q.attempts > 0 ? Math.round(q.corrects/q.attempts*100) : null;
+    const accColor = acc === null ? '#aaa' : acc >= 70 ? '#10b981' : acc >= 40 ? '#f59e0b' : '#ef4444';
+    const accText = acc === null ? '未挑戦' : acc + '%正解';
+    const tags = (q.tags||[]).slice(0,3).map(t => `<span style="background:#f0f0ff;color:#667eea;border-radius:4px;padding:1px 6px;font-size:0.72rem;">#${escapeHtml(t)}</span>`).join('');
+    const checked = selectedIds.has(q.id) ? 'checked' : '';
+    return `
+      <label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;cursor:pointer;border-radius:8px;transition:background 0.15s;" onmouseover="this.style.background='#f5f5ff'" onmouseout="this.style.background=''">
+        <input type="checkbox" class="qcb" value="${q.id}" ${checked}
+          onchange="updateSelectedCount()"
+          style="width:18px;height:18px;margin-top:3px;flex-shrink:0;accent-color:#667eea;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:0.9rem;font-weight:bold;color:#333;margin-bottom:3px;line-height:1.4;">${escapeHtml(q.question.slice(0,60))}${q.question.length>60?'…':''}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+            ${tags}
+            <span style="font-size:0.75rem;color:${accColor};font-weight:bold;">${accText}</span>
+            ${q.attempts > 0 ? `<span style="font-size:0.72rem;color:#aaa;">${q.attempts}人挑戦</span>` : ''}
+          </div>
+        </div>
+      </label>`;
+  }).join('');
+
+  updateSelectedCount();
+}
+
+function updateSelectedCount() {
+  const cnt = document.querySelectorAll('.qcb:checked').length;
+  const el = document.getElementById('selected-count');
+  if (el) {
+    el.textContent = cnt + '問選択中';
+    el.style.color = cnt > 0 ? '#667eea' : '#aaa';
+  }
+}
+
+function selectAllQuizzes() {
+  document.querySelectorAll('.qcb').forEach(c => c.checked = true);
+  updateSelectedCount();
+}
+
+function clearAllQuizzes() {
+  document.querySelectorAll('.qcb').forEach(c => c.checked = false);
+  updateSelectedCount();
+}
+
+document.getElementById('btn-save-set').addEventListener('click', function() {
+  var name = document.getElementById('set-name').value.trim();
+  var ids = Array.from(document.querySelectorAll('.qcb:checked')).map(function(c) { return c.value; });
+  if (!name) { window.toast('セット名を入れてね', 'error'); return; }
+  if (ids.length === 0) { window.toast('クイズを選んでね', 'error'); return; }
+  window.api.post('/api/sets', { name: name, quiz_ids: ids }).then(function() {
+    window.toast('保存したよ', 'success');
+    window.closeModal('modal-create-set');
+    loadAll();
+  }).catch(function(err) { window.toast(err.message, 'error'); });
+});
+
+loadAll();
+setInterval(loadAll, 10000);
+</script>
+{% endblock %}

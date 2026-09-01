@@ -1,0 +1,1335 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Qstart 管理者</title>
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif; background:#f7f6f2; color:#2b2820; }
+.hd { background:#14213d; color:#fff; padding:14px 22px; display:flex; align-items:center; gap:14px; }
+.hd .logo { font-size:18px; font-weight:700; } .hd .logo span { color:#b8860b; }
+.hd .badge { font-size:11px; background:#b8860b; padding:3px 8px; border-radius:20px; }
+.hd a { margin-left:auto; color:#aab; font-size:13px; text-decoration:none; }
+.tabs { display:flex; flex-wrap:wrap; gap:2px; background:#fff; padding:0 16px; border-bottom:1px solid #e8e4da; }
+/* ソース切替バー */
+.srcbar { display:flex; gap:6px; background:#14213d; padding:8px 16px; align-items:center; }
+.srcbtn { padding:7px 18px; border-radius:20px; font-size:13px; cursor:pointer;
+  background:rgba(255,255,255,.08); color:#aab; border:1px solid transparent;
+  display:flex; align-items:center; gap:6px; white-space:nowrap; transition:.15s; }
+.srcbtn:hover { background:rgba(255,255,255,.16); color:#fff; }
+.srcbtn.on { background:#b8860b; color:#fff; font-weight:600; }
+.srcbtn.dim { opacity:.35; cursor:not-allowed; }
+.srcbtn.dim:hover { background:rgba(255,255,255,.08); color:#aab; }
+.srcbtn .n { font-size:11px; opacity:.8; }
+.srcnote { font-size:11px; color:#8a93a8; margin-left:auto; }
+@media (max-width:600px){
+  .srcbar { padding:7px 10px; gap:4px; overflow-x:auto; }
+  .srcbtn { padding:6px 12px; font-size:12px; }
+  .srcnote { display:block; width:100%; margin:4px 0 0; font-size:10.5px; }
+}
+.tab { padding:13px 16px; font-size:14px; color:#7a7362; cursor:pointer; white-space:nowrap; border-bottom:2px solid transparent; }
+.tab:hover { color:#14213d; }
+.tab.active { color:#14213d; font-weight:600; border-bottom-color:#b8860b; }
+.wrap { padding:24px; max-width:1200px; margin:0 auto; }
+.pane { display:none; } .pane.active { display:block; }
+h2 { font-size:17px; margin-bottom:16px; color:#14213d; }
+.cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; margin-bottom:24px; }
+.card { background:#fff; border:1px solid #ece9e2; border-radius:12px; padding:16px; }
+.card .k { font-size:11px; color:#8a8270; margin-bottom:6px; }
+.card .v { font-size:24px; font-weight:700; color:#14213d; }
+table { width:100%; background:#fff; border-radius:12px; overflow:hidden; border-collapse:collapse; font-size:13px; }
+th { background:#faf9f5; padding:11px; text-align:left; color:#7a7362; font-size:12px; font-weight:600; }
+td { padding:11px; border-top:1px solid #f2efe8; }
+input,select,textarea { padding:8px 11px; border:1px solid #ddd8cc; border-radius:8px; font-size:13px; font-family:inherit; }
+textarea { width:100%; min-height:90px; }
+button { padding:8px 14px; background:#14213d; color:#fff; border:none; border-radius:8px; font-size:13px; cursor:pointer; }
+button:hover { background:#1d2d52; }
+button.gold { background:#b8860b; } button.ghost { background:#fff; color:#14213d; border:1px solid #ddd8cc; }
+button.red { background:#b03a3a; }
+.row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+.pill { font-size:11px; padding:3px 8px; border-radius:20px; }
+.pill.on { background:#e8f5e9; color:#2e7d32; } .pill.off { background:#fbe9e7; color:#c0392b; }
+.form { background:#fff; border:1px solid #ece9e2; border-radius:12px; padding:18px; margin-bottom:20px; }
+.form label { display:block; font-size:12px; color:#8a8270; margin:10px 0 4px; }
+.bars { background:#fff; border:1px solid #ece9e2; border-radius:12px; padding:18px; }
+.bar { display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:12px; }
+.bar .t { width:120px; color:#7a7362; }
+.bar .g { flex:1; height:8px; background:#f0ede5; border-radius:4px; overflow:hidden; }
+.bar .g i { display:block; height:100%; background:#b8860b; }
+
+/* ===== モバイル対応 ===== */
+@media (max-width: 768px) {
+  .hd { padding:11px 14px; gap:8px; }
+  .hd .logo { font-size:16px; }
+  .hd a { font-size:12px; }
+  .tabs { padding:0 8px; gap:1px; }
+  .tab { padding:10px 11px; font-size:12.5px; }
+  .wrap { padding:16px 12px 40px; }
+  h2 { font-size:15px; margin-bottom:12px; }
+
+  .cards { grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:9px; }
+  .card { padding:12px; }
+  .card .v { font-size:19px; }
+
+  .form { padding:14px; }
+  .row { gap:8px; }
+  .row > div { flex:1 1 auto; min-width:0; }
+  input, select { max-width:100%; }
+  input[style*="width:280px"], input[style*="width:260px"],
+  input[style*="width:200px"], input[style*="width:180px"] { width:100% !important; }
+
+  /* テーブルを横スクロール可能に */
+  table { display:block; overflow-x:auto; white-space:nowrap; font-size:12px; }
+  th, td { padding:9px 8px; }
+  td[style*="max-width"] { max-width:200px !important; white-space:normal; }
+
+  button { padding:9px 12px; font-size:12.5px; }
+  textarea { font-size:13px; }
+}
+
+@media (max-width: 480px) {
+  .cards { grid-template-columns:1fr 1fr; }
+  .tab { padding:9px 9px; font-size:12px; }
+  .hd .badge { display:none; }
+}
+</style>
+</head>
+<body>
+
+<script>
+(function(){
+  if (new URLSearchParams(location.search).get('embed') === '1') {
+    document.documentElement.classList.add('embedded');
+  }
+})();
+</script>
+<style>html.embedded .hd { display:none !important; }</style>
+
+<div class="hd">
+  <div class="logo">Q<span>start</span></div>
+  <div class="badge">ADMIN</div><div style="font-size:11px;color:#8a93a8;">v1.6</div>
+  <a href="/staff/login" style="margin-left:auto;">🏢 社員</a>
+  <a href="/setting/" style="margin-left:16px;">📚 QuizShare管理</a>
+  <a href="/qstart" style="margin-left:16px;">← Qstartに戻る</a>
+  <a href="#" onclick="adminLogout();return false;" style="margin-left:16px;color:#e88;">ログアウト</a>
+</div>
+
+<div class="srcbar">
+  <div class="srcbtn on" data-src="all" onclick="setSource('all')">
+    <span>📊</span><span>合計</span><span class="n" id="srcN-all"></span></div>
+  <div class="srcbtn" data-src="chat" onclick="setSource('chat')">
+    <span>💬</span><span>チャット</span><span class="n" id="srcN-chat"></span></div>
+  <div class="srcbtn" data-src="api" onclick="setSource('api')">
+    <span>🔑</span><span>API</span><span class="n" id="srcN-api"></span></div>
+  <div class="srcnote">チャットとAPIは同じ使用量枠を共有しています</div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" data-p="dash" onclick="tab('dash')">📊 ダッシュボード</div>
+  <div class="tab" data-p="users" onclick="tab('users')">👥 ユーザー</div>
+  <div class="tab" data-p="announce" onclick="tab('announce')">📢 お知らせ</div>
+  <div class="tab" data-p="models" onclick="tab('models')">🤖 モデル</div>
+  <div class="tab" data-p="features" onclick="tab('features')">🚩 機能フラグ</div>
+  <div class="tab" data-p="promo" onclick="tab('promo')">🎟 優待コード</div>
+  <div class="tab" data-p="pricing" onclick="tab('pricing')">💰 料金・売上</div>
+  <div class="tab" data-p="signup" onclick="tab('signup')">🎫 登録・メール</div>
+  <div class="tab" data-p="contacts" onclick="tab('contacts')">📮 問い合わせ</div>
+  <div class="tab" data-p="reports" onclick="tab('reports')">🚨 通報</div>
+  <div class="tab" data-p="maint" onclick="tab('maint')">🔧 メンテナンス</div>
+  <div class="tab" data-p="apitest" onclick="tab('apitest')">🧪 APIテスト</div>
+  <div class="tab" data-p="errors" onclick="tab('errors')">🐛 エラー</div>
+  <div class="tab" data-p="logs" onclick="tab('logs')">📜 監査ログ</div>
+</div>
+
+<div class="wrap">
+
+<div class="pane active" id="p-dash">
+  <h2>ダッシュボード</h2>
+  <div class="cards" id="statCards"></div>
+  <div class="bars">
+    <div style="font-size:13px;font-weight:600;margin-bottom:12px;">モデル別トークン</div>
+    <div id="byModel"></div>
+    <div style="font-size:13px;font-weight:600;margin:18px 0 12px;">言語別ユーザー</div>
+    <div id="byLang"></div>
+  </div>
+</div>
+
+<div class="pane" id="p-users">
+  <h2>ユーザー管理</h2>
+  <div style="background:#fff;border:1px solid #ece9e2;border-radius:12px;padding:12px 15px;
+    margin-bottom:14px;font-size:12.5px;color:#6b6555;line-height:1.8;">
+    <b>凍結</b>するとログインできなくなり、ログイン中でも次の発言でログアウトされます。<br>
+    <b>権限</b>: user=一般 / moderator=通報対応のみ / admin=すべての管理操作
+  </div>
+  <div class="row">
+    <input id="uq" placeholder="ID / ニックネーム / メールで検索" style="width:280px">
+    <button onclick="loadUsers(1)">検索</button>
+    <span id="uTotal" style="font-size:12px;color:#8a8270;"></span>
+  </div>
+  <table><thead><tr><th>ID</th><th>名前</th><th>言語</th><th>トークン</th><th>権限</th><th>状態</th><th>登録</th><th></th></tr></thead>
+  <tbody id="uBody"></tbody></table>
+  <div class="row" style="margin-top:12px;">
+    <button class="ghost" onclick="loadUsers(uPage-1)">← 前</button>
+    <span id="uPage" style="font-size:13px;"></span>
+    <button class="ghost" onclick="loadUsers(uPage+1)">次 →</button>
+  </div>
+</div>
+
+<div class="pane" id="p-announce">
+  <h2>お知らせ配信</h2>
+  <div class="form">
+    <label>タイトル</label><input id="anTitle" style="width:100%">
+    <label>本文</label><textarea id="anBody"></textarea>
+    <div class="row" style="margin-top:12px;">
+      <select id="anLevel"><option value="info">お知らせ</option><option value="warn">注意</option><option value="critical">重要</option></select>
+      <select id="anLang"><option value="all">全言語</option><option value="ja">日本語</option><option value="en">English</option><option value="zh">中文</option><option value="ko">한국어</option></select>
+      <select id="anTarget"><option value="all">全員</option><option value="free">Free</option><option value="staff">社員</option></select>
+      <button class="gold" onclick="createAnnounce()">配信する</button>
+    </div>
+  </div>
+  <table><thead><tr><th>ID</th><th>タイトル</th><th>レベル</th><th>対象</th><th>状態</th><th>作成</th><th></th></tr></thead>
+  <tbody id="anBodyList"></tbody></table>
+</div>
+
+<div class="pane" id="p-models">
+  <h2>モデル制御</h2>
+  <table><thead><tr><th>モデル</th><th>提供先</th><th>公開</th><th>メンテ</th><th>最低権限</th><th>メモ</th><th></th></tr></thead>
+  <tbody id="mBody"></tbody></table>
+</div>
+
+<div class="pane" id="p-features">
+  <h2>機能フラグ（段階リリース）</h2>
+  <div style="background:#fff;border:1px solid #ece9e2;border-radius:12px;padding:14px 16px;
+    margin-bottom:16px;font-size:12.5px;color:#6b6555;line-height:1.9;">
+    新しい機能を少しずつ公開する仕組みです。<b>公開率</b>を 10 にすると、
+    ユーザーの約10%にだけその機能が表示されます。問題がなければ徐々に上げていきます。<br>
+    <span style="color:#a09a8a;">
+    projects=プロジェクト機能 / purchase=トークン販売 / voice=音声入力 / artifacts=生成物表示 /
+    register_open=新規登録の受付</span>
+  </div>
+  <table><thead><tr><th>キー</th><th>有効</th><th>公開率%</th><th>メモ</th><th></th></tr></thead>
+  <tbody id="fBody"></tbody></table>
+</div>
+
+<div class="pane" id="p-promo">
+  <h2>優待コード</h2>
+  <div class="form">
+    <div style="font-size:13px;font-weight:600;margin-bottom:6px;">新しいコードを発行</div>
+    <div class="row" style="margin-bottom:0;">
+      <div><label style="font-size:11px;color:#8a8270;">コード（空なら自動生成）</label><br>
+        <input id="pcCode" placeholder="QS-XXXXXXXX" style="width:180px;text-transform:uppercase"></div>
+      <div><label style="font-size:11px;color:#8a8270;">種類</label><br>
+        <select id="pcType" onchange="pcHint()">
+          <option value="token_add">トークン追加</option>
+          <option value="monthly_add">月間枠を追加</option>
+          <option value="feature">機能を解放</option>
+        </select></div>
+      <div><label style="font-size:11px;color:#8a8270;">持続性</label><br>
+        <select id="pcPersist" onchange="pcHint()">
+          <option value="0">ナシ（使い切り）</option>
+          <option value="1">アリ（毎回復活）</option>
+        </select></div>
+      <div><label style="font-size:11px;color:#8a8270;">値</label><br>
+        <input id="pcValue" type="number" value="50000" style="width:120px"></div>
+      <div><label style="font-size:11px;color:#8a8270;">使用上限</label><br>
+        <select id="pcMax">
+          <option value="1">1人</option><option value="5">5人</option>
+          <option value="10">10人</option><option value="50">50人</option>
+          <option value="100">100人</option><option value="-1">無制限</option>
+        </select></div>
+      <div><label style="font-size:11px;color:#8a8270;">有効期限（任意）</label><br>
+        <input id="pcExp" type="date"></div>
+    </div>
+    <label>説明</label>
+    <input id="pcDesc" placeholder="例: 夏のキャンペーン" style="width:100%">
+    <div id="pcHint" class="hint" style="font-size:11px;color:#a09a8a;margin-top:6px;"></div>
+    <div class="row" style="margin-top:14px;">
+      <button class="gold" onclick="createPromo()">🎟 発行する</button>
+      <span id="pcResult" style="font-size:13px;"></span>
+    </div>
+  </div>
+  <table><thead><tr><th>コード</th><th>種類</th><th>持続</th><th>値</th><th>使用</th><th>期限</th><th>説明</th><th>状態</th><th></th></tr></thead>
+  <tbody id="pcBody"></tbody></table>
+</div>
+
+<div class="pane" id="p-pricing">
+  <h2>料金・売上</h2>
+
+  <div class="form">
+    <div class="row" style="margin-bottom:14px;align-items:center;">
+      <div style="font-size:14px;font-weight:600;">トークン販売</div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+        <input type="checkbox" id="prEnabled" style="width:18px;height:18px;">
+        <span id="prStatus" class="pill off">停止中</span>
+      </label>
+      <div style="font-size:11px;color:#a09a8a;">オフの間は購入ボタンが「準備中」になります</div>
+    </div>
+
+    <div style="font-size:13px;font-weight:600;margin:6px 0 10px;">基準価格（USD建て）</div>
+    <div class="row" style="margin-bottom:8px;">
+      <div><label style="font-size:11px;color:#8a8270;">100トークンあたり (USD)</label><br>
+        <input id="prUsd" type="number" step="0.00001" style="width:150px" oninput="prCalc()"></div>
+      <div><label style="font-size:11px;color:#8a8270;">最低購入トークン</label><br>
+        <input id="prMin" type="number" style="width:130px"></div>
+      <button class="gold" onclick="savePricing()">保存</button>
+      <span id="prSaved" style="font-size:13px;color:#2e7d32;"></span>
+    </div>
+    <div id="prCalcBox" style="font-size:12px;color:#6b6555;background:#faf9f5;border:1px solid #ece9e2;border-radius:8px;padding:10px 12px;margin-top:6px;line-height:1.9;"></div>
+  </div>
+
+  <div class="form">
+    <div style="font-size:13px;font-weight:600;margin-bottom:4px;">為替レート（1 USD = ?）</div>
+    <div style="font-size:11px;color:#a09a8a;margin-bottom:12px;">
+      表示用。実際の請求はUSDで確定します。1日1回自動更新されます。
+      <span id="fxTime" style="margin-left:8px;"></span>
+      <button class="ghost" style="margin-left:8px;padding:4px 10px;font-size:11px;" onclick="refreshFx()">🔄 今すぐ更新</button>
+    </div>
+    <div id="fxBox" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;"></div>
+    <button class="gold" style="margin-top:14px;" onclick="saveFx()">レートを保存</button>
+    <span id="fxSaved" style="font-size:13px;color:#2e7d32;margin-left:10px;"></span>
+  </div>
+
+  <h2 style="margin-top:26px;">購入履歴</h2>
+  <div class="cards" id="saleCards"></div>
+  <table><thead><tr><th>日時</th><th>ユーザー</th><th>トークン</th><th>金額(USD)</th><th>状態</th><th>備考</th></tr></thead>
+  <tbody id="buyBody"></tbody></table>
+</div>
+
+<div class="pane" id="p-signup">
+  <h2>新規登録の設定</h2>
+  <div class="cards" id="suCards"></div>
+
+  <div class="form">
+    <div style="font-size:13px;font-weight:600;margin-bottom:12px;">受付モード</div>
+    <div class="row" style="margin-bottom:14px;">
+      <select id="suMode" onchange="saveSignup()" style="min-width:220px;">
+        <option value="closed">🔒 停止中 — 誰も登録できない</option>
+        <option value="invite">🎫 招待制 — コードを持つ人だけ</option>
+        <option value="open">🌏 全開放 — 誰でも登録できる</option>
+      </select>
+      <span id="suModeMsg" style="font-size:12px;color:#8a8270;"></span>
+    </div>
+
+    <div class="row" style="margin-bottom:12px;">
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+        <input type="checkbox" id="suTurnstile" onchange="saveSignup()" style="width:17px;height:17px;">
+        人間確認 (Cloudflare Turnstile)
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+        <input type="checkbox" id="suEmail" onchange="saveSignup()" style="width:17px;height:17px;">
+        メール認証を必須にする
+      </label>
+      <div>1日の上限
+        <input id="suLimit" type="number" min="1" max="10000" style="width:90px" onchange="saveSignup()">人
+      </div>
+    </div>
+    <div id="suHint" style="font-size:11.5px;color:#a09a8a;line-height:1.9;"></div>
+  </div>
+
+  <div class="form">
+    <div style="font-size:13px;font-weight:600;margin-bottom:10px;">招待コードを発行</div>
+    <div class="row" style="margin-bottom:8px;">
+      <div><label style="font-size:11px;color:#8a8270;">発行数</label><br>
+        <input id="ivCount" type="number" value="1" min="1" max="50" style="width:80px"></div>
+      <div><label style="font-size:11px;color:#8a8270;">1コードで何人まで</label><br>
+        <select id="ivMax">
+          <option value="1">1人</option><option value="5">5人</option>
+          <option value="10">10人</option><option value="50">50人</option>
+          <option value="-1">無制限</option>
+        </select></div>
+      <div><label style="font-size:11px;color:#8a8270;">有効期限</label><br>
+        <input id="ivExp" type="date"></div>
+      <div><label style="font-size:11px;color:#8a8270;">メモ</label><br>
+        <input id="ivNote" placeholder="例: 学校の友達用" style="width:180px"></div>
+    </div>
+    <div class="row" style="margin-bottom:8px;">
+      <div><label style="font-size:11px;color:#8a8270;">年齢制限</label><br>
+        <select id="ivAge">
+          <option value="13">13歳以上（通常）</option>
+          <option value="0">制限なし（保護者同意済み）</option>
+          <option value="18">18歳以上</option>
+        </select></div>
+      <div><label style="font-size:11px;color:#8a8270;">権限を付与</label><br>
+        <select id="ivRole">
+          <option value="">なし</option>
+          <option value="moderator">moderator</option>
+        </select></div>
+      <div><label style="font-size:11px;color:#8a8270;">3時間枠 +（恒久）</label><br>
+        <input id="ivBw" type="number" value="0" min="0" style="width:110px"></div>
+      <div><label style="font-size:11px;color:#8a8270;">予備タンク +</label><br>
+        <input id="ivBs" type="number" value="0" min="0" style="width:110px"></div>
+      <button class="gold" onclick="makeInvite()">🎫 発行</button>
+    </div>
+    <div id="ivResult" style="font-size:13px;margin-top:8px;"></div>
+    <div style="font-size:11px;color:#a09a8a;margin-top:8px;line-height:1.8;">
+      「制限なし」を選ぶと13歳未満でも登録できます。保護者に直接渡すコードにのみ使ってください。<br>
+      全開放モードでも、コードを入力すれば特典と年齢緩和が適用されます。</div>
+  </div>
+
+  <table><thead><tr><th>コード</th><th>使用</th><th>期限</th><th>メモ</th><th>状態</th><th>作成</th><th></th></tr></thead>
+  <tbody id="ivBody"></tbody></table>
+
+  <h2 style="margin-top:26px;">使用履歴</h2>
+  <table><thead><tr><th>日時</th><th>コード</th><th>登録したID</th><th>メモ</th></tr></thead>
+  <tbody id="ivUses"></tbody></table>
+
+
+</div>
+
+</div>
+
+<div class="pane" id="p-contacts">
+  <h2>お問い合わせ</h2>
+  <div class="row">
+    <a href="/qstart/contact" target="_blank"><button class="ghost">📮 フォームを見る</button></a>
+    <button class="ghost" onclick="loadContacts()">🔄 更新</button>
+  </div>
+  <div id="ctBody"></div>
+</div>
+
+<div class="pane" id="p-reports">
+  <h2>通報・フィードバック</h2>
+  <table><thead><tr><th>ID</th><th>ユーザー</th><th>種別</th><th>内容</th><th>状態</th><th>日時</th><th></th></tr></thead>
+  <tbody id="rBody"></tbody></table>
+</div>
+
+<div class="pane" id="p-maint">
+  <h2>メンテナンス</h2>
+  <div id="mtStatus"></div>
+
+  <div class="form">
+    <div style="font-size:13px;font-weight:600;margin-bottom:10px;">新しいメンテナンスを予約</div>
+    <div class="row" style="margin-bottom:8px;">
+      <div><label style="font-size:11px;color:#8a8270;">開始</label><br>
+        <input id="mtStart" type="datetime-local"></div>
+      <div><label style="font-size:11px;color:#8a8270;">終了</label><br>
+        <input id="mtEnd" type="datetime-local"></div>
+      <div><label style="font-size:11px;color:#8a8270;">対象</label><br>
+        <select id="mtScope">
+          <option value="both">両方（チャット + API）</option>
+          <option value="chat">チャットのみ</option>
+          <option value="api">APIのみ</option>
+        </select></div>
+    </div>
+    <label style="font-size:11px;color:#8a8270;">タイトル</label>
+    <input id="mtTitle" placeholder="例: システム更新のためのメンテナンス" style="width:100%">
+    <label style="font-size:11px;color:#8a8270;margin-top:10px;display:block;">詳細（任意）</label>
+    <textarea id="mtBody" placeholder="ユーザーに表示される説明" style="min-height:70px;"></textarea>
+    <div class="row" style="margin-top:14px;">
+      <button class="gold" onclick="createMaint(false)">📅 予約する</button>
+      <button class="red" onclick="createMaint(true)">🚨 緊急メンテを今すぐ開始</button>
+      <span id="mtMsg" style="font-size:13px;"></span>
+    </div>
+    <div style="font-size:11px;color:#a09a8a;margin-top:8px;line-height:1.8;">
+      通常の予約は24時間以上先から。緊急メンテは即座に開始され、24時間ルールを飛ばします。<br>
+      メンテナンス中は管理者以外 Qstart にアクセスできなくなります（テスト用: <a href="/admin/qstart" target="_blank" style="color:#b8860b;">/admin/qstart</a>）。
+    </div>
+  </div>
+
+  <table><thead><tr><th>期間</th><th>タイトル</th><th>種類</th><th>状態</th><th>補償</th><th></th></tr></thead>
+  <tbody id="mtBody2"></tbody></table>
+
+  <div id="lcBox" style="background:#fff;border:1px solid #ece9e2;border-radius:12px;
+    padding:18px;margin-top:16px;">
+    <div style="font-size:14px;font-weight:600;margin-bottom:6px;">📅 提供終了の予定</div>
+    <div style="font-size:11.5px;color:#8a8270;line-height:1.8;margin-bottom:14px;">
+      新しい世代に切り替えるとき、古いモデルの終了日を決めておきます。<br>
+      終了日を過ぎると、そのモデルへのリクエストは自動で後継モデルに切り替わります。
+    </div>
+    <div class="row">
+      <div><label style="font-size:11px;color:#8a8270;">対象モデル</label><br>
+        <select id="lcModel" style="min-width:150px;"></select></div>
+      <div><label style="font-size:11px;color:#8a8270;">非推奨にする日</label><br>
+        <input id="lcDep" type="date"></div>
+      <div><label style="font-size:11px;color:#8a8270;">提供を終了する日</label><br>
+        <input id="lcSun" type="date"></div>
+      <div><label style="font-size:11px;color:#8a8270;">移行先</label><br>
+        <select id="lcSucc" style="min-width:150px;"><option value="">（なし）</option></select></div>
+    </div>
+    <label style="font-size:11px;color:#8a8270;margin-top:12px;display:block;">お知らせ本文（空欄なら自動生成）</label>
+    <textarea id="lcNote" style="min-height:70px;" placeholder="例: 画像を理解できる新モデルに刷新するため…"></textarea>
+    <div class="row" style="margin-top:14px;">
+      <label style="font-size:12.5px;display:flex;align-items:center;gap:6px;">
+        <input type="checkbox" id="lcAnnounce" checked> 同時にお知らせを配信する</label>
+      <button class="gold" onclick="saveLifecycle()">保存</button>
+      <span id="lcMsg" style="font-size:13px;"></span>
+    </div>
+  </div>
+
+  <div id="mtComp" style="display:none;background:#fff;border:1px solid #ece9e2;
+    border-radius:12px;padding:18px;margin-top:16px;">
+    <div style="display:flex;align-items:center;margin-bottom:12px;">
+      <b id="mtCompTitle" style="flex:1;font-size:14px;">補償の計算</b>
+      <button class="ghost" onclick="document.getElementById('mtComp').style.display='none'">閉じる</button>
+    </div>
+    <div id="mtCompInfo" style="font-size:12.5px;color:#6b6555;background:#faf9f5;
+      border-radius:8px;padding:11px 13px;margin-bottom:12px;line-height:1.9;"></div>
+    <table><thead><tr><th>ユーザー</th><th>プラン</th><th>状態</th><th>付与量</th><th>期間延長</th><th>理由</th></tr></thead>
+    <tbody id="mtCompBody"></tbody></table>
+    <div class="row" style="margin-top:14px;">
+      <button class="gold" onclick="doCompensate()">この内容で付与する</button>
+      <span id="mtCompMsg" style="font-size:13px;"></span>
+    </div>
+  </div>
+</div>
+
+<div class="pane" id="p-apitest">
+  <h2>APIテスト</h2>
+  <div class="form">
+    <div style="font-size:12px;color:#6b6555;margin-bottom:12px;line-height:1.8;">
+      APIキーとモデルを選んで、実際にリクエストを送って動作を確認できます。<br>
+      <span style="color:#a09a8a;">キーは画面に保存されません。テストのたびに入力してください。</span>
+    </div>
+    <label style="font-size:11px;color:#8a8270;">APIキー</label>
+    <input id="atKey" type="password" placeholder="qsk_..." style="width:100%;font-family:monospace;">
+    <div class="row" style="margin:12px 0 0;">
+      <div><label style="font-size:11px;color:#8a8270;">モデル</label><br>
+        <select id="atModel" style="min-width:180px;"></select></div>
+      <div><label style="font-size:11px;color:#8a8270;">エンドポイント</label><br>
+        <select id="atEp" onchange="atSwitch()">
+          <option value="chat">/v1/chat — チャット</option>
+          <option value="grade">/v1/grade — 採点</option>
+        </select></div>
+    </div>
+
+    <div id="atChatBox">
+      <label style="font-size:11px;color:#8a8270;margin-top:12px;display:block;">メッセージ</label>
+      <input id="atMsg" value="こんにちは" style="width:100%;">
+    </div>
+
+    <div id="atGradeBox" style="display:none;">
+      <div class="row" style="margin-top:12px;">
+        <div style="flex:1;"><label style="font-size:11px;color:#8a8270;">問題</label><br>
+          <input id="atQ" value="日本の首都はどこ？" style="width:100%;"></div>
+      </div>
+      <div class="row">
+        <div><label style="font-size:11px;color:#8a8270;">正解</label><br>
+          <input id="atC" value="東京" style="width:160px;"></div>
+        <div><label style="font-size:11px;color:#8a8270;">生徒の回答</label><br>
+          <input id="atA" value="とうきょう" style="width:200px;"></div>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:16px;">
+      <button class="gold" onclick="runApiTest()">▶ 送信</button>
+      <button class="ghost" onclick="document.getElementById('atOut').textContent='';">クリア</button>
+      <span id="atMsgOut" style="font-size:13px;"></span>
+    </div>
+  </div>
+
+  <div style="background:#14213d;border-radius:12px;padding:16px;margin-top:14px;">
+    <div style="font-size:11px;color:#8a93a8;margin-bottom:8px;">レスポンス</div>
+    <pre id="atOut" style="color:#7ee787;font-size:12px;white-space:pre-wrap;
+      word-break:break-all;margin:0;line-height:1.7;min-height:60px;"></pre>
+  </div>
+
+  <div style="background:#fff;border:1px solid #ece9e2;border-radius:12px;padding:16px;margin-top:14px;">
+    <div style="font-size:13px;font-weight:600;margin-bottom:8px;">curl で試す</div>
+    <pre id="atCurl" style="background:#faf9f5;padding:12px;border-radius:8px;font-size:11px;
+      overflow-x:auto;margin:0;line-height:1.7;"></pre>
+  </div>
+</div>
+
+<div class="pane" id="p-errors">
+  <h2>エラー監視</h2>
+  <div class="cards" id="erCards"></div>
+  <div class="row">
+    <button class="ghost" onclick="loadErrors()">🔄 更新</button>
+    <button class="red" onclick="clearErrors()">すべて消去</button>
+    <a href="/qstart/health" target="_blank"><button class="ghost">🩺 稼働状況を見る</button></a>
+  </div>
+  <table><thead><tr><th>最終発生</th><th>回数</th><th>場所</th><th>内容</th><th></th></tr></thead>
+  <tbody id="erBody"></tbody></table>
+  <div id="erDetail" style="display:none;background:#fff;border:1px solid #ece9e2;
+    border-radius:12px;padding:16px;margin-top:14px;">
+    <div style="display:flex;align-items:center;margin-bottom:10px;">
+      <b id="erTitle" style="flex:1;font-size:13px;"></b>
+      <button class="ghost" onclick="document.getElementById('erDetail').style.display='none'">閉じる</button>
+    </div>
+    <pre id="erTrace" style="font-size:11px;background:#faf9f5;padding:12px;border-radius:8px;
+      overflow-x:auto;white-space:pre-wrap;line-height:1.6;color:#5c5647;"></pre>
+  </div>
+</div>
+
+<div class="pane" id="p-logs">
+  <h2>監査ログ</h2>
+  <table><thead><tr><th>日時</th><th>管理者</th><th>操作</th><th>対象</th><th>詳細</th></tr></thead>
+  <tbody id="lBody"></tbody></table>
+</div>
+
+
+<script>
+var A='/qstart/api/v1/admin/';
+var SRC = 'all';   // all / chat / api
+
+// タブごとに固定されるソース(切替できないタブ用)
+var SRC_FIXED = {
+  announce: 'chat',    // お知らせはチャット画面のみ
+  features: 'chat',    // 機能フラグはチャット画面の機能
+  reports:  'chat',    // 通報はチャット画面から
+  users:    'all',     // アカウントは共通
+  promo:    'all',     // 優待コードは共通の枠
+  pricing:  'all',     // 料金は共通
+  signup:   'all',     // 登録は共通
+  contacts: 'all',     // 問い合わせ窓口はひとつ
+  logs:     'all',     // 管理操作の記録は共通
+  apitest:  'api'      // APIのテストなのでAPI固定
+};
+
+// 切替バーを使うタブ(それ以外では固定表示)
+var SRC_TABS = {
+  dash:   true,   // 使用量を分けて見る
+  models: true,   // チャットとAPIで別々に設定できる
+  maint:  true,   // チャットだけ止める等
+  errors: true,   // どちらで出たエラーか
+  users:  false,  // アカウントは共通なので合計
+  announce: false, features: false, promo: false,
+  pricing: false, signup: false, contacts: false,
+  reports: false, logs: false
+};
+
+// タブごとの対象を表示する注記
+var SRC_NOTE = {
+  announce: '📢 お知らせはチャット画面にのみ表示されるため、分ける必要がありません',
+  features: '🚩 機能フラグはチャット画面の機能を制御するため、APIには影響しません',
+  promo:    '🎟 優待コードはチャットとAPIで同じ枠に加算されるため、共通です',
+  pricing:  '💰 料金はチャットとAPIで同じ枠のため、共通です',
+  signup:   '🎫 アカウントを作ると両方で使えるため、共通です',
+  users:    '👥 アカウントはチャットとAPIで共通です（使用量の内訳は各行に表示）',
+  contacts: '📮 お問い合わせ窓口はひとつのため、共通です',
+  reports:  '🚨 通報はチャット画面から送られるため、分ける必要がありません',
+  logs:     '📜 管理操作の記録は共通です'
+};
+
+function setSource(s){
+  var btn = document.querySelector('.srcbtn[data-src="'+s+'"]');
+  if (btn && btn.classList.contains('dim')) return;   // 対象外のタブでは切替不可
+  SRC = s;
+  document.querySelectorAll('.srcbtn').forEach(function(b){
+    b.classList.toggle('on', b.dataset.src === s);
+  });
+  // 今開いているタブを再読み込み
+  var cur = document.querySelector('.tab.active');
+  if (cur) tab(cur.dataset.p);
+}
+
+function srcQ(base){
+  return base + (base.indexOf('?') >= 0 ? '&' : '?') + 'source=' + SRC;
+}
+var uPage=1;
+function esc(s){var d=document.createElement('div');d.textContent=(s==null?'':s);return d.innerHTML;}
+function num(n){return (n||0).toLocaleString();}
+async function api(p,m,b){
+  var o={method:m||'GET',headers:{'Content-Type':'application/json'}};
+  if(b)o.body=JSON.stringify(b);
+  var r=await fetch(A+p,o); return await r.json();
+}
+function tab(n){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.p===n));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active',p.id==='p-'+n));
+  // 切替バーの出し入れ
+  var bar = document.querySelector('.srcbar');
+  if (bar) {
+    bar.style.display = 'flex';   // ★常に表示
+    var use = !!SRC_TABS[n];
+    // 対象外のタブでは、そのタブに対応するソースを選んで固定表示
+    if (!use) {
+      var fix = SRC_FIXED[n] || 'all';
+      if (SRC !== fix) SRC = fix;
+      document.querySelectorAll('.srcbtn').forEach(function(b){
+        b.classList.toggle('on', b.dataset.src === fix);
+        if (b.dataset.src !== fix) b.classList.add('dim');
+        else b.classList.remove('dim');
+      });
+      var nt = document.querySelector('.srcnote');
+      if (nt) nt.textContent = SRC_NOTE[n] ||
+        (fix === 'all' ? 'このページはチャットとAPIで共通です'
+                       : 'このページは' + ({chat:'チャット', api:'API'}[fix]) + '専用です');
+    } else {
+      document.querySelectorAll('.srcbtn').forEach(function(b){ b.classList.remove('dim'); });
+      var nt2 = document.querySelector('.srcnote');
+      if (nt2) nt2.textContent = 'チャットとAPIは同じ使用量枠を共有しています';
+    }
+  }
+  // 注記
+  // 注記は切替バーに表示するのでここでは何もしない
+  ({dash:loadStats,users:()=>loadUsers(1),announce:loadAnnounce,models:loadModels,features:loadFeatures,promo:loadPromo,pricing:loadPricing,signup:loadSignup,contacts:loadContacts,reports:loadReports,maint:loadMaint,apitest:loadApiTest,errors:loadErrors,logs:function(){loadLogs();loadBackup();}}[n]||function(){})();
+}
+function bars(el,items,key,val){
+  var max=Math.max(1,...items.map(i=>i[val]));
+  el.innerHTML=items.map(i=>'<div class="bar"><div class="t">'+esc(i[key])+'</div><div class="g"><i style="width:'+(i[val]/max*100)+'%"></i></div><div style="width:80px;text-align:right;">'+num(i[val])+'</div></div>').join('')||'<div style="color:#aaa;font-size:12px;">データなし</div>';
+}
+async function loadStats(){
+  var d=await api(srcQ('stats')); if(!d.ok)return; var s=d.stats;
+  var C=[['総ユーザー',s.users_total],['今日の登録',s.users_today],['プロジェクト',s.projects],['チャット',s.chats],['24hトークン',s.tokens_24h],['累計トークン',s.tokens_total],['未対応通報',s.reports_open],['24hエラー',s.errors_24h||0]];
+  document.getElementById('statCards').innerHTML=C.map(c=>'<div class="card"><div class="k">'+c[0]+'</div><div class="v">'+num(c[1])+'</div></div>').join('');
+  // 切替バーに内訳を表示
+  var bs = {}; (s.by_source||[]).forEach(function(x){ bs[x.source] = x.tokens; });
+  var tChat = (bs.chat||0) + (bs.qstart||0);
+  var tApi  = (bs.api||0) + (bs.grade||0);
+  var eAll = document.getElementById('srcN-all');
+  var eC = document.getElementById('srcN-chat');
+  var eA = document.getElementById('srcN-api');
+  if (eAll) eAll.textContent = num(tChat + tApi);
+  if (eC) eC.textContent = num(tChat);
+  if (eA) eA.textContent = num(tApi);
+
+  bars(document.getElementById('byModel'),s.by_model,'model','tokens');
+  bars(document.getElementById('byLang'),s.by_lang,'lang','n');
+}
+async function loadUsers(p){
+  p=Math.max(1,p||1);
+  var d=await api('users?page='+p+'&q='+encodeURIComponent(document.getElementById('uq').value));
+  if(!d.ok)return; uPage=d.page;
+  document.getElementById('uTotal').textContent=num(d.total)+'人';
+  document.getElementById('uPage').textContent=d.page+' / '+Math.max(1,Math.ceil(d.total/d.per));
+  document.getElementById('uBody').innerHTML=d.users.map(u=>
+    '<tr><td>'+esc(u.user_id)+'</td><td>'+esc(u.nickname)+'</td><td>'+esc(u.lang||'ja')+'</td>'+
+    '<td>'+num(u.tokens)+
+      (SRC==='all' && (u.tok_chat||u.tok_api)
+        ? '<br><span style="font-size:10px;color:#999;">💬'+num(u.tok_chat)+' 🔑'+num(u.tok_api)+'</span>' : '')
+    +'</td>'+
+    '<td><select onchange="setUser(\''+esc(u.user_id)+'\',\'role\',this.value)">'+
+    ['user','moderator','admin'].map(r=>'<option value="'+r+'"'+(u.role===r?' selected':'')+'>'+r+'</option>').join('')+'</select></td>'+
+    '<td><span class="pill '+(u.status==='active'?'on':'off')+'">'+esc(u.status)+'</span></td>'+
+    '<td style="font-size:11px;color:#999;">'+esc((u.created_at||'').slice(0,10))+'</td>'+
+    '<td><button class="'+(u.status==='active'?'red':'ghost')+'" onclick="setUser(\''+esc(u.user_id)+'\',\'status\',\''+(u.status==='active'?'suspended':'active')+'\')">'+(u.status==='active'?'凍結':'解除')+'</button></td></tr>').join('');
+}
+async function setUser(uid,k,v){var b={};b[k]=v;await api('users/'+uid,'PATCH',b);loadUsers(uPage);}
+async function loadAnnounce(){
+  var d=await api('announce'); if(!d.ok)return;
+  document.getElementById('anBodyList').innerHTML=d.announcements.map(a=>
+    '<tr><td>'+a.id+'</td><td>'+esc(a.title)+'</td><td>'+esc(a.level)+'</td><td>'+esc(a.target)+'</td>'+
+    '<td><span class="pill '+(a.active?'on':'off')+'">'+(a.active?'配信中':'停止')+'</span></td>'+
+    '<td style="font-size:11px;color:#999;">'+esc((a.created_at||'').slice(0,16))+'</td>'+
+    '<td><button class="ghost" onclick="togAn('+a.id+','+(a.active?0:1)+')">'+(a.active?'停止':'再開')+'</button> '+
+    '<button class="red" onclick="delAn('+a.id+')">削除</button></td></tr>').join('');
+}
+async function createAnnounce(){
+  var t=document.getElementById('anTitle').value.trim();
+  if(!t){alert('タイトルを入力してください');return;}
+  await api('announce','POST',{title:t,body:document.getElementById('anBody').value,
+    level:document.getElementById('anLevel').value,lang:document.getElementById('anLang').value,
+    target:document.getElementById('anTarget').value});
+  document.getElementById('anTitle').value='';document.getElementById('anBody').value='';
+  loadAnnounce();
+}
+async function togAn(id,v){await api('announce/'+id,'PATCH',{active:v});loadAnnounce();}
+async function delAn(id){if(!confirm('削除しますか？'))return;await api('announce/'+id,'DELETE');loadAnnounce();}
+async function loadModels(){
+  var d=await api(srcQ('models')); if(!d.ok)return;
+  var el = document.getElementById('mBody');
+  var head = document.querySelector('#p-models table thead tr');
+
+  if (SRC === 'all') {
+    // 合計: チャットとAPIの状態を並べて表示(閲覧のみ)
+    head.innerHTML = '<th>モデル</th><th>💬 チャット</th><th>🔑 API</th><th>メモ</th>';
+    el.innerHTML = d.models.map(function(m){
+      var badge = function(on, mt){
+        if (Number(mt)) return '<span class="pill" style="background:#fff3e0;color:#e65100;">メンテ中</span>';
+        return Number(on) ? '<span class="pill on">公開</span>'
+                          : '<span class="pill off">停止</span>';
+      };
+      return '<tr><td style="font-weight:600;">'+esc(m.display||m.model)
+        +'<br><span style="font-size:10px;color:#999;font-family:monospace;">'+esc(m.model)+'</span></td>'
+        +'<td>'+badge(m.chat_enabled, m.chat_maint)+'</td>'
+        +'<td>'+badge(m.api_enabled, m.api_maint)+'</td>'
+        +'<td style="font-size:12px;color:#777;">'+esc(m.note||'')+'</td></tr>';
+    }).join('');
+    return;
+  }
+
+  // chat / api: その提供先の設定を編集できる
+  var L = {chat:'チャット', api:'API'}[SRC];
+  head.innerHTML = '<th>モデル</th><th>公開</th><th>メンテ</th><th>最低権限</th><th>メモ</th><th></th>';
+  el.innerHTML = d.models.map(function(m){
+    return '<tr><td style="font-weight:600;">'+esc(m.display||m.model)
+      +'<br><span style="font-size:10px;color:#999;font-family:monospace;">'+esc(m.model)+'</span></td>'
+      +'<td><input type="checkbox" id="me-'+m.model+'"'+(Number(m.enabled)?' checked':'')+'></td>'
+      +'<td><input type="checkbox" id="mm-'+m.model+'"'+(Number(m.maintenance)?' checked':'')+'></td>'
+      +'<td><select id="mr-'+m.model+'">'
+      +['user','staff','admin'].map(function(r){
+          return '<option value="'+r+'"'+(m.min_role===r?' selected':'')+'>'+r+'</option>';
+        }).join('')+'</select></td>'
+      +'<td><input id="mn-'+m.model+'" value="'+esc(m.note||'')+'" style="width:180px"></td>'
+      +'<td><button onclick="saveModel(\''+m.model+'\')">保存</button></td></tr>';
+  }).join('');
+  fillLifecycleSelects(d.models);
+}
+
+async function saveModel(m){
+  if (SRC === 'all') { alert('「チャット」か「API」を選んでから編集してください'); return; }
+  await api('models','POST',{model:m, scope:SRC,
+    enabled:document.getElementById('me-'+m).checked,
+    maintenance:document.getElementById('mm-'+m).checked,
+    min_role:document.getElementById('mr-'+m).value,
+    note:document.getElementById('mn-'+m).value});
+  loadModels();
+}
+async function loadFeatures(){
+  var d=await api('features'); if(!d.ok)return;
+  document.getElementById('fBody').innerHTML=d.features.map(f=>
+    '<tr><td style="font-weight:600;">'+esc(f.key)+'</td>'+
+    '<td><input type="checkbox" id="fe-'+f.key+'"'+(f.enabled?' checked':'')+'></td>'+
+    '<td><input type="number" id="fp-'+f.key+'" value="'+(f.rollout_pct||0)+'" min="0" max="100" style="width:70px"></td>'+
+    '<td><input id="fn-'+f.key+'" value="'+esc(f.note)+'" style="width:200px"></td>'+
+    '<td><button onclick="saveFeat(\''+f.key+'\')">保存</button></td></tr>').join('');
+}
+async function saveFeat(k){
+  await api('features','POST',{key:k,enabled:document.getElementById('fe-'+k).checked,
+    rollout_pct:document.getElementById('fp-'+k).value,note:document.getElementById('fn-'+k).value});
+  loadFeatures();
+}
+function pcHint(){
+  var t=document.getElementById('pcType').value;
+  var p=document.getElementById('pcPersist').value;
+  var el=document.getElementById('pcHint');
+  if(t==='feature'){ el.textContent='機能を解放します（値は使いません）'; return; }
+  var v=Number(document.getElementById('pcValue').value||0).toLocaleString();
+  if(p==='1'){
+    el.innerHTML='<b>持続性アリ</b>：'+(t==='monthly_add'?'月間枠':'3時間枠')
+      +'の上限が <b>+'+v+'</b> トークン<b>恒久的に</b>増えます。リセットのたびに復活します。';
+  } else {
+    el.innerHTML='<b>持続性ナシ</b>：<b>'+v+'</b> トークンの予備タンクをもらえます。'
+      +'通常枠を使い切ったあとに消費され、なくなったら終わりです（復活しません）。';
+  }
+}
+async function loadPromo(){
+  pcHint();
+  var d=await api('promo'); if(!d.ok)return;
+  var TN={token_add:'トークン追加',monthly_add:'月間枠',feature:'機能解放'};
+  document.getElementById('pcBody').innerHTML=d.codes.map(function(c){
+    var left = c.max_uses<0 ? '∞' : c.max_uses;
+    var exp = c.expires_at ? esc(c.expires_at) : '無期限';
+    var expired = c.expires_at && c.expires_at < new Date().toISOString().slice(0,10);
+    return '<tr><td style="font-family:monospace;font-weight:600;">'+esc(c.code)+'</td>'+
+    '<td>'+(TN[c.type]||esc(c.type))+'</td>'+
+    '<td>'+(Number(c.persistent)?'<span class="pill on">アリ</span>':'<span class="pill off">ナシ</span>')+'</td>'+
+    '<td>'+num(c.value)+'</td>'+
+    '<td>'+(c.used_count||0)+' / '+left+'</td>'+
+    '<td style="font-size:11px;'+(expired?'color:#c0392b;':'color:#999;')+'">'+exp+'</td>'+
+    '<td style="font-size:12px;max-width:160px;">'+esc(c.description||'')+'</td>'+
+    '<td><span class="pill '+(c.active&&!expired?'on':'off')+'">'+(expired?'期限切れ':(c.active?'有効':'停止'))+'</span></td>'+
+    '<td><button class="ghost" onclick="copyCode(\''+esc(c.code)+'\')">コピー</button> '+
+    '<button class="ghost" onclick="togPromo(\''+esc(c.code)+'\','+(c.active?0:1)+')">'+(c.active?'停止':'再開')+'</button> '+
+    '<button class="red" onclick="delPromo(\''+esc(c.code)+'\')">削除</button></td></tr>';
+  }).join('')||'<tr><td colspan="9" style="color:#aaa;">コードがありません</td></tr>';
+}
+async function createPromo(){
+  var b={code:document.getElementById('pcCode').value.trim(),
+    type:document.getElementById('pcType').value,
+    value:document.getElementById('pcValue').value,
+    max_uses:document.getElementById('pcMax').value,
+    persistent:document.getElementById('pcPersist').value,
+    expires_at:document.getElementById('pcExp').value||null,
+    description:document.getElementById('pcDesc').value};
+  var d=await api('promo','POST',b);
+  var r=document.getElementById('pcResult');
+  if(d.ok){ r.style.color='#2e7d32'; r.textContent='発行しました: '+d.code;
+    document.getElementById('pcCode').value=''; document.getElementById('pcDesc').value='';
+    loadPromo(); }
+  else { r.style.color='#c0392b';
+    r.textContent=(d.error==='duplicate'?'そのコードは既に存在します':'発行に失敗しました'); }
+}
+async function togPromo(c,v){ await api('promo/'+encodeURIComponent(c),'PATCH',{active:v}); loadPromo(); }
+async function delPromo(c){ if(!confirm(c+' を削除しますか？'))return;
+  await api('promo/'+encodeURIComponent(c),'DELETE'); loadPromo(); }
+function copyCode(c){ navigator.clipboard.writeText(c).then(function(){
+  var r=document.getElementById('pcResult'); r.style.color='#2e7d32';
+  r.textContent='コピーしました: '+c; }); }
+
+var FX = [];
+function prCalc(){
+  var u = parseFloat(document.getElementById('prUsd').value||0);
+  if(!u){ document.getElementById('prCalcBox').textContent=''; return; }
+  var m = u * 10000;  // 1Mトークンあたり
+  var lines = ['<b>1Mトークン = $'+m.toFixed(2)+'</b>'];
+  FX.slice(0,6).forEach(function(f){
+    if(f.currency==='USD') return;
+    var v = m * f.rate;
+    lines.push('　'+f.currency+': '+f.symbol+v.toLocaleString(undefined,{maximumFractionDigits:f.decimals}));
+  });
+  lines.push('<span style="color:#a09a8a;">参考: Haiku 4.5の入力は $1.00 / 1Mトークン</span>');
+  document.getElementById('prCalcBox').innerHTML = lines.join('<br>');
+}
+async function loadPricing(){
+  var d = await api('pricing'); if(!d.ok) return;
+  var p = d.pricing;
+  document.getElementById('prUsd').value = p.usd_per_100_tokens;
+  document.getElementById('prMin').value = p.min_tokens;
+  var en = !!Number(p.enabled) && d.sale_on;
+  document.getElementById('prEnabled').checked = en;
+  var st = document.getElementById('prStatus');
+  st.className = 'pill ' + (en?'on':'off');
+  st.textContent = en ? '販売中' : '停止中';
+  FX = d.fx || [];
+  document.getElementById('fxBox').innerHTML = FX.map(function(f){
+    return '<div><label style="font-size:11px;color:#8a8270;">'+esc(f.currency)+' ('+esc(f.symbol)+')</label><br>'
+      +'<input id="fx-'+f.currency+'" type="number" step="0.0001" value="'+f.rate+'" style="width:100%" oninput="prCalc()"></div>';
+  }).join('');
+  prCalc();
+  var t = FX.length ? (FX[0].updated_at||'') : '';
+  document.getElementById('fxTime').textContent = t ? ('最終更新: '+t.slice(0,16)) : '';
+  var b = d.purchases||[];
+  var done = b.filter(function(x){return x.status==='completed';});
+  var sum = done.reduce(function(a,x){return a+(x.amount||0);},0);
+  var tok = done.reduce(function(a,x){return a+(x.tokens||0);},0);
+  document.getElementById('saleCards').innerHTML =
+    [['売上合計(USD)','$'+sum.toFixed(2)],['販売トークン',num(tok)],
+     ['取引数',b.length],['未処理',b.filter(function(x){return x.status==='pending';}).length]]
+    .map(function(c){return '<div class="card"><div class="k">'+c[0]+'</div><div class="v">'+c[1]+'</div></div>';}).join('');
+  document.getElementById('buyBody').innerHTML = b.map(function(x){
+    return '<tr><td style="font-size:11px;color:#999;">'+esc((x.created_at||'').slice(0,16))+'</td>'
+      +'<td>'+esc(x.user_id)+'</td><td>'+num(x.tokens)+'</td><td>$'+(x.amount||0).toFixed(4)+'</td>'
+      +'<td><span class="pill '+(x.status==='completed'?'on':'off')+'">'+esc(x.status)+'</span></td>'
+      +'<td style="font-size:11px;color:#777;">'+esc(x.note||'')+'</td></tr>';
+  }).join('')||'<tr><td colspan="6" style="color:#aaa;">購入履歴はありません</td></tr>';
+}
+async function savePricing(){
+  await api('pricing','POST',{usd_per_100_tokens:document.getElementById('prUsd').value,
+    min_tokens:document.getElementById('prMin').value,
+    enabled:document.getElementById('prEnabled').checked});
+  await api('features','POST',{key:'purchase',enabled:document.getElementById('prEnabled').checked,rollout_pct:100});
+  var s=document.getElementById('prSaved'); s.textContent='保存しました';
+  setTimeout(function(){s.textContent='';},1600);
+  loadPricing();
+}
+async function refreshFx(){
+  var s=document.getElementById('fxSaved'); s.style.color='#8a8270'; s.textContent='取得中…';
+  var d=await api('fx/refresh','POST');
+  if(d.ok && d.updated){ s.style.color='#2e7d32'; s.textContent=d.updated+'通貨を更新しました'; }
+  else if(d.skipped){ s.style.color='#8a8270'; s.textContent='最新です'; }
+  else { s.style.color='#c0392b'; s.textContent='取得に失敗しました'; }
+  setTimeout(function(){s.textContent='';},2500);
+  loadPricing();
+}
+async function saveFx(){
+  var arr = FX.map(function(f){
+    return {currency:f.currency, rate:document.getElementById('fx-'+f.currency).value};
+  });
+  await api('pricing','POST',{fx:arr});
+  var s=document.getElementById('fxSaved'); s.textContent='保存しました';
+  setTimeout(function(){s.textContent='';},1600);
+  loadPricing();
+}
+
+var CAT_NAME = {wrong:'事実と違う', broken:'文章が壊れている', harmful:'不適切・有害',
+  offtopic:'質問と関係ない', other:'その他'};
+
+async function loadSignup(){
+  var d = await api('signup'); if(!d.ok) return;
+  var c = d.config;
+  document.getElementById('suMode').value = c.mode;
+  document.getElementById('suTurnstile').checked = !!Number(c.require_turnstile);
+  document.getElementById('suEmail').checked = !!Number(c.require_email);
+  document.getElementById('suLimit').value = c.daily_limit;
+  document.getElementById('suModeMsg').textContent = MODE_MSG[c.mode] || '';
+
+  var active = d.invites.filter(function(i){return i.active;}).length;
+  document.getElementById('suCards').innerHTML =
+    [['受付モード', {closed:'🔒 停止',invite:'🎫 招待制',open:'🌏 全開放'}[c.mode]],
+     ['今日の登録', d.signups_today + ' / ' + c.daily_limit],
+     ['有効な招待コード', active],
+     ['人間確認', d.has_turnstile ? (Number(c.require_turnstile)?'✅ ON':'OFF') : '❌ 未設定']]
+    .map(function(x){ return '<div class="card"><div class="k">'+x[0]+'</div><div class="v" style="font-size:18px;">'+x[1]+'</div></div>'; }).join('');
+
+  var h = [];
+  if (!d.has_turnstile) h.push('<span style="color:#c0392b;">⚠ TURNSTILE_SECRET_KEY が未設定です</span>');
+  if (Number(c.require_email) && !d.has_resend) h.push('<span style="color:#c0392b;">⚠ メール認証が必須ですが RESEND_API_KEY が未設定です</span>');
+  if (Number(c.require_email)) h.push('メール認証はドメイン未認証だと自分宛にしか届きません。');
+  h.push('人間確認をONにするとボットの大量登録を防げます。');
+  document.getElementById('suHint').innerHTML = h.join('<br>');
+
+  document.getElementById('ivBody').innerHTML = d.invites.map(function(i){
+    var left = i.max_uses < 0 ? '∞' : i.max_uses;
+    var expd = i.expires_at && i.expires_at < new Date().toISOString().slice(0,10);
+    return '<tr><td style="font-family:monospace;font-weight:600;">'+esc(i.code)+'</td>'
+      +'<td>'+(i.used_count||0)+' / '+left+'</td>'
+      +'<td style="font-size:11px;'+(expd?'color:#c0392b;':'color:#999;')+'">'+esc(i.expires_at||'無期限')+'</td>'
+      +'<td style="font-size:12px;">'+esc(i.note||'')
+      +(Number(i.min_age)===0?' <span class="pill on">年齢制限なし</span>':'')
+      +(i.grant_role?' <span class="pill on">'+esc(i.grant_role)+'</span>':'')
+      +((i.bonus_window||i.bonus_stock)?' <span class="pill on">特典あり</span>':'')+'</td>'
+      +'<td><span class="pill '+(i.active&&!expd?'on':'off')+'">'+(expd?'期限切れ':(i.active?'有効':'停止'))+'</span></td>'
+      +'<td style="font-size:11px;color:#999;">'+esc((i.created_at||'').slice(0,10))+'</td>'
+      +'<td><button class="ghost" onclick="copyInv(\''+esc(i.code)+'\')">コピー</button> '
+      +'<button class="ghost" onclick="togInv(\''+esc(i.code)+'\','+(i.active?0:1)+')">'+(i.active?'停止':'再開')+'</button> '
+      +'<button class="red" onclick="delInv(\''+esc(i.code)+'\')">削除</button></td></tr>';
+  }).join('') || '<tr><td colspan="7" style="color:#aaa;">招待コードがありません</td></tr>';
+
+  document.getElementById('ivUses').innerHTML = (d.uses||[]).map(function(u){
+    return '<tr><td style="font-size:11px;color:#999;">'+esc((u.used_at||'').slice(0,16))+'</td>'
+      +'<td style="font-family:monospace;">'+esc(u.code)+'</td>'
+      +'<td>'+esc(u.user_id)+'</td><td style="font-size:12px;">'+esc(u.note||'')+'</td></tr>';
+  }).join('') || '<tr><td colspan="4" style="color:#aaa;">まだ使われていません</td></tr>';
+}
+async function saveSignup(){
+  await api('signup','POST',{
+    mode: document.getElementById('suMode').value,
+    require_turnstile: document.getElementById('suTurnstile').checked ? 1 : 0,
+    require_email: document.getElementById('suEmail').checked ? 1 : 0,
+    daily_limit: document.getElementById('suLimit').value });
+  loadSignup();
+}
+async function makeInvite(){
+  var d = await api('invites','POST',{
+    count: document.getElementById('ivCount').value,
+    max_uses: document.getElementById('ivMax').value,
+    expires_at: document.getElementById('ivExp').value || null,
+    note: document.getElementById('ivNote').value,
+    min_age: document.getElementById('ivAge').value,
+    grant_role: document.getElementById('ivRole').value || null,
+    bonus_window: document.getElementById('ivBw').value || 0,
+    bonus_stock: document.getElementById('ivBs').value || 0 });
+  var r = document.getElementById('ivResult');
+  if(d.ok){ r.style.color='#2e7d32';
+    r.innerHTML = '発行しました: <b style="font-family:monospace;">'+d.codes.join('</b>, <b style="font-family:monospace;">')+'</b>';
+    document.getElementById('ivNote').value=''; loadSignup(); }
+  else { r.style.color='#c0392b'; r.textContent='発行に失敗しました'; }
+}
+async function togInv(c,v){ await api('invites/'+encodeURIComponent(c),'PATCH',{active:v}); loadSignup(); }
+async function delInv(c){ if(!confirm(c+' を削除しますか？'))return;
+  await api('invites/'+encodeURIComponent(c),'DELETE'); loadSignup(); }
+function copyInv(c){ navigator.clipboard.writeText(c).then(function(){
+  var r=document.getElementById('ivResult'); r.style.color='#2e7d32';
+  r.textContent='コピーしました: '+c; }); }
+
+var CT_CAT = {question:'使い方の質問', bug:'不具合の報告', request:'機能のご要望',
+  account:'アカウント', parent:'保護者から', privacy:'プライバシー',
+  business:'取材・お仕事', other:'その他'};
+
+async function loadContacts(){
+  var d = await api('contacts'); if(!d.ok) return;
+  var openN = d.contacts.filter(function(c){return c.status==='open';}).length;
+  var hd = document.querySelector('#p-contacts h2');
+  if (hd) hd.textContent = 'お問い合わせ' + (openN ? '（未対応 ' + openN + '件）' : '');
+  var el = document.getElementById('ctBody');
+  if (!d.contacts.length) {
+    el.innerHTML = '<div style="padding:40px;text-align:center;color:#aaa;">お問い合わせはありません</div>';
+    return;
+  }
+  el.innerHTML = d.contacts.map(function(c){
+    var isOpen = c.status === 'open';
+    return '<div style="background:#fff;border:1px solid '+(isOpen?'#f0e0c0':'#ece9e2')
+      +';border-radius:12px;padding:16px;margin-bottom:12px;">'
+      +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">'
+      +'<span class="pill '+(isOpen?'off':'on')+'">'+(isOpen?'未対応':'返信済み')+'</span>'
+      +'<b style="font-size:13px;">'+esc(CT_CAT[c.category]||c.category)+'</b>'
+      +'<span style="font-size:12px;color:#8a8270;">'+esc(c.name||'名前なし')+' &lt;'+esc(c.email)+'&gt;</span>'
+      +'<span style="flex:1"></span>'
+      +'<span style="font-size:11px;color:#999;">'+esc((c.created_at||'').slice(0,16))+'</span></div>'
+      +(c.subject?'<div style="font-size:13.5px;font-weight:600;margin-bottom:6px;">'+esc(c.subject)+'</div>':'')
+      +'<div style="font-size:13px;color:#3a3630;line-height:1.8;white-space:pre-wrap;'
+      +'background:#faf9f5;border-radius:8px;padding:12px;margin-bottom:10px;">'+esc(c.body)+'</div>'
+      +(c.reply?'<div style="font-size:12.5px;color:#2e7d32;line-height:1.8;white-space:pre-wrap;'
+        +'background:#f1f8f2;border-radius:8px;padding:12px;margin-bottom:10px;">'
+        +'<b>返信 ('+esc((c.replied_at||'').slice(0,16))+')</b><br>'+esc(c.reply)+'</div>':'')
+      +(isOpen?'<textarea id="ctR'+c.id+'" placeholder="返信内容（メールで送信されます）" '
+        +'style="width:100%;min-height:80px;padding:10px;border:1px solid #ddd8cc;border-radius:8px;'
+        +'font-size:13px;font-family:inherit;line-height:1.6;"></textarea>'
+        +'<div class="row" style="margin:10px 0 0;">'
+        +'<button class="gold" onclick="replyContact('+c.id+')">📧 返信を送る</button>'
+        +'<button class="ghost" onclick="closeContact('+c.id+')">返信せず完了</button></div>':'')
+      +'</div>';
+  }).join('');
+}
+async function replyContact(id){
+  var t = document.getElementById('ctR'+id).value.trim();
+  if(!t){ alert('返信内容を入力してください'); return; }
+  await api('contacts/'+id,'PATCH',{reply:t});
+  loadContacts();
+}
+async function closeContact(id){
+  await api('contacts/'+id,'PATCH',{status:'closed'});
+  loadContacts();
+}
+
+async function loadReports(){
+  var d=await api('reports'); if(!d.ok)return;
+  var open_n = d.reports.filter(function(r){return r.status==='open';}).length;
+  var hd = document.querySelector('#p-reports h2');
+  if (hd) hd.textContent = '通報・フィードバック' + (open_n ? '（未対応 ' + open_n + '件）' : '');
+  document.getElementById('rBody').innerHTML=d.reports.map(function(r){
+    var isOpen = r.status === 'open';
+    return '<tr'+(isOpen?' style="background:#fffdf7;"':'')+'>'+
+    '<td>'+r.id+'</td><td>'+esc(r.user_id)+'</td>'+
+    '<td>'+esc(CAT_NAME[r.category]||r.category)+'</td>'+
+    '<td style="max-width:320px;font-size:12px;white-space:pre-wrap;">'+esc((r.body||'').slice(0,200))+'</td>'+
+    '<td><span class="pill '+(isOpen?'off':'on')+'">'+(isOpen?'未対応':'対応済み')+'</span></td>'+
+    '<td style="font-size:11px;color:#999;">'+esc((r.created_at||'').slice(0,16))+'</td>'+
+    '<td>'+(isOpen
+      ? '<button onclick="closeReport('+r.id+')">対応済みに</button>'
+      : '<button class="ghost" onclick="reopenReport('+r.id+')">戻す</button>')+
+    '</td></tr>';
+  }).join('')
+    ||'<tr><td colspan="7" style="color:#aaa;">通報はありません</td></tr>';
+}
+async function closeReport(id){ await api('reports/'+id,'PATCH',{status:'closed'}); loadReports(); loadStats(); }
+async function reopenReport(id){ await api('reports/'+id,'PATCH',{status:'open'}); loadReports(); loadStats(); }
+var MT_CUR = null;
+
+async function loadMaint(){
+  var d = await api('maintenance'); if(!d.ok) return;
+  var st = document.getElementById('mtStatus');
+  if (d.active) {
+    st.innerHTML = '<div style="background:#fdecea;border:1px solid #f5c6c0;border-radius:12px;'
+      + 'padding:16px;margin-bottom:16px;">'
+      + '<b style="color:#a3211a;font-size:15px;">🔧 現在メンテナンス中</b><br>'
+      + '<span style="font-size:13px;color:#6b6555;">'+esc(d.active.starts_at)+' 〜 '+esc(d.active.ends_at)+'</span><br>'
+      + '<button class="gold" style="margin-top:10px;" onclick="endMaint('+d.active.id+')">メンテナンスを終了する</button></div>';
+  } else if (d.upcoming) {
+    st.innerHTML = '<div style="background:#fff6e5;border:1px solid #f0dcb0;border-radius:12px;'
+      + 'padding:16px;margin-bottom:16px;">'
+      + '<b style="color:#8a5a00;font-size:15px;">📅 メンテナンス予定</b><br>'
+      + '<span style="font-size:13px;color:#6b6555;">'+esc(d.upcoming.starts_at)+' 〜 '+esc(d.upcoming.ends_at)+'</span><br>'
+      + '<span style="font-size:12px;color:#a09a8a;">ユーザーの画面にバナーで告知されています</span></div>';
+  } else {
+    st.innerHTML = '<div style="background:#e8f5e9;border:1px solid #c8e6c9;border-radius:12px;'
+      + 'padding:14px;margin-bottom:16px;font-size:13.5px;color:#2e7d32;">'
+      + '✅ 現在メンテナンスの予定はありません</div>';
+  }
+
+  var TYPE = {1:'🚨 緊急', 0:'📅 予定'};
+  var STAT = {scheduled:'予約中', active:'実施中', done:'完了', cancelled:'中止'};
+  document.getElementById('mtBody2').innerHTML = (d.list||[]).map(function(m){
+    return '<tr><td style="font-size:12px;">'+esc(m.starts_at)+'<br>〜 '+esc(m.ends_at)+'</td>'
+      +'<td style="font-size:12.5px;">'+esc(m.title||'')+'</td>'
+      +'<td>'+(TYPE[Number(m.is_emergency)]||'')
+      +'<br><span style="font-size:10px;color:#999;">'
+      +({both:'両方',chat:'チャット',api:'API'}[m.scope||'both'])+'</span></td>'
+      +'<td><span class="pill '+(m.status==='done'?'on':'off')+'">'+(STAT[m.status]||m.status)+'</span></td>'
+      +'<td style="font-size:12px;">'+(m.compensated_at
+          ? '<span style="color:#2e7d32;">✅ '+num(m.compensate)+'</span>'
+          : '<span style="color:#a09a8a;">未</span>')+'</td>'
+      +'<td><button class="ghost" onclick="previewComp('+m.id+')">補償を計算</button> '
+      +'<button class="red" onclick="delMaint('+m.id+')">削除</button></td></tr>';
+  }).join('') || '<tr><td colspan="6" style="color:#aaa;">まだありません</td></tr>';
+}
+
+async function createMaint(emergency){
+  var s = document.getElementById('mtStart').value;
+  var e = document.getElementById('mtEnd').value;
+  var m = document.getElementById('mtMsg');
+  if (emergency) {
+    // 緊急は入力欄を無視して必ず「今から」開始
+    var now = new Date();
+    var mins = prompt('緊急メンテナンスを何分間おこないますか？', '120');
+    if (mins === null) return;
+    mins = parseInt(mins, 10);
+    if (!mins || mins < 1) { m.style.color='#c0392b'; m.textContent='分数が正しくありません'; return; }
+    now.setMinutes(now.getMinutes() - 1);   // 1分前から有効にする(即時反映)
+    var end = new Date(now.getTime() + mins*60*1000);
+    s = fmtDT(now); e = fmtDT(end);
+  }
+  if (!s || !e) { m.style.color='#c0392b'; m.textContent='開始と終了を指定してください'; return; }
+  if (emergency && !confirm('緊急メンテナンスを今すぐ開始しますか？\n管理者以外はQstartを使えなくなります。')) return;
+  var d = await api('maintenance','POST',{
+    starts_at: s.replace('T',' ').slice(0,16),
+    ends_at: e.replace('T',' ').slice(0,16),
+    title: document.getElementById('mtTitle').value,
+    body: document.getElementById('mtBody').value,
+    scope: document.getElementById('mtScope').value,
+    emergency: emergency });
+  if (d.ok) { m.style.color='#2e7d32'; m.textContent='✅ 登録しました'; loadMaint(); }
+  else { m.style.color='#c0392b'; m.textContent=d.error||'失敗しました'; }
+  setTimeout(function(){m.textContent='';}, 4000);
+}
+
+function fmtDT(dt){
+  var p = function(n){ return String(n).padStart(2,'0'); };
+  return dt.getFullYear()+'-'+p(dt.getMonth()+1)+'-'+p(dt.getDate())
+       +'T'+p(dt.getHours())+':'+p(dt.getMinutes());
+}
+async function endMaint(id){
+  if(!confirm('メンテナンスを終了しますか？')) return;
+  await api('maintenance/'+id,'PATCH',{status:'done'});
+  loadMaint();
+}
+async function delMaint(id){
+  if(!confirm('削除しますか？')) return;
+  await api('maintenance/'+id,'DELETE'); loadMaint();
+}
+
+async function previewComp(id){
+  var d = await api('maintenance/'+id+'/preview');
+  if(!d.ok){ alert('計算に失敗しました'); return; }
+  MT_CUR = {id:id, users:d.users};
+  document.getElementById('mtComp').style.display='block';
+  document.getElementById('mtCompTitle').textContent = '補償の計算 (#'+id+')';
+  document.getElementById('mtCompInfo').innerHTML =
+    'メンテナンス時間: <b>'+d.hours+'時間</b>（1時間あたり '+num(d.per_hour)+' トークン相当）<br>'
+    + '基準の付与量: <b>'+num(d.base)+' トークン</b>　合計: <b>'+num(d.total)+' トークン</b> / '+d.users.length+'人<br>'
+    + (d.already ? '<span style="color:#c0392b;">⚠️ このメンテナンスは既に補償済みです</span>'
+                 : '<span style="color:#a09a8a;">付与量は下の表で直接変更できます。</span>');
+  document.getElementById('mtCompBody').innerHTML = d.users.map(function(u,i){
+    return '<tr><td>'+esc(u.user_id)+'<br><span style="font-size:11px;color:#999;">'+esc(u.nickname||'')+'</span></td>'
+      +'<td>'+((u.plan||'free')==='free'?'Free':'<b style="color:#b8860b;">'+esc(u.plan)+'</b>')+'</td>'
+      +'<td><span class="pill '+(u.status==='active'?'on':'off')+'">'+esc(u.status)+'</span></td>'
+      +'<td><input type="number" id="cp'+i+'" value="'+u.amount+'" style="width:100px"></td>'
+      +'<td>'+(u.extend_hours>0?'<input type="number" step="0.1" id="ce'+i+'" value="'+u.extend_hours+'" style="width:80px">時間':'—')+'</td>'
+      +'<td style="font-size:11.5px;color:#777;">'+esc(u.reason)+'</td></tr>';
+  }).join('');
+}
+
+async function doCompensate(){
+  if(!MT_CUR) return;
+  var m = document.getElementById('mtCompMsg');
+  var plan = MT_CUR.users.map(function(u,i){
+    var a = document.getElementById('cp'+i);
+    var e = document.getElementById('ce'+i);
+    return {user_id:u.user_id, amount: a?Number(a.value):0,
+            extend_hours: e?Number(e.value):0};
+  });
+  var total = plan.reduce(function(s,x){return s+x.amount;},0);
+  if(!confirm(plan.length+'人に合計 '+total.toLocaleString()+' トークンを付与します。\nよろしいですか？')) return;
+  m.style.color='#8a8270'; m.textContent='付与中…';
+  var d = await api('maintenance/'+MT_CUR.id+'/compensate','POST',{amount: total, users: plan});
+  if(d.ok){ m.style.color='#2e7d32'; m.textContent='✅ '+d.users+'人に付与しました'; loadMaint(); }
+  else { m.style.color='#c0392b'; m.textContent=d.error||'失敗しました'; }
+}
+
+function atSwitch(){
+  var ep = document.getElementById('atEp').value;
+  document.getElementById('atChatBox').style.display  = ep === 'chat'  ? 'block' : 'none';
+  document.getElementById('atGradeBox').style.display = ep === 'grade' ? 'block' : 'none';
+  atCurlUpdate();
+}
+
+async function loadApiTest(){
+  var d = await api('models?source=api');
+  var sel = document.getElementById('atModel');
+  if (d.ok) {
+    sel.innerHTML = d.models.map(function(m){
+      var ok = Number(m.enabled) && !Number(m.maintenance);
+      return '<option value="'+m.model+'"'+(ok?'':' disabled')+'>'
+        + (m.display||m.model) + (ok?'':' (停止中)') + '</option>';
+    }).join('');
+  }
+  atSwitch();
+}
+
+function atCurlUpdate(){
+  var ep = document.getElementById('atEp').value;
+  var model = document.getElementById('atModel').value;
+  var body;
+  if (ep === 'chat') {
+    body = JSON.stringify({message: document.getElementById('atMsg').value, model: model});
+  } else {
+    body = JSON.stringify({question: document.getElementById('atQ').value,
+      correct: document.getElementById('atC').value,
+      answer: document.getElementById('atA').value});
+  }
+  var url = 'https://yuto113.pythonanywhere.com/qstart/api/v1/' + ep;
+  document.getElementById('atCurl').textContent =
+    'curl -X POST ' + url + ' \\\n'
+    + "  -H 'Authorization: Bearer あなたのAPIキー' \\\n"
+    + "  -H 'Content-Type: application/json' \\\n"
+    + "  -d '" + body + "'";
+}
+
+async function runApiTest(){
+  var key = document.getElementById('atKey').value.trim();
+  var ep = document.getElementById('atEp').value;
+  var model = document.getElementById('atModel').value;
+  var out = document.getElementById('atOut');
+  var msg = document.getElementById('atMsgOut');
+  if (!key) { msg.style.color='#c0392b'; msg.textContent='APIキーを入力してください'; return; }
+  msg.style.color='#8a8270'; msg.textContent='送信中…';
+  out.textContent = '';
+
+  var body = ep === 'chat'
+    ? {message: document.getElementById('atMsg').value, model: model}
+    : {question: document.getElementById('atQ').value,
+       correct: document.getElementById('atC').value,
+       answer: document.getElementById('atA').value};
+
+  var t0 = Date.now();
+  try {
+    var r = await fetch('/qstart/api/v1/' + ep, {
+      method:'POST',
+      headers:{'Authorization':'Bearer '+key, 'Content-Type':'application/json'},
+      body: JSON.stringify(body)});
+    var txt = await r.text();
+    var ms = Date.now() - t0;
+    try { txt = JSON.stringify(JSON.parse(txt), null, 2); } catch(e) {}
+    out.style.color = r.ok ? '#7ee787' : '#ff7b72';
+    out.textContent = 'HTTP ' + r.status + '  (' + ms + 'ms)\n\n' + txt;
+    msg.style.color = r.ok ? '#2e7d32' : '#c0392b';
+    msg.textContent = r.ok ? '✅ 成功' : '❌ エラー';
+  } catch(e) {
+    out.style.color='#ff7b72'; out.textContent = String(e);
+    msg.style.color='#c0392b'; msg.textContent='通信エラー';
+  }
+  atCurlUpdate();
+}
+
+async function saveLifecycle(){
+  var m = document.getElementById('lcMsg');
+  var d = await api('lifecycle','POST',{
+    model: document.getElementById('lcModel').value,
+    deprecated_at: document.getElementById('lcDep').value,
+    sunset_at: document.getElementById('lcSun').value,
+    successor: document.getElementById('lcSucc').value,
+    sunset_note: document.getElementById('lcNote').value,
+    announce: document.getElementById('lcAnnounce').checked});
+  if(d.ok){ m.style.color='#2e7d32'; m.textContent='✅ 保存しました'; loadModels(); }
+  else { m.style.color='#c0392b'; m.textContent=d.error||'失敗しました'; }
+  setTimeout(function(){m.textContent='';}, 4000);
+}
+
+function fillLifecycleSelects(models){
+  var a = document.getElementById('lcModel');
+  var b = document.getElementById('lcSucc');
+  if (!a || !b) return;
+  var opts = models.map(function(m){
+    return '<option value="'+m.model+'">'+(m.display||m.model)+'</option>';
+  }).join('');
+  a.innerHTML = opts;
+  b.innerHTML = '<option value="">（なし）</option>' + opts;
+}
+
+async function loadErrors(){
+  var d = await api(srcQ('errors')); if(!d.ok) return;
+  var tot = d.errors.reduce(function(a,e){return a+(e.count||0);},0);
+  document.getElementById('erCards').innerHTML =
+    [['24時間のエラー', d.count_24h],['種類', d.errors.length],['累計', tot]]
+    .map(function(c){ var warn = c[0]==='24時間のエラー' && c[1]>0;
+      return '<div class="card"><div class="k">'+c[0]+'</div><div class="v" style="'
+        +(warn?'color:#c0392b;':'')+'">'+num(c[1])+'</div></div>'; }).join('');
+  document.getElementById('erBody').innerHTML = d.errors.map(function(e){
+    return '<tr><td style="font-size:11px;color:#999;">'+esc((e.last_at||'').slice(5,16))+'</td>'
+      +'<td><b>'+e.count+'</b></td>'
+      +'<td style="font-size:12px;font-family:monospace;">'+esc(e.method)+' '+esc(e.path)+'</td>'
+      +'<td style="font-size:12px;color:#c0392b;max-width:380px;">'+esc((e.message||'').slice(0,120))+'</td>'
+      +'<td><button class="ghost" onclick="showErr('+e.id+')">詳細</button></td></tr>';
+  }).join('') || '<tr><td colspan="5" style="color:#2e7d32;">✅ エラーはありません</td></tr>';
+}
+async function showErr(id){
+  var d = await api('errors/'+id); if(!d.ok) return;
+  document.getElementById('erTitle').textContent = d.error.message;
+  document.getElementById('erTrace').textContent = d.error.trace || '(スタックトレースなし)';
+  document.getElementById('erDetail').style.display = 'block';
+}
+async function clearErrors(){
+  if(!confirm('エラー記録をすべて消去しますか？')) return;
+  await api('errors','DELETE'); loadErrors();
+}
+
+async function loadLogs(){
+  var d=await api('logs'); if(!d.ok)return;
+  document.getElementById('lBody').innerHTML=d.logs.map(l=>
+    '<tr><td style="font-size:11px;color:#999;">'+esc((l.created_at||'').slice(0,16))+'</td>'+
+    '<td>'+esc(l.admin_id)+'</td><td>'+esc(l.action)+'</td><td>'+esc(l.target)+'</td>'+
+    '<td style="font-size:11px;color:#777;max-width:300px;">'+esc((l.detail||'').slice(0,100))+'</td></tr>').join('')
+    ||'<tr><td colspan="5" style="color:#aaa;">ログなし</td></tr>';
+}
+async function adminLogout(){
+  if(!confirm('ログアウトしますか？')) return;
+  await fetch('/qstart/admin/logout',{method:'POST'});
+  location.href='/qstart';
+}
+loadStats();
+</script>
+</body>
+</html>

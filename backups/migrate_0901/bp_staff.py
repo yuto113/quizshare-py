@@ -13,19 +13,6 @@ from qz_common import (
 
 bp = Blueprint('staff', __name__)
 
-# ====================================================================
-# /staff/* は2026年8月で提供終了。すべて /admin に移動した。
-# APIとLINE webhookは /admin の各ページが使うので通す。
-# ====================================================================
-@bp.before_request
-def _staff_retired_gate():
-    from flask import request, render_template
-    p = request.path or ''
-    if not p.startswith('/staff'):
-        return None                       # /api/staff/* /api/line/* は素通し
-    return render_template('service_ended.html'), 410
-
-
 # ===== QZERO 社員システム =====
 
 @bp.route('/staff/login')

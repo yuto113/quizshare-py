@@ -1,0 +1,498 @@
+{% extends "base.html" %}
+{% block title %}課題詳細 - {{ group.name }}{% endblock %}
+{% block content %}
+<div style="max-width:800px; margin:0 auto; padding:20px 16px;">
+  <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
+    <a href="/tasks" style="color:#9CA3AF; text-decoration:none; font-size:14px;">← 課題一覧へ</a>
+    <h1 style="margin:0; font-size:22px; font-weight:900;" id="page-title">読み込み中...</h1>
+  </div>
+
+  <!-- 課題情報 -->
+  <div id="task-info" style="background:white; border-radius:16px; padding:24px; margin-bottom:20px; box-shadow:0 2px 12px rgba(0,0,0,0.08); border-left:4px solid #f59e0b;">
+    <div style="padding:32px; text-align:center; color:#9CA3AF;">読み込み中...</div>
+  </div>
+
+  <!-- 先生用アクション -->
+  <div id="teacher-actions" style="display:none; margin-bottom:20px; display:none;">
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <button onclick="openEditModal()" style="padding:10px 18px; background:#f59e0b; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">✏️ 課題を編集</button>
+      <button onclick="openExtendModal()" style="padding:10px 18px; background:#10b981; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">⏰ 締切を延長</button>
+      <button onclick="deleteTask()" style="padding:10px 18px; background:#ef4444; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">🗑️ 削除</button>
+    </div>
+  </div>
+
+  <!-- クイズ追加案内 -->
+  <div id="add-hint-box" style="margin-bottom:20px;">
+  <div style="background:linear-gradient(135deg,#fef3c7,#fff7ed); border:2px solid #f59e0b; border-radius:16px; padding:20px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div style="font-size:40px;">➕</div>
+      <div>
+        <div style="font-weight:900; font-size:16px; color:#92400e; margin-bottom:4px;">クイズを投稿するには</div>
+        <div style="font-size:14px; color:#78350f; line-height:1.6;">クイズ一覧ページの右下の <strong>「＋」ボタン</strong> からクイズを追加してね。<br>タグ「<strong id="task-tag-hint"></strong>」が自動でつくよ！</div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <!-- 投稿一覧 -->
+  <div style="background:white; border-radius:16px; padding:24px; box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+      <h2 style="margin:0; font-size:17px; font-weight:900;">📚 みんなの投稿</h2>
+      <span id="sub-count" style="background:#fef3c7; color:#d97706; border-radius:999px; padding:2px 12px; font-size:13px; font-weight:bold;"></span>
+    </div>
+    <div id="submission-list">
+      <div style="padding:32px; text-align:center; color:#9CA3AF;">読み込み中...</div>
+    </div>
+  </div>
+</div>
+
+<!-- 編集モーダル -->
+<div id="edit-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+  <div style="background:white; border-radius:16px; padding:28px; max-width:520px; width:100%;">
+    <h3 style="margin:0 0 20px; font-size:18px; font-weight:900;">✏️ 課題を編集</h3>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px; font-weight:900; color:#374151; display:block; margin-bottom:4px;">📌 タイトル</label>
+      <input type="text" id="edit-title" style="width:100%; padding:10px; border:2px solid #e5e7eb; border-radius:10px; font-size:14px; box-sizing:border-box;">
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px; font-weight:900; color:#374151; display:block; margin-bottom:4px;">📄 説明</label>
+      <textarea id="edit-desc" rows="4" style="width:100%; padding:10px; border:2px solid #e5e7eb; border-radius:10px; font-size:14px; box-sizing:border-box; resize:vertical;"></textarea>
+    </div>
+    <div style="margin-bottom:20px;">
+      <label style="font-size:12px; font-weight:900; color:#374151; display:block; margin-bottom:4px;">📅 締切日時</label>
+      <input type="datetime-local" id="edit-due" style="width:100%; padding:10px; border:2px solid #e5e7eb; border-radius:10px; font-size:14px; box-sizing:border-box;">
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button onclick="saveEdit()" style="flex:2; padding:12px; background:#f59e0b; color:white; border:none; border-radius:10px; font-weight:900; cursor:pointer;">💾 保存</button>
+      <button onclick="document.getElementById('edit-modal').style.display='none'" style="flex:1; padding:12px; background:#f3f4f6; color:#333; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<!-- 締切延長モーダル -->
+<div id="extend-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+  <div style="background:white; border-radius:16px; padding:28px; max-width:440px; width:100%;">
+    <h3 style="margin:0 0 16px; font-size:18px; font-weight:900;">⏰ 締切を延長</h3>
+    <p style="color:#9CA3AF; font-size:13px; margin-bottom:16px;">現在の締切: <span id="current-due" style="font-weight:bold; color:#374151;"></span></p>
+    <div style="margin-bottom:20px;">
+      <label style="font-size:12px; font-weight:900; color:#374151; display:block; margin-bottom:4px;">新しい締切日時</label>
+      <input type="datetime-local" id="extend-due" style="width:100%; padding:10px; border:2px solid #e5e7eb; border-radius:10px; font-size:14px; box-sizing:border-box;">
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button onclick="saveExtend()" style="flex:2; padding:12px; background:#10b981; color:white; border:none; border-radius:10px; font-weight:900; cursor:pointer;">⏰ 延長する</button>
+      <button onclick="document.getElementById('extend-modal').style.display='none'" style="flex:1; padding:12px; background:#f3f4f6; color:#333; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<!-- FAB -->
+<button class="fab" id="btn-add-quiz" aria-label="クイズを追加">+</button>
+
+<!-- クイズ追加モーダル（フル機能） -->
+<div class="modal-overlay" id="modal-add" style="display:none;">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span>➕ クイズを追加</span>
+      <button type="button" class="modal-close" onclick="closeModal('modal-add')">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="add-form">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">名前 *</label>
+            <input type="text" id="q-name" class="form-control" placeholder="山田太郎" maxlength="30" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">クラス</label>
+            <input type="text" id="q-class" class="form-control" placeholder="3年A組" maxlength="20">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">クイズ(問題) *</label>
+          <textarea id="q-question" class="form-control" placeholder="問題文を入力..." maxlength="500" rows="3" required></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">回答形式</label>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <button type="button" class="mode-btn" data-mode="text"
+                    style="padding:10px; border-radius:10px; border:2px solid var(--c-main); background:var(--c-main); color:#fff; font-weight:900; cursor:pointer;">
+              📝 記述
+            </button>
+            <button type="button" class="mode-btn" data-mode="options"
+                    style="padding:10px; border-radius:10px; border:2px solid transparent; background:var(--c-soft); color:var(--c-main); font-weight:900; cursor:pointer;">
+              📋 選択
+            </button>
+          </div>
+        </div>
+        <div id="text-mode" class="form-group">
+          <label class="form-label">答え(正解) *</label>
+          <div id="answers-box">
+            <div style="display:flex; gap:8px; margin-bottom:6px; align-items:flex-start;">
+              <span style="font-size:11px; font-weight:900; color:#10B981; padding-top:10px; flex-shrink:0;">1</span>
+              <textarea class="form-control ans-input" placeholder="答えを入力..." maxlength="500" rows="2" style="flex:1;"></textarea>
+            </div>
+          </div>
+          <button type="button" id="btn-add-answer" class="btn btn-secondary" style="font-size:12px; padding:6px 12px; margin-top:4px;">➕ 正解を追加</button>
+        </div>
+        <div id="options-mode" class="form-group" style="display:none;">
+          <label class="form-label">選択肢と正解 *(✓で正解を選ぶ)</label>
+          <div id="opt-list">
+            <div class="opt-row" style="display:flex; gap:8px; margin-bottom:6px; align-items:center;">
+              <input type="checkbox" class="opt-correct-chk" data-idx="0" style="width:20px; height:20px; accent-color:#10B981; flex-shrink:0;" checked>
+              <span style="font-size:12px; font-weight:900; color:#10B981; flex-shrink:0;">A</span>
+              <input type="text" class="form-control opt-input" placeholder="選択肢 A" maxlength="100">
+            </div>
+            <div class="opt-row" style="display:flex; gap:8px; margin-bottom:6px; align-items:center;">
+              <input type="checkbox" class="opt-correct-chk" data-idx="1" style="width:20px; height:20px; accent-color:#10B981; flex-shrink:0;">
+              <span style="font-size:12px; font-weight:900; color:#9CA3AF; flex-shrink:0;">B</span>
+              <input type="text" class="form-control opt-input" placeholder="選択肢 B" maxlength="100">
+            </div>
+          </div>
+          <button type="button" id="btn-add-opt" class="btn btn-secondary" style="margin-top:6px; font-size:12px; padding:6px 12px;">➕ 選択肢を追加</button>
+        </div>
+        <div class="form-group">
+          <label class="form-label">🏷️ 課題タグ（自動設定）</label>
+          <input type="text" id="q-task-tag" class="form-control" readonly style="background:#f3f4f6; color:#6b7280; font-weight:bold;">
+        </div>
+        <div class="form-group">
+          <label class="form-label">🔍 ヒント(任意)</label>
+          <input type="text" id="q-hint" class="form-control" placeholder="難しいときに見られるヒント" maxlength="300">
+        </div>
+        <div class="form-group">
+          <label class="form-label">💡 解説(任意)</label>
+          <textarea id="q-explanation" class="form-control" placeholder="答えの解説" maxlength="1000" rows="3"></textarea>
+        </div>
+        <div style="margin:12px 0; padding:12px; background:#F9FAFB; border-radius:12px; border:1px dashed #E5E7EB;">
+          <label class="form-label">🔒 編集パスワード(任意)</label>
+          <input type="password" id="q-edit-pw" class="form-control" placeholder="設定すると編集時にパスワードが必要になるよ" maxlength="100">
+        </div>
+        <label class="form-check">
+          <input type="checkbox" id="q-confirm-legal" required>
+          <span>著作権・他人の権利を侵害する内容を含んでいません</span>
+        </label>
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top:12px;">✅ 保存する</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+const taskId = {{ task_id }};
+let isTeacher = false;
+let currentTask = null;
+
+async function init() {
+  const r = await fetch('/api/teacher/status');
+  const data = await r.json();
+  if (data.ok && data.is_teacher) {
+    isTeacher = true;
+    document.getElementById('teacher-actions').style.display = 'block';
+  }
+  loadTask();
+}
+
+function formatDueDate(due) {
+  if (!due) return null;
+  const now = new Date();
+  const dueDate = new Date(due.replace(' ','T'));
+  const diff = dueDate - now;
+  if (diff < 0) return { label: '⚠️ 締切済み', color: '#ef4444' };
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days >= 1) return { label: `📅 締切まであと${days}日`, color: '#f59e0b' };
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  return { label: `⏰ 締切まであと${hours}時間${mins}分`, color: '#ef4444' };
+}
+
+async function loadTask() {
+  const r = await fetch('/api/tasks/' + taskId);
+  const data = await r.json();
+  if (!data.ok) {
+    document.getElementById('task-info').innerHTML = '<div style="padding:32px; text-align:center; color:#ef4444;">課題が見つかりませんでした</div>';
+    return;
+  }
+  currentTask = data.task;
+  const t = data.task;
+  document.getElementById('page-title').textContent = t.title;
+
+  const due = t.due_date ? formatDueDate(t.due_date) : null;
+  document.getElementById('task-info').innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="width:40px; height:40px; border-radius:50%; background:linear-gradient(135deg,#f59e0b,#d97706); display:flex; align-items:center; justify-content:center; color:white; font-weight:900; font-size:16px;">${esc(t.teacher_name[0])}</div>
+        <div>
+          <div style="font-weight:900; font-size:14px;">${esc(t.teacher_name)}</div>
+          <div style="font-size:12px; color:#9CA3AF;">${(t.created_at||'').substring(0,16)}</div>
+        </div>
+      </div>
+      ${due ? `<div style="background:${due.color}18; color:${due.color}; border:1px solid ${due.color}40; border-radius:10px; padding:6px 14px; font-weight:900; font-size:13px;">${due.label}</div>` : ''}
+    </div>
+    ${t.due_date ? `<div style="font-size:12px; color:#9CA3AF; margin-bottom:12px;">締切: ${t.due_date.replace('T',' ')}</div>` : ''}
+    <p style="margin:0; color:#374151; font-size:15px; line-height:1.8; white-space:pre-wrap;">${esc(t.description)}</p>
+  `;
+
+  // 締切チェック
+  const submitSection = document.querySelector('.submit-section');
+  if (t.due_date) {
+    const due = new Date(t.due_date.replace(' ','T'));
+    const now = new Date();
+    if (now > due) {
+      // 締切済み→FABと投稿フォームを非表示
+      const fab = document.getElementById('btn-add-quiz');
+      if (fab) fab.style.display = 'none';
+      const hint = document.getElementById('add-hint-box');
+      if (hint) hint.innerHTML = '<div style="background:#fee2e2; border:2px solid #ef4444; border-radius:14px; padding:16px; text-align:center; color:#dc2626; font-weight:bold;">⚠️ 締切が過ぎたため、新しいクイズは投稿できません</div>';
+    } else {
+      const fab = document.getElementById('btn-add-quiz');
+      if (fab) fab.style.display = 'block';
+    }
+  }
+
+  // タグ案内を更新
+  const tagName = '課題:' + t.title;
+  const tagHint = document.getElementById('task-tag-hint');
+  if (tagHint) tagHint.textContent = tagName;
+  const gotoBtn = document.getElementById('goto-group-btn');
+  if (gotoBtn) gotoBtn.href = '/group?task_tag=' + encodeURIComponent(tagName);
+
+  // タグで絞ったクイズ一覧を取得
+  const qr = await fetch('/api/quizzes');
+  const qdata = await qr.json();
+  const tagged = (qdata.quizzes || []).filter(q => (q.tags||[]).includes(tagName));
+  document.getElementById('sub-count').textContent = tagged.length + '件の投稿';
+  if (tagged.length === 0) {
+    document.getElementById('submission-list').innerHTML = '<div style="padding:32px; text-align:center; color:#9CA3AF;"><div style="font-size:48px; margin-bottom:12px;">📭</div><div>まだ投稿がありません。＋ボタンからクイズを追加してね！</div></div>';
+    return;
+  }
+  document.getElementById('submission-list').innerHTML = tagged.map(s => `
+    <a href="/answer/${encodeURIComponent(s.id)}" style="display:block; border:1px solid #f3f4f6; border-radius:12px; padding:16px; margin-bottom:10px; text-decoration:none; color:inherit; transition:transform 0.15s; cursor:pointer;"
+      onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'"
+      onmouseout="this.style.transform='';this.style.boxShadow=''">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div style="width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg,#667eea,#764ba2); display:flex; align-items:center; justify-content:center; color:white; font-weight:900; font-size:13px;">${esc(s.name[0])}</div>
+          <span style="font-weight:900; font-size:14px;">${esc(s.name)}</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:11px; color:#9CA3AF;">${(s.created_at||'').substring(0,10)}</span>
+          <span style="color:#667eea; font-weight:bold; font-size:13px;">→ 挑戦する</span>
+        </div>
+      </div>
+      <div style="background:#f9fafb; border-radius:8px; padding:12px;">
+        <div style="font-size:12px; color:#6b7280; margin-bottom:4px;">❓ 問題</div>
+        <div style="font-weight:bold; font-size:15px; color:#1a1a1a;">${esc(s.question)}</div>
+      </div>
+    </a>
+  `).join('');
+}
+
+function openEditModal() {
+  if (!currentTask) return;
+  document.getElementById('edit-title').value = currentTask.title;
+  document.getElementById('edit-desc').value = currentTask.description;
+  document.getElementById('edit-due').value = (currentTask.due_date||'').replace(' ','T').substring(0,16);
+  document.getElementById('edit-modal').style.display = 'flex';
+}
+
+function openExtendModal() {
+  if (!currentTask) return;
+  document.getElementById('current-due').textContent = currentTask.due_date ? currentTask.due_date.replace('T',' ') : '未設定';
+  document.getElementById('extend-due').value = (currentTask.due_date||'').replace(' ','T').substring(0,16);
+  document.getElementById('extend-modal').style.display = 'flex';
+}
+
+async function saveEdit() {
+  const title = document.getElementById('edit-title').value.trim();
+  const description = document.getElementById('edit-desc').value.trim();
+  const due_date = document.getElementById('edit-due').value;
+  if (!title || !description) { alert('タイトルと説明を入力してね'); return; }
+  const r = await fetch('/api/tasks/' + taskId + '/edit', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({title, description, due_date})
+  });
+  const data = await r.json();
+  if (data.ok) {
+    document.getElementById('edit-modal').style.display = 'none';
+    window.toast('編集しました！', 'success');
+    loadTask();
+  } else { alert(data.error || 'エラー'); }
+}
+
+async function saveExtend() {
+  const due_date = document.getElementById('extend-due').value;
+  if (!due_date) { alert('新しい締切日時を入力してね'); return; }
+  const r = await fetch('/api/tasks/' + taskId + '/edit', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      title: currentTask.title,
+      description: currentTask.description,
+      due_date
+    })
+  });
+  const data = await r.json();
+  if (data.ok) {
+    document.getElementById('extend-modal').style.display = 'none';
+    window.toast('締切を延長しました！', 'success');
+    loadTask();
+  } else { alert(data.error || 'エラー'); }
+}
+
+
+
+async function deleteTask() {
+  if (!confirm('この課題を削除しますか？投稿も全て消えます。')) return;
+  const r = await fetch('/api/tasks/' + taskId + '/delete', {method:'POST'});
+  const data = await r.json();
+  if (data.ok) { location.href = '/tasks'; }
+  else { alert(data.error || 'エラー'); }
+}
+
+// FABクリック
+document.getElementById('btn-add-quiz').addEventListener('click', () => {
+  if (currentTask) {
+    document.getElementById('q-task-tag').value = '課題:' + currentTask.title;
+  }
+  document.getElementById('modal-add').style.display = 'flex';
+});
+
+document.querySelector('.modal-overlay').addEventListener('click', (e) => {
+  if (e.target.classList.contains('modal-overlay')) {
+    document.getElementById('modal-add').style.display = 'none';
+  }
+});
+
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+// 回答形式切替
+let currentMode = 'text';
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentMode = btn.dataset.mode;
+    document.querySelectorAll('.mode-btn').forEach(b => {
+      if (b.dataset.mode === currentMode) {
+        b.style.background = 'var(--c-main)'; b.style.color = '#fff'; b.style.borderColor = 'var(--c-main)';
+      } else {
+        b.style.background = 'var(--c-soft)'; b.style.color = 'var(--c-main)'; b.style.borderColor = 'transparent';
+      }
+    });
+    document.getElementById('text-mode').style.display = currentMode === 'text' ? 'block' : 'none';
+    document.getElementById('options-mode').style.display = currentMode === 'options' ? 'block' : 'none';
+  });
+});
+
+document.getElementById('btn-add-answer').addEventListener('click', () => {
+  const box = document.getElementById('answers-box');
+  const count = box.children.length + 1;
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex; gap:8px; margin-bottom:6px; align-items:flex-start;';
+  row.innerHTML = '<span style="font-size:11px; font-weight:900; color:#10B981; padding-top:10px; flex-shrink:0;">' + count + '</span>' +
+    '<textarea class="form-control ans-input" maxlength="500" rows="2" style="flex:1;"></textarea>' +
+    '<button type="button" style="background:#FEE2E2; color:#DC2626; border:none; border-radius:8px; padding:6px 10px; cursor:pointer; margin-top:4px;" onclick="this.parentElement.remove();">✕</button>';
+  box.appendChild(row);
+});
+
+document.getElementById('btn-add-opt').addEventListener('click', () => {
+  const list = document.getElementById('opt-list');
+  const count = list.children.length;
+  if (count >= 20) { window.toast('選択肢は20個までだよ', 'error'); return; }
+  const letter = String.fromCharCode(65 + count);
+  const row = document.createElement('div');
+  row.className = 'opt-row';
+  row.style.cssText = 'display:flex; gap:8px; margin-bottom:6px; align-items:center;';
+  row.innerHTML = '<input type="checkbox" class="opt-correct-chk" style="width:20px; height:20px; accent-color:#10B981; flex-shrink:0;">' +
+    '<span style="font-size:12px; font-weight:900; color:#9CA3AF; flex-shrink:0;">' + letter + '</span>' +
+    '<input type="text" class="form-control opt-input" placeholder="選択肢 ' + letter + '" maxlength="100">' +
+    '<button type="button" style="background:#FEE2E2; color:#DC2626; border:none; border-radius:8px; padding:6px 10px; cursor:pointer;" onclick="this.parentElement.remove();">✕</button>';
+  list.appendChild(row);
+});
+
+document.getElementById('add-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = document.getElementById('q-name').value.trim();
+  const klass = document.getElementById('q-class').value.trim();
+  const question = document.getElementById('q-question').value.trim();
+  const taskTag = document.getElementById('q-task-tag').value;
+  const confirmLegal = document.getElementById('q-confirm-legal').checked;
+  const hint = document.getElementById('q-hint').value.trim();
+  const explanation = document.getElementById('q-explanation').value.trim();
+  if (!name || !question) { window.toast('名前と問題を入力してね', 'error'); return; }
+
+  let answer, answers, answer_options;
+  if (currentMode === 'text') {
+    answers = Array.from(document.querySelectorAll('.ans-input')).map(i => i.value.trim()).filter(v => v);
+    if (answers.length === 0) { window.toast('答えを入力してね', 'error'); return; }
+    answer = answers[0];
+  } else {
+    const rows = document.querySelectorAll('#opt-list .opt-row');
+    const opts = [], correctOpts = [];
+    rows.forEach(row => {
+      const val = row.querySelector('.opt-input').value.trim();
+      const chk = row.querySelector('.opt-correct-chk');
+      if (val) { opts.push(val); if (chk && chk.checked) correctOpts.push(val); }
+    });
+    if (opts.length < 2) { window.toast('選択肢は2個以上入力してね', 'error'); return; }
+    if (correctOpts.length === 0) { window.toast('正解を選んでね', 'error'); return; }
+    answer = correctOpts[0]; answers = correctOpts; answer_options = opts;
+  }
+
+  const btn = e.target.querySelector('button[type="submit"]');
+  btn.disabled = true; btn.textContent = '保存中...';
+  try {
+    const editPw = document.getElementById('q-edit-pw').value;
+    await window.api.post('/api/quizzes', {
+      name, class_name: klass, question, answer, answers,
+      answer_options, tags: [taskTag],
+      hint, explanation, edit_password: editPw,
+      confirm_not_illegal: confirmLegal
+    });
+    window.toast('追加したよ！', 'success');
+    closeModal('modal-add');
+    e.target.reset();
+    document.getElementById('q-task-tag').value = '課題:' + currentTask.title;
+    loadTask();
+  } catch(err) { window.toast(err.message, 'error'); }
+  btn.disabled = false; btn.textContent = '✅ 保存する';
+});
+
+document.querySelector('.modal-overlay').addEventListener('click', (e) => {
+  if (e.target.classList.contains('modal-overlay')) {
+    document.getElementById('modal-add').style.display = 'none';
+  }
+});
+
+function closeModal(id) {
+  document.getElementById(id).style.display = 'none';
+}
+
+document.getElementById('add-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = document.getElementById('q-name').value.trim();
+  const klass = document.getElementById('q-class').value.trim();
+  const question = document.getElementById('q-question').value.trim();
+  const answer = document.getElementById('q-answer').value.trim();
+  const taskTag = document.getElementById('q-task-tag').value;
+  const confirmLegal = document.getElementById('q-confirm-legal').checked;
+  if (!name || !question || !answer) { window.toast('名前・問題・答えを入力してね', 'error'); return; }
+  const btn = e.target.querySelector('button[type="submit"]');
+  btn.disabled = true; btn.textContent = '保存中...';
+  try {
+    await window.api.post('/api/quizzes', {
+      name, class_name: klass, question, answer,
+      answers: [answer], tags: [taskTag],
+      confirm_not_illegal: confirmLegal
+    });
+    window.toast('追加したよ！', 'success');
+    closeModal('modal-add');
+    e.target.reset();
+    document.getElementById('q-task-tag').value = taskTag;
+    loadTask();
+  } catch(err) { window.toast(err.message, 'error'); }
+  btn.disabled = false; btn.textContent = '✅ 保存する';
+});
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+init();
+setInterval(loadTask, 30000);
+</script>
+{% endblock %}

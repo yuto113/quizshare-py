@@ -44,8 +44,6 @@ iframe{width:100%;height:100%;border:none;display:block;position:absolute;inset:
   {% if role == 'admin' %}
   <div class="tab" data-g="quiz" onclick="grp(this)">📚 QuizShare</div>
   <div class="tab" data-g="qstart" onclick="grp(this)">⚙️ Qstart</div>
-  <div class="tab" data-g="kouan" onclick="grp(this)">🕶 公安部</div>
-  <div class="tab" data-g="pages" onclick="grp(this)">🔧 ページ管理</div>
   {% endif %}
 </div>
 
@@ -60,17 +58,17 @@ var IS_ADMIN = {{ 'true' if role == 'admin' else 'false' }};
 
 var MENU = {
   staff: [
-    ['📋 掲示板',      '/admin/staff/board'],
-    ['📁 ファイル',    '/admin/staff/files'],
-    ['📅 カレンダー',  '/admin/staff/calendar'],
-    ['✅ タスク',      '/admin/staff/tasks'],
-    ['📖 ハンドブック','/admin/staff/handbook'],
-    ['👤 プロフィール','/admin/staff/profile'],
-    ['👥 人事',        '/admin/staff/hr',         'admin'],
-    ['🚨 エラー',      '/admin/staff/errors',     'admin'],
-    ['🛡 モデレーション','/admin/staff/moderation','admin'],
-    ['💬 会話パターン', '/admin/staff/patterns',   'admin'],
-    ['📊 統計',        '/admin/staff/dashboard',  'admin'],
+    ['📋 掲示板',      '/staff/board'],
+    ['📁 ファイル',    '/staff/files'],
+    ['📅 カレンダー',  '/staff/calendar'],
+    ['✅ タスク',      '/staff/tasks'],
+    ['📖 ハンドブック','/staff/handbook'],
+    ['👤 プロフィール','/staff/profile'],
+    ['👥 人事',        '/staff/hr',         'admin'],
+    ['🐛 エラー',      '/staff/errors',     'admin'],
+    ['🛡 モデレーション','/staff/moderation', 'admin'],
+    ['💬 会話パターン', '/staff/qzero-patterns', 'admin'],
+    ['📊 統計',        '/staff/dashboard',  'admin'],
   ],
   quiz: [
     ['📋 グループ一覧','/setting/'],
@@ -82,13 +80,6 @@ var MENU = {
     ['🩺 稼働状況',   '/qstart/status'],
     ['🔑 API',        '/qstart/api'],
     ['🧪 テスト環境', '/admin/qstart'],
-  ],
-  kouan: [
-    ['🕶 Qzero公安部',            '/admin/kouan'],
-    ['🎯 警備局警備企画課（ゼロ）','/admin/kouan?div=keibi'],
-  ],
-  pages: [
-    ['🔧 管理ページ管理', '/admin/pages'],
   ],
 };
 

@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>クイズ研究部 - QuizShare使い方ガイド</title>
+  <meta name="robots" content="noindex">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Hiragino Sans', 'Meiryo', sans-serif; background: #0a1628; color: #e0e8ff; min-height: 100vh; }
+
+    /* ヘッダー */
+    .header { background: rgba(10,22,60,0.95); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(100,150,255,0.3); padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
+    .header-title { font-size: 1.1rem; font-weight: bold; color: #7eb8ff; display: flex; align-items: center; gap: 10px; }
+    .header-btns { display: flex; gap: 10px; }
+    .header-btn { padding: 8px 16px; border-radius: 20px; border: none; cursor: pointer; font-size: 0.85rem; font-weight: bold; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s; }
+    .btn-group { background: #1565c0; color: white; }
+    .btn-group:hover { background: #1976d2; transform: translateY(-1px); }
+    .btn-main { background: rgba(255,255,255,0.1); color: #e0e8ff; border: 1px solid rgba(255,255,255,0.2); }
+    .btn-main:hover { background: rgba(255,255,255,0.2); transform: translateY(-1px); }
+
+    /* ログイン画面 */
+    #login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+    .login-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(100,150,255,0.3); border-radius: 24px; padding: 40px 32px; max-width: 420px; width: 100%; text-align: center; }
+    .login-logo { font-size: 3rem; margin-bottom: 16px; }
+    .login-title { font-size: 1.6rem; font-weight: 900; color: #7eb8ff; margin-bottom: 6px; }
+    .login-sub { color: #8899bb; font-size: 0.9rem; margin-bottom: 32px; }
+    .login-input { width: 100%; padding: 12px 16px; background: rgba(255,255,255,0.08); border: 2px solid rgba(100,150,255,0.3); border-radius: 12px; color: #e0e8ff; font-size: 1rem; margin-bottom: 12px; outline: none; transition: border 0.2s; }
+    .login-input:focus { border-color: #5b9bd5; }
+    .login-input::placeholder { color: #556688; }
+    .login-btn { width: 100%; padding: 14px; background: linear-gradient(135deg, #1565c0, #1976d2); color: white; border: none; border-radius: 12px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+    .login-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(21,101,192,0.4); }
+    .login-error { color: #ff6b6b; font-size: 0.88rem; margin-top: 8px; display: none; }
+
+    /* メインコンテンツ */
+    #main-screen { display: none; }
+    .hero { background: linear-gradient(135deg, #0d1f4e, #1a3a7c, #0d1f4e); padding: 60px 24px; text-align: center; border-bottom: 1px solid rgba(100,150,255,0.2); }
+    .hero-badge { display: inline-block; background: rgba(91,155,213,0.2); border: 1px solid rgba(91,155,213,0.4); border-radius: 20px; padding: 6px 16px; font-size: 0.82rem; color: #7eb8ff; margin-bottom: 16px; }
+    .hero-title { font-size: 2.2rem; font-weight: 900; margin-bottom: 12px; line-height: 1.3; }
+    .hero-title span { color: #5b9bd5; }
+    .hero-sub { color: #8899bb; font-size: 1rem; margin-bottom: 28px; line-height: 1.7; }
+    .hero-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .hero-btn { padding: 14px 28px; border-radius: 25px; font-weight: bold; font-size: 1rem; text-decoration: none; transition: all 0.2s; border: none; cursor: pointer; }
+    .hero-btn-primary { background: linear-gradient(135deg, #1565c0, #1976d2); color: white; box-shadow: 0 4px 16px rgba(21,101,192,0.4); }
+    .hero-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(21,101,192,0.5); }
+    .hero-btn-secondary { background: rgba(255,255,255,0.08); color: #e0e8ff; border: 1px solid rgba(255,255,255,0.2); }
+    .hero-btn-secondary:hover { background: rgba(255,255,255,0.15); transform: translateY(-2px); }
+
+    /* グループID表示 */
+    .group-info { background: rgba(21,101,192,0.15); border: 1px solid rgba(91,155,213,0.3); border-radius: 16px; padding: 20px; margin: 24px auto; max-width: 600px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .group-id-box { flex: 1; }
+    .group-id-label { font-size: 0.8rem; color: #8899bb; margin-bottom: 4px; }
+    .group-id-value { font-size: 1.1rem; font-weight: bold; color: #7eb8ff; font-family: monospace; background: rgba(0,0,0,0.2); padding: 6px 12px; border-radius: 8px; display: inline-block; }
+
+    /* セクション */
+    .container { max-width: 900px; margin: 0 auto; padding: 48px 24px; }
+    .section { margin-bottom: 56px; }
+    .section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; padding-bottom: 12px; border-bottom: 2px solid rgba(91,155,213,0.3); }
+    .section-icon { font-size: 1.8rem; }
+    .section-title { font-size: 1.4rem; font-weight: 900; color: #7eb8ff; }
+    .section-badge { background: rgba(91,155,213,0.2); color: #7eb8ff; border-radius: 20px; padding: 3px 12px; font-size: 0.78rem; font-weight: bold; }
+
+    /* スクリーンショット */
+    .screenshot { width: 100%; border-radius: 16px; box-shadow: 0 4px 32px rgba(0,0,0,0.4); border: 1px solid rgba(100,150,255,0.2); margin: 16px 0; cursor: zoom-in; transition: transform 0.2s; }
+    .screenshot:hover { transform: scale(1.01); }
+
+    /* ステップ */
+    .steps { display: flex; flex-direction: column; gap: 16px; }
+    .step { display: flex; gap: 16px; align-items: flex-start; background: rgba(255,255,255,0.04); border: 1px solid rgba(100,150,255,0.15); border-radius: 14px; padding: 16px; }
+    .step-num { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #1565c0, #1976d2); display: flex; align-items: center; justify-content: center; font-weight: 900; color: white; flex-shrink: 0; font-size: 1rem; }
+    .step-content { flex: 1; }
+    .step-title { font-weight: bold; color: #c8dcff; margin-bottom: 4px; }
+    .step-desc { color: #8899bb; font-size: 0.9rem; line-height: 1.7; }
+
+    /* 機能カード */
+    .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+    .feature-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(100,150,255,0.15); border-radius: 16px; padding: 20px; transition: all 0.2s; }
+    .feature-card:hover { border-color: rgba(91,155,213,0.4); transform: translateY(-2px); background: rgba(255,255,255,0.07); }
+    .feature-icon { font-size: 2rem; margin-bottom: 10px; display: block; }
+    .feature-title { font-weight: bold; color: #c8dcff; margin-bottom: 6px; }
+    .feature-desc { color: #8899bb; font-size: 0.88rem; line-height: 1.7; }
+
+    /* ヒントボックス */
+    .tip { background: rgba(21,101,192,0.15); border: 1px solid rgba(91,155,213,0.3); border-radius: 12px; padding: 14px 16px; margin: 12px 0; font-size: 0.9rem; color: #a8c4e8; }
+    .tip strong { color: #7eb8ff; }
+
+    /* テーブル */
+    .info-table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+    .info-table th { background: rgba(21,101,192,0.2); color: #7eb8ff; padding: 10px 14px; text-align: left; font-size: 0.88rem; }
+    .info-table td { padding: 10px 14px; border-bottom: 1px solid rgba(100,150,255,0.1); color: #c8dcff; font-size: 0.9rem; }
+    .info-table tr:hover td { background: rgba(255,255,255,0.03); }
+
+    /* フッター */
+    .footer { background: rgba(0,0,0,0.3); border-top: 1px solid rgba(100,150,255,0.2); padding: 24px; text-align: center; color: #556688; font-size: 0.85rem; }
+
+    @media (max-width: 600px) {
+      .hero-title { font-size: 1.6rem; }
+      .header-btns { gap: 6px; }
+      .header-btn { padding: 6px 12px; font-size: 0.78rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- 閉鎖画面 -->
+<div id="closed-screen" style="display:none; align-items:center; justify-content:center; min-height:100vh; padding:24px;">
+  <div style="text-align:center; max-width:480px;">
+    <div style="font-size:4rem; margin-bottom:20px;">🔒</div>
+    <h1 style="font-size:1.8rem; font-weight:900; color:#7eb8ff; margin-bottom:12px;">現在このページは閉鎖中です</h1>
+    <p style="color:#8899bb; line-height:1.8; margin-bottom:24px;">
+      このページは以下の期間のみアクセスできます。<br><br>
+      <span style="color:#7eb8ff; font-weight:bold;">テスト日: 2026年5月21日 00:00〜18:00</span><br>
+      <span style="color:#7eb8ff; font-weight:bold;">本番期間: 2026年5月25日 23:59 〜 2027年3月31日</span>
+    </p>
+    <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(100,150,255,0.2); border-radius:16px; padding:16px; color:#556688; font-size:0.88rem;">
+      期間外のアクセスはできません。<br>期間になったら再度アクセスしてください。
+    </div>
+    <a href="/" style="display:inline-block; margin-top:24px; padding:12px 28px; background:rgba(255,255,255,0.08); color:#e0e8ff; border-radius:20px; text-decoration:none; border:1px solid rgba(255,255,255,0.2);">← メインページへ戻る</a>
+  </div>
+</div>
+
+<!-- ログイン画面 -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">🎯</div>
+    <div class="login-title">クイズ研究部</div>
+    <div class="login-sub">QuizShare 使い方ガイド<br>部員専用ページです</div>
+    <input type="text" id="login-id" class="login-input" placeholder="グループID">
+    <div style="position:relative; margin-bottom:12px;">
+      <input type="password" id="login-pw" class="login-input" placeholder="パスワード" style="margin-bottom:0; padding-right:48px;">
+      <button type="button" onclick="togglePw()" id="pw-eye" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1.1rem;color:#7eb8ff;line-height:1;">👁️</button>
+    </div>
+    <button class="login-btn" onclick="doLogin()">🔑 入る</button>
+    <div class="login-error" id="login-error">IDまたはパスワードが違います</div>
+  </div>
+</div>
+
+<!-- メイン画面 -->
+<div id="main-screen">
+  <!-- ヘッダー -->
+  <div class="header">
+    <div class="header-title">🎯 クイズ研究部 使い方ガイド</div>
+    <div class="header-btns">
+      <button onclick="goToGroup()" class="header-btn btn-group">🏠 グループへ入る</button>
+      <a href="/" class="header-btn btn-main">← メインへ戻る</a>
+    </div>
+  </div>
+
+  <!-- ヒーロー -->
+  <div class="hero">
+    <div class="hero-badge">クイズ研究部 部員向けガイド 2026</div>
+    <div style="font-size:1.3rem; font-weight:900; color:#c8dcff; margin-bottom:8px;">📣 沢中のクイズ研究部の皆さん</div>
+    <h1 class="hero-title">🎯 <span>QuizShare</span>へようこそ！</h1>
+    <p class="hero-sub">クイズ研究部のみんなで使えるクイズ共有サービスです。<br>クイズを作って・答えて・みんなで楽しもう！</p>
+    <div class="hero-btns">
+      <button onclick="goToGroup()" class="hero-btn hero-btn-primary">🏠 クイズ研究部へ入る</button>
+      <a href="/" class="hero-btn hero-btn-secondary">← メインページへ</a>
+    </div>
+    <div class="group-info">
+      <div class="group-id-box">
+        <div class="group-id-label">グループID</div>
+        <div class="group-id-value">sawa-quiz2026</div>
+      </div>
+      <div class="group-id-box">
+        <div class="group-id-label">パスワード</div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div class="group-id-value" id="pw-display">••••••</div>
+          <button onclick="toggleHeroPw()" id="hero-pw-btn"
+            style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#7eb8ff; border-radius:8px; padding:4px 10px; cursor:pointer; font-size:0.8rem;">
+            👁️ 表示
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <!-- はじめ方 -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-icon">🚀</span>
+        <span class="section-title">はじめ方</span>
+        <span class="section-badge">まずここから</span>
+      </div>
+      <img src="{{ url_for('static', filename='help_top.png') }}" alt="トップページ" class="screenshot" onclick="zoomImg(this)">
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <div class="step-title">トップページを開く</div>
+            <div class="step-desc"><a href="https://yuto113.pythonanywhere.com" style="color:#7eb8ff;">https://yuto113.pythonanywhere.com</a> にアクセスします</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <div class="step-title">グループIDを入力する</div>
+            <div class="step-desc">グループIDに <strong style="color:#7eb8ff;">sawa-quiz2026</strong> と入力して「入る」を押します<br><span style="font-size:0.82rem;color:#556688;">↑ 上のグループID欄からコピーできます</span></div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <div class="step-title">パスワードを入力する</div>
+            <div class="step-desc">パスワードは上の「👁️ 表示」ボタンで確認できます。入力してログインしましょう</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <div class="step-title">クイズ一覧が表示される</div>
+            <div class="step-desc">ログイン成功！クイズ一覧が表示されます。クイズに挑戦したり、新しく作ったりできます。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- クイズ一覧 -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-icon">📋</span>
+        <span class="section-title">クイズ一覧画面</span>
+      </div>
+      <img src="{{ url_for('static', filename='help_list.png') }}" alt="クイズ一覧" class="screenshot" onclick="zoomImg(this)">
+      <div class="feature-grid" style="margin-top: 20px;">
+        <div class="feature-card">
+          <span class="feature-icon">🎲</span>
+          <div class="feature-title">ランダム出題</div>
+          <div class="feature-desc">全クイズからランダムに出題します。何問出すか選べます。</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">📋</span>
+          <div class="feature-title">セット</div>
+          <div class="feature-desc">クイズをまとめてセット問題として出題できます。</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">📊</span>
+          <div class="feature-title">全体統計</div>
+          <div class="feature-desc">みんなの挑戦記録・正解率・ランキングを確認できます。</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">📚</span>
+          <div class="feature-title">引用ライブラリ</div>
+          <div class="feature-desc">AIが作ったクイズを追加できます。世界・料理・ゲームなど多数！</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">#️⃣</span>
+          <div class="feature-title">タグで絞り込み</div>
+          <div class="feature-desc">タグをクリックしてカテゴリごとにクイズを絞り込めます。</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">🔄</span>
+          <div class="feature-title">並び替え</div>
+          <div class="feature-desc">新しい順・難しい順・正解率順など並び替えできます。</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- クイズを作る -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-icon">✏️</span>
+        <span class="section-title">クイズを作る</span>
+        <span class="section-badge">ぜひ作ってみよう！</span>
+      </div>
+      <img src="{{ url_for('static', filename='help_add.png') }}" alt="クイズ追加画面" class="screenshot" onclick="zoomImg(this)">
+      <div class="tip">💡 右下の <strong>「＋」ボタン</strong> を押すと追加フォームが開きます</div>
+      <table class="info-table">
+        <tr><th>項目</th><th>説明</th><th>必須</th></tr>
+        <tr><td>名前・クラス</td><td>誰が作ったか表示されます</td><td>任意</td></tr>
+        <tr><td>クイズ（問題文）</td><td>最大500文字。画像も添付できます</td><td>✅ 必須</td></tr>
+        <tr><td>回答形式</td><td>「記述式」か「選択肢」を選べます</td><td>✅ 必須</td></tr>
+        <tr><td>答え（正解）</td><td>複数の正解を登録できます</td><td>✅ 必須</td></tr>
+        <tr><td>タグ</td><td>カテゴリを入力してEnterで追加</td><td>任意</td></tr>
+        <tr><td>解説</td><td>答え合わせ後に表示される説明文</td><td>任意</td></tr>
+        <tr><td>ヒント</td><td>挑戦中に使えるヒント</td><td>任意</td></tr>
+        <tr><td>編集パスワード</td><td>後から編集・削除するためのパスワード</td><td>任意</td></tr>
+      </table>
+      <div class="tip">
+        <strong>💡 採点のしくみ</strong><br>
+        漢字↔ひらがな・カタカナ変換・類義語・タイポ許容・部分一致など賢く採点します！
+        「さくら」と入力しても「桜」と一致するよ。
+      </div>
+    </div>
+
+    <!-- クイズに挑戦 -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-icon">⏱️</span>
+        <span class="section-title">クイズに挑戦する</span>
+      </div>
+      <img src="{{ url_for('static', filename='help_answer.png') }}" alt="クイズ挑戦画面" class="screenshot" onclick="zoomImg(this)">
+      <div class="feature-grid" style="margin-top: 20px;">
+        <div class="feature-card">
+          <span class="feature-icon">⏱️</span>
+          <div class="feature-title">タイム計測</div>
+          <div class="feature-desc">解答にかかった時間が自動で記録されます。速く正解できるほど好タイム！</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">💡</span>
+          <div class="feature-title">ヒント機能</div>
+          <div class="feature-desc">「ヒント」ボタンでヒントを表示できます（タイムに加算されます）</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">📖</span>
+          <div class="feature-title">解説表示</div>
+          <div class="feature-desc">答え合わせ後に解説が表示されます。知識を深めよう！</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">🏆</span>
+          <div class="feature-title">ランキング</div>
+          <div class="feature-desc">名前を登録してタイムを競えます。1位を目指そう！</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">😊</span>
+          <div class="feature-title">感想</div>
+          <div class="feature-desc">挑戦後に感想やコメントを残せます。</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">🤖</span>
+          <div class="feature-title">AI採点（β）</div>
+          <div class="feature-desc">記述式で不正解のとき、AIが「惜しい」「正解に近い」を判定してくれます。</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- その他の機能 -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-icon">✨</span>
+        <span class="section-title">その他の便利機能</span>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <span class="feature-icon">🎨</span>
+          <div class="feature-title">テーマ設定</div>
+          <div class="feature-desc">背景テーマを20種類以上から選べます。季節に合わせて自動変更もできます！</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">📱</span>
+          <div class="feature-title">スマホ対応</div>
+          <div class="feature-desc">スマートフォン・タブレットでも快適に使えます。</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">🖼️</span>
+          <div class="feature-title">画像付きクイズ</div>
+          <div class="feature-desc">クイズに画像を3枚まで添付できます。画像をタップすると拡大表示されます。</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">📚</span>
+          <div class="feature-title">引用ライブラリ</div>
+          <div class="feature-desc">AIが作った問題を追加できます。世界・料理・ゲーム・大学レベルなど多数！</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">💬</span>
+          <div class="feature-title">フィードバック</div>
+          <div class="feature-desc">不具合・要望はフィードバックページから送れます。</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">🔒</span>
+          <div class="feature-title">セキュリティ</div>
+          <div class="feature-desc">パスワードは安全に暗号化されています。個人情報は収集しません。</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ヒント集 -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-icon">💡</span>
+        <span class="section-title">使い方のコツ</span>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">💡</div>
+          <div class="step-content">
+            <div class="step-title">タグを活用しよう</div>
+            <div class="step-desc">クイズにタグ（#歴史、#地理など）をつけると、後から絞り込みできて便利です！</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">💡</div>
+          <div class="step-content">
+            <div class="step-title">複数の正解を登録しよう</div>
+            <div class="step-desc">「徳川家康」と「家康」の両方を正解にするなど、複数の答えを登録できます！</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">💡</div>
+          <div class="step-content">
+            <div class="step-title">解説を書こう</div>
+            <div class="step-desc">解説欄に詳しい説明を書くと、間違えた人の勉強になります！</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">💡</div>
+          <div class="step-content">
+            <div class="step-title">編集パスワードを設定しよう</div>
+            <div class="step-desc">編集パスワードを設定すると、後から自分だけが編集・削除できます！</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">💡</div>
+          <div class="step-content">
+            <div class="step-title">ランダム出題で練習しよう</div>
+            <div class="step-desc">「ランダム出題」で毎回違うクイズが出るので、繰り返し練習に最適です！</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ガイド付きで入るボタン -->
+  <div style="background:linear-gradient(135deg,#0d1f4e,#1a3a7c); padding:48px 24px; text-align:center; border-top:1px solid rgba(100,150,255,0.2);">
+    <div style="font-size:2.5rem; margin-bottom:12px;">🎮</div>
+    <h2 style="font-size:1.5rem; font-weight:900; color:#7eb8ff; margin-bottom:8px;">実際に使ってみよう！</h2>
+    <p style="color:#8899bb; margin-bottom:24px; line-height:1.7;">ガイド付きでQuizShareの使い方を体験できます。<br>初めての方はまずここから！</p>
+    <button onclick="startGuide()" style="padding:16px 40px; background:linear-gradient(135deg,#1565c0,#1976d2); color:white; border:none; border-radius:25px; font-size:1.1rem; font-weight:bold; cursor:pointer; box-shadow:0 4px 20px rgba(21,101,192,0.4); transition:all 0.2s;"
+      onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+      🗺️ ガイド付きで入ってみる
+    </button>
+    <div style="margin-top:12px; color:#556688; font-size:0.82rem;">※ 初回のみガイドが表示されます</div>
+    <button onclick="resetGuide()" style="margin-top:8px; background:none; border:1px solid rgba(255,255,255,0.2); color:#8899bb; border-radius:20px; padding:6px 16px; cursor:pointer; font-size:0.8rem;">🔄 ガイドをリセット</button>
+  </div>
+
+  <div class="footer">
+    <p>🎯 クイズ研究部 × QuizShare | <a href="https://yuto113.pythonanywhere.com" style="color:#7eb8ff;">yuto113.pythonanywhere.com</a></p>
+    <p style="margin-top: 6px;">問題・要望は <a href="/feedback" style="color:#7eb8ff;">フィードバック</a> からどうぞ</p>
+  </div>
+</div>
+
+<!-- 画像拡大モーダル -->
+<div id="zoom-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:9999; align-items:center; justify-content:center; padding:16px;" onclick="closeZoom()">
+  <img id="zoom-img" src="" style="max-width:95vw; max-height:95vh; border-radius:12px; box-shadow:0 8px 40px rgba(0,0,0,0.5);">
+</div>
+
+<script>
+const CORRECT_ID = 'sawa-quiz2026';
+const CORRECT_PW = 'asao-14';
+const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+
+function goToGroup() {
+  window.location.href = '/quizclub-login';
+}
+
+function startGuide() {
+  if (sessionStorage.getItem('quizclub_guide_done') === '1') {
+    if (!confirm('ガイドは既に完了しています。もう一度見ますか？')) return;
+  }
+  window.location.href = '/quizclub-login-guide';
+}
+
+function resetGuide() {
+  sessionStorage.removeItem('quizclub_guide_done');
+  sessionStorage.removeItem('quizclub_guide_pending');
+  alert('ガイドをリセットしました！');
+}
+
+function toggleHeroPw() {
+  const disp = document.getElementById('pw-display');
+  const btn = document.getElementById('hero-pw-btn');
+  if (disp.textContent === '••••••') {
+    disp.textContent = 'asao-14';
+    btn.textContent = '🙈 隠す';
+  } else {
+    disp.textContent = '••••••';
+    btn.textContent = '👁️ 表示';
+  }
+}
+
+// アクセス期間チェック（APIから取得）
+async function checkAccessPeriod() {
+  try {
+    const r = await fetch('/api/page_schedules/quizclub/check');
+    const data = await r.json();
+    return data.ok && data.open;
+  } catch(e) {
+    return true; // APIエラーの場合は開く
+  }
+}
+
+// 閉鎖画面を表示
+function showClosed() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('main-screen').style.display = 'none';
+  document.getElementById('closed-screen').style.display = 'flex';
+}
+
+// 1ヶ月間アクセスなしチェック
+function checkSessionExpiry() {
+  const lastAccess = localStorage.getItem('quizclub_last_access');
+  if (lastAccess) {
+    const elapsed = Date.now() - parseInt(lastAccess);
+    if (elapsed > ONE_MONTH_MS) {
+      // 1ヶ月以上経過 → ログアウト
+      sessionStorage.removeItem('quizclub_auth');
+      localStorage.removeItem('quizclub_last_access');
+      return false;
+    }
+  }
+  return true;
+}
+
+// アクセス時刻を更新
+function updateLastAccess() {
+  localStorage.setItem('quizclub_last_access', Date.now().toString());
+}
+
+// パスワード表示トグル
+function togglePw() {
+  const input = document.getElementById('login-pw');
+  const btn = document.getElementById('pw-eye');
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁️';
+  }
+}
+
+// ガイドは/group/guideページで表示される
+
+function doLogin() {
+  const id = document.getElementById('login-id').value.trim();
+  const pw = document.getElementById('login-pw').value.trim();
+  if (id === CORRECT_ID && pw === CORRECT_PW) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('main-screen').style.display = 'block';
+    sessionStorage.setItem('quizclub_auth', '1');
+    updateLastAccess();
+  } else {
+    document.getElementById('login-error').style.display = 'block';
+    setTimeout(() => document.getElementById('login-error').style.display = 'none', 3000);
+  }
+}
+
+// 起動時チェック（非同期）
+(async function() {
+  const isOpen = await checkAccessPeriod();
+  if (!isOpen) {
+    showClosed();
+  } else if (sessionStorage.getItem('quizclub_auth') === '1' && checkSessionExpiry()) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('main-screen').style.display = 'block';
+    updateLastAccess();
+  } else {
+    document.getElementById('login-screen').style.display = 'flex';
+  }
+})();
+
+// Enterキーでログイン
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+// 画像拡大
+function zoomImg(img) {
+  document.getElementById('zoom-img').src = img.src;
+  document.getElementById('zoom-modal').style.display = 'flex';
+}
+function closeZoom() {
+  document.getElementById('zoom-modal').style.display = 'none';
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeZoom();
+});
+</script>
+</body>
+</html>

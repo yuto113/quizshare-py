@@ -1,0 +1,318 @@
+<style>
+.kw{max-width:980px;margin:0 auto;padding:18px 20px 60px;
+  font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;color:#14213d}
+.kw h2{font-size:19px;margin:0 0 4px;display:flex;align-items:center;gap:9px}
+.kw .lead{font-size:12.5px;color:#8a8270;margin:0 0 16px;line-height:1.7}
+.kw .badges{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:18px}
+.kbadge{font-size:11px;padding:3px 10px;border-radius:99px;font-weight:700}
+.kbadge.k{background:#e8ecf7;color:#2c3e66}
+.kbadge.b{background:#f3e8f7;color:#5c2c66}
+.kbadge.u{background:#14213d;color:#e0b84a}
+.ktabs{display:flex;gap:2px;border-bottom:1px solid #ece9e2;margin-bottom:16px;overflow-x:auto}
+.ktab{padding:9px 15px;font-size:12.5px;color:#8a8270;cursor:pointer;white-space:nowrap;
+  background:none;border:none;border-bottom:2px solid transparent;font-family:inherit}
+.ktab:hover{color:#14213d}
+.ktab.on{color:#14213d;border-bottom-color:#b8860b;font-weight:600}
+.kpane{display:none}.kpane.on{display:block}
+.kcard{background:#fff;border:1px solid #ece9e2;border-radius:10px;padding:13px 15px;margin-bottom:10px}
+.kcard .top{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:6px}
+.kcard .who{font-size:12px;color:#8a8270}
+.kcard .body{font-size:13px;line-height:1.7;white-space:pre-wrap;margin:6px 0}
+.st{font-size:10.5px;padding:2px 8px;border-radius:99px;font-weight:700}
+.st.open{background:#fdf0e2;color:#a35a1c}
+.st.working{background:#e4eefb;color:#1c4f8a}
+.st.closed{background:#f0eee8;color:#8a8270}
+.st.pending{background:#fdf0e2;color:#a35a1c}
+.st.approved{background:#e4f4f1;color:#1d6f65}
+.st.rejected{background:#fdf2f1;color:#a83a30}
+.kbtn{background:#14213d;color:#fff;border:none;padding:6px 13px;border-radius:7px;
+  font-size:11.5px;cursor:pointer;font-family:inherit}
+.kbtn:hover{background:#1c2d52}
+.kbtn.gh{background:none;border:1px solid #ece9e2;color:#14213d}
+.kbtn.gh:hover{background:#faf9f5}
+.kbtn.ng{background:#c0453b}
+.kinp,.ksel,.kta{padding:7px 10px;border:1px solid #ece9e2;border-radius:7px;
+  font-size:12.5px;font-family:inherit;width:100%}
+.kta{min-height:74px;resize:vertical}
+.krow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:9px}
+.kform{background:#faf9f6;border:1px solid #ece9e2;border-radius:10px;padding:14px;margin-bottom:18px}
+.kform h4{font-size:12.5px;margin:0 0 10px}
+.kempty{padding:30px 0;text-align:center;color:#b0a894;font-size:12.5px}
+.knote{background:#fdf9ec;border:1px solid #f0e4c0;border-radius:8px;padding:10px 13px;
+  font-size:11.5px;color:#7a6420;line-height:1.7;margin-bottom:16px}
+.kmono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;color:#8a8270}
+.ktbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.ktbl th{text-align:left;font-size:11px;color:#8a8270;padding:7px 9px;border-bottom:1px solid #ece9e2}
+.ktbl td{padding:8px 9px;border-bottom:1px solid #f4f2ec}
+</style>
+
+<div class="kw">
+  <h2 id="kTitle">🕶 Qzero公安部</h2>
+  <p class="lead" id="kLead">会社の秩序を守るための部署です。通報の受理と対応、協力者の管理をします。</p>
+
+  <div class="badges" id="kBadges"></div>
+
+  <div class="knote">
+    <b>記録について</b><br>
+    公安部員がメールや投稿を閲覧すると、その操作は「対応記録」に必ず残ります。
+    記録は対象になった本人も見ることができます。監視する側も記録される仕組みです。
+  </div>
+
+  <div class="ktabs">
+    <button class="ktab on" data-p="reports">📮 通報</button>
+    <button class="ktab" data-p="agents">🤝 協力者</button>
+    <button class="ktab" data-p="members">👥 所属</button>
+    <button class="ktab" data-p="audits">📜 対応記録</button>
+  </div>
+
+  <!-- 通報 -->
+  <div class="kpane on" id="p-reports">
+    <div class="kform">
+      <h4>＋ 通報する</h4>
+      <div class="krow">
+        <select class="ksel" id="rCat" style="max-width:150px">
+          <option value="speech">言動について</option>
+          <option value="mail">メールについて</option>
+          <option value="other">その他</option>
+        </select>
+        <input class="kinp" id="rTarget" placeholder="対象（社員IDなど・任意）" style="max-width:220px">
+      </div>
+      <textarea class="kta" id="rBody" placeholder="内容を書いてください"></textarea>
+      <div class="krow" style="margin:9px 0 0"><button class="kbtn" onclick="repSend()">通報する</button></div>
+    </div>
+    <div id="repList"></div>
+  </div>
+
+  <!-- 協力者 -->
+  <div class="kpane" id="p-agents">
+    <div class="knote">
+      協力者は<b>公安部が申請</b>し、<b>警備の裏理事官が許可</b>してはじめて表に載ります。
+      公安部だけでは登録できません。
+    </div>
+    <div class="kform" id="agForm" style="display:none">
+      <h4>＋ 協力者を申請する（公安部）</h4>
+      <div class="krow">
+        <input class="kinp" id="agName" placeholder="コードネーム" style="max-width:200px">
+        <input class="kinp" id="agReal" placeholder="社員ID（任意）" style="max-width:180px">
+      </div>
+      <textarea class="kta" id="agNote" placeholder="理由・メモ"></textarea>
+      <div class="krow" style="margin:9px 0 0"><button class="kbtn" onclick="agSend()">申請する</button></div>
+    </div>
+    <div id="agList"></div>
+  </div>
+
+  <!-- 所属 -->
+  <div class="kpane" id="p-members">
+    <div class="kform" id="mbForm" style="display:none">
+      <h4>＋ 配属する（オーナーのみ）</h4>
+      <div class="krow">
+        <select class="ksel" id="mbStaff" style="max-width:200px"></select>
+        <select class="ksel" id="mbDiv" style="max-width:170px" onchange="mbRankOpts()">
+          <option value="kouan">Qzero公安部</option>
+          <option value="keibi">警備</option>
+        </select>
+        <select class="ksel" id="mbRank" style="max-width:170px"></select>
+        <button class="kbtn" onclick="mbAdd()">配属</button>
+      </div>
+    </div>
+    <div id="mbList"></div>
+  </div>
+
+  <!-- 対応記録 -->
+  <div class="kpane" id="p-audits">
+    <p class="lead">公安部で行われた操作の記録です。消すことはできません。</p>
+    <div id="auList"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+var D = null;
+var K = function(s){ return String(s==null?'':s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+var RANK = {ura_rijikan:'裏理事官', chief:'部長', member:'部員'};
+var STL  = {open:'受理', working:'対応中', closed:'完了',
+            pending:'承認待ち', approved:'承認済み', rejected:'却下'};
+var CAT  = {speech:'言動', mail:'メール', other:'その他'};
+
+async function J(u, o){
+  var r = await fetch(u, o);
+  return await r.json().catch(function(){ return {ok:false, error:'応答を読めません'}; });
+}
+function P(u, b){ return J(u, {method:'POST', headers:{'Content-Type':'application/json'},
+                              body: JSON.stringify(b||{})}); }
+function T(m, t){ if (window.toast) window.toast(m, t); else alert(m); }
+
+async function load(){
+  D = await J('/api/admin/kouan/overview');
+  if (!D.ok){ document.getElementById('repList').innerHTML =
+    '<div class="kempty">'+K(D.error)+'</div>'; return; }
+
+  var b = [];
+  if (D.rank_kouan) b.push('<span class="kbadge k">Qzero公安部 · '+K(RANK[D.rank_kouan]||D.rank_kouan)+'</span>');
+  if (D.rank_keibi) b.push('<span class="kbadge b">警備 · '+K(RANK[D.rank_keibi]||D.rank_keibi)+'</span>');
+  if (D.is_owner)  b.push('<span class="kbadge u">オーナー</span>');
+  document.getElementById('kBadges').innerHTML = b.join('');
+
+  document.getElementById('agForm').style.display = D.rank_kouan ? '' : 'none';
+  document.getElementById('mbForm').style.display = D.is_owner ? '' : 'none';
+  if (D.is_owner){
+    document.getElementById('mbStaff').innerHTML = (D.staff||[]).map(function(s){
+      return '<option value="'+K(s.staff_id)+'">'+K(s.name||s.staff_id)+'（'+K(s.staff_id)+'）</option>';
+    }).join('');
+    mbRankOpts();
+  }
+  drawReports(); drawAgents(); drawMembers(); drawAudits();
+}
+
+function drawReports(){
+  var el = document.getElementById('repList');
+  if (!D.reports.length){ el.innerHTML = '<div class="kempty">通報はありません</div>'; return; }
+  el.innerHTML = D.reports.map(function(r){
+    var act = '';
+    if (D.rank_kouan && r.status !== 'closed'){
+      act = '<button class="kbtn gh" onclick="repSet('+r.id+',\'working\')">対応中にする</button> '
+          + '<button class="kbtn" onclick="repSet('+r.id+',\'closed\')">完了にする</button>';
+    }
+    return '<div class="kcard"><div class="top">'
+      + '<span class="st '+K(r.status)+'">'+K(STL[r.status]||r.status)+'</span>'
+      + '<b>'+K(CAT[r.category]||r.category)+'</b>'
+      + (r.target ? '<span class="kmono">対象: '+K(r.target)+'</span>' : '')
+      + '</div>'
+      + '<div class="who">'+K(r.reporter_id)+' · '+K(r.created_at)+'</div>'
+      + '<div class="body">'+K(r.body)+'</div>'
+      + (r.note ? '<div class="kmono">記録: '+K(r.note)+'</div>' : '')
+      + (act ? '<div class="krow" style="margin:8px 0 0">'+act+'</div>' : '')
+      + '</div>';
+  }).join('');
+}
+
+function drawAgents(){
+  var el = document.getElementById('agList');
+  if (!D.agents.length){ el.innerHTML = '<div class="kempty">協力者はいません</div>'; return; }
+  el.innerHTML = D.agents.map(function(a){
+    var act = '';
+    if (D.rank_keibi === 'ura_rijikan' && a.status === 'pending'){
+      act = '<button class="kbtn" onclick="agDecide('+a.id+',1)">許可する</button> '
+          + '<button class="kbtn ng" onclick="agDecide('+a.id+',0)">却下</button>';
+    }
+    return '<div class="kcard"><div class="top">'
+      + '<span class="st '+K(a.status)+'">'+K(STL[a.status]||a.status)+'</span>'
+      + '<b>'+K(a.code_name)+'</b>'
+      + (a.real_id ? '<span class="kmono">'+K(a.real_id)+'</span>' : '')
+      + '</div>'
+      + '<div class="who">申請: '+K(a.requested_by)+' · '+K(a.requested_at)
+      + (a.approved_by ? ' ／ 決裁: '+K(a.approved_by)+' · '+K(a.approved_at||'') : '') + '</div>'
+      + (a.note ? '<div class="body">'+K(a.note)+'</div>' : '')
+      + (act ? '<div class="krow" style="margin:8px 0 0">'+act+'</div>' : '')
+      + '</div>';
+  }).join('');
+}
+
+function drawMembers(){
+  var el = document.getElementById('mbList');
+  var rows = D.members.map(function(m){
+    var rm = (D.is_owner && m.staff_id !== 'yuto')
+      ? '<button class="kbtn gh" onclick="mbDel(\''+K(m.staff_id)+'\',\''+K(m.division)+'\')">解任</button>' : '';
+    return '<tr><td><b>'+K(m.staff_id)+'</b></td>'
+      + '<td>'+(m.division==='keibi'?'警備':'Qzero公安部')+'</td>'
+      + '<td>'+K(RANK[m.rank]||m.rank)+'</td>'
+      + '<td class="kmono">'+K(m.assigned_at)+'</td><td>'+rm+'</td></tr>';
+  });
+  el.innerHTML = rows.length
+    ? '<table class="ktbl"><thead><tr><th>社員</th><th>部署</th><th>階級</th><th>配属</th><th></th></tr></thead><tbody>'
+      + rows.join('') + '</tbody></table>'
+    : '<div class="kempty">所属者はいません</div>';
+}
+
+function drawAudits(){
+  var el = document.getElementById('auList');
+  if (!D.audits.length){ el.innerHTML = '<div class="kempty">記録はありません</div>'; return; }
+  el.innerHTML = '<table class="ktbl"><thead><tr><th>日時</th><th>操作した人</th>'
+    + '<th>操作</th><th>対象</th><th>内容</th></tr></thead><tbody>'
+    + D.audits.map(function(a){
+        return '<tr><td class="kmono">'+K(a.created_at)+'</td><td>'+K(a.actor_id)+'</td>'
+          + '<td>'+K(a.action)+'</td><td class="kmono">'+K(a.target)+'</td>'
+          + '<td>'+K(a.detail)+'</td></tr>'; }).join('')
+    + '</tbody></table>';
+}
+
+window.repSend = async function(){
+  var b = document.getElementById('rBody').value.trim();
+  if (!b) return T('内容を書いてください', 'error');
+  var r = await P('/api/admin/kouan/report', {body:b,
+    target: document.getElementById('rTarget').value,
+    category: document.getElementById('rCat').value});
+  if (!r.ok) return T(r.error||'失敗しました', 'error');
+  document.getElementById('rBody').value = '';
+  document.getElementById('rTarget').value = '';
+  T('通報しました', 'ok'); load();
+};
+window.repSet = async function(id, st){
+  var note = prompt(st === 'closed' ? '対応の記録（任意）' : 'メモ（任意）') || '';
+  var r = await P('/api/admin/kouan/report/status', {id:id, status:st, note:note});
+  if (!r.ok) return T(r.error||'失敗しました', 'error');
+  T('更新しました', 'ok'); load();
+};
+window.agSend = async function(){
+  var n = document.getElementById('agName').value.trim();
+  if (!n) return T('コードネームが必要です', 'error');
+  var r = await P('/api/admin/kouan/agent/request', {code_name:n,
+    real_id: document.getElementById('agReal').value,
+    note: document.getElementById('agNote').value});
+  if (!r.ok) return T(r.error||'失敗しました', 'error');
+  document.getElementById('agName').value = '';
+  document.getElementById('agReal').value = '';
+  document.getElementById('agNote').value = '';
+  T('申請しました。警備の許可を待ちます', 'ok'); load();
+};
+window.agDecide = async function(id, ok){
+  if (!confirm(ok ? 'この協力者を許可しますか？' : '却下しますか？')) return;
+  var r = await P('/api/admin/kouan/agent/decide', {id:id, approve:!!ok});
+  if (!r.ok) return T(r.error||'失敗しました', 'error');
+  T(ok ? '許可しました' : '却下しました', 'ok'); load();
+};
+window.mbRankOpts = function(){
+  var div = document.getElementById('mbDiv').value;
+  document.getElementById('mbRank').innerHTML = (div === 'keibi')
+    ? '<option value="member">部員</option><option value="ura_rijikan">裏理事官</option>'
+    : '<option value="member">部員</option><option value="chief">部長</option>';
+};
+window.mbAdd = async function(){
+  var r = await P('/api/admin/kouan/member', {
+    staff_id: document.getElementById('mbStaff').value,
+    division: document.getElementById('mbDiv').value,
+    rank:     document.getElementById('mbRank').value});
+  if (!r.ok) return T(r.error||'失敗しました', 'error');
+  T('配属しました', 'ok'); load();
+};
+window.mbDel = async function(sid, div){
+  if (!confirm(sid + ' を解任しますか？')) return;
+  var r = await P('/api/admin/kouan/member', {staff_id:sid, division:div, remove:true});
+  if (!r.ok) return T(r.error||'失敗しました', 'error');
+  T('解任しました', 'ok'); load();
+};
+
+document.querySelectorAll('.ktab').forEach(function(t){
+  t.onclick = function(){
+    document.querySelectorAll('.ktab').forEach(function(x){ x.classList.toggle('on', x===t); });
+    document.querySelectorAll('.kpane').forEach(function(p){
+      p.classList.toggle('on', p.id === 'p-'+t.dataset.p); });
+  };
+});
+
+// URLの div で開く部署を決める
+(function(){
+  var div = new URLSearchParams(location.search).get('div');
+  if (div === 'keibi'){
+    document.getElementById('kTitle').textContent = '🎯 警備局警備企画課（ゼロ）';
+    document.getElementById('kLead').textContent =
+      '公安部の上位機関です。協力者の許可と、記録の管理をします。';
+    // 協力者タブを最初に開く
+    var t = document.querySelector('.ktab[data-p="agents"]');
+    if (t) t.click();
+  }
+})();
+load();
+})();
+</script>

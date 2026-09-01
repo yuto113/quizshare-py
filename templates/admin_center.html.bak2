@@ -44,8 +44,6 @@ iframe{width:100%;height:100%;border:none;display:block;position:absolute;inset:
   {% if role == 'admin' %}
   <div class="tab" data-g="quiz" onclick="grp(this)">📚 QuizShare</div>
   <div class="tab" data-g="qstart" onclick="grp(this)">⚙️ Qstart</div>
-  <div class="tab" data-g="kouan" onclick="grp(this)">🕶 公安部</div>
-  <div class="tab" data-g="pages" onclick="grp(this)">🔧 ページ管理</div>
   {% endif %}
 </div>
 
@@ -82,13 +80,6 @@ var MENU = {
     ['🩺 稼働状況',   '/qstart/status'],
     ['🔑 API',        '/qstart/api'],
     ['🧪 テスト環境', '/admin/qstart'],
-  ],
-  kouan: [
-    ['🕶 Qzero公安部',            '/admin/kouan'],
-    ['🎯 警備局警備企画課（ゼロ）','/admin/kouan?div=keibi'],
-  ],
-  pages: [
-    ['🔧 管理ページ管理', '/admin/pages'],
   ],
 };
 

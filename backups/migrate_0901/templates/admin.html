@@ -1,0 +1,632 @@
+{# ============================================================
+   admin.html : 管理者画面 (/<groupID>/setting/)
+   閲覧モードの切替・グループ削除ができる
+   ============================================================ #}
+{% extends "base.html" %}
+{% block title %}管理者 - クイズシェア{% endblock %}
+{% block body_class %}admin-body{% endblock %}
+
+{% block nav_items %}
+  <a class="header-link" href="{{ url_for('page_home') }}">← メインへ</a>
+  <a class="header-link" href="{{ url_for('page_help') }}">❓ ヘルプ</a>
+  <a class="header-link" href="{{ url_for('page_terms') }}">📜 規約</a>
+  <a class="header-link" href="{{ url_for('page_privacy') }}">🔒 プライバシー</a>
+{% endblock %}
+
+{% block content %}
+<div class="container-narrow">
+  {% if not group_info %}
+    {# ===== グループが存在しない場合 ===== #}
+    <div class="admin-card" style="text-align:center; padding:40px 24px;">
+      <div style="font-size:56px;">❓</div>
+      <h2 style="color:#fff; font-family:'Zen Maru Gothic',sans-serif; font-weight:900; font-size:22px; margin:8px 0;">
+        グループが見つからないよ
+      </h2>
+      <p style="color:#9CA3AF; font-size:13px;">
+        URLのグループID「<code style="background:rgba(255,255,255,0.1); padding:2px 6px; border-radius:4px;">{{ group_id }}</code>」が正しいか確認してね
+      </p>
+    </div>
+
+
+  {% elif not logged_in %}
+    {# ===== ログイン画面 ===== #}
+    <div style="text-align:center; margin-bottom:32px;">
+      <div style="display:inline-flex; align-items:center; justify-content:center; width:64px; height:64px; border-radius:22px; background:linear-gradient(135deg, #EF4444, #DC2626); font-size:28px;">
+        🔒
+      </div>
+      <h1 class="display-font" style="color:#fff; font-weight:900; font-size:28px; margin:16px 0 6px;">管理者ログイン</h1>
+      <p style="color:#9CA3AF; font-size:13px; margin:0;">管理者パスワードを入力してね</p>
+    </div>
+
+    <div class="admin-card">
+      <form id="login-form">
+        <div class="form-group">
+          <label class="form-label">グループID</label>
+          <div style="padding:10px 14px; background:rgba(0,0,0,0.3); border-radius:10px; font-family:monospace; font-size:13px; color:#9CA3AF; border:1px solid rgba(255,255,255,0.05);">
+            {{ group_id }}
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">パスワード</label>
+          <input type="password" id="admin-pw" class="form-control" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn btn-block" style="background:linear-gradient(135deg, #EF4444, #DC2626); color:#fff; margin-top:4px;">
+          🔓 ログイン
+        </button>
+      </form>
+    </div>
+    <p style="text-align:center; font-size:11px; color:#6B7280; margin-top:20px;">
+      🛡️ セッションは1時間で期限切れになるよ
+    </p>
+
+  {% else %}
+    {# ===== ログイン後の管理画面 ===== #}
+    <div style="text-align:center; margin-bottom:24px;">
+      <div style="font-size:40px;">⚙️</div>
+      <h1 class="display-font" style="color:#fff; font-weight:900; font-size:24px; margin:8px 0 0;">
+        {{ group_info.name }} の管理画面
+      </h1>
+    </div>
+
+    {# ---- AI採点 + APIキー設定（統合） ---- #}
+    <div class="admin-card" style="margin-bottom:16px; padding:16px;">
+      <h3 style="margin-bottom:12px;">🤖 AI採点設定</h3>
+
+      <div class="form-group">
+        <label class="form-label">AIサービスを選ぶ</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;" id="admin-ai-provider-btns">
+          <button type="button" class="admin-ai-pvd-btn" data-provider="gemini"
+            style="padding:10px;border-radius:10px;border:2px solid #444;background:#1e1e2e;color:#e0e0ff;cursor:pointer;font-weight:bold;font-size:0.85rem;">
+            🌟 Google Gemini
+          </button>
+          <button type="button" class="admin-ai-pvd-btn" data-provider="openai"
+            style="padding:10px;border-radius:10px;border:2px solid #444;background:#1e1e2e;color:#e0e0ff;cursor:pointer;font-weight:bold;font-size:0.85rem;">
+            🧠 OpenAI
+          </button>
+          <button type="button" class="admin-ai-pvd-btn" data-provider="anthropic"
+            style="padding:10px;border-radius:10px;border:2px solid #444;background:#1e1e2e;color:#e0e0ff;cursor:pointer;font-weight:bold;font-size:0.85rem;">
+            🔮 Anthropic
+          </button>
+          <button type="button" class="admin-ai-pvd-btn" data-provider="cloudflare"
+            style="padding:10px;border-radius:10px;border:2px solid #444;background:#1e1e2e;color:#e0e0ff;cursor:pointer;font-weight:bold;font-size:0.85rem;">
+            ☁️ Cloudflare
+          </button>
+        </div>
+        <div id="admin-ai-model-info" style="margin-top:8px;background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);border-radius:8px;padding:10px;font-size:0.82rem;color:#a5b4fc;">
+          サービスを選択してください
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" id="admin-ai-key-label">APIキー</label>
+        <div style="position:relative;">
+          <input type="password" id="admin-ai-key" class="form-control" placeholder="APIキーを入力..."
+            style="padding-right:48px;font-family:monospace;font-size:0.85rem;">
+          <button type="button" onclick="toggleAdminAiKey()" id="admin-ai-key-eye"
+            style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1rem;">👁️</button>
+        </div>
+      </div>
+
+      <div class="form-group" id="admin-cf-section" style="display:none;">
+        <label class="form-label">Account ID（Cloudflareのみ）</label>
+        <input type="text" id="admin-cf-account" class="form-control" placeholder="Cloudflare Account ID"
+          style="font-family:monospace;font-size:0.85rem;">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">管理者パスワード（確認用）</label>
+        <input type="password" id="ai-admin-pw" class="form-control" placeholder="管理者パスワード">
+      </div>
+
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
+        <span style="font-size:0.85rem;color:#9CA3AF;">AI採点</span>
+        <button type="button" id="toggle-ai" class="toggle {% if group_info.ai_scoring %}on{% endif %}" aria-label="AI採点切替"></button>
+        <span id="ai-status" style="font-size:0.82rem;color:{{ '#34D399' if group_info.ai_scoring else '#9CA3AF' }};">
+          現在: {% if group_info.ai_scoring %}有効{% else %}無効{% endif %}
+        </span>
+      </div>
+
+      <div style="display:flex;gap:8px;">
+        <button type="button" onclick="saveAdminAiConfig()" class="btn btn-primary" style="flex:1;">💾 保存する</button>
+        <button type="button" onclick="loadAdminAiConfig()" class="btn btn-secondary" style="padding:8px 16px;">📋 現在の設定</button>
+      </div>
+      <div id="ai-config-status" style="margin-top:8px;font-size:0.82rem;color:#9CA3AF;display:none;"></div>
+    </div>
+
+
+    {# ---- 閲覧のみモード切替 ---- #}
+    <div class="admin-card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:12px;">
+        <div style="flex:1;">
+          <h3>👁️ 閲覧のみモード</h3>
+          <p>
+            ONにするとメンバーはクイズの追加・編集・削除ができなくなるよ。<br>
+            挑戦や感想の投稿は引き続きできるよ。
+          </p>
+        </div>
+        <button type="button" id="toggle-view" class="toggle {% if group_info.view_only %}on{% endif %}" aria-label="閲覧モード切替"></button>
+      </div>
+      <div id="mode-status" style="display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:700; padding:4px 12px; border-radius:999px;
+                                    background: {{ 'rgba(59,130,246,0.2)' if group_info.view_only else 'rgba(52,211,153,0.2)' }};
+                                    color: {{ '#60A5FA' if group_info.view_only else '#34D399' }};">
+        <span style="width:6px; height:6px; border-radius:50%; background:currentColor;"></span>
+        現在: {% if group_info.view_only %}閲覧のみモード{% else %}通常モード(編集可){% endif %}
+      </div>
+    </div>
+
+    {# ---- グループ削除 ---- #}
+    <div class="admin-card danger">
+      <h3>🚫 グループを削除</h3>
+      <p>
+        グループ本体、全クイズ、全挑戦記録、全感想が永久に削除されるよ。<br>
+        <strong style="color:#FCA5A5;">この操作は取り消せない!</strong>
+      </p>
+
+      <div id="delete-step1">
+        <button type="button" id="btn-show-delete" class="btn" style="background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#FCA5A5;">
+          🗑️ 削除する
+        </button>
+      </div>
+
+      <div id="delete-step2" style="display:none;">
+        <p style="font-size:12px; color:#9CA3AF;">
+          確認のため、グループID <code style="background:rgba(0,0,0,0.3); padding:2px 6px; border-radius:4px; color:#FCA5A5;">{{ group_id }}</code> を入力してね:
+        </p>
+        <input type="text" id="delete-confirm" class="form-control" placeholder="グループID" style="margin-bottom:10px;">
+        {# ---- 削除前の最終確認 ---- #}
+        <label class="form-check" style="background:rgba(239,68,68,0.1); border-color:rgba(239,68,68,0.3);">
+          <input type="checkbox" id="delete-confirm-chk">
+          <span style="color:#fff;">この削除の結果について、すべての責任は管理者である私が負うことを確認しました。</span>
+        </label>
+        <div style="display:flex; gap:8px; margin-top:10px;">
+          <button type="button" id="btn-do-delete" class="btn btn-danger" disabled style="flex:1;">
+            🔥 完全に削除する
+          </button>
+          <button type="button" id="btn-cancel-delete" class="btn" style="background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.15);">
+            キャンセル
+          </button>
+        </div>
+      </div>
+    </div>
+
+    {# ---- グループに入る ---- #}
+    <div class="admin-card" style="margin-top:16px;">
+      <h3>🚪 グループに入る</h3>
+      <p>管理者としてパスワードなしでグループに入れるよ。</p>
+      <button type="button" id="btn-enter-group" class="btn btn-block" style="background:rgba(99,102,241,0.2); color:#a5b4fc; border:1px solid rgba(99,102,241,0.3);">
+        → グループのクイズ一覧へ
+      </button>
+    </div>
+
+    {# ---- フィードバック ---- #}
+    <div class="admin-card" style="margin-top:16px;">
+      <h3>💬 フィードバック</h3>
+      <p>ユーザーから届いたフィードバックを確認できるよ。</p>
+      <button type="button" id="btn-feedback" class="btn btn-block"
+        style="background:rgba(251,191,36,0.2); color:#FCD34D; border:1px solid rgba(251,191,36,0.3);">
+        📊 フィードバック集計を見る
+      </button>
+    </div>
+
+    {# ---- クイズ管理 ---- #}
+    <div class="admin-card" style="margin-top:16px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 style="margin:0;">📝 クイズ管理</h3>
+        <button type="button" id="btn-load-quizzes" style="padding:6px 14px; background:rgba(255,255,255,0.08); color:#9CA3AF; border:1px solid rgba(255,255,255,0.1); border-radius:8px; cursor:pointer; font-size:0.85rem;">
+          🔄 一覧を読み込む
+        </button>
+      </div>
+      <div id="bulk-delete-bar" style="display:none; gap:8px; align-items:center; margin-bottom:10px; padding:8px 12px; background:rgba(239,68,68,0.1); border-radius:8px; border:1px solid rgba(239,68,68,0.2);">
+        <label style="display:flex; align-items:center; gap:6px; cursor:pointer; color:#FCA5A5; font-size:0.85rem;">
+          <input type="checkbox" id="select-all-quizzes" style="width:16px; height:16px; accent-color:#EF4444;">
+          すべて選択
+        </label>
+        <span style="color:#6B7280; font-size:0.8rem;" id="selected-quiz-count">0件選択中</span>
+        <button type="button" id="btn-bulk-delete" disabled
+          style="margin-left:auto; padding:5px 14px; background:rgba(239,68,68,0.3); color:#FCA5A5; border:1px solid rgba(239,68,68,0.4); border-radius:6px; cursor:pointer; font-size:0.8rem;">
+          🗑️ まとめて削除
+        </button>
+      </div>
+      <div id="quiz-admin-list" style="color:#6B7280; font-size:0.85rem;">
+        「一覧を読み込む」を押してね
+      </div>
+    </div>
+
+    <button type="button" id="btn-logout-admin" class="btn btn-block" style="background:rgba(255,255,255,0.05); color:#9CA3AF; border:1px solid rgba(255,255,255,0.1); margin-top:16px;">
+      ← ログアウト
+    </button>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if group_info and not logged_in %}
+<script>
+// ============================================================
+// 管理者ログイン
+// # submitをfetchに変えてリロードなしでログインさせる
+// ============================================================
+// # このスクリプトはフォームの後に読み込まれるので直接登録できる
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const pw  = document.getElementById('admin-pw').value;
+  const btn = e.target.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  btn.textContent = 'チェック中...';
+  try {
+    await window.api.post('/api/admin/login/{{ group_id }}', { password: pw });
+    window.location.reload();  // 成功したらリロードして管理画面を表示
+  } catch (err) {
+    window.toast(err.message, 'error');
+    btn.disabled = false;
+    btn.textContent = '🔓 ログイン';
+  }
+});
+</script>
+{% endif %}
+
+{% if group_info and logged_in %}
+<script>
+// ============================================================
+// 管理画面 (ログイン後)
+// ============================================================
+const groupIdRaw = '{{ group_id }}';
+
+// ---- 閲覧モードの切替 ----
+document.getElementById('toggle-ai').addEventListener('click', async () => {
+  const tgl = document.getElementById('toggle-ai');
+  const next = !tgl.classList.contains('on');
+  if (!confirm(next ? 'AI採点を有効にするよ?' : 'AI採点を無効にするよ?')) return;
+  const r = await window.api.post(`/api/admin/ai-scoring/${encodeURIComponent(groupIdRaw)}`, {ai_scoring: next});
+  tgl.classList.toggle('on', r.ai_scoring);
+  const status = document.getElementById('ai-status');
+  if (status) {
+    status.style.background = r.ai_scoring ? 'rgba(52,211,153,0.1)' : 'rgba(156,163,175,0.1)';
+    status.style.color = r.ai_scoring ? '#34D399' : '#9CA3AF';
+    status.textContent = r.ai_scoring ? '現在: AI採点 有効' : '現在: AI採点 無効';
+  }
+});
+
+document.getElementById('toggle-view').addEventListener('click', async () => {
+  const tgl = document.getElementById('toggle-view');
+  const next = !tgl.classList.contains('on');
+  const msg = next
+    ? '閲覧のみモードに変更するよ?\nクイズの追加・編集・削除ができなくなるよ(挑戦は可能)。'
+    : '通常モードに戻すよ?\nクイズの追加・編集・削除が再びできるようになるよ。';
+  if (!confirm(msg)) return;
+  try {
+    const r = await window.api.post(`/api/admin/view-only/${encodeURIComponent(groupIdRaw)}`, {
+      view_only: next,
+    });
+    tgl.classList.toggle('on', r.view_only);
+    const status = document.getElementById('mode-status');
+    status.style.background = r.view_only ? 'rgba(59,130,246,0.2)' : 'rgba(52,211,153,0.2)';
+    status.style.color = r.view_only ? '#60A5FA' : '#34D399';
+    status.innerHTML = `<span style="width:6px;height:6px;border-radius:50%;background:currentColor;"></span>現在: ${r.view_only ? '閲覧のみモード' : '通常モード(編集可)'}`;
+    window.toast(r.view_only ? '閲覧のみにしたよ' : '通常モードに戻したよ', 'success');
+  } catch (err) {
+    window.toast(err.message, 'error');
+  }
+});
+
+// ---- グループ削除 ----
+document.getElementById('btn-show-delete').addEventListener('click', () => {
+  document.getElementById('delete-step1').style.display = 'none';
+  document.getElementById('delete-step2').style.display = 'block';
+});
+
+document.getElementById('btn-cancel-delete').addEventListener('click', () => {
+  document.getElementById('delete-step1').style.display = 'block';
+  document.getElementById('delete-step2').style.display = 'none';
+  document.getElementById('delete-confirm').value = '';
+  document.getElementById('delete-confirm-chk').checked = false;
+  document.getElementById('btn-do-delete').disabled = true;
+});
+
+// IDが一致し、かつ責任チェックがONなら削除ボタンを有効化
+function checkCanDelete() {
+  const idMatch = document.getElementById('delete-confirm').value.trim() === groupIdRaw;
+  const chk = document.getElementById('delete-confirm-chk').checked;
+  document.getElementById('btn-do-delete').disabled = !(idMatch && chk);
+}
+document.getElementById('delete-confirm').addEventListener('input', checkCanDelete);
+document.getElementById('delete-confirm-chk').addEventListener('change', checkCanDelete);
+
+document.getElementById('btn-do-delete').addEventListener('click', async () => {
+  if (!confirm('本当に完全に削除するよ?\nこの操作は取り消せないよ。')) return;
+  const btn = document.getElementById('btn-do-delete');
+  btn.disabled = true;
+  btn.textContent = '削除中...';
+  try {
+    await window.api.post(`/api/admin/delete-group/${encodeURIComponent(groupIdRaw)}`, {
+      confirm_group_id: document.getElementById('delete-confirm').value.trim(),
+    });
+    window.toast('グループを削除したよ', 'success');
+    setTimeout(() => { window.location.href = '/'; }, 1200);
+  } catch (err) {
+    window.toast(err.message, 'error');
+    btn.disabled = false;
+    btn.textContent = '🔥 完全に削除する';
+  }
+});
+
+// ---- グループに入る ----
+document.getElementById('btn-enter-group').addEventListener('click', async () => {
+  try {
+    const r = await window.api.post(`/api/admin/enter/${encodeURIComponent(groupIdRaw)}`);
+    window.location.href = r.redirect || '/group';
+  } catch (err) {
+    window.toast(err.message, 'error');
+  }
+});
+
+// ---- フィードバックページへ ----
+document.getElementById('btn-feedback').addEventListener('click', () => {
+  const pw = prompt('管理者パスワードを入力してね');
+  if (pw) window.open('/feedback/list?pw=' + encodeURIComponent(pw), '_blank');
+});
+
+// ---- クイズ一覧を読み込む ----
+let allQuizzes = [];
+const selectedQuizIds = new Set();
+
+document.getElementById('btn-load-quizzes').addEventListener('click', async () => {
+  const list = document.getElementById('quiz-admin-list');
+  list.innerHTML = '読み込み中...';
+  selectedQuizIds.clear();
+  try {
+    const r = await window.api.get(`/api/admin/quizzes/${encodeURIComponent(groupIdRaw)}`);
+    allQuizzes = r.quizzes || [];
+    if (allQuizzes.length === 0) {
+      list.innerHTML = '<p style="color:#9CA3AF; margin:8px 0;">クイズがないよ</p>';
+      document.getElementById('bulk-delete-bar').style.display = 'none';
+      return;
+    }
+    document.getElementById('bulk-delete-bar').style.display = 'flex';
+    renderQuizList();
+  } catch (err) {
+    window.toast(err.message, 'error');
+    list.innerHTML = '<p style="color:#EF4444;">読み込み失敗</p>';
+  }
+});
+
+function renderQuizList() {
+  const list = document.getElementById('quiz-admin-list');
+  list.innerHTML = allQuizzes.map((q, i) => `
+    <div style="display:flex; justify-content:space-between; align-items:center;
+                padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+      <label style="display:flex; align-items:center; gap:8px; flex:1; min-width:0; cursor:pointer;">
+        <input type="checkbox" class="quiz-check" data-id="${q.id}"
+          onchange="onQuizCheck(this)"
+          style="width:16px; height:16px; flex-shrink:0; accent-color:#EF4444;"
+          ${selectedQuizIds.has(q.id) ? 'checked' : ''}>
+        <div style="min-width:0;">
+          <div style="color:#e2e8f0; font-size:0.85rem;
+                      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+            ${q.under_review ? '<span style="color:#F59E0B;">【調査中】</span>' : ''}${i+1}. ${window.escapeHtml(q.question || '（問題）')}
+          </div>
+          <div style="color:#6B7280; font-size:0.75rem; margin-top:2px;">
+            ${window.escapeHtml(q.author_name || '')}
+            ${q.created_at ? ' · ' + q.created_at.substring(0,10) : ''}
+          </div>
+          ${q.under_review && q.review_reason ? '<div style="color:#F59E0B; font-size:0.75rem; margin-top:2px;">理由: ' + window.escapeHtml(q.review_reason) + '</div>' : ''}
+        </div>
+      </label>
+      <button onclick="toggleReviewAdmin('${q.id}', ${q.under_review ? 1 : 0})"
+        title="${q.under_review ? '調査中を解除' : '調査中にする'}"
+        style="padding:4px 10px; background:rgba(245,158,11,0.15);
+               color:#FCD34D; border:1px solid rgba(245,158,11,0.3);
+               border-radius:6px; cursor:pointer; font-size:0.8rem; flex-shrink:0; margin-left:8px;">
+        ${q.under_review ? '✅' : '⚠️'}
+      </button>
+      <button onclick="deleteQuizAdmin('${q.id}')"
+        style="padding:4px 10px; background:rgba(239,68,68,0.15);
+               color:#FCA5A5; border:1px solid rgba(239,68,68,0.3);
+               border-radius:6px; cursor:pointer; font-size:0.8rem; flex-shrink:0; margin-left:8px;">
+        🗑️
+      </button>
+    </div>
+  `).join('');
+  updateBulkBar();
+}
+
+function onQuizCheck(cb) {
+  if (cb.checked) selectedQuizIds.add(cb.dataset.id);
+  else selectedQuizIds.delete(cb.dataset.id);
+  updateBulkBar();
+  // すべて選択チェックボックスを同期
+  const total = document.querySelectorAll('.quiz-check').length;
+  document.getElementById('select-all-quizzes').checked = (selectedQuizIds.size === total && total > 0);
+}
+
+function updateBulkBar() {
+  const count = selectedQuizIds.size;
+  document.getElementById('selected-quiz-count').textContent = count + '件選択中';
+  document.getElementById('btn-bulk-delete').disabled = count === 0;
+}
+
+document.getElementById('select-all-quizzes').addEventListener('change', function() {
+  document.querySelectorAll('.quiz-check').forEach(cb => {
+    cb.checked = this.checked;
+    if (this.checked) selectedQuizIds.add(cb.dataset.id);
+    else selectedQuizIds.delete(cb.dataset.id);
+  });
+  updateBulkBar();
+});
+
+document.getElementById('btn-bulk-delete').addEventListener('click', async () => {
+  const ids = [...selectedQuizIds];
+  if (ids.length === 0) return;
+  if (!confirm(ids.length + '件のクイズを削除するよ？\n挑戦記録・感想も全部消えるよ。')) return;
+  const btn = document.getElementById('btn-bulk-delete');
+  btn.disabled = true; btn.textContent = '削除中...';
+  let ok = 0, ng = 0;
+  for (const id of ids) {
+    try {
+      await window.api.del(`/api/admin/quizzes/${encodeURIComponent(groupIdRaw)}/${id}`);
+      ok++;
+      allQuizzes = allQuizzes.filter(q => q.id !== id);
+      selectedQuizIds.delete(id);
+    } catch(e) { ng++; }
+  }
+  if (ok > 0) window.toast(ok + '件削除したよ', 'success');
+  if (ng > 0) window.toast(ng + '件は失敗したよ', 'error');
+  if (allQuizzes.length === 0) {
+    document.getElementById('quiz-admin-list').innerHTML = '<p style="color:#9CA3AF; margin:8px 0;">クイズがないよ</p>';
+    document.getElementById('bulk-delete-bar').style.display = 'none';
+  } else {
+    renderQuizList();
+  }
+  btn.textContent = '🗑️ まとめて削除';
+  updateBulkBar();
+});
+
+// ---- クイズを削除する ----
+async function deleteQuizAdmin(quizId) {
+  if (!confirm('このクイズを削除するよ？\n挑戦記録・感想も全部消えるよ。')) return;
+  try {
+    await window.api.del(`/api/admin/quizzes/${encodeURIComponent(groupIdRaw)}/${quizId}`);
+    window.toast('削除したよ', 'success');
+    // 削除後に一覧を再読み込みする
+    document.getElementById('btn-load-quizzes').click();
+  } catch (err) {
+    window.toast(err.message, 'error');
+  }
+}
+
+// ---- 調査中フラグを切り替える ----
+async function toggleReviewAdmin(quizId, current) {
+  let reason = '';
+  if (!current) {
+    // 調査中にするとき: 理由を入力してもらう(クイズを開いた人に表示される)
+    reason = prompt('調査中にする理由を入力してね(みんなに表示されるよ)',
+                    '利用規約違反の可能性があるため調査中です。');
+    if (reason === null) return;  // キャンセルされたら何もしない
+  } else {
+    if (!confirm('調査中を解除するよ？')) return;
+  }
+  try {
+    await window.api.post(`/api/admin/quizzes/${encodeURIComponent(groupIdRaw)}/${quizId}/review`,
+                          { under_review: current ? 0 : 1, reason: reason });
+    window.toast(current ? '解除したよ' : '調査中にしたよ', 'success');
+    document.getElementById('btn-load-quizzes').click();
+  } catch (err) {
+    window.toast(err.message, 'error');
+  }
+}
+
+// ---- ログアウト ----
+document.getElementById('btn-logout-admin').addEventListener('click', async () => {
+  try {
+    await window.api.post(`/api/admin/logout/${encodeURIComponent(groupIdRaw)}`);
+    window.location.reload();
+  } catch (err) {
+    window.toast(err.message, 'error');
+  }
+});
+
+// ===== Admin AI設定 =====
+const ADMIN_AI_PROVIDERS = {
+  gemini:     { model:'gemini-1.5-flash', help:'Google AI StudioでAPIキーを取得（無料枠あり）' },
+  openai:     { model:'gpt-4o-mini',      help:'platform.openai.comでAPIキーを取得（有料）' },
+  anthropic:  { model:'claude-haiku',     help:'console.anthropic.comでAPIキーを取得（有料）' },
+  cloudflare: { model:'Llama 3 8B',       help:'Account IDとAPIトークン両方が必要（無料）' },
+};
+let adminSelectedProvider = 'gemini';
+
+document.querySelectorAll('.admin-ai-pvd-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    adminSelectedProvider = btn.dataset.provider;
+    document.querySelectorAll('.admin-ai-pvd-btn').forEach(b => {
+      const active = b.dataset.provider === adminSelectedProvider;
+      b.style.borderColor = active ? '#667eea' : '#444';
+      b.style.background  = active ? 'rgba(99,102,241,0.2)' : '#1e1e2e';
+      b.style.color       = active ? '#a5b4fc' : '#e0e0ff';
+    });
+    document.getElementById('admin-cf-section').style.display =
+      adminSelectedProvider === 'cloudflare' ? 'block' : 'none';
+    const info = ADMIN_AI_PROVIDERS[adminSelectedProvider];
+    document.getElementById('admin-ai-model-info').textContent =
+      `使用モデル: ${info.model} — ${info.help}`;
+    document.getElementById('admin-ai-key-label').textContent =
+      adminSelectedProvider === 'cloudflare' ? 'APIトークン' : 'APIキー';
+  });
+});
+document.querySelector('.admin-ai-pvd-btn[data-provider="gemini"]').click();
+
+function toggleAdminAiKey() {
+  const input = document.getElementById('admin-ai-key');
+  const btn   = document.getElementById('admin-ai-key-eye');
+  if (input.type === 'password') { input.type = 'text';     btn.textContent = '🙈'; }
+  else                           { input.type = 'password'; btn.textContent = '👁️'; }
+}
+
+async function saveAdminAiConfig() {
+  const apiKey    = document.getElementById('admin-ai-key').value.trim();
+  const cfAccount = document.getElementById('admin-cf-account').value.trim();
+  const pw        = document.getElementById('ai-admin-pw').value;
+  const status    = document.getElementById('ai-config-status');
+  if (!pw)     { window.toast('管理者パスワードを入力してね', 'error'); return; }
+  if (!apiKey) { window.toast('APIキーを入力してね', 'error'); return; }
+  if (adminSelectedProvider === 'cloudflare' && !cfAccount) {
+    window.toast('CloudflareはAccount IDも必要だよ', 'error'); return;
+  }
+  status.style.display = 'block';
+  status.style.color   = '#9CA3AF';
+  status.textContent   = '保存中...';
+  try {
+    const r = await fetch('/api/group/ai_config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        ai_provider:    adminSelectedProvider,
+        ai_api_key:     apiKey,
+        cf_account_id:  cfAccount,
+        cf_api_token:   adminSelectedProvider === 'cloudflare' ? apiKey : '',
+        admin_password: pw,
+      })
+    });
+    const data = await r.json();
+    if (data.ok) {
+      status.style.color = '#34D399';
+      status.textContent = '✅ 保存しました！AI採点が有効になります。';
+      window.toast('AI設定を保存したよ！', 'success');
+      const tgl = document.getElementById('toggle-ai');
+      if (tgl && !tgl.classList.contains('on')) tgl.click();
+    } else {
+      status.style.color = '#ef4444';
+      status.textContent = '❌ ' + (data.error || 'エラー');
+    }
+  } catch(e) {
+    status.style.color = '#ef4444';
+    status.textContent = '❌ 通信エラー';
+  }
+}
+
+async function loadAdminAiConfig() {
+  const status = document.getElementById('ai-config-status');
+  status.style.display = 'block';
+  try {
+    const r    = await fetch('/api/group/ai_config');
+    const data = await r.json();
+    if (data.ok) {
+      const pvdBtn = document.querySelector(`.admin-ai-pvd-btn[data-provider="${data.ai_provider || 'gemini'}"]`);
+      if (pvdBtn) pvdBtn.click();
+      if (data.has_config) {
+        status.style.color = '#34D399';
+        status.textContent = '✅ APIキーが設定済みです（キーは非表示）';
+      } else {
+        status.style.color = '#9CA3AF';
+        status.textContent = 'APIキーは未設定。サーバー共通キーが使われます。';
+      }
+    }
+  } catch(e) {
+    status.style.color = '#ef4444';
+    status.textContent = '❌ 取得エラー';
+  }
+}
+
+
+</script>
+{% endif %}
+{% endblock %}

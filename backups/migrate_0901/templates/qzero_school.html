@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}QZERO教室{% endblock %}
+{% block body_class %}qz-board-page{% endblock %}
+{% block content %}
+<style>
+.site-header { display:none !important; }
+.qs-wrap { max-width:760px; margin:24px auto; padding:0 20px; }
+.qs-box { background:white; border:1px solid #e3ddd0; border-radius:12px; padding:14px 16px; margin-bottom:12px; }
+.qs-q { color:#14213d; font-weight:700; font-size:14px; }
+.qs-btn { padding:6px 12px; border:none; border-radius:8px; cursor:pointer; font-size:12px; color:white; }
+.qs-input { width:100%; padding:9px; border:1px solid #e3ddd0; border-radius:8px; box-sizing:border-box; font-size:14px; margin-top:6px; }
+</style>
+{% include '_staff_nav.html' %}
+<div class="qs-wrap">
+  <h2 style="color:#14213d;">📝 QZERO教室</h2>
+  <p style="color:#8a8270; font-size:13px;">QZEROが答えられなかった質問に「こう答えて」を教えると、次から答えられるようになるよ。先生は君だ!</p>
+
+  <h3 style="color:#fb6f5b; font-size:1rem;">❓ 答えられなかった質問</h3>
+  <div id="qs-unknown">読み込み中...</div>
+
+  <h3 style="color:#2a9d8f; font-size:1rem; margin-top:24px;">🧠 覚えたこと</h3>
+  <div id="qs-memory"></div>
+</div>
+
+<script>
+async function loadSchool() {
+  const r = await fetch('/api/qzero/school/list');
+  const data = await r.json();
+  if (data.ok === false || data.ok === undefined) { window.location.href='/staff/board'; return; }
+
+  document.getElementById('qs-unknown').innerHTML = data.unknown.length === 0
+    ? '<p style="color:#8a8270; font-size:13px;">今はないよ。QZEROは順調!</p>'
+    : data.unknown.map(u => `
+      <div class="qs-box">
+        <div class="qs-q">Q: ${escS(u.question)}</div>
+        <div style="color:#b8b09e; font-size:11px;">${u.created_at}</div>
+        <input class="qs-input" id="ans-${u.id}" placeholder="この質問への答えを教える">
+        <div style="text-align:right; margin-top:8px;">
+          <button class="qs-btn" style="background:#8a8270;" onclick="dismiss(${u.id})">消す</button>
+          <button class="qs-btn" style="background:#2a9d8f;" onclick="teach(${u.id}, '${escAttrS(u.question)}')">教える</button>
+        </div>
+      </div>`).join('');
+
+  document.getElementById('qs-memory').innerHTML = data.memory.length === 0
+    ? '<p style="color:#8a8270; font-size:13px;">まだ何も覚えてないよ。</p>'
+    : data.memory.map(m => `
+      <div class="qs-box">
+        <div class="qs-q">Q: ${escS(m.question)}</div>
+        <div style="color:#4a4436; font-size:14px; margin-top:4px;">A: ${escS(m.answer)}</div>
+        <div style="text-align:right; margin-top:6px;">
+          <button class="qs-btn" style="background:#e76f51;" onclick="forget(${m.id})">忘れさせる</button>
+        </div>
+      </div>`).join('');
+}
+
+async function teach(unknownId, question) {
+  const answer = document.getElementById('ans-' + unknownId).value.trim();
+  if (answer === '') { window.toast('答えを入力してね', 'error'); return; }
+  const r = await fetch('/api/qzero/school/teach', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({question, answer, unknown_id: unknownId})
+  });
+  const data = await r.json();
+  window.toast(data.ok ? data.message : (data.error||'エラー'), data.ok?'success':'error');
+  loadSchool();
+}
+async function forget(id) {
+  if (!confirm('この記憶を忘れさせる？')) return;
+  await fetch('/api/qzero/school/forget', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id})});
+  loadSchool();
+}
+async function dismiss(id) {
+  await fetch('/api/qzero/school/dismiss', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id})});
+  loadSchool();
+}
+function escS(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function escAttrS(s){return String(s||'').replace(/\\/g,'').replace(/'/g,'').replace(/"/g,'');}
+loadSchool();
+</script>
+
+<!-- ===== QZERO使用量管理(管理者用) ===== -->
+<div style="background:#fff; border:1px solid #e3ddd0; border-radius:12px; padding:16px 20px; margin-top:20px;">
+  <h3 style="margin:0 0 4px;">📊 使用量管理</h3>
+  <p style="font-size:12px; color:#8a8270; margin:0 0 10px;">今日の使用量(トークン)。基本: ログイン10,000 / 未ログイン3,000。追加分を設定できるよ(マイナス不可)。</p>
+  <div id="usage-list" style="font-size:13px;">読み込み中…</div>
+  <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+    <input id="bonus-owner" placeholder="アカウント(例: s:yuto)" style="flex:2; min-width:140px; padding:8px; border:1px solid #ddd; border-radius:8px;">
+    <input id="bonus-extra" type="number" min="0" placeholder="追加トークン" style="flex:1; min-width:100px; padding:8px; border:1px solid #ddd; border-radius:8px;">
+    <button onclick="setBonus()" style="padding:8px 16px; background:#111; color:#fff; border:0; border-radius:8px; cursor:pointer;">設定</button>
+  </div>
+</div>
+<script>
+// 使用量一覧の読み込み(管理者用)
+async function loadUsage(){
+  const box = document.getElementById('usage-list');
+  try{
+    const d = await (await fetch('/api/qzero/usage/list')).json();
+    if(!d.ok){ box.textContent = d.error || 'エラー'; return; }
+    if(!d.users.length){ box.textContent = '今日はまだ誰も使ってないよ'; return; }
+    box.innerHTML = '<table style="width:100%; border-collapse:collapse;">' +
+      '<tr style="color:#8a8270; font-size:11px; text-align:left;"><th style="padding:4px;">アカウント</th><th>使用</th><th>追加</th><th>上限</th></tr>' +
+      d.users.map(u => {
+        const base = u.owner.startsWith('ip:') ? d.base_guest : d.base;
+        const limit = base + u.extra;
+        const full = u.used >= limit;
+        return '<tr style="border-top:1px solid #f0ece0;' + (full ? 'color:#e24b4a;font-weight:700;' : '') + '">' +
+          '<td style="padding:5px 4px; cursor:pointer;" onclick="document.getElementById(\'bonus-owner\').value=\'' + u.owner + '\'">' + u.owner + '</td>' +
+          '<td>' + u.used + '</td><td>+' + u.extra + '</td><td>' + limit + (full ? ' 🈵' : '') + '</td></tr>';
+      }).join('') + '</table>';
+  }catch(e){ box.textContent = '読み込み失敗'; }
+}
+async function setBonus(){
+  const owner = document.getElementById('bonus-owner').value.trim();
+  const extra = parseInt(document.getElementById('bonus-extra').value || '0');
+  const d = await (await fetch('/api/qzero/usage/bonus', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({owner, extra})})).json();
+  alert(d.ok ? d.message : (d.error || 'エラー'));
+  if(d.ok) loadUsage();
+}
+loadUsage();
+setInterval(loadUsage, 30000);
+</script>
+
+{% endblock %}

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qstart API</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'SF Mono','Consolas','Menlo',monospace;background:#0a0a0a;color:#e0e0e0;min-height:100vh}
+.header{border-bottom:1px solid #222;padding:20px 32px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-size:1.2rem;font-weight:700;color:#fff;letter-spacing:1px}
+.logo span{color:#7c6ef0}
+.nav-btns{display:flex;gap:8px}
+.nav-btns button{background:none;border:1px solid #333;color:#aaa;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:.8rem;font-family:inherit}
+.nav-btns button:hover{border-color:#7c6ef0;color:#fff}
+.nav-btns button.active{background:#7c6ef0;border-color:#7c6ef0;color:#fff}
+.container{max-width:800px;margin:0 auto;padding:40px 24px}
+.section{display:none}.section.active{display:block}
+.auth-box{background:#111;border:1px solid #222;border-radius:12px;padding:32px;max-width:400px;margin:60px auto}
+.auth-box h2{font-size:1.1rem;margin-bottom:20px;color:#fff}
+.auth-box input{width:100%;background:#0a0a0a;border:1px solid #333;color:#fff;padding:10px 12px;border-radius:6px;font-size:.9rem;margin-bottom:12px;font-family:inherit}
+.auth-box input:focus{outline:none;border-color:#7c6ef0}
+.btn-primary{width:100%;background:#7c6ef0;border:none;color:#fff;padding:10px;border-radius:6px;font-size:.9rem;cursor:pointer;font-family:inherit;font-weight:600}
+.btn-primary:hover{background:#6b5dd3}
+.auth-tabs{display:flex;gap:0;margin-bottom:20px}
+.auth-tabs button{flex:1;background:none;border:1px solid #333;color:#888;padding:8px;cursor:pointer;font-family:inherit;font-size:.85rem}
+.auth-tabs button:first-child{border-radius:6px 0 0 6px}
+.auth-tabs button:last-child{border-radius:0 6px 6px 0}
+.auth-tabs button.active{background:#222;color:#fff;border-color:#444}
+.msg{padding:8px 12px;border-radius:6px;margin-bottom:12px;font-size:.8rem}
+.msg-ok{background:#0a2a1a;border:1px solid #1a4a2a;color:#4ade80}
+.msg-err{background:#2a0a0a;border:1px solid #4a1a1a;color:#f87171}
+.dash-card{background:#111;border:1px solid #222;border-radius:12px;padding:24px;margin-bottom:16px}
+.dash-card h3{font-size:.95rem;color:#7c6ef0;margin-bottom:16px}
+.usage-bar{background:#222;border-radius:4px;height:8px;margin:8px 0}
+.usage-fill{background:#7c6ef0;border-radius:4px;height:100%;transition:width .3s}
+.usage-text{font-size:.8rem;color:#888}
+.stat-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1a1a1a;font-size:.85rem}
+.stat-label{color:#888}.stat-val{color:#fff;font-weight:600}
+.key-box{background:#0a0a0a;border:1px solid #333;border-radius:6px;padding:10px 14px;font-size:.8rem;word-break:break-all;margin:8px 0;color:#4ade80}
+.btn-sm{background:#222;border:1px solid #333;color:#ccc;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:.8rem;font-family:inherit}
+.btn-sm:hover{border-color:#7c6ef0;color:#fff}
+.btn-link{background:#1a4a2a;border:1px solid #2a6a3a;color:#4ade80}
+.doc h2{font-size:1rem;color:#fff;margin:28px 0 12px;padding-bottom:8px;border-bottom:1px solid #222}
+.doc p{color:#aaa;font-size:.85rem;line-height:1.7;margin-bottom:12px}
+.code-block{background:#111;border:1px solid #222;border-radius:8px;padding:16px;margin:12px 0;overflow-x:auto;font-size:.8rem;line-height:1.6}
+.comment{color:#555}.string{color:#4ade80}.key{color:#7c6ef0}
+.endpoint{display:inline-block;background:#1a1a2a;border:1px solid #333;border-radius:4px;padding:2px 8px;font-size:.8rem;color:#7c6ef0;margin:4px 0}
+.method{display:inline-block;padding:2px 6px;border-radius:3px;font-size:.7rem;font-weight:700;margin-right:6px}
+.method-get{background:#0a2a1a;color:#4ade80}.method-post{background:#1a1a3a;color:#818cf8}
+.model-card{display:flex;align-items:center;gap:16px;padding:12px 0;border-bottom:1px solid #1a1a1a}
+.model-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1rem}
+.model-info{flex:1}.model-name{font-size:.9rem;font-weight:600;color:#fff}
+.model-desc{font-size:.75rem;color:#888;margin-top:2px}
+.badge{font-size:.65rem;padding:2px 8px;border-radius:10px;font-weight:600}
+.badge-live{background:#0a2a1a;color:#4ade80;border:1px solid #1a4a2a}
+.badge-train{background:#2a2a0a;color:#facc15;border:1px solid #4a4a1a}
+.badge-plan{background:#1a1a1a;color:#888;border:1px solid #333}
+@media(max-width:600px){.header{padding:14px 16px}.container{padding:24px 16px}.auth-box{margin:30px auto;padding:24px}}
+</style>
+</head>
+<body>
+<div class="header">
+<div class="logo"><span>Qstart</span> API</div>
+<div class="nav-btns">
+<button onclick="showSection('docs')" id="tab-docs">ドキュメント</button>
+<button onclick="showSection('dash')" id="tab-dash">ダッシュボード</button>
+<button onclick="doLogout()" id="btn-logout" style="display:none;color:#f87171;border-color:#4a1a1a">ログアウト</button>
+</div>
+</div>
+
+<div id="section-auth" class="section active">
+<div class="auth-box">
+<div class="auth-tabs">
+<button class="active" onclick="switchAuth('login')">ログイン</button>
+<button onclick="switchAuth('register')">新規登録</button>
+</div>
+<div id="auth-msg"></div>
+<div id="form-login">
+<input type="text" id="login-user" placeholder="ユーザーID">
+<input type="password" id="login-pass" placeholder="パスワード">
+<button class="btn-primary" onclick="doLogin()">ログイン</button>
+<div style="margin-top:12px;text-align:center;font-size:.8rem;color:#555">または</div>
+<div style="font-size:.7rem;color:#666;margin-top:8px;margin-bottom:4px">※社員IDとパスワードで入力</div>
+<button class="btn-primary" onclick="doStaffLogin()" style="margin-top:4px;background:#1a4a2a;border:1px solid #2a6a3a">社員アカウントでログイン</button>
+</div>
+<div id="form-register" style="display:none">
+<input type="text" id="reg-user" placeholder="ユーザーID">
+<input type="password" id="reg-pass" placeholder="パスワード">
+<button class="btn-primary" onclick="doRegister()">アカウント作成</button>
+</div>
+</div>
+</div>
+
+<div id="section-dash" class="section">
+<div class="container">
+<div class="dash-card">
+<h3>⚡ 3時間枠（リセット: 3時間ごと）</h3>
+<div class="usage-bar"><div class="usage-fill" id="window-fill" style="width:0%"></div></div>
+<div class="usage-text"><span id="window-used">0</span> / 4,000 トークン</div>
+<div style="margin-top:16px">
+<h3>📊 月間枠（連携者のみ・3時間枠の後に使用）</h3>
+<div class="usage-bar"><div class="usage-fill" id="monthly-fill" style="width:0%"></div></div>
+<div class="usage-text"><span id="monthly-used">0</span> / <span id="monthly-limit">0</span> トークン</div>
+</div>
+<div style="margin-top:12px">
+<div class="stat-row"><span class="stat-label">現在の枠</span><span class="stat-val" id="active-pool">-</span></div>
+<div class="stat-row"><span class="stat-label">Qstart連携</span><span class="stat-val" id="link-status">未連携</span></div>
+</div>
+<div style="margin-top:12px">
+<button class="btn-sm btn-link" onclick="doLink()" id="btn-link">🔗 Qstartアカウントを連携（+150万トークン/月）</button>
+</div>
+</div>
+<div class="dash-card">
+<h3>🔑 APIキー</h3>
+<div id="keys-list"></div>
+<button class="btn-sm" onclick="createKey()" style="margin-top:8px">+ 新しいキーを発行</button>
+</div>
+<div class="dash-card">
+<h3>🤖 モデル</h3>
+<div id="models-list"></div>
+</div>
+
+<div class="dash-card">
+<h3>🎟 優待コード</h3>
+<div style="display:flex;gap:8px;">
+<input type="text" id="api-promo-input" placeholder="コードを入力" style="flex:1;background:#0a0a0a;border:1px solid #333;color:#fff;padding:8px 12px;border-radius:6px;font-size:.85rem;font-family:inherit;">
+<button class="btn-sm" onclick="useApiPromo()" style="background:#7c6ef0;border-color:#7c6ef0;color:#fff;">適用</button>
+</div>
+<div id="api-promo-msg" style="margin-top:8px;font-size:.8rem;"></div>
+</div>
+</div>
+</div>
+
+<div id="section-docs" class="section">
+<div class="container doc">
+<h2>はじめに</h2>
+<p>Qstart APIを使うと、yutoが作ったAIモデルを自分のアプリから呼び出せます。</p>
+<h2>認証</h2>
+<p>すべてのAPIリクエストにはAPIキーが必要です。ダッシュボードで発行できます。</p>
+<div class="code-block">
+<span class="comment"># リクエストヘッダーにAPIキーを含める</span><br>
+<span class="key">Authorization</span>: Bearer <span class="string">qsk_あなたのAPIキー</span>
+</div>
+<h2>エンドポイント</h2>
+<p><span class="method method-post">POST</span><span class="endpoint">/qstart/api/v1/chat</span></p>
+<p>AIとチャットします。</p>
+<div class="code-block">
+<span class="comment"># リクエスト</span><br>
+{<br>
+&nbsp;&nbsp;<span class="key">"message"</span>: <span class="string">"AIとは何ですか？"</span>,<br>
+&nbsp;&nbsp;<span class="key">"model"</span>: <span class="string">"equi-1"</span><br>
+}<br><br>
+<span class="comment"># レスポンス</span><br>
+{<br>
+&nbsp;&nbsp;<span class="key">"model"</span>: <span class="string">"equi-1"</span>,<br>
+&nbsp;&nbsp;<span class="key">"message"</span>: <span class="string">"人工知能のことで、コンピュータが人間のように考える技術です"</span>,<br>
+&nbsp;&nbsp;<span class="key">"tokens_used"</span>: 42<br>
+}
+</div>
+<p><span class="method method-get">GET</span><span class="endpoint">/qstart/api/v1/models</span></p>
+<p>利用可能なモデルの一覧を取得します。</p>
+<p><span class="method method-get">GET</span><span class="endpoint">/qstart/api/v1/usage</span></p>
+<p>今月の使用量を確認します。</p>
+<h2>使用量</h2>
+<p>無料枠: 月10万トークン。Qstartアカウント連携で+50万トークン/月（$10相当）。QstartとAPIの使用量は共有です。</p>
+<h2>モデル</h2>
+<div class="model-card"><div class="model-icon" style="background:#2a0a1a">🔥</div><div class="model-info"><div class="model-name">Apex 3 <code>apex3</code></div><div class="model-desc">最高性能・96.3M パラメータ。Wikipedia 2.5億トークンで学習。知らないことは「わからない」と正直に答えます。</div></div><span class="badge badge-live">利用可能</span></div>
+<div class="model-card"><div class="model-icon" style="background:#2a1a1a">🔥</div><div class="model-info"><div class="model-name">Apex 2 <code>apex</code></div><div class="model-desc">旧バージョン・81.1M パラメータ。</div></div><span class="badge badge-live">利用可能</span></div>
+<div class="model-card"><div class="model-icon" style="background:#2a1a0a">💭</div><div class="model-info"><div class="model-name">zin 1 <code>zin</code></div><div class="model-desc">思考型・28.6M パラメータ。じっくり考えて答えます。</div></div><span class="badge badge-live">利用可能</span></div>
+<div class="model-card"><div class="model-icon" style="background:#1a1a3a">⚙️</div><div class="model-info"><div class="model-name">Equi 1 <code>equi</code></div><div class="model-desc">バランス型・11.9M パラメータ。軽くて速い普段使い向け。</div></div><span class="badge badge-live">利用可能</span></div>
+<div class="model-card"><div class="model-icon" style="background:#0a2a1a">⚡</div><div class="model-info"><div class="model-name">Pure 1 <code>pure</code></div><div class="model-desc">軽量・高速。2026年秋 公開予定。</div></div><span class="badge badge-plan">予定</span></div>
+<div class="model-card"><div class="model-icon" style="background:#2a2a0a">🎯</div><div class="model-info"><div class="model-name">Voto 1 <code>voto</code></div><div class="model-desc">クイズ採点専用。正解／部分正解／不正解を理由つきで判定します。判定精度99.6%。チャットには使えません。</div></div><span class="badge badge-live">API専用</span></div>
+
+<h2>採点API</h2>
+<p><span class="method method-post">POST</span><span class="endpoint">/qstart/api/v1/grade</span></p>
+<p>答え合わせをします。表記ゆれや言い換えもAIが判定します。</p>
+<div class="code-block">
+{<br>
+&nbsp;&nbsp;<span class="string">"question"</span>: <span class="string">"日本の首都は？"</span>,<br>
+&nbsp;&nbsp;<span class="string">"correct"</span>: <span class="string">"東京"</span>,<br>
+&nbsp;&nbsp;<span class="string">"answer"</span>: <span class="string">"とうきょう"</span><br>
+}
+</div>
+<p>返り値:</p>
+<div class="code-block">
+{<br>
+&nbsp;&nbsp;<span class="string">"ok"</span>: true,<br>
+&nbsp;&nbsp;<span class="string">"verdict"</span>: <span class="string">"正解"</span>,<br>
+&nbsp;&nbsp;<span class="string">"reason"</span>: <span class="string">"ひらがなですが同じ場所です。"</span>,<br>
+&nbsp;&nbsp;<span class="string">"stage"</span>: 4,<br>
+&nbsp;&nbsp;<span class="string">"by"</span>: <span class="string">"voto"</span><br>
+}
+</div>
+<p><code>verdict</code> は「正解」「部分正解」「不正解」のいずれか。<code>stage</code> はどの段階で判定したか（1=完全一致 / 2=表記ゆれ / 3=別解 / 4=AI）。</p>
+<h2>Python サンプルコード</h2>
+<div class="code-block">
+<span class="key">import</span> requests<br><br>
+response = requests.post(<br>
+&nbsp;&nbsp;<span class="string">"https://yuto113.pythonanywhere.com/qstart/api/v1/chat"</span>,<br>
+&nbsp;&nbsp;headers={<span class="string">"Authorization"</span>: <span class="string">"Bearer qsk_あなたのキー"</span>},<br>
+&nbsp;&nbsp;json={<span class="string">"message"</span>: <span class="string">"こんにちは"</span>, <span class="string">"model"</span>: <span class="string">"equi-1"</span>}<br>
+)<br><br>
+<span class="key">print</span>(response.json()[<span class="string">"message"</span>])
+</div>
+</div>
+</div>
+
+<script>
+let loggedIn=false;
+
+// ===== ページ切替 =====
+function showSection(s){
+  document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.nav-btns button').forEach(b=>b.classList.remove('active'));
+  if(s==='dash'){
+    if(!loggedIn){document.getElementById('section-auth').classList.add('active')}
+    else{document.getElementById('section-dash').classList.add('active');loadDashboard()}
+    document.getElementById('tab-dash').classList.add('active');
+  }else{
+    document.getElementById('section-docs').classList.add('active');
+    document.getElementById('tab-docs').classList.add('active');
+  }
+}
+
+// ===== 認証タブ切替 =====
+function switchAuth(m){
+  document.querySelectorAll('.auth-tabs button').forEach(b=>b.classList.remove('active'));
+  if(m==='login'){
+    document.getElementById('form-login').style.display='block';
+    document.getElementById('form-register').style.display='none';
+    document.querySelectorAll('.auth-tabs button')[0].classList.add('active');
+  }else{
+    document.getElementById('form-login').style.display='none';
+    document.getElementById('form-register').style.display='block';
+    document.querySelectorAll('.auth-tabs button')[1].classList.add('active');
+  }
+}
+
+function showMsg(t,ok){
+  document.getElementById('auth-msg').innerHTML='<div class="msg '+(ok?'msg-ok':'msg-err')+'">'+t+'</div>';
+}
+
+// ===== ログイン（Qstartアカウント） =====
+async function doLogin(){
+  const u=document.getElementById('login-user').value.trim();
+  const p=document.getElementById('login-pass').value;
+  if(!u||!p){showMsg('IDとパスワードを入力してね',false);return}
+  try{
+    const r=await fetch('/api/qstart/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:u,password:p,type:'qstart'})});
+    const d=await r.json();
+    if(d.ok){loggedIn=true;document.getElementById('btn-logout').style.display='block';showSection('dash')}
+    else{showMsg(d.error||'ログインできませんでした',false)}
+  }catch(e){showMsg('通信エラー',false)}
+}
+
+// ===== ログイン（社員アカウント） =====
+async function doStaffLogin(){
+  const u=document.getElementById('login-user').value.trim();
+  const p=document.getElementById('login-pass').value;
+  if(!u||!p){showMsg('社員IDとパスワードを入力してね',false);return}
+  try{
+    const r=await fetch('/api/qstart/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:u,password:p,type:'staff'})});
+    const d=await r.json();
+    if(d.ok){loggedIn=true;document.getElementById('btn-logout').style.display='block';showSection('dash')}
+    else{showMsg(d.error||'ログインできませんでした',false)}
+  }catch(e){showMsg('通信エラー',false)}
+}
+
+// ===== 新規登録 =====
+async function doRegister(){
+  const u=document.getElementById('reg-user').value.trim();
+  const p=document.getElementById('reg-pass').value;
+  if(!u||!p){showMsg('IDとパスワードを入力してね',false);return}
+  try{
+    const r=await fetch('/api/qstart/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:u,password:p,nickname:u})});
+    const d=await r.json();
+    if(d.ok){showMsg('アカウント作成完了！ログインしてください',true);switchAuth('login')}
+    else{showMsg(d.error||'エラー',false)}
+  }catch(e){showMsg('通信エラー',false)}
+}
+
+// ===== ログアウト =====
+async function doLogout(){
+  await fetch('/api/qstart/logout',{method:'POST'});
+  loggedIn=false;document.getElementById('btn-logout').style.display='none';
+  showSection('dash');
+}
+
+// ===== ダッシュボード読み込み =====
+async function loadDashboard(){
+  loadUsage();
+  loadKeys();
+  loadModels();
+}
+
+// ===== 使用量 =====
+async function loadUsage(){
+  try{
+    const r=await fetch('/qstart/api/v1/usage');
+    if(!r.ok)return;
+    const d=await r.json();
+    const w=d.window, m=d.monthly;
+    document.getElementById('window-used').textContent=w.used.toLocaleString();
+    document.getElementById('window-fill').style.width=Math.min(w.used/w.limit*100,100)+'%';
+    document.getElementById('monthly-used').textContent=m.used.toLocaleString();
+    document.getElementById('monthly-limit').textContent=m.limit.toLocaleString();
+    document.getElementById('monthly-fill').style.width=m.limit>0?Math.min(m.used/m.limit*100,100)+'%':'0%';
+    const poolNames={'window':'⚡ 3時間枠','monthly':'📊 月間枠','exhausted':'❌ 上限到達'};
+    document.getElementById('active-pool').textContent=poolNames[d.active_pool]||d.active_pool;
+    document.getElementById('link-status').textContent=d.is_linked?'✅ 連携済み':'未連携';
+    if(d.is_linked)document.getElementById('btn-link').style.display='none';
+  }catch(e){console.error('usage error',e)}
+}
+
+// ===== APIキー一覧 =====
+async function loadKeys(){
+  try{
+    const r=await fetch('/qstart/api/v1/keys');
+    if(!r.ok)return;
+    const d=await r.json();
+    if(!d.ok)return;
+    const el=document.getElementById('keys-list');
+    if(d.keys.length===0){el.innerHTML='<div style="font-size:.8rem;color:#555">まだAPIキーがありません</div>';return}
+    el.innerHTML=d.keys.map(function(k){
+      return '<div style="margin-bottom:12px;padding:12px;background:#0a0a0a;border:1px solid #222;border-radius:8px">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+        +'<span style="font-size:.8rem;color:#888">'+k.name+'</span>'
+        +'<div style="display:flex;gap:4px">'
+        +'<button class="btn-sm" onclick="toggleKey(this,\''+k.full+'\')">👁 表示</button>'
+        +'<button class="btn-sm" onclick="copyKey(\''+k.full+'\')">📋 コピー</button>'
+        +'<button class="btn-sm" onclick="deleteKey(\''+k.name+'\')" style="color:#f87171">🗑</button>'
+        +'</div></div>'
+        +'<div class="key-box" style="color:#555">'+k.masked+'</div>'
+        +'</div>';
+    }).join('');
+  }catch(e){console.error('keys error',e)}
+}
+
+function toggleKey(btn,full){
+  var box=btn.closest('div[style*="margin-bottom:12px"]').querySelector('.key-box');
+  if(box.textContent===full){box.textContent=full.substring(0,8)+'...'+full.slice(-4);box.style.color='#555';btn.textContent='👁 表示'}
+  else{box.textContent=full;box.style.color='#4ade80';btn.textContent='👁 隠す'}
+}
+
+function copyKey(full){navigator.clipboard.writeText(full).then(function(){alert('コピーしました！')})}
+
+async function deleteKey(name){
+  if(!confirm(name+' のキーを削除しますか？'))return;
+  await fetch('/qstart/api/v1/keys/'+encodeURIComponent(name),{method:'DELETE'});
+  loadKeys();
+}
+
+async function createKey(){
+  var n=prompt('キーの名前（例: my-app）')||'default';
+  var r=await fetch('/qstart/api/v1/keys',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n})});
+  var d=await r.json();
+  if(d.ok){alert('キー作成完了！');loadKeys()}
+}
+
+// ===== モデル一覧 =====
+async function loadModels(){
+  try{
+    const r=await fetch('/qstart/api/v1/models?scope=api');
+    if(!r.ok)return;
+    const d=await r.json();
+    const icons={equi:'⚙️', pure:'⚡', zin:'💭', apex:'🔥', apex3:'🔥', voto:'🎯'};
+    function esc(s){ var e=document.createElement('div'); e.textContent=(s==null?'':s); return e.innerHTML; }
+    const el=document.getElementById('models-list');
+    el.innerHTML=d.models.map(function(m){
+      // 新形式(enabled/maintenance)と旧形式(status)の両対応
+      var st = m.status;
+      if (st === undefined) {
+        st = Number(m.maintenance) ? 'maintenance' : (Number(m.enabled) ? 'live' : 'coming');
+      }
+      var b = st==='training'?'badge-train' : st==='live'?'badge-live'
+            : st==='maintenance'?'badge-train' : 'badge-plan';
+      var l = st==='training'?'学習中' : st==='live'?'利用可能'
+            : st==='maintenance'?'メンテナンス中' : '予定';
+      var mid = m.id || m.model || '';
+      var mname = m.name || ('Qstart ' + (m.display || mid));
+      var mdesc = m.description || m.note || '';
+      if (m.params) mdesc += (mdesc ? ' / ' : '') + m.params + ' パラメータ';
+      return '<div class="model-card"><div class="model-icon" style="background:#1a1a2a">'+(icons[mid]||'🤖')+'</div><div class="model-info"><div class="model-name">'+esc(mname)+' <code style="font-size:11px;opacity:.6;">'+esc(mid)+'</code></div><div class="model-desc">'+esc(mdesc)+'</div></div><span class="badge '+b+'">'+l+'</span></div>';
+    }).join('');
+  }catch(e){console.error('models error',e)}
+}
+
+// ===== 連携 =====
+async function doLink(){
+  // 連携は不要になりました(Qstartアカウントがそのまま使えます)
+  alert('Qstartアカウントでログインすれば、そのままAPIをご利用いただけます。\n'
+      + '追加の連携手続きは必要ありません。');
+}
+
+// ===== 起動時チェック =====
+(async function(){
+  try{
+    const r=await fetch('/api/qstart/me');
+    const d=await r.json();
+    if(d.ok&&d.logged_in){
+      loggedIn=true;
+      document.getElementById('btn-logout').style.display='block';
+    }
+  }catch(e){}
+})();
+
+// Enterキー対応
+document.getElementById('login-pass').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin()});
+document.getElementById('reg-pass').addEventListener('keydown',function(e){if(e.key==='Enter')doRegister()});
+</script>
+</body>
+</html>

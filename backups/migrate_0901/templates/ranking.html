@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}ランキング - クイズシェア{% endblock %}
+
+{% block content %}
+<div class="container">
+  <h1 class="page-title">🏆 ランキング</h1>
+  <p class="page-subtitle">クイズを選んでランキングを見よう</p>
+  <div id="quiz-list" class="quiz-grid">
+    <p style="color:#9CA3AF;">読み込み中...</p>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-ranking" style="display:none;">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span>🏆 <span id="ranking-quiz-title"></span></span>
+      <button class="modal-close" onclick="closeModal('modal-ranking')">✕</button>
+    </div>
+    <div class="modal-body" id="ranking-body">
+      <p style="text-align:center; color:#9CA3AF;">読み込み中...</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadQuizList() {
+  try {
+    const r = await window.api.get('/api/group/rankings');
+    const list = document.getElementById('quiz-list');
+    if (r.quizzes.length === 0) {
+      list.innerHTML = '<p style="color:#9CA3AF; text-align:center; padding:40px;">まだクイズがないよ</p>';
+      return;
+    }
+    list.innerHTML = r.quizzes.map(q =>
+      '<div class="quiz-card" onclick="showRanking(\'' + q.id + '\', this)" style="cursor:pointer;">' +
+      '<div class="q-question">' + window.escapeHtml(q.question) + '</div>' +
+      '<div style="display:flex; justify-content:space-between; align-items:center; margin-top:auto; padding-top:12px; border-top:1px solid #F3F4F6;">' +
+      '<span style="font-size:13px; font-weight:900; color:#374151;">' + window.escapeHtml(q.author_name) + '</span>' +
+      '<span style="font-size:12px; color:#9CA3AF;">🏅 ' + q.ranking_count + '件</span>' +
+      '</div></div>'
+    ).join('');
+  } catch (err) {
+    window.toast(err.message, 'error');
+  }
+}
+
+async function showRanking(quizId, card) {
+  const title = card.querySelector('.q-question').textContent;
+  document.getElementById('ranking-quiz-title').textContent = title.slice(0, 20) + (title.length > 20 ? '...' : '');
+  document.getElementById('ranking-body').innerHTML = '<p style="text-align:center; padding:40px; color:#9CA3AF;">読み込み中...</p>';
+  window.openModal('modal-ranking');
+  try {
+    const r = await window.api.get('/api/quizzes/' + encodeURIComponent(quizId) + '/rankings');
+    const body = document.getElementById('ranking-body');
+    if (r.rankings.length === 0) {
+      body.innerHTML = '<p style="text-align:center; color:#9CA3AF; padding:40px;">まだ登録者がいないよ</p>';
+      return;
+    }
+    const medals = ['🥇', '🥈', '🥉'];
+    let rows = r.rankings.map((row, i) =>
+      '<tr style="border-bottom:1px solid #F3F4F6; ' + (i < 3 ? 'font-weight:900;' : '') + '">' +
+      '<td style="padding:10px 8px;">' + (i < 3 ? medals[i] : (i+1) + '位') + '</td>' +
+      '<td style="padding:10px 8px;">' + window.escapeHtml(row.display_name) + '</td>' +
+      '<td style="padding:10px 8px; text-align:right; font-family:monospace; color:var(--c-main);">' + window.formatTime(row.time_ms) + '</td>' +
+      '</tr>'
+    ).join('');
+    body.innerHTML =
+      '<table style="width:100%; border-collapse:collapse; font-size:14px;">' +
+      '<thead><tr style="border-bottom:2px solid #E5E7EB;">' +
+      '<th style="padding:8px; text-align:left; color:#9CA3AF; font-size:11px;">順位</th>' +
+      '<th style="padding:8px; text-align:left; color:#9CA3AF; font-size:11px;">名前</th>' +
+      '<th style="padding:8px; text-align:right; color:#9CA3AF; font-size:11px;">タイム</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table>';
+  } catch (err) {
+    document.getElementById('ranking-body').innerHTML = '<p style="color:#EF4444; text-align:center;">' + window.escapeHtml(err.message) + '</p>';
+  }
+}
+
+loadQuizList();
+setInterval(loadQuizList, 10000);
+</script>
+{% endblock %}

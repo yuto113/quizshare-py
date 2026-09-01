@@ -1,0 +1,96 @@
+<style>
+.pw{max-width:860px;margin:0 auto;padding:18px 20px 60px;
+  font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;color:#14213d}
+.pw h2{font-size:19px;margin:0 0 4px;display:flex;align-items:center;gap:9px}
+.pw .lead{font-size:12.5px;color:#8a8270;margin:0 0 16px;line-height:1.7}
+.pnote{background:#fdf9ec;border:1px solid #f0e4c0;border-radius:8px;padding:11px 14px;
+  font-size:11.5px;color:#7a6420;line-height:1.7;margin-bottom:18px}
+.prow{background:#fff;border:1px solid #ece9e2;border-radius:10px;padding:12px 15px;
+  margin-bottom:9px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.prow .nm{font-weight:600;font-size:13.5px;min-width:150px}
+.prow .ky{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;color:#b0a894}
+.prow.locked{background:#faf9f5;opacity:.85}
+.psel{padding:6px 10px;border:1px solid #ece9e2;border-radius:7px;font-size:12px;font-family:inherit}
+.pids{padding:6px 10px;border:1px solid #ece9e2;border-radius:7px;font-size:12px;
+  font-family:inherit;flex:1;min-width:160px}
+.pbtn{background:#14213d;color:#fff;border:none;padding:6px 13px;border-radius:7px;
+  font-size:11.5px;cursor:pointer;font-family:inherit}
+.pbtn:hover{background:#1c2d52}
+.pbtn:disabled{background:#d8d4ca;cursor:not-allowed}
+.plock{font-size:10.5px;padding:3px 9px;border-radius:99px;background:#14213d;color:#e0b84a;font-weight:700}
+.pvis{font-size:10.5px;padding:2px 8px;border-radius:99px;font-weight:700}
+.pvis.owner{background:#14213d;color:#e0b84a}
+.pvis.admin{background:#fbf1d8;color:#8a5a00}
+.pvis.staff{background:#e4f4f1;color:#1d6f65}
+.pvis.custom{background:#eef1f6;color:#4a5568}
+.psec{font-size:12px;font-weight:700;margin:20px 0 9px;padding-bottom:6px;border-bottom:1px solid #ece9e2}
+.pempty{padding:28px 0;text-align:center;color:#b0a894;font-size:12.5px}
+</style>
+
+<div class="pw">
+  <h2>🔧 管理ページ管理</h2>
+  <p class="lead">管理センターの各ページを、誰に見せるか決められます。</p>
+
+  <div class="pnote">
+    <b>このページはオーナー専用です。</b><br>
+    人事で誰かを管理者にしても、このページには入れません。設定を変えられるのはオーナーだけです。<br>
+    「オーナーのみ」にしたページは、管理者であっても表示されなくなります。
+  </div>
+
+  <div id="pList"><div class="pempty">読み込み中…</div></div>
+</div>
+
+<script>
+(function(){
+var K = function(s){ return String(s==null?'':s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+var VIS = {owner:'オーナーのみ', admin:'管理者', staff:'社員ぜんぶ', custom:'指定した人'};
+function T(m, t){ if (window.toast) window.toast(m, t); else alert(m); }
+
+async function load(){
+  var r = await fetch('/api/admin/pages');
+  var d = await r.json().catch(function(){ return {ok:false, error:'応答を読めません'}; });
+  var el = document.getElementById('pList');
+  if (!d.ok){ el.innerHTML = '<div class="pempty">'+K(d.error)+'</div>'; return; }
+
+  el.innerHTML = d.pages.map(function(p){
+    if (p.locked){
+      return '<div class="prow locked"><span class="nm">'+K(p.label)+'</span>'
+        + '<span class="ky">'+K(p.key)+'</span>'
+        + '<span style="flex:1"></span><span class="plock">変更できません</span></div>';
+    }
+    var opts = Object.keys(VIS).map(function(v){
+      return '<option value="'+v+'"'+(p.visible_to===v?' selected':'')+'>'+VIS[v]+'</option>'; }).join('');
+    return '<div class="prow" data-k="'+K(p.key)+'">'
+      + '<span class="nm">'+K(p.label)+'</span><span class="ky">'+K(p.key)+'</span>'
+      + '<span class="pvis '+K(p.visible_to)+'">'+K(VIS[p.visible_to]||p.visible_to)+'</span>'
+      + '<select class="psel" onchange="visChange(this)">'+opts+'</select>'
+      + '<input class="pids" value="'+K(p.allow_ids)+'" placeholder="社員IDをカンマ区切り"'
+      + (p.visible_to==='custom'?'':' style="display:none"')+'>'
+      + '<button class="pbtn" onclick="save(this)">保存</button></div>';
+  }).join('');
+}
+
+window.visChange = function(sel){
+  var row = sel.closest('.prow');
+  row.querySelector('.pids').style.display = (sel.value === 'custom') ? '' : 'none';
+};
+
+window.save = async function(btn){
+  var row = btn.closest('.prow');
+  btn.disabled = true;
+  var r = await fetch('/api/admin/pages', {method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      page_key:   row.dataset.k,
+      visible_to: row.querySelector('.psel').value,
+      allow_ids:  row.querySelector('.pids').value })});
+  var d = await r.json().catch(function(){ return {ok:false, error:'応答を読めません'}; });
+  btn.disabled = false;
+  if (!d.ok) return T(d.error||'失敗しました', 'error');
+  T('保存しました', 'ok'); load();
+};
+
+load();
+})();
+</script>
