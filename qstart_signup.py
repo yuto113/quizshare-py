@@ -104,6 +104,45 @@ def new_invite(note='', max_uses=1, expires_at=None, by='admin', code=None,
     return code
 
 
+def new_invite_batch(prefix, count, note='', max_uses=1, expires_at=None, by='admin',
+                     min_age=13, grant_role=None, bonus_window=0, bonus_monthly=0,
+                     bonus_stock=0, label=''):
+    """同じ内容で、コード名だけ違うものをまとめて発行する。
+       prefix='QS-CLUB' なら QS-CLUB-A7K2 のような形になる。"""
+    prefix = (prefix or 'QS').strip().upper().rstrip('-')
+    count = max(1, min(int(count or 1), 50))     # 一度に50個まで
+    made = []
+    for _ in range(count):
+        for _try in range(20):                   # 衝突したら引き直す
+            code = prefix + '-' + secrets.token_hex(2).upper()
+            if new_invite(note=note, max_uses=max_uses, expires_at=expires_at, by=by,
+                          code=code, min_age=min_age, grant_role=grant_role,
+                          bonus_window=bonus_window, bonus_monthly=bonus_monthly,
+                          bonus_stock=bonus_stock):
+                made.append(code)
+                break
+    if made:
+        conn = db()
+        conn.executemany('UPDATE qstart_invites SET batch=?, label=? WHERE code=?',
+                         [(prefix, label, c) for c in made])
+        conn.commit(); conn.close()
+    return made
+
+
+def list_batches():
+    """束ごとの集計。何個発行して何個使われたか。"""
+    conn = db()
+    rows = conn.execute("""
+        SELECT batch, label, COUNT(*) AS total,
+               SUM(CASE WHEN used_count > 0 THEN 1 ELSE 0 END) AS used,
+               SUM(CASE WHEN active = 1 AND used_count < max_uses THEN 1 ELSE 0 END) AS usable,
+               MIN(created_at) AS created_at, MIN(min_age) AS min_age
+        FROM qstart_invites WHERE batch IS NOT NULL AND batch <> ''
+        GROUP BY batch, label ORDER BY MIN(created_at) DESC""").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
 def get_invite(code):
     if not code: return None
     conn = db()

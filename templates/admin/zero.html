@@ -1,0 +1,331 @@
+<style>
+.zw{max-width:980px;margin:0 auto;padding:18px 20px 60px;
+  font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;color:#14213d}
+.zw h2{font-size:19px;margin:0 0 4px;display:flex;align-items:center;gap:9px}
+.zw .lead{font-size:12.5px;color:#8a8270;margin:0 0 14px;line-height:1.7}
+.zbadges{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
+.zb{font-size:11px;padding:3px 10px;border-radius:99px;font-weight:700}
+.zb.code{background:#14213d;color:#e0b84a;letter-spacing:.14em}
+.zb.rank{background:#f3e8f7;color:#5c2c66}
+.zb.alias{background:#e8ecf7;color:#2c3e66}
+.znote{background:#fdf9ec;border:1px solid #f0e4c0;border-radius:8px;padding:10px 13px;
+  font-size:11.5px;color:#7a6420;line-height:1.7;margin-bottom:16px}
+.ztabs{display:flex;gap:2px;border-bottom:1px solid #ece9e2;margin-bottom:16px;overflow-x:auto}
+.ztab{padding:9px 15px;font-size:12.5px;color:#8a8270;cursor:pointer;white-space:nowrap;
+  background:none;border:none;border-bottom:2px solid transparent;font-family:inherit}
+.ztab:hover{color:#14213d}
+.ztab.on{color:#14213d;border-bottom-color:#b8860b;font-weight:600}
+.zpane{display:none}.zpane.on{display:block}
+.zcard{background:#fff;border:1px solid #ece9e2;border-radius:10px;padding:13px 15px;margin-bottom:10px}
+.zcard .top{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:5px}
+.zcard .who{font-size:11.5px;color:#8a8270}
+.zcard .body{font-size:13px;line-height:1.7;white-space:pre-wrap;margin:6px 0}
+.zno{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:15px;font-weight:700;
+  letter-spacing:.14em;background:#14213d;color:#e0b84a;padding:3px 10px;border-radius:6px}
+.st{font-size:10.5px;padding:2px 8px;border-radius:99px;font-weight:700}
+.st.pending{background:#fdf0e2;color:#a35a1c}
+.st.approved{background:#e4f4f1;color:#1d6f65}
+.st.rejected{background:#fdf2f1;color:#a83a30}
+.st.released{background:#f0eee8;color:#8a8270}
+.st.open{background:#e4eefb;color:#1c4f8a}
+.st.done{background:#e4f4f1;color:#1d6f65}
+.st.canceled{background:#f0eee8;color:#8a8270}
+.st.ok{background:#e4f4f1;color:#1d6f65}
+.st.no{background:#f0eee8;color:#8a8270}
+.zbtn{background:#14213d;color:#fff;border:none;padding:6px 13px;border-radius:7px;
+  font-size:11.5px;cursor:pointer;font-family:inherit}
+.zbtn:hover{background:#1c2d52}
+.zbtn.gh{background:none;border:1px solid #ece9e2;color:#14213d}
+.zbtn.gh:hover{background:#faf9f5}
+.zbtn.ng{background:#c0453b}
+.zinp,.zsel,.zta{padding:7px 10px;border:1px solid #ece9e2;border-radius:7px;
+  font-size:12.5px;font-family:inherit;width:100%}
+.zta{min-height:70px;resize:vertical}
+.zrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:9px}
+.zform{background:#faf9f6;border:1px solid #ece9e2;border-radius:10px;padding:14px;margin-bottom:18px}
+.zform h4{font-size:12.5px;margin:0 0 10px}
+.zempty{padding:30px 0;text-align:center;color:#b0a894;font-size:12.5px}
+.zmono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;color:#8a8270}
+.ztbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.ztbl th{text-align:left;font-size:11px;color:#8a8270;padding:7px 9px;border-bottom:1px solid #ece9e2}
+.ztbl td{padding:8px 9px;border-bottom:1px solid #f4f2ec}
+</style>
+
+<div class="zw">
+  <h2>🎯 警備局警備企画課</h2>
+  <p class="lead">協力者の運営管理と、公安部への指示を行います。</p>
+
+  <div class="zbadges" id="zBadges"></div>
+
+  <div class="znote">
+    ここでの操作はすべて対応記録に残ります。記録は対象になった本人も見ることができます。
+  </div>
+
+  <div class="ztabs">
+    <button class="ztab on" data-p="agents">🤝 協力者</button>
+    <button class="ztab" data-p="mail">✉️ メール閲覧の解放</button>
+    <button class="ztab" data-p="orders">📡 指示</button>
+    <button class="ztab" data-p="alias">🎭 偽名</button>
+    <button class="ztab" data-p="members">👥 所属</button>
+  </div>
+
+  <!-- 協力者 -->
+  <div class="zpane on" id="z-agents">
+    <div class="znote">承認すると、協力者に4桁の識別番号が自動で振られます。</div>
+    <div id="agList"></div>
+  </div>
+
+  <!-- メール閲覧の解放 -->
+  <div class="zpane" id="z-mail">
+    <div class="znote">
+      対象者ごとに閲覧の可否を決めます。解放しても、実際に閲覧すれば1通ごとに記録が残ります。
+    </div>
+    <div class="zform" id="mgForm">
+      <h4>＋ 閲覧の可否を決める</h4>
+      <div class="zrow">
+        <select class="zsel" id="mgTarget" style="max-width:220px"></select>
+        <select class="zsel" id="mgAllow" style="max-width:140px">
+          <option value="1">解放する</option>
+          <option value="0">解放しない</option>
+        </select>
+        <input class="zinp" id="mgExp" type="date" style="max-width:170px" title="期限（空なら無期限）">
+      </div>
+      <input class="zinp" id="mgReason" placeholder="理由（必ず書いてください）">
+      <div class="zrow" style="margin:9px 0 0"><button class="zbtn" onclick="mgSet()">決裁する</button></div>
+    </div>
+    <div id="mgList"></div>
+  </div>
+
+  <!-- 指示 -->
+  <div class="zpane" id="z-orders">
+    <div class="zform">
+      <h4>＋ 指示を出す</h4>
+      <div class="zrow">
+        <select class="zsel" id="odStaff" style="max-width:220px"></select>
+        <select class="zsel" id="odAgent" style="max-width:220px"></select>
+      </div>
+      <textarea class="zta" id="odBody" placeholder="指示の内容"></textarea>
+      <div class="zrow" style="margin:9px 0 0">
+        <button class="zbtn" onclick="odSend()">発出する</button>
+        <span class="zmono" id="odAs"></span>
+      </div>
+    </div>
+    <div id="odList"></div>
+  </div>
+
+  <!-- 所属 -->
+  <div class="zpane" id="z-members">
+    <div class="znote">
+      秘匿されている所属は、裏理事官とオーナーにだけ表示されます。
+    </div>
+    <div id="mbList"></div>
+  </div>
+
+  <!-- 偽名 -->
+  <div class="zpane" id="z-alias">
+    <div class="znote">
+      偽名を登録すると、あなたが出す指示はこの名前で表示されます。実名は記録には残ります。
+    </div>
+    <div class="zform">
+      <h4>🎭 自分の偽名</h4>
+      <div class="zrow">
+        <input class="zinp" id="alName" placeholder="偽名（空にすると解除）" style="max-width:240px">
+        <button class="zbtn" onclick="alSave()">登録</button>
+      </div>
+    </div>
+    <div id="alList"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+var D = null;
+var K = function(s){ return String(s==null?'':s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+var RANK = {ura_rijikan:'裏理事官', member:'課員'};
+var STL = {pending:'承認待ち', approved:'承認済み', rejected:'却下', released:'解放済み',
+           open:'発出中', done:'完了', canceled:'取消'};
+function T(m,t){ if(window.toast) window.toast(m,t); else alert(m); }
+async function J(u,o){ var r=await fetch(u,o);
+  return await r.json().catch(function(){ return {ok:false,error:'応答を読めません'}; }); }
+function P(u,b){ return J(u,{method:'POST',headers:{'Content-Type':'application/json'},
+                             body:JSON.stringify(b||{})}); }
+
+async function load(){
+  D = await J('/api/admin/zero/overview');
+  if (!D.ok){ document.getElementById('agList').innerHTML =
+    '<div class="zempty">'+K(D.error)+'</div>'; return; }
+
+  document.querySelector('.zw h2').innerHTML =
+    '🎯 警備局警備企画課（' + K(D.codename) + '）';
+
+  var b = ['<span class="zb code">' + K(D.codename) + '</span>',
+           '<span class="zb rank">' + K(RANK[D.rank]||D.rank) + '</span>'];
+  if (D.alias) b.push('<span class="zb alias">🎭 ' + K(D.alias) + '</span>');
+  document.getElementById('zBadges').innerHTML = b.join('');
+
+  var sOpt = (D.staff||[]).map(function(s){
+    return '<option value="'+K(s.staff_id)+'">'+K(s.name||s.staff_id)+'（'+K(s.staff_id)+'）</option>'; }).join('');
+  document.getElementById('mgTarget').innerHTML = sOpt;
+  document.getElementById('odStaff').innerHTML = '<option value="">— 社員に出す —</option>' + sOpt;
+  document.getElementById('odAgent').innerHTML = '<option value="">— 協力者に出す —</option>'
+    + (D.agents||[]).filter(function(a){ return a.status==='approved'; })
+        .map(function(a){ return '<option value="'+a.id+'">'+K(a.agent_no)+' '+K(a.code_name)+'</option>'; }).join('');
+  document.getElementById('alName').value = D.alias || '';
+  document.getElementById('odAs').textContent = D.alias
+    ? '発出者名: ' + D.alias + '（偽名）' : '発出者名: ' + K(D.rank==='ura_rijikan'?'裏理事官':'課員');
+
+  drawAgents(); drawGrants(); drawOrders(); drawAlias(); drawMembers();
+}
+
+function drawAgents(){
+  var el = document.getElementById('agList');
+  if (!D.agents.length){ el.innerHTML='<div class="zempty">協力者はいません</div>'; return; }
+  el.innerHTML = D.agents.map(function(a){
+    var act = '';
+    if (D.is_ura && a.status==='pending')
+      act = '<button class="zbtn" onclick="agAct('+a.id+',\'approve\')">承認する</button> '
+          + '<button class="zbtn ng" onclick="agAct('+a.id+',\'reject\')">却下</button>';
+    else if (D.is_ura && a.status==='approved')
+      act = '<button class="zbtn gh" onclick="agAct('+a.id+',\'release\')">解放する</button>';
+    return '<div class="zcard"><div class="top">'
+      + (a.agent_no ? '<span class="zno">'+K(a.agent_no)+'</span>' : '')
+      + '<span class="st '+K(a.status)+'">'+K(STL[a.status]||a.status)+'</span>'
+      + '<b>'+K(a.code_name)+'</b>'
+      + (a.real_id ? '<span class="zmono">'+K(a.real_id)+'</span>' : '')
+      + '</div><div class="who">申請: '+K(a.requested_by)+' · '+K(a.requested_at)
+      + (a.approved_by ? ' ／ 決裁: '+K(a.approved_by)+' · '+K(a.approved_at||'') : '')+'</div>'
+      + (a.note ? '<div class="body">'+K(a.note)+'</div>' : '')
+      + (act ? '<div class="zrow" style="margin:8px 0 0">'+act+'</div>' : '')
+      + '</div>';
+  }).join('');
+}
+
+function drawGrants(){
+  var el = document.getElementById('mgList');
+  document.getElementById('mgForm').style.display = D.is_ura ? '' : 'none';
+  if (!D.grants.length){ el.innerHTML='<div class="zempty">解放の記録はありません</div>'; return; }
+  el.innerHTML = '<table class="ztbl"><thead><tr><th>対象</th><th>状態</th><th>理由</th>'
+    + '<th>決裁</th><th>期限</th></tr></thead><tbody>'
+    + D.grants.map(function(g){
+        return '<tr><td><b>'+K(g.target_id)+'</b></td>'
+          + '<td><span class="st '+(g.allowed?'ok':'no')+'">'+(g.allowed?'解放中':'不可')+'</span></td>'
+          + '<td>'+K(g.reason)+'</td>'
+          + '<td class="zmono">'+K(g.granted_by)+'<br>'+K(g.granted_at)+'</td>'
+          + '<td class="zmono">'+K(g.expires_at||'無期限')+'</td></tr>'; }).join('')
+    + '</tbody></table>';
+}
+
+function drawOrders(){
+  var el = document.getElementById('odList');
+  if (!D.orders.length){ el.innerHTML='<div class="zempty">指示はありません</div>'; return; }
+  el.innerHTML = D.orders.map(function(o){
+    var to = o.to_staff ? '社員 '+K(o.to_staff)
+           : (o.to_agent ? '協力者 #'+K(o.to_agent) : '—');
+    var act = (o.status==='open')
+      ? '<button class="zbtn gh" onclick="odDone('+o.id+',\'done\')">完了</button> '
+      + '<button class="zbtn gh" onclick="odDone('+o.id+',\'canceled\')">取消</button>' : '';
+    return '<div class="zcard"><div class="top">'
+      + '<span class="st '+K(o.status)+'">'+K(STL[o.status]||o.status)+'</span>'
+      + '<b>→ '+to+'</b></div>'
+      + '<div class="who">発出: '+K(o.issued_as || o.issued_by)
+      + (o.issued_as ? '（偽名）' : '') + ' · '+K(o.created_at)+'</div>'
+      + '<div class="body">'+K(o.body)+'</div>'
+      + (act ? '<div class="zrow" style="margin:8px 0 0">'+act+'</div>' : '')
+      + '</div>';
+  }).join('');
+}
+
+function drawAlias(){
+  var el = document.getElementById('alList');
+  if (!D.aliases.length){ el.innerHTML='<div class="zempty">偽名の登録はありません</div>'; return; }
+  el.innerHTML = '<table class="ztbl"><thead><tr><th>偽名</th><th>登録</th></tr></thead><tbody>'
+    + D.aliases.map(function(a){
+        var mine = (a.staff_id === '{{ me }}');
+        return '<tr><td><b>🎭 '+K(a.alias)+'</b>'+(mine?' <span class="zmono">(自分)</span>':'')+'</td>'
+          + '<td class="zmono">'+K(a.created_at)+'</td></tr>'; }).join('')
+    + '</tbody></table>';
+}
+
+async function drawMembers(){
+  var m = await J('/api/admin/kouan/members');
+  var el = document.getElementById('mbList');
+  if (!m.ok){ el.innerHTML = '<div class="zempty">'+K(m.error)+'</div>'; return; }
+  var DIVN = {kouan:'Qzero公安部', keibi:'警備企画課'};
+  var RK = {ura_rijikan:'裏理事官', chief:'部長', member:'部員'};
+  el.innerHTML = '<table class="ztbl"><thead><tr><th>社員</th><th>部署</th><th>階級</th>'
+    + '<th>任期</th><th>秘匿</th>'+(m.can_toggle?'<th></th>':'')+'</tr></thead><tbody>'
+    + m.members.map(function(x){
+        return '<tr><td><b>'+K(x.staff_id)+'</b></td>'
+          + '<td>'+K(DIVN[x.division]||x.division)+'</td>'
+          + '<td>'+K(RK[x.rank]||x.rank)+'</td>'
+          + '<td class="zmono">'+K(x.term_to || '定めなし')+'</td>'
+          + '<td>'+(x.secret?'秘匿中':'—')+'</td>'
+          + (m.can_toggle
+              ? '<td><button class="zbtn gh" onclick="scToggle(\''+K(x.staff_id)+'\',\''
+                + K(x.division)+'\','+(x.secret?'0':'1')+')">'
+                + (x.secret?'公開':'秘匿')+'</button></td>'
+              : '')
+          + '</tr>'; }).join('')
+    + '</tbody></table>';
+}
+
+window.scToggle = async function(sid, div, v){
+  if (!confirm(sid + ' を' + (v ? '秘匿にしますか？' : '公開に戻しますか？'))) return;
+  var r = await P('/api/admin/kouan/secret', {staff_id:sid, division:div, secret:!!v});
+  if (!r.ok) return T(r.error||'失敗しました','error');
+  T(v ? '秘匿にしました' : '公開に戻しました','ok'); load();
+};
+
+window.agAct = async function(id, act){
+  var L = {approve:'承認', reject:'却下', release:'解放'};
+  if (!confirm('この協力者を' + L[act] + 'しますか？')) return;
+  var r = await P('/api/admin/zero/agent/decide', {id:id, action:act});
+  if (!r.ok) return T(r.error||'失敗しました','error');
+  T(r.message || '更新しました','ok'); load();
+};
+window.mgSet = async function(){
+  var reason = document.getElementById('mgReason').value.trim();
+  if (!reason) return T('理由を書いてください','error');
+  var r = await P('/api/admin/zero/mailgrant', {
+    target_id: document.getElementById('mgTarget').value,
+    allowed:   document.getElementById('mgAllow').value === '1',
+    expires_at:document.getElementById('mgExp').value,
+    reason:    reason});
+  if (!r.ok) return T(r.error||'失敗しました','error');
+  document.getElementById('mgReason').value = '';
+  T('決裁しました','ok'); load();
+};
+window.odSend = async function(){
+  var b = document.getElementById('odBody').value.trim();
+  if (!b) return T('指示の内容を書いてください','error');
+  var st = document.getElementById('odStaff').value;
+  var ag = document.getElementById('odAgent').value;
+  if (!st && !ag) return T('宛先を選んでください','error');
+  var r = await P('/api/admin/zero/order', {to_staff:st, to_agent:ag||null, body:b});
+  if (!r.ok) return T(r.error||'失敗しました','error');
+  document.getElementById('odBody').value = '';
+  T('指示を発出しました','ok'); load();
+};
+window.odDone = async function(id, st){
+  var r = await P('/api/admin/zero/order/done', {id:id, status:st});
+  if (!r.ok) return T(r.error||'失敗しました','error');
+  T('更新しました','ok'); load();
+};
+window.alSave = async function(){
+  var a = document.getElementById('alName').value.trim();
+  var r = await P('/api/admin/zero/alias', {alias:a});
+  if (!r.ok) return T(r.error||'失敗しました','error');
+  T(a ? '偽名を登録しました' : '偽名を解除しました','ok'); load();
+};
+
+document.querySelectorAll('.ztab').forEach(function(t){
+  t.onclick = function(){
+    document.querySelectorAll('.ztab').forEach(function(x){ x.classList.toggle('on', x===t); });
+    document.querySelectorAll('.zpane').forEach(function(p){
+      p.classList.toggle('on', p.id === 'z-'+t.dataset.p); });
+  };
+});
+load();
+})();
+</script>

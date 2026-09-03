@@ -192,10 +192,7 @@ function drawAgents(){
   if (!D.agents.length){ el.innerHTML = '<div class="kempty">協力者はいません</div>'; return; }
   el.innerHTML = D.agents.map(function(a){
     var act = '';
-    if (D.rank_keibi === 'ura_rijikan' && a.status === 'pending'){
-      act = '<button class="kbtn" onclick="agDecide('+a.id+',1)">許可する</button> '
-          + '<button class="kbtn ng" onclick="agDecide('+a.id+',0)">却下</button>';
-    }
+    // 承認・却下・解放はゼロの権限。ここには出さない。
     return '<div class="kcard"><div class="top">'
       + '<span class="st '+K(a.status)+'">'+K(STL[a.status]||a.status)+'</span>'
       + '<b>'+K(a.code_name)+'</b>'

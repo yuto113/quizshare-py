@@ -1,0 +1,342 @@
+<style>
+.uw{max-width:980px;margin:0 auto;padding:18px 20px 60px;
+  font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;color:#14213d}
+.uw h2{font-size:19px;margin:0 0 4px;display:flex;align-items:center;gap:9px}
+.uw .lead{font-size:12.5px;color:#8a8270;margin:0 0 14px;line-height:1.7}
+.ubadges{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:16px}
+.ub{font-size:11px;padding:3px 10px;border-radius:99px;font-weight:700}
+.ub.code{background:#14213d;color:#e0b84a;letter-spacing:.14em}
+.ub.ura{background:#2c1a3a;color:#d8b4f0}
+.ub.own{background:#5c2c00;color:#f0c878}
+.uwarn{background:#fdf2f1;border:1px solid #f3d5d2;border-radius:8px;padding:11px 14px;
+  font-size:11.5px;color:#8a3028;line-height:1.75;margin-bottom:16px}
+.unote{background:#fdf9ec;border:1px solid #f0e4c0;border-radius:8px;padding:10px 13px;
+  font-size:11.5px;color:#7a6420;line-height:1.7;margin-bottom:16px}
+.utabs{display:flex;gap:2px;border-bottom:1px solid #ece9e2;margin-bottom:16px;overflow-x:auto}
+.utab{padding:9px 15px;font-size:12.5px;color:#8a8270;cursor:pointer;white-space:nowrap;
+  background:none;border:none;border-bottom:2px solid transparent;font-family:inherit}
+.utab:hover{color:#14213d}
+.utab.on{color:#14213d;border-bottom-color:#b8860b;font-weight:600}
+.upane{display:none}.upane.on{display:block}
+.uform{background:#faf9f6;border:1px solid #ece9e2;border-radius:10px;padding:14px;margin-bottom:18px}
+.uform.danger{background:#fdf6f5;border-color:#f3d5d2}
+.uform h4{font-size:12.5px;margin:0 0 10px}
+.uinp,.usel,.uta{padding:7px 10px;border:1px solid #ece9e2;border-radius:7px;
+  font-size:12.5px;font-family:inherit;width:100%}
+.uta{min-height:66px;resize:vertical}
+.urow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:9px}
+.ubtn{background:#14213d;color:#fff;border:none;padding:6px 13px;border-radius:7px;
+  font-size:11.5px;cursor:pointer;font-family:inherit}
+.ubtn:hover{background:#1c2d52}
+.ubtn.gh{background:none;border:1px solid #ece9e2;color:#14213d}
+.ubtn.ng{background:#c0453b}
+.utbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.utbl th{text-align:left;font-size:11px;color:#8a8270;padding:7px 9px;border-bottom:1px solid #ece9e2}
+.utbl td{padding:8px 9px;border-bottom:1px solid #f4f2ec;vertical-align:top}
+.umono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;color:#8a8270}
+.uempty{padding:28px 0;text-align:center;color:#b0a894;font-size:12.5px}
+.utag{font-size:10.5px;padding:2px 8px;border-radius:99px;font-weight:700}
+.utag.now{background:#e4f4f1;color:#1d6f65}
+.utag.old{background:#f0eee8;color:#8a8270}
+.utag.ok{background:#e4f4f1;color:#1d6f65}
+.utag.no{background:#f0eee8;color:#8a8270}
+.utag.exp{background:#fdf2f1;color:#a83a30}
+.usecret{color:#b0a894;font-style:italic}
+.ucard{background:#fff;border:1px solid #ece9e2;border-radius:10px;padding:12px 14px;margin-bottom:9px}
+</style>
+
+<div class="uw">
+  <h2>👑 裏理事官／オーナー</h2>
+  <p class="lead">最上位の権限です。ここでの操作もすべて記録に残ります。</p>
+
+  <div class="ubadges" id="uBadges"></div>
+
+  <div class="uwarn">
+    <b>記録は消せません。</b>
+    この画面の操作は、緊急閲覧も含めてすべて対応記録に残ります。
+    通知は出さなくても、記録は必ず残ります。あとから誰でも検証できるようにするためです。
+  </div>
+
+  <div class="utabs">
+    <button class="utab on" data-p="audit">📜 対応記録</button>
+    <button class="utab" data-p="mail">🔓 緊急閲覧</button>
+    <button class="utab" data-p="grants">✉️ 解放一覧</button>
+    <button class="utab" data-p="alias">🎭 偽名一覧</button>
+    <button class="utab" data-p="code">🏷 コードネーム</button>
+    <button class="utab" data-p="term">⏳ 任期</button>
+    <button class="utab" data-p="resign">⚖️ 引責辞任</button>
+  </div>
+
+  <div class="upane on" id="u-audit"><div id="auList"></div></div>
+
+  <div class="upane" id="u-mail">
+    <div class="uwarn">
+      対象者への通知は出ません。ただし、この操作は記録に残り、対象者本人も後から見られます。
+      理由の入力は必須です。
+    </div>
+    <div class="uform danger">
+      <h4>🔓 緊急閲覧</h4>
+      <div class="urow"><select class="usel" id="mvTarget" style="max-width:230px"></select></div>
+      <textarea class="uta" id="mvReason" placeholder="閲覧の理由（必須・記録に残ります）"></textarea>
+      <div class="urow" style="margin:9px 0 0">
+        <button class="ubtn ng" onclick="mvGo()">閲覧する</button></div>
+    </div>
+    <div id="mvList"></div>
+  </div>
+
+  <div class="upane" id="u-grants"><div id="grList"></div></div>
+  <div class="upane" id="u-alias"><div id="alList"></div></div>
+
+  <div class="upane" id="u-code">
+    <div class="unote">
+      コードネームは、名前が知られるたびに変えるのが作法です。旧名は履歴として残ります。
+    </div>
+    <div class="uform">
+      <h4>🏷 改称する</h4>
+      <div class="urow">
+        <input class="uinp" id="cnName" placeholder="新しいコードネーム" style="max-width:200px">
+        <input class="uinp" id="cnReason" placeholder="改称の理由" style="max-width:280px">
+        <button class="ubtn" onclick="cnSet()">改称</button>
+      </div>
+    </div>
+    <div id="cnList"></div>
+  </div>
+
+  <div class="upane" id="u-term">
+    <div class="unote">
+      任期を過ぎると権限は自動で失効します。更新しない限り復活しません。
+      秘匿にすると、所属一覧に名前が出なくなります。
+    </div>
+    <div class="uform" id="tmForm">
+      <h4>⏳ 任期を設定する（オーナーのみ）</h4>
+      <div class="urow">
+        <select class="usel" id="tmWho" style="max-width:250px"></select>
+        <input class="uinp" id="tmFrom" type="date" style="max-width:160px">
+        <input class="uinp" id="tmTo" type="date" style="max-width:160px">
+      </div>
+      <div class="urow">
+        <label style="font-size:12px"><input type="checkbox" id="tmSecret"> 組織図から秘匿する</label>
+        <button class="ubtn" onclick="tmSet()">設定</button>
+      </div>
+    </div>
+    <div id="tmList"></div>
+  </div>
+
+  <div class="upane" id="u-resign">
+    <div class="uwarn">
+      記録に不適切な操作が見つかったとき、責任を取らせて解任します。
+      解任すると公安部・ゼロの所属から外れます。発令はオーナーのみです。
+    </div>
+    <div class="uform danger" id="rsForm">
+      <h4>⚖️ 引責辞任を発令する</h4>
+      <div id="rsWho" style="margin-bottom:9px"></div>
+      <input class="uinp" id="rsIncident" placeholder="事案名（例: 無断閲覧の発覚）" style="margin-bottom:8px">
+      <textarea class="uta" id="rsReason" placeholder="理由"></textarea>
+      <div class="urow" style="margin:9px 0 0">
+        <button class="ubtn ng" onclick="rsGo()">発令する</button></div>
+    </div>
+    <div id="rsList"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+var D = null;
+var K = function(s){ return String(s==null?'':s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+var RANK = {ura_rijikan:'裏理事官', chief:'部長', member:'部員'};
+var DIV  = {kouan:'Qzero公安部', keibi:'警備企画課'};
+function T(m,t){ if(window.toast) window.toast(m,t); else alert(m); }
+async function J(u,o){ var r=await fetch(u,o);
+  return await r.json().catch(function(){ return {ok:false,error:'応答を読めません'}; }); }
+function P(u,b){ return J(u,{method:'POST',headers:{'Content-Type':'application/json'},
+                             body:JSON.stringify(b||{})}); }
+function today(){ return new Date().toISOString().slice(0,10); }
+
+async function load(){
+  D = await J('/api/admin/ura/overview');
+  if (!D.ok){ document.getElementById('auList').innerHTML =
+    '<div class="uempty">'+K(D.error)+'</div>'; return; }
+
+  var b = ['<span class="ub code">'+K(D.codename)+'</span>',
+           '<span class="ub ura">裏理事官</span>'];
+  if (D.is_owner) b.push('<span class="ub own">オーナー</span>');
+  document.getElementById('uBadges').innerHTML = b.join('');
+
+  var people = {};
+  (D.members||[]).forEach(function(m){ people[m.staff_id] = 1; });
+  (D.grants||[]).forEach(function(g){ people[g.target_id] = 1; });
+  var opts = Object.keys(people).map(function(p){
+    return '<option value="'+K(p)+'">'+K(p)+'</option>'; }).join('');
+  document.getElementById('mvTarget').innerHTML = opts;
+  document.getElementById('tmWho').innerHTML = (D.members||[]).map(function(m){
+    return '<option value="'+K(m.staff_id)+'|'+K(m.division)+'">'
+      + K(m.staff_id)+' — '+K(DIV[m.division])+'</option>'; }).join('');
+  document.getElementById('rsWho').innerHTML = (D.members||[])
+    .filter(function(m){ return m.staff_id !== 'yuto'; })
+    .map(function(m){
+      return '<label style="font-size:12px;margin-right:14px">'
+        + '<input type="checkbox" class="rsChk" value="'+K(m.staff_id)+'"> '
+        + K(m.staff_id)+'（'+K(DIV[m.division])+'）</label>'; }).join('')
+    || '<span class="uempty">対象者がいません</span>';
+
+  document.getElementById('tmForm').style.display = D.is_owner ? '' : 'none';
+  document.getElementById('rsForm').style.display = D.is_owner ? '' : 'none';
+  if (!document.getElementById('tmFrom').value) document.getElementById('tmFrom').value = today();
+
+  drawAudit(); drawGrants(); drawAlias(); drawCode(); drawTerm(); drawResign();
+}
+
+function drawAudit(){
+  var el = document.getElementById('auList');
+  if (!D.audits.length){ el.innerHTML='<div class="uempty">記録はありません</div>'; return; }
+  el.innerHTML = '<p class="lead">直近200件。消すことはできません。</p>'
+    + '<table class="utbl"><thead><tr><th>日時</th><th>操作した人</th><th>操作</th>'
+    + '<th>対象</th><th>内容</th></tr></thead><tbody>'
+    + D.audits.map(function(a){
+        var em = (a.action === 'emergency_mailview');
+        return '<tr'+(em?' style="background:#fdf6f5"':'')+'>'
+          + '<td class="umono">'+K(a.created_at)+'</td><td>'+K(a.actor_id)+'</td>'
+          + '<td>'+(em?'<b style="color:#a83a30">緊急閲覧</b>':K(a.action))+'</td>'
+          + '<td class="umono">'+K(a.target)+'</td><td>'+K(a.detail)+'</td></tr>'; }).join('')
+    + '</tbody></table>';
+}
+
+function drawGrants(){
+  var el = document.getElementById('grList');
+  if (!D.grants.length){ el.innerHTML='<div class="uempty">解放の記録はありません</div>'; return; }
+  el.innerHTML = '<table class="utbl"><thead><tr><th>対象</th><th>状態</th><th>理由</th>'
+    + '<th>決裁</th><th>期限</th><th></th></tr></thead><tbody>'
+    + D.grants.map(function(g){
+        var rm = g.allowed
+          ? '<button class="ubtn gh" onclick="grClose(\''+K(g.target_id)+'\')">取り消す</button>' : '';
+        return '<tr><td><b>'+K(g.target_id)+'</b></td>'
+          + '<td><span class="utag '+(g.allowed?'ok':'no')+'">'+(g.allowed?'解放中':'不可')+'</span></td>'
+          + '<td>'+K(g.reason)+'</td>'
+          + '<td class="umono">'+K(g.granted_by)+'<br>'+K(g.granted_at)+'</td>'
+          + '<td class="umono">'+K(g.expires_at||'無期限')+'</td><td>'+rm+'</td></tr>'; }).join('')
+    + '</tbody></table>';
+}
+
+function drawAlias(){
+  var el = document.getElementById('alList');
+  if (!D.aliases.length){ el.innerHTML='<div class="uempty">偽名の登録はありません</div>'; return; }
+  el.innerHTML = '<p class="lead">誰がどの偽名を使っているか、ここでだけ分かります。</p>'
+    + '<table class="utbl"><thead><tr><th>偽名</th><th>実名</th><th>登録</th></tr></thead><tbody>'
+    + D.aliases.map(function(a){
+        return '<tr><td><b>🎭 '+K(a.alias)+'</b></td><td class="umono">'+K(a.staff_id)+'</td>'
+          + '<td class="umono">'+K(a.created_at)+'</td></tr>'; }).join('')
+    + '</tbody></table>';
+}
+
+function drawCode(){
+  var el = document.getElementById('cnList');
+  el.innerHTML = '<table class="utbl"><thead><tr><th>コードネーム</th><th>期間</th>'
+    + '<th>理由</th><th>改称した人</th></tr></thead><tbody>'
+    + D.codenames.map(function(n){
+        var now = !n.to_date;
+        return '<tr><td><b>'+K(n.name)+'</b> '
+          + '<span class="utag '+(now?'now':'old')+'">'+(now?'現行':'旧称')+'</span></td>'
+          + '<td class="umono">'+K(n.from_date)+(n.to_date?' 〜 '+K(n.to_date):' 〜')+'</td>'
+          + '<td>'+K(n.reason)+'</td><td class="umono">'+K(n.changed_by)+'</td></tr>'; }).join('')
+    + '</tbody></table>';
+}
+
+function drawTerm(){
+  var el = document.getElementById('tmList');
+  var t = new Date().toISOString().slice(0,10);
+  el.innerHTML = '<table class="utbl"><thead><tr><th>社員</th><th>部署</th><th>階級</th>'
+    + '<th>任期</th><th>秘匿</th></tr></thead><tbody>'
+    + D.members.map(function(m){
+        var exp = m.term_to && m.term_to < t;
+        return '<tr><td><b>'+K(m.staff_id)+'</b></td><td>'+K(DIV[m.division]||m.division)+'</td>'
+          + '<td>'+K(RANK[m.rank]||m.rank)+'</td>'
+          + '<td class="umono">'+(m.term_to
+              ? K(m.term_from||'')+' 〜 '+K(m.term_to)
+                + (exp?' <span class="utag exp">失効</span>':'')
+              : '定めなし')+'</td>'
+          + '<td>'+(m.secret?'<span class="usecret">秘匿</span>':'—')+'</td></tr>'; }).join('')
+    + '</tbody></table>';
+}
+
+function drawResign(){
+  var el = document.getElementById('rsList');
+  if (!D.resigns.length){ el.innerHTML='<div class="uempty">引責辞任の記録はありません</div>'; return; }
+  el.innerHTML = '<table class="utbl"><thead><tr><th>社員</th><th>事案</th><th>理由</th>'
+    + '<th>発令</th></tr></thead><tbody>'
+    + D.resigns.map(function(r){
+        return '<tr><td><b>'+K(r.staff_id)+'</b></td><td>'+K(r.incident)+'</td>'
+          + '<td>'+K(r.reason)+'</td>'
+          + '<td class="umono">'+K(r.ordered_by)+'<br>'+K(r.created_at)+'</td></tr>'; }).join('')
+    + '</tbody></table>';
+}
+
+window.mvGo = async function(){
+  var reason = document.getElementById('mvReason').value.trim();
+  if (!reason) return T('理由を書いてください','error');
+  if (!confirm('緊急閲覧をします。この操作は記録に残り、対象者も後から見られます。よろしいですか？')) return;
+  var r = await P('/api/admin/ura/mailview', {
+    target_id: document.getElementById('mvTarget').value, reason: reason});
+  if (!r.ok) return T(r.error||'失敗しました','error');
+  document.getElementById('mvList').innerHTML =
+    '<div class="ucard"><b>'+K(r.notice)+'</b><div class="umono" style="margin-top:6px">'
+    + (r.mails||[]).length + ' 件を取得しました</div></div>'
+    + (r.mails||[]).map(function(m){
+        return '<div class="ucard"><div class="umono">#'+K(m.id)+' · '+K(m.created_at||'')+'</div>'
+          + '<div style="font-size:12.5px;margin-top:5px;word-break:break-all">'
+          + K(JSON.stringify(m).slice(0,300))+'</div></div>'; }).join('');
+  document.getElementById('mvReason').value = '';
+  T('記録に残しました','ok'); load();
+};
+window.grClose = async function(tid){
+  if (!confirm(tid + ' の解放を取り消しますか？')) return;
+  var r = await P('/api/admin/zero/mailgrant',
+    {target_id:tid, allowed:false, reason:'裏理事官により取消'});
+  if (!r.ok) return T(r.error||'失敗しました','error');
+  T('取り消しました','ok'); load();
+};
+window.cnSet = async function(){
+  var n = document.getElementById('cnName').value.trim();
+  if (!n) return T('新しいコードネームを入力してください','error');
+  if (!confirm('「'+n+'」に改称しますか？')) return;
+  var r = await P('/api/admin/ura/codename',
+    {name:n, reason:document.getElementById('cnReason').value});
+  if (!r.ok) return T(r.error||'失敗しました','error');
+  document.getElementById('cnName').value = '';
+  document.getElementById('cnReason').value = '';
+  T('改称しました','ok'); load();
+};
+window.tmSet = async function(){
+  var v = document.getElementById('tmWho').value.split('|');
+  var r = await P('/api/admin/ura/term', {
+    staff_id: v[0], division: v[1],
+    term_from: document.getElementById('tmFrom').value,
+    term_to:   document.getElementById('tmTo').value,
+    secret:    document.getElementById('tmSecret').checked});
+  if (!r.ok) return T(r.error||'失敗しました','error');
+  T('設定しました','ok'); load();
+};
+window.rsGo = async function(){
+  var ids = Array.from(document.querySelectorAll('.rsChk:checked')).map(function(c){ return c.value; });
+  if (!ids.length) return T('対象を選んでください','error');
+  var inc = document.getElementById('rsIncident').value.trim();
+  if (!inc) return T('事案名を書いてください','error');
+  if (!confirm(ids.join('、') + ' に引責辞任を発令します。よろしいですか？')) return;
+  var r = await P('/api/admin/ura/resign', {staff_ids:ids, incident:inc,
+    reason: document.getElementById('rsReason').value});
+  if (!r.ok) return T(r.error||'失敗しました','error');
+  document.getElementById('rsIncident').value = '';
+  document.getElementById('rsReason').value = '';
+  T(r.count + '名に発令しました','ok'); load();
+};
+
+document.querySelectorAll('.utab').forEach(function(t){
+  t.onclick = function(){
+    document.querySelectorAll('.utab').forEach(function(x){ x.classList.toggle('on', x===t); });
+    document.querySelectorAll('.upane').forEach(function(p){
+      p.classList.toggle('on', p.id === 'u-'+t.dataset.p); });
+  };
+});
+load();
+})();
+</script>

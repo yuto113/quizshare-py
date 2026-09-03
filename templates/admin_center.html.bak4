@@ -44,9 +44,9 @@ iframe{width:100%;height:100%;border:none;display:block;position:absolute;inset:
   {% if role == 'admin' %}
   <div class="tab" data-g="quiz" onclick="grp(this)">📚 QuizShare</div>
   <div class="tab" data-g="qstart" onclick="grp(this)">⚙️ Qstart</div>
+  <div class="tab" data-g="kouan" onclick="grp(this)">🕶 公安部</div>
   <div class="tab" data-g="pages" onclick="grp(this)">🔧 ページ管理</div>
   {% endif %}
-  <div class="tab" data-g="kouan" onclick="grp(this)">🕶 公安部</div>
 </div>
 
 <div class="subtabs" id="subtabs"></div>
@@ -93,29 +93,10 @@ var MENU = {
   ],
 };
 
-var MYKEYS = null;   // 自分が開けるページ。null のうちは絞り込まない
-
-// URL → mymenu のキー
-function keyOf(u){
-  var m = /^\/admin\/staff\/([a-z0-9_-]+)/i.exec(u);
-  if (m) return 'staff/' + m[1];
-  if (u === '/admin/kouan') return 'kouan/kouan';
-  if (u === '/admin/zero')  return 'kouan/zero';
-  if (u === '/admin/ura')   return 'kouan/ura';
-  if (u === '/admin/pages') return 'pages/pages';
-  return null;              // QuizShare・Qstart は従来どおり
-}
-
-function allowed(u){
-  if (!MYKEYS) return true;
-  var k = keyOf(u);
-  return (k === null) ? true : MYKEYS.indexOf(k) >= 0;
-}
-
 function grp(el){
   document.querySelectorAll('.tab').forEach(function(t){ t.classList.toggle('on', t===el); });
   var g = el.dataset.g;
-  var items = (MENU[g]||[]).filter(function(x){ return (!x[2] || IS_ADMIN) && allowed(x[1]); });
+  var items = (MENU[g]||[]).filter(function(x){ return !x[2] || IS_ADMIN; });
   var sb = document.getElementById('subtabs');
   sb.innerHTML = items.map(function(x, i){
     var admin = x[2] === 'admin' ? ' adm' : '';
@@ -134,21 +115,7 @@ function go(el){
   setFrame(el.dataset.u);
 }
 
-function refreshTabs(){
-  var first = null;
-  document.querySelectorAll('.tab').forEach(function(t){
-    var g = t.dataset.g;
-    var n = (MENU[g]||[]).filter(function(x){ return (!x[2] || IS_ADMIN) && allowed(x[1]); }).length;
-    t.style.display = n ? '' : 'none';
-    if (n && !first) first = t;
-  });
-  if (first) grp(first);
-}
-
-// 自分が開けるページを聞いてからメニューを組む
-fetch('/api/admin/mymenu').then(function(r){ return r.json(); }).then(function(d){
-  if (d && d.ok) MYKEYS = d.keys;
-}).catch(function(){}).then(function(){ refreshTabs(); });
+grp(document.querySelector('.tab'));
 async function doLogout(){
   if(!confirm('ログアウトしますか？')) return;
   await fetch('/api/admin/logout',{method:'POST'});

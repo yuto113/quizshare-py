@@ -1781,6 +1781,61 @@ def admin_invite_create():
     return jsonify({'ok': bool(made), 'codes': made})
 
 
+@qstart_core.route('/qstart/api/v1/admin/invites/batch', methods=['POST'])
+@require_admin
+def admin_invite_batch():
+    """接頭辞を決めて、同じ内容のコードをまとめて発行する。
+       prefix='QS-CLUB', count=20 → QS-CLUB-A7K2 … が20個"""
+    import qstart_signup as qs
+    d = request.get_json(silent=True) or {}
+    prefix = (d.get('prefix') or '').strip().upper()
+    if not prefix:
+        return jsonify({'ok': False, 'error': '接頭辞を入力してください'}), 400
+    made = qs.new_invite_batch(
+        prefix=prefix,
+        count=int(d.get('count', 1)),
+        note=(d.get('note') or '')[:200],
+        label=(d.get('label') or '')[:100],
+        max_uses=int(d.get('max_uses', 1)),
+        expires_at=d.get('expires_at') or None,
+        by=cur_uid() or session.get('staff_id', 'admin'),
+        min_age=int(d.get('min_age', 13)),
+        grant_role=d.get('grant_role') or None,
+        bonus_window=int(d.get('bonus_window', 0) or 0),
+        bonus_monthly=int(d.get('bonus_monthly', 0) or 0),
+        bonus_stock=int(d.get('bonus_stock', 0) or 0))
+    alog('invite_batch', prefix, f'{len(made)}件')
+    return jsonify({'ok': bool(made), 'codes': made, 'prefix': prefix, 'count': len(made)})
+
+
+@qstart_core.route('/qstart/api/v1/admin/invites/batches', methods=['GET'])
+@require_admin
+def admin_invite_batches():
+    """束ごとの集計"""
+    import qstart_signup as qs
+    return jsonify({'ok': True, 'batches': qs.list_batches()})
+
+
+@qstart_core.route('/qstart/api/v1/admin/invites/batch/<batch>', methods=['PATCH','DELETE'])
+@require_admin
+def admin_invite_batch_edit(batch):
+    """束ごとまとめて停止・再開・削除する"""
+    conn = db()
+    if request.method == 'DELETE':
+        n = conn.execute('SELECT COUNT(*) FROM qstart_invites WHERE batch=? AND used_count=0',
+                         (batch,)).fetchone()[0]
+        conn.execute('DELETE FROM qstart_invites WHERE batch=? AND used_count=0', (batch,))
+        act, msg = 'invite_batch_delete', f'未使用{n}件を削除'
+    else:
+        d = request.get_json(silent=True) or {}
+        v = 1 if d.get('active') else 0
+        conn.execute('UPDATE qstart_invites SET active=? WHERE batch=?', (v, batch))
+        act, msg = 'invite_batch_toggle', ('再開' if v else '停止')
+    conn.commit(); conn.close()
+    alog(act, batch, msg)
+    return jsonify({'ok': True, 'message': msg})
+
+
 @qstart_core.route('/qstart/api/v1/admin/invites/<code>', methods=['PATCH','DELETE'])
 @require_admin
 def admin_invite_edit(code):
@@ -2240,6 +2295,83 @@ def admin_promo_create():
     conn.close()
     alog('promo_create', code, f"{d.get('type')} {value} x{max_uses}")
     return jsonify({'ok': True, 'code': code})
+
+@qstart_core.route('/qstart/api/v1/admin/promo/batch', methods=['POST'])
+@require_admin
+def admin_promo_batch():
+    """同じ内容で、コード名だけ違うものをまとめて発行する"""
+    import secrets as _sec
+    d = request.get_json(silent=True) or {}
+    prefix = (d.get('prefix') or '').strip().upper().rstrip('-')
+    if not prefix:
+        return jsonify({'ok': False, 'error': '接頭辞を入力してください'}), 400
+    try:
+        count = max(1, min(int(d.get('count', 1)), 50))
+        value = int(d.get('value', 10000))
+        max_uses = int(d.get('max_uses', 1))
+        min_age = int(d.get('min_age', 0) or 0)
+    except Exception:
+        return jsonify({'ok': False, 'error': 'bad_number'}), 400
+
+    who = session.get('staff_id') or cur_uid() or 'admin'
+    persist = 1 if str(d.get('persistent', '0')) in ('1', 'true', 'True') else 0
+    conn = db()
+    made = []
+    for _ in range(count):
+        for _try in range(20):
+            code = prefix + '-' + _sec.token_hex(2).upper()
+            try:
+                conn.execute("""INSERT INTO promo_codes
+                    (code,type,value,description,max_uses,expires_at,created_by,
+                     persistent,min_age,batch,label)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+                    (code, d.get('type', 'token_add'), value, d.get('description', ''),
+                     max_uses, d.get('expires_at') or None, who, persist,
+                     min_age, prefix, (d.get('label') or '')[:100]))
+                made.append(code)
+                break
+            except Exception:
+                continue
+    conn.commit(); conn.close()
+    alog('promo_batch', prefix, f'{len(made)}件')
+    return jsonify({'ok': bool(made), 'codes': made, 'prefix': prefix, 'count': len(made)})
+
+
+@qstart_core.route('/qstart/api/v1/admin/promo/batches', methods=['GET'])
+@require_admin
+def admin_promo_batches():
+    conn = db()
+    rows = conn.execute("""
+        SELECT batch, label, type, value, persistent, MIN(min_age) AS min_age,
+               COUNT(*) AS total,
+               SUM(CASE WHEN used_count > 0 THEN 1 ELSE 0 END) AS used,
+               SUM(CASE WHEN active = 1 AND (max_uses < 0 OR used_count < max_uses)
+                        THEN 1 ELSE 0 END) AS usable,
+               MIN(created_at) AS created_at
+        FROM promo_codes WHERE batch IS NOT NULL AND batch <> ''
+        GROUP BY batch, label ORDER BY MIN(created_at) DESC""").fetchall()
+    conn.close()
+    return jsonify({'ok': True, 'batches': [dict(r) for r in rows]})
+
+
+@qstart_core.route('/qstart/api/v1/admin/promo/batch/<batch>', methods=['PATCH','DELETE'])
+@require_admin
+def admin_promo_batch_edit(batch):
+    conn = db()
+    if request.method == 'DELETE':
+        n = conn.execute('SELECT COUNT(*) FROM promo_codes WHERE batch=? AND used_count=0',
+                         (batch,)).fetchone()[0]
+        conn.execute('DELETE FROM promo_codes WHERE batch=? AND used_count=0', (batch,))
+        act, msg = 'promo_batch_delete', f'未使用{n}件を削除しました'
+    else:
+        d = request.get_json(silent=True) or {}
+        v = 1 if d.get('active') else 0
+        conn.execute('UPDATE promo_codes SET active=? WHERE batch=?', (v, batch))
+        act, msg = 'promo_batch_toggle', ('再開しました' if v else '停止しました')
+    conn.commit(); conn.close()
+    alog(act, batch, msg)
+    return jsonify({'ok': True, 'message': msg})
+
 
 @qstart_core.route('/qstart/api/v1/admin/promo/<code>', methods=['PATCH','DELETE'])
 @require_admin

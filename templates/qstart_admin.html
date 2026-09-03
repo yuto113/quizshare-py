@@ -240,6 +240,12 @@ button.red { background:#b03a3a; }
         </select></div>
       <div><label style="font-size:11px;color:#8a8270;">有効期限（任意）</label><br>
         <input id="pcExp" type="date"></div>
+      <div><label style="font-size:11px;color:#8a8270;">接頭辞（まとめて発行）</label><br>
+        <input id="pcPrefix" placeholder="例: QS-CLUB（空なら1個）" style="width:190px;text-transform:uppercase"></div>
+      <div><label style="font-size:11px;color:#8a8270;">個数</label><br>
+        <input id="pcCount" type="number" value="1" min="1" max="50" style="width:70px"></div>
+      <div><label style="font-size:11px;color:#8a8270;">配布先メモ</label><br>
+        <input id="pcLabel" placeholder="例: 3年B組" style="width:150px"></div>
     </div>
     <label>説明</label>
     <input id="pcDesc" placeholder="例: 夏のキャンペーン" style="width:100%">
@@ -251,6 +257,13 @@ button.red { background:#b03a3a; }
   </div>
   <table><thead><tr><th>コード</th><th>種類</th><th>持続</th><th>値</th><th>使用</th><th>期限</th><th>説明</th><th>状態</th><th></th></tr></thead>
   <tbody id="pcBody"></tbody></table>
+
+  <h3 style="margin-top:26px;font-size:15px;">📦 まとめて発行したコード</h3>
+  <p style="font-size:12px;color:#a09a8a;margin:4px 0 10px;">
+    接頭辞を指定して発行したものは、束ごとにまとめて操作できます。</p>
+  <table><thead><tr><th>接頭辞</th><th>配布先</th><th>種類</th><th>値</th>
+    <th>発行数</th><th>使用状況</th><th></th></tr></thead>
+  <tbody id="pcBatches"></tbody></table>
 </div>
 
 <div class="pane" id="p-pricing">
@@ -824,14 +837,53 @@ async function createPromo(){
     persistent:document.getElementById('pcPersist').value,
     expires_at:document.getElementById('pcExp').value||null,
     description:document.getElementById('pcDesc').value};
-  var d=await api('promo','POST',b);
+  var pfx=(document.getElementById('pcPrefix')||{value:''}).value.trim().toUpperCase();
+  var d;
+  if(pfx){
+    b.prefix=pfx;
+    b.count=(document.getElementById('pcCount')||{value:1}).value;
+    b.label=(document.getElementById('pcLabel')||{value:''}).value;
+    d=await api('promo/batch','POST',b);
+  } else {
+    d=await api('promo','POST',b);
+  }
   var r=document.getElementById('pcResult');
-  if(d.ok){ r.style.color='#2e7d32'; r.textContent='発行しました: '+d.code;
+  if(d.ok){ r.style.color='#2e7d32';
+    r.textContent = d.codes
+      ? d.count+'個 発行しました: '+d.codes.slice(0,3).join(', ')+(d.count>3?' ほか':'')
+      : '発行しました: '+d.code;
     document.getElementById('pcCode').value=''; document.getElementById('pcDesc').value='';
     loadPromo(); }
   else { r.style.color='#c0392b';
     r.textContent=(d.error==='duplicate'?'そのコードは既に存在します':'発行に失敗しました'); }
 }
+async function loadPromoBatches(){
+  var el=document.getElementById('pcBatches'); if(!el) return;
+  var d=await api('promo/batches');
+  var TY={token_add:'トークン追加',monthly_add:'月間枠を追加',feature:'機能を解放'};
+  if(!d||!d.ok||!d.batches.length){
+    el.innerHTML='<tr><td colspan="7" style="color:#aaa;">まとめて発行したコードはありません</td></tr>';
+    return; }
+  el.innerHTML=d.batches.map(function(b){
+    return '<tr><td style="font-family:monospace;font-weight:600;">'+esc(b.batch)+'-****</td>'
+      +'<td style="font-size:12px;">'+esc(b.label||'')+'</td>'
+      +'<td>'+esc(TY[b.type]||b.type)+'</td>'
+      +'<td>'+Number(b.value||0).toLocaleString()+'</td>'
+      +'<td>'+b.total+' 個</td>'
+      +'<td>'+b.used+' 個使用 / 残り '+b.usable+'</td>'
+      +'<td><button class="ghost" onclick="togPromoBatch(\''+esc(b.batch)+'\',0)">停止</button> '
+      +'<button class="ghost" onclick="togPromoBatch(\''+esc(b.batch)+'\',1)">再開</button> '
+      +'<button class="red" onclick="delPromoBatch(\''+esc(b.batch)+'\')">未使用を削除</button></td></tr>';
+  }).join('');
+}
+async function togPromoBatch(b,v){
+  await api('promo/batch/'+encodeURIComponent(b),'PATCH',{active:v}); loadPromo(); }
+async function delPromoBatch(b){
+  if(!confirm(b+'-**** のうち、まだ使われていないコードを削除します。よろしいですか？'))return;
+  var d=await api('promo/batch/'+encodeURIComponent(b),'DELETE');
+  var r=document.getElementById('pcResult');
+  if(d&&d.ok){ r.style.color='#2e7d32'; r.textContent=d.message||'削除しました'; }
+  loadPromo(); }
 async function togPromo(c,v){ await api('promo/'+encodeURIComponent(c),'PATCH',{active:v}); loadPromo(); }
 async function delPromo(c){ if(!confirm(c+' を削除しますか？'))return;
   await api('promo/'+encodeURIComponent(c),'DELETE'); loadPromo(); }
@@ -917,6 +969,11 @@ async function saveFx(){
 var CAT_NAME = {wrong:'事実と違う', broken:'文章が壊れている', harmful:'不適切・有害',
   offtopic:'質問と関係ない', other:'その他'};
 
+var MODE_MSG = {
+  closed: '新規登録を受け付けません。',
+  invite: '招待コードを持つ人だけが登録できます。',
+  open:   '誰でも登録できます。'
+};
 async function loadSignup(){
   var d = await api('signup'); if(!d.ok) return;
   var c = d.config;
