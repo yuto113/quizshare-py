@@ -1463,7 +1463,7 @@ def bootstrap():
 
     # --- モデル ---
     out['models'] = [dict(r) for r in conn.execute(
-        "SELECT f.model, f.note, f.family, f.version, f.display, f.is_latest, f.params, "
+        "SELECT f.model, f.note, f.family, f.version, f.display, f.is_latest, f.params, f.credit, "
         "s.enabled, s.maintenance, s.min_role "
         "FROM qstart_model_flags f "
         "JOIN qstart_model_scope s ON s.model=f.model AND s.scope='chat' "
@@ -1607,7 +1607,7 @@ def public_models():
     conn = db()
     _sc = (request.args.get('scope') or 'chat').lower()
     if _sc not in ('chat','api'): _sc = 'chat'
-    rows = conn.execute("SELECT f.model, f.note, f.family, f.version, f.display, f.is_latest, f.params, s.enabled, s.maintenance, s.min_role, s.scope FROM qstart_model_flags f JOIN qstart_model_scope s ON s.model=f.model AND s.scope=? ORDER BY f.family, f.version DESC", (_sc,)).fetchall()
+    rows = conn.execute("SELECT f.model, f.note, f.family, f.version, f.display, f.is_latest, f.params, f.credit, s.enabled, s.maintenance, s.min_role, s.scope FROM qstart_model_flags f JOIN qstart_model_scope s ON s.model=f.model AND s.scope=? ORDER BY f.family, f.version DESC", (_sc,)).fetchall()
     conn.close()
     return jsonify({'ok': True, 'models': [dict(r) for r in rows]})
 
@@ -1993,7 +1993,7 @@ def admin_models():
                 "ORDER BY f.family, f.version DESC", (_sc,)).fetchall()
         else:
             rows = conn.execute(
-                "SELECT f.model, f.note, f.family, f.version, f.display, f.is_latest, f.params, "
+                "SELECT f.model, f.note, f.family, f.version, f.display, f.is_latest, f.params, f.credit, "
                 "MAX(CASE WHEN s.scope='chat' THEN s.enabled END) chat_enabled, "
                 "MAX(CASE WHEN s.scope='chat' THEN s.maintenance END) chat_maint, "
                 "MAX(CASE WHEN s.scope='api' THEN s.enabled END) api_enabled, "

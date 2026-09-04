@@ -202,6 +202,8 @@ body { font-family: 'Segoe UI','Hiragino Sans',sans-serif; background:#faf9f6; c
   box-shadow:0 4px 20px rgba(0,0,0,0.1); padding:8px 0; z-index:100; min-width:260px;
 }
 .qs-model-menu.open { display:block; }
+.qs-model-credit { font-size:10px; color:#a8a294; margin-top:2px; line-height:1.4; }
+body[data-theme="dark"] .qs-model-credit { color:#6b665c; }
 .qs-model-option {
   padding:10px 16px; cursor:pointer; font-size:14px;
 }
@@ -975,6 +977,12 @@ function versionRow(m) {
     + (Number(m.maintenance) ? ' ・メンテナンス中' : '');
   mid.appendChild(nm);
   if (ds.textContent) mid.appendChild(ds);
+  if (m.credit) {
+    var cr = document.createElement('div');
+    cr.className = 'qs-model-credit';
+    cr.textContent = m.credit;
+    mid.appendChild(cr);
+  }
   row.appendChild(mid);
   if (currentModel === m.model) {
     var ck = document.createElement('span');
