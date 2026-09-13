@@ -1573,6 +1573,9 @@ def page_homepage():
 # ====================================================================
 # 社員システム(掲示板・人事・公安・暗号・LINE)はbp_staff.pyに引っ越した
 # ====================================================================
+from bp_member import bp as _bp_member
+app.register_blueprint(_bp_member)
+
 from bp_admin import bp as _bp_admin
 app.register_blueprint(_bp_admin)
 
