@@ -1,0 +1,242 @@
+<style>
+.aw{max-width:820px;margin:0 auto;padding:18px 20px 60px;
+  font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;color:#0a1628}
+.aw h2{font-size:19px;margin:0 0 4px;display:flex;align-items:center;gap:9px}
+.aw .lead{font-size:12.5px;color:#7a8794;margin:0 0 16px;line-height:1.7}
+
+.awarn{background:#fdf2f1;border:1px solid #f3d5d2;border-radius:9px;padding:12px 15px;
+  font-size:12px;color:#8a3028;line-height:1.8;margin-bottom:18px}
+.awarn b{display:block;margin-bottom:3px}
+.awarn a{color:#8a3028}
+
+.anote{background:#eefcff;border:1px solid #b8e8f2;border-radius:8px;padding:10px 13px;
+  font-size:11.5px;color:#1a5966;line-height:1.7;margin-bottom:16px}
+
+.asetup{background:#fffbe8;border:1px solid #f0e0a0;border-radius:9px;padding:14px 16px;
+  font-size:12.5px;color:#6b5a15;line-height:1.8;margin-bottom:18px;display:none}
+.asetup.on{display:block}
+
+.acard{background:#fff;border:1px solid #dde5ea;border-radius:10px;padding:13px 15px;
+  margin-bottom:9px;display:flex;align-items:flex-start;gap:12px}
+.acard.fixed{background:#f7fbfc;border-color:#cfe3ea}
+.aplace{flex:1;min-width:0}
+.aplace .nm{font-weight:600;font-size:13.5px}
+.aplace .sub{font-size:11.5px;color:#7a8794;margin-top:3px}
+.abadge{font-size:10.5px;padding:2px 8px;border-radius:99px;background:#cffafe;
+  color:#0e7490;font-weight:700;white-space:nowrap}
+
+.aform{background:#f7f9fa;border:1px solid #dde5ea;border-radius:10px;padding:15px;margin-bottom:18px}
+.aform h4{font-size:13px;margin:0 0 4px}
+.aform .hint{font-size:11.5px;color:#7a8794;margin:0 0 12px;line-height:1.7}
+.arow{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:9px}
+.ainp,.asel{padding:8px 11px;border:1px solid #dde5ea;border-radius:8px;
+  font-size:12.5px;font-family:inherit}
+.ainp{min-width:0}
+.abtn{background:#0a1628;color:#fff;border:none;padding:8px 16px;border-radius:8px;
+  font-size:12.5px;cursor:pointer;font-family:inherit}
+.abtn:hover{background:#123047}
+.abtn.gh{background:none;border:1px solid #dde5ea;color:#0a1628;padding:5px 12px;font-size:11.5px}
+.abtn.gh:hover{background:#f0f4f6}
+.abtn:disabled{background:#d8dfe4;cursor:not-allowed}
+
+.asec{font-size:12.5px;font-weight:700;margin:22px 0 9px;padding-bottom:6px;
+  border-bottom:1px solid #dde5ea}
+.aempty{padding:26px 0;text-align:center;color:#9aa8b2;font-size:12.5px}
+.astat{font-size:11px;color:#9aa8b2;margin-top:14px;line-height:1.7}
+</style>
+
+<div class="aw">
+  <h2>🌊 天気・防災情報の設定</h2>
+  <p class="lead">住んでいる場所を登録すると、その地域の警報や注意報がAIとのDMに届きます。</p>
+
+  <div class="awarn">
+    <b>この通知だけに頼らないでください</b>
+    サーバーが止まっていたり、気象庁のデータが取れないと、通知は届きません。
+    避難の判断は、必ずテレビ・ラジオ・自治体の情報で行ってください。<br>
+    気象庁 <a href="https://www.jma.go.jp/bosai/" target="_blank" rel="noopener">jma.go.jp/bosai</a>
+    ／ 名古屋市防災 <a href="https://www.city.nagoya.jp/bosaikikikanri/" target="_blank" rel="noopener">city.nagoya.jp</a>
+  </div>
+
+  <div class="asetup" id="aSetup">
+    <b>まだ地域を登録していません。</b><br>
+    下の欄から住んでいる場所を追加すると、警報が届くようになります。
+    自宅のほかに、学校や祖父母の家など、いくつでも登録できます。
+  </div>
+
+  <div class="anote">
+    <b>届く先</b><br>
+    注意報 … AIとのDM だけ<br>
+    警報・危険警報・特別警報 … AIとのDM と LINE<br>
+    地震・津波 … AIとのDM と LINE<br>
+    ※ AIとのDMがないと届きません。掲示板でAIとのDMを作ってください。
+  </div>
+
+  <div class="aform">
+    <h4>＋ 場所を追加する</h4>
+    <p class="hint">
+      都道府県は必須です。市区町村より細かい部分は、通知の文面を分かりやすくするために使います。
+      川の名前を入れておくと、将来その川の水位もお知らせできるようになります。
+    </p>
+    <div class="arow">
+      <select class="asel" id="fPref" style="min-width:150px"><option>読み込み中…</option></select>
+      <select class="asel" id="fCity" style="flex:1;min-width:170px"><option value="">市区町村を選ぶ</option></select>
+    </div>
+    <div class="arow">
+      <input class="ainp" id="fWard"  placeholder="区（例: 熱田区）" style="flex:1;min-width:110px">
+      <input class="ainp" id="fArea"  placeholder="町名（例: 沢上）" style="flex:1;min-width:110px">
+      <input class="ainp" id="fRiver" placeholder="近くの川（例: 堀川）" style="flex:1;min-width:110px">
+    </div>
+    <div class="arow" style="margin:12px 0 0">
+      <button class="abtn" id="fAdd" onclick="addArea()">この場所を追加</button>
+      <span id="fMsg" style="font-size:12px;color:#7a8794"></span>
+    </div>
+  </div>
+
+  <div class="asec">登録した場所</div>
+  <div id="aList"><div class="aempty">読み込み中…</div></div>
+
+  <div class="asec">全員に届く場所</div>
+  <div id="aFixed"></div>
+
+  <div class="astat" id="aStat"></div>
+</div>
+
+<script>
+(function(){
+var AREA = null;
+
+var K = function(s){ return String(s==null?'':s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+function T(m,t){ if(window.toast) window.toast(m,t); else alert(m); }
+
+// 気象庁の地域一覧を読んで、都道府県 → 市区町村 の連動選択にする
+async function loadArea(){
+  try {
+    AREA = await (await fetch('/static/area.json')).json();
+  } catch(e){
+    document.getElementById('fPref').innerHTML = '<option value="">読み込めませんでした</option>';
+    return;
+  }
+  var offices = AREA.offices || {};
+  var list = Object.keys(offices).map(function(k){
+    return [k, offices[k].name];
+  }).sort(function(a,b){ return a[0] < b[0] ? -1 : 1; });
+
+  document.getElementById('fPref').innerHTML =
+    '<option value="">都道府県を選ぶ</option>' +
+    list.map(function(p){
+      return '<option value="'+p[0]+'"'+(p[1]==='愛知県'?' selected':'')+'>'+K(p[1])+'</option>';
+    }).join('');
+  fillCity();
+}
+
+// 選んだ都道府県の下にある市区町村を並べる。
+// 気象庁の区分は 都道府県 → 地方 → 地域 → 市区町村 の4段だが、
+// 選ぶ側には 都道府県 → 市区町村 の2段だけ見せる。
+function fillCity(){
+  var sel = document.getElementById('fCity');
+  var pref = document.getElementById('fPref').value;
+  if (!AREA || !pref){ sel.innerHTML = '<option value="">市区町村を選ぶ</option>'; return; }
+
+  var cities = [];
+  (AREA.offices[pref] ? AREA.offices[pref].children : []).forEach(function(c10){
+    ((AREA.class10s[c10] || {}).children || []).forEach(function(c15){
+      ((AREA.class15s[c15] || {}).children || []).forEach(function(c20){
+        var o = AREA.class20s[c20];
+        if (o) cities.push([c20, o.name]);
+      });
+    });
+  });
+  // 同じ名前が複数出ることがあるので、コード順のまま重複だけ除く
+  var seen = {}, out = [];
+  cities.forEach(function(c){ if (!seen[c[0]]){ seen[c[0]] = 1; out.push(c); } });
+
+  sel.innerHTML = '<option value="">市区町村を選ぶ（任意）</option>' +
+    out.map(function(c){
+      return '<option value="'+c[0]+'">'+K(c[1])+'</option>'; }).join('');
+}
+
+document.getElementById('fPref').addEventListener('change', fillCity);
+loadArea();
+
+function line(a){
+  var parts = [a.city, a.ward, a.area].filter(Boolean).join(' ');
+  return '<div class="aplace"><div class="nm">' + K(a.pref)
+    + (parts ? ' ' + K(parts) : '') + '</div>'
+    + '<div class="sub">'
+    + (a.river ? '近くの川: ' + K(a.river) : '川の登録なし')
+    + (a.created_at ? ' · ' + K(String(a.created_at).slice(0,10)) : '')
+    + '</div></div>';
+}
+
+async function load(){
+  var r = await fetch('/api/admin/alert/areas');
+  var d = await r.json().catch(function(){ return {ok:false, error:'応答を読めません'}; });
+  var el = document.getElementById('aList');
+  if (!d.ok){ el.innerHTML = '<div class="aempty">'+K(d.error)+'</div>'; return; }
+
+  document.getElementById('aSetup').classList.toggle('on', !!d.need_setup);
+
+  el.innerHTML = (d.areas || []).length
+    ? d.areas.map(function(a){
+        return '<div class="acard">' + line(a)
+          + '<button class="abtn gh" onclick="delArea('+a.id+')">削除</button></div>';
+      }).join('')
+    : '<div class="aempty">まだ登録がありません</div>';
+
+  document.getElementById('aFixed').innerHTML = (d.fixed || []).map(function(a){
+    return '<div class="acard fixed">' + line(a)
+      + '<span class="abadge">全員</span></div>';
+  }).join('') || '<div class="aempty">設定なし</div>';
+
+  // 稼働状況
+  try {
+    var s = await (await fetch('/api/admin/alert/active')).json();
+    if (s && s.ok){
+      document.getElementById('aStat').innerHTML =
+        '最後に取得できた時刻: ' + K(s.last_ok || '（まだ取得できていません）')
+        + '<br>いま出ている警報: ' + (s.count || 0) + ' 件';
+    }
+  } catch(e){}
+}
+
+window.addArea = async function(){
+  var sel = document.getElementById('fPref');
+  var pref = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '';
+  if (!sel.value){ T('都道府県を選んでください','error'); return; }
+  var btn = document.getElementById('fAdd');
+  btn.disabled = true;
+  var r = await fetch('/api/admin/alert/areas', {method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      pref: pref,
+      city:  (function(){
+        var c = document.getElementById('fCity');
+        return c.selectedIndex > 0 ? c.options[c.selectedIndex].text : '';
+      })(),
+      city_code: document.getElementById('fCity').value,
+      ward:  document.getElementById('fWard').value,
+      area:  document.getElementById('fArea').value,
+      river: document.getElementById('fRiver').value,
+      jma_code: sel.value })});
+  var d = await r.json().catch(function(){ return {ok:false, error:'応答を読めません'}; });
+  btn.disabled = false;
+  if (!d.ok){ T(d.error || '追加できませんでした','error'); return; }
+  ['fWard','fArea','fRiver'].forEach(function(id){
+    document.getElementById(id).value = ''; });
+  T('追加しました','ok');
+  load();
+};
+
+window.delArea = async function(id){
+  if (!confirm('この場所を削除しますか？')) return;
+  var r = await fetch('/api/admin/alert/areas/' + id, {method:'DELETE'});
+  var d = await r.json().catch(function(){ return {ok:false}; });
+  if (!d.ok){ T('削除できませんでした','error'); return; }
+  T('削除しました','ok');
+  load();
+};
+
+load();
+})();
+</script>

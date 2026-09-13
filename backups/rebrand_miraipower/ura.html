@@ -1,11 +1,11 @@
 <style>
 .uw{max-width:980px;margin:0 auto;padding:18px 20px 60px;
-  font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;color:#0a1628}
+  font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;color:#14213d}
 .uw h2{font-size:19px;margin:0 0 4px;display:flex;align-items:center;gap:9px}
 .uw .lead{font-size:12.5px;color:#8a8270;margin:0 0 14px;line-height:1.7}
 .ubadges{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:16px}
 .ub{font-size:11px;padding:3px 10px;border-radius:99px;font-weight:700}
-.ub.code{background:#0a1628;color:#22d3ee;letter-spacing:.14em}
+.ub.code{background:#14213d;color:#e0b84a;letter-spacing:.14em}
 .ub.ura{background:#2c1a3a;color:#d8b4f0}
 .ub.own{background:#5c2c00;color:#f0c878}
 .uwarn{background:#fdf2f1;border:1px solid #f3d5d2;border-radius:8px;padding:11px 14px;
@@ -15,8 +15,8 @@
 .utabs{display:flex;gap:2px;border-bottom:1px solid #ece9e2;margin-bottom:16px;overflow-x:auto}
 .utab{padding:9px 15px;font-size:12.5px;color:#8a8270;cursor:pointer;white-space:nowrap;
   background:none;border:none;border-bottom:2px solid transparent;font-family:inherit}
-.utab:hover{color:#0a1628}
-.utab.on{color:#0a1628;border-bottom-color:#0891b2;font-weight:600}
+.utab:hover{color:#14213d}
+.utab.on{color:#14213d;border-bottom-color:#b8860b;font-weight:600}
 .upane{display:none}.upane.on{display:block}
 .uform{background:#faf9f6;border:1px solid #ece9e2;border-radius:10px;padding:14px;margin-bottom:18px}
 .uform.danger{background:#fdf6f5;border-color:#f3d5d2}
@@ -25,10 +25,10 @@
   font-size:12.5px;font-family:inherit;width:100%}
 .uta{min-height:66px;resize:vertical}
 .urow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:9px}
-.ubtn{background:#0a1628;color:#fff;border:none;padding:6px 13px;border-radius:7px;
+.ubtn{background:#14213d;color:#fff;border:none;padding:6px 13px;border-radius:7px;
   font-size:11.5px;cursor:pointer;font-family:inherit}
-.ubtn:hover{background:#123047}
-.ubtn.gh{background:none;border:1px solid #ece9e2;color:#0a1628}
+.ubtn:hover{background:#1c2d52}
+.ubtn.gh{background:none;border:1px solid #ece9e2;color:#14213d}
 .ubtn.ng{background:#c0453b}
 .utbl{width:100%;border-collapse:collapse;font-size:12.5px}
 .utbl th{text-align:left;font-size:11px;color:#8a8270;padding:7px 9px;border-bottom:1px solid #ece9e2}
@@ -145,7 +145,7 @@ var D = null;
 var K = function(s){ return String(s==null?'':s)
   .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
 var RANK = {ura_rijikan:'裏理事官', chief:'部長', member:'部員'};
-var DIV  = {kouan:'公安部', keibi:'警備企画課'};
+var DIV  = {kouan:'Qzero公安部', keibi:'警備企画課'};
 function T(m,t){ if(window.toast) window.toast(m,t); else alert(m); }
 async function J(u,o){ var r=await fetch(u,o);
   return await r.json().catch(function(){ return {ok:false,error:'応答を読めません'}; }); }

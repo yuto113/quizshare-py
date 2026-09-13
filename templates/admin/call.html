@@ -1,0 +1,326 @@
+<style>
+.cw{max-width:900px;margin:0 auto;padding:18px 20px 60px;
+  font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;color:#0a1628}
+.cw h2{font-size:19px;margin:0 0 4px;display:flex;align-items:center;gap:9px}
+.cw .lead{font-size:12.5px;color:#7a8794;margin:0 0 18px;line-height:1.7}
+
+.cnote{background:#eefcff;border:1px solid #b8e8f2;border-radius:8px;padding:10px 13px;
+  font-size:11.5px;color:#1a5966;line-height:1.7;margin-bottom:18px}
+
+/* 相手の一覧 */
+.crow{background:#fff;border:1px solid #dde5ea;border-radius:10px;padding:12px 15px;
+  margin-bottom:9px;display:flex;align-items:center;gap:12px}
+.cdot{width:9px;height:9px;border-radius:50%;flex:none;background:#c8d2d8}
+.cdot.on{background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.18)}
+.cnm{font-weight:600;font-size:13.5px;flex:1;min-width:0}
+.cid{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;color:#9aa8b2;
+  font-weight:400;margin-left:6px}
+.cst{font-size:11px;color:#9aa8b2}
+.cbtn{background:#0a1628;color:#fff;border:none;padding:7px 15px;border-radius:8px;
+  font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap}
+.cbtn:hover{background:#123047}
+.cbtn:disabled{background:#d8dfe4;cursor:not-allowed}
+.cbtn.ng{background:#dc2626}
+.cbtn.ok{background:#16a34a}
+.cbtn.gh{background:none;border:1px solid #dde5ea;color:#0a1628}
+
+/* 通話中の画面 */
+.cstage{position:fixed;inset:0;background:#050b14;z-index:9998;display:none;
+  flex-direction:column}
+.cstage.on{display:flex}
+.cvideos{flex:1;position:relative;min-height:0}
+#vRemote{width:100%;height:100%;object-fit:contain;background:#050b14}
+#vLocal{position:absolute;right:16px;bottom:16px;width:168px;border-radius:10px;
+  background:#0a1628;box-shadow:0 4px 20px rgba(0,0,0,.5);object-fit:cover}
+.cbar{padding:14px;display:flex;align-items:center;justify-content:center;gap:10px;
+  background:#0a1628;flex:none}
+.cwho{position:absolute;top:16px;left:18px;color:#e8f4f8;font-size:14px;font-weight:600;
+  text-shadow:0 1px 6px rgba(0,0,0,.6)}
+.ctime{position:absolute;top:38px;left:18px;color:#8fa6b5;font-size:12px;
+  font-family:ui-monospace,Menlo,Consolas,monospace}
+.cic{width:46px;height:46px;border-radius:50%;border:none;cursor:pointer;font-size:18px;
+  background:#1e3148;color:#e8f4f8}
+.cic:hover{background:#2a4360}
+.cic.off{background:#dc2626;color:#fff}
+.cic.hang{background:#dc2626;color:#fff;width:58px}
+
+/* 着信 */
+.cring{position:fixed;inset:0;background:rgba(5,11,20,.88);z-index:9999;display:none;
+  align-items:center;justify-content:center}
+.cring.on{display:flex}
+.cbox{background:#0f1c2e;border-radius:18px;padding:34px 40px;text-align:center;
+  box-shadow:0 20px 60px rgba(0,0,0,.5);max-width:340px}
+.cbox .av{width:74px;height:74px;border-radius:50%;background:#1e3148;color:#22d3ee;
+  display:flex;align-items:center;justify-content:center;font-size:30px;margin:0 auto 14px;
+  animation:cpulse 1.4s ease-out infinite}
+@keyframes cpulse{
+  0%{box-shadow:0 0 0 0 rgba(34,211,238,.4)}
+  70%{box-shadow:0 0 0 18px rgba(34,211,238,0)}
+  100%{box-shadow:0 0 0 0 rgba(34,211,238,0)}}
+.cbox .t{color:#e8f4f8;font-size:17px;font-weight:700;margin-bottom:3px}
+.cbox .s{color:#7d95a8;font-size:12.5px;margin-bottom:22px}
+.cbox .btns{display:flex;gap:10px;justify-content:center}
+.cbox button{border:none;padding:11px 22px;border-radius:10px;font-size:13px;
+  cursor:pointer;font-family:inherit;font-weight:600}
+
+.cempty{padding:30px 0;text-align:center;color:#9aa8b2;font-size:12.5px}
+</style>
+
+<div class="cw">
+  <h2>📞 通話</h2>
+  <p class="lead">社員どうしで1対1のビデオ通話ができます。</p>
+
+  <div class="cnote">
+    映像と音声は相手のブラウザへ直接送られます。サーバーには残りません。<br>
+    相手が管理センターを開いているときだけ、呼び出せます。
+  </div>
+
+  <div id="cList"><div class="cempty">読み込み中…</div></div>
+</div>
+
+<!-- 着信 -->
+<div class="cring" id="cRing">
+  <div class="cbox">
+    <div class="av">📞</div>
+    <div class="t" id="cRingName">—</div>
+    <div class="s">着信中…</div>
+    <div class="btns">
+      <button class="cbtn ng" onclick="callDecline()">断る</button>
+      <button class="cbtn ok" onclick="callAccept()">出る</button>
+    </div>
+  </div>
+</div>
+
+<!-- 通話中 -->
+<div class="cstage" id="cStage">
+  <div class="cvideos">
+    <video id="vRemote" autoplay playsinline></video>
+    <video id="vLocal" autoplay playsinline muted></video>
+    <div class="cwho" id="cWho">—</div>
+    <div class="ctime" id="cTime">接続中…</div>
+  </div>
+  <div class="cbar">
+    <button class="cic" id="bMic" onclick="toggleMic()" title="マイク">🎤</button>
+    <button class="cic" id="bCam" onclick="toggleCam()" title="カメラ">📹</button>
+    <button class="cic hang" onclick="callHangup()" title="切る">📵</button>
+  </div>
+</div>
+
+<script>
+(function(){
+var ICE = {iceServers:[
+  {urls:'stun:stun.l.google.com:19302'},
+  {urls:'stun:stun1.l.google.com:19302'}
+]};
+
+var pc = null, local = null, callId = null, role = null;
+var iceSince = 0, iceTimer = null, tickTimer = null, startedAt = 0;
+var ringing = null, audioCtx = null, ringOsc = null;
+
+var K = function(s){ return String(s==null?'':s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+function T(m,t){ if(window.toast) window.toast(m,t); else alert(m); }
+async function P(u,b){
+  var r = await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},
+                         body:JSON.stringify(b||{})});
+  return await r.json().catch(function(){ return {ok:false,error:'応答を読めません'}; });
+}
+
+/* ---------- 着信音（合成。音声ファイルを置かずに済む） ---------- */
+function ringStart(){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    ringStop();
+    var loop = function(){
+      if (!ringing) return;
+      var t = audioCtx.currentTime;
+      [0, 0.4].forEach(function(off){
+        var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = 'sine'; o.frequency.value = 880;
+        g.gain.setValueAtTime(0, t+off);
+        g.gain.linearRampToValueAtTime(0.16, t+off+0.02);
+        g.gain.setValueAtTime(0.16, t+off+0.28);
+        g.gain.linearRampToValueAtTime(0, t+off+0.32);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(t+off); o.stop(t+off+0.35);
+      });
+    };
+    loop();
+    ringOsc = setInterval(loop, 2000);
+  }catch(e){}
+}
+function ringStop(){ if (ringOsc){ clearInterval(ringOsc); ringOsc = null; } }
+
+/* ---------- 相手の一覧 ---------- */
+function drawList(people){
+  var el = document.getElementById('cList');
+  if (!people.length){ el.innerHTML = '<div class="cempty">ほかに社員がいません</div>'; return; }
+  el.innerHTML = people.map(function(p){
+    return '<div class="crow"><span class="cdot'+(p.online?' on':'')+'"></span>'
+      + '<span class="cnm">'+K(p.name)+'<span class="cid">'+K(p.staff_id)+'</span></span>'
+      + (p.online
+          ? '<button class="cbtn" onclick="callStart(\''+K(p.staff_id)+'\',\''+K(p.name)+'\')">📞 発信</button>'
+          : '<span class="cst">開いていません</span>')
+      + '</div>';
+  }).join('');
+}
+
+/* ---------- 定期通信。着信の検知もここ ---------- */
+async function tick(){
+  var d = await P('/api/admin/call/ping');
+  if (!d.ok) return;
+  if (!pc) drawList(d.people || []);
+
+  // 着信
+  if (d.incoming && !callId && !ringing){
+    ringing = d.incoming;
+    var nm = (d.people||[]).filter(function(p){ return p.staff_id===d.incoming.caller; })[0];
+    document.getElementById('cRingName').textContent = nm ? nm.name : d.incoming.caller;
+    document.getElementById('cRing').classList.add('on');
+    ringStart();
+  }
+  // 相手が出た／切れた
+  if (d.outgoing && callId === d.outgoing.id){
+    if (d.outgoing.status === 'active' && d.outgoing.answer && pc && !pc.currentRemoteDescription){
+      await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(d.outgoing.answer)));
+      startedAt = Date.now();
+    }
+  } else if (callId && role === 'caller' && !d.outgoing){
+    T('通話が終わりました'); cleanup();
+  }
+}
+
+/* ---------- 発信 ---------- */
+window.callStart = async function(to, name){
+  if (pc) return T('もう通話中だよ','error');
+  if (!await getMedia()) return;
+  role = 'caller';
+  document.getElementById('cWho').textContent = name;
+  document.getElementById('cStage').classList.add('on');
+  document.getElementById('cTime').textContent = '呼び出し中…';
+
+  pc = newPeer();
+  var offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  var d = await P('/api/admin/call/start', {callee:to, offer:offer});
+  if (!d.ok){ T(d.error||'発信できませんでした','error'); cleanup(); return; }
+  callId = d.call_id;
+  iceLoop();
+};
+
+/* ---------- 応答 ---------- */
+window.callAccept = async function(){
+  var inc = ringing;
+  document.getElementById('cRing').classList.remove('on');
+  ringStop();
+  if (!inc) return;
+  if (!await getMedia()){ ringing = null; return; }
+  role = 'callee'; callId = inc.id;
+  document.getElementById('cWho').textContent = inc.caller;
+  document.getElementById('cStage').classList.add('on');
+
+  pc = newPeer();
+  await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(inc.offer)));
+  var ans = await pc.createAnswer();
+  await pc.setLocalDescription(ans);
+  await P('/api/admin/call/answer', {call_id:callId, answer:ans});
+  ringing = null; startedAt = Date.now();
+  iceLoop();
+};
+
+window.callDecline = async function(){
+  if (ringing) await P('/api/admin/call/end', {call_id:ringing.id, decline:true});
+  document.getElementById('cRing').classList.remove('on');
+  ringStop(); ringing = null;
+};
+
+window.callHangup = async function(){
+  if (callId) await P('/api/admin/call/end', {call_id:callId});
+  cleanup();
+};
+
+/* ---------- WebRTC ---------- */
+async function getMedia(){
+  try{
+    local = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
+    document.getElementById('vLocal').srcObject = local;
+    return true;
+  }catch(e){
+    T('カメラとマイクを使えません: ' + e.name, 'error');
+    return false;
+  }
+}
+
+function newPeer(){
+  var p = new RTCPeerConnection(ICE);
+  local.getTracks().forEach(function(t){ p.addTrack(t, local); });
+  p.ontrack = function(e){
+    document.getElementById('vRemote').srcObject = e.streams[0];
+    if (!startedAt) startedAt = Date.now();
+  };
+  p.onicecandidate = function(e){
+    if (e.candidate && callId) P('/api/admin/call/ice', {call_id:callId, cand:e.candidate});
+  };
+  p.onconnectionstatechange = function(){
+    if (['failed','disconnected','closed'].indexOf(p.connectionState) >= 0){
+      T('接続が切れました'); cleanup();
+    }
+  };
+  return p;
+}
+
+function iceLoop(){
+  clearInterval(iceTimer);
+  iceTimer = setInterval(async function(){
+    if (!callId || !pc) return;
+    var d = await P('/api/admin/call/ice', {call_id:callId, since:iceSince});
+    if (!d.ok) return;
+    for (var i=0; i<(d.cands||[]).length; i++){
+      var c = d.cands[i];
+      iceSince = Math.max(iceSince, c.id);
+      try{ await pc.addIceCandidate(new RTCIceCandidate(c.cand)); }catch(e){}
+    }
+    // 経過時間
+    if (startedAt){
+      var s = Math.floor((Date.now()-startedAt)/1000);
+      document.getElementById('cTime').textContent =
+        String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+    }
+  }, 1500);
+}
+
+function cleanup(){
+  clearInterval(iceTimer);
+  if (pc){ try{ pc.close(); }catch(e){} pc = null; }
+  if (local){ local.getTracks().forEach(function(t){ t.stop(); }); local = null; }
+  document.getElementById('cStage').classList.remove('on');
+  document.getElementById('vRemote').srcObject = null;
+  document.getElementById('vLocal').srcObject = null;
+  callId = null; role = null; iceSince = 0; startedAt = 0;
+}
+
+window.toggleMic = function(){
+  if (!local) return;
+  var t = local.getAudioTracks()[0]; if (!t) return;
+  t.enabled = !t.enabled;
+  document.getElementById('bMic').classList.toggle('off', !t.enabled);
+  document.getElementById('bMic').textContent = t.enabled ? '🎤' : '🔇';
+};
+window.toggleCam = function(){
+  if (!local) return;
+  var t = local.getVideoTracks()[0]; if (!t) return;
+  t.enabled = !t.enabled;
+  document.getElementById('bCam').classList.toggle('off', !t.enabled);
+  document.getElementById('bCam').textContent = t.enabled ? '📹' : '🚫';
+};
+
+window.addEventListener('beforeunload', function(){
+  if (callId) navigator.sendBeacon('/api/admin/call/end',
+    new Blob([JSON.stringify({call_id:callId})], {type:'application/json'}));
+});
+
+tick();
+tickTimer = setInterval(tick, 2500);
+})();
+</script>

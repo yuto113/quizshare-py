@@ -1290,8 +1290,13 @@ def _preview_body(mime, fname, blob_url, data_url):
     from markupsafe import escape
     if mime.startswith('image/'):
         return '<img src="' + blob_url + '" style="max-width:100%; border-radius:10px;">'
-    if mime == 'application/pdf' or mime.startswith('text/'):
-        return ('<iframe src="' + blob_url + '" style="width:100%; height:80vh; '
+    if mime == 'application/pdf' or fname.lower().endswith('.pdf'):
+        # toolbar=0 navpanes=0 でビューアの枠とサムネイル一覧を隠す
+        return ('<iframe src="' + blob_url + '#toolbar=0&navpanes=0&scrollbar=1&view=Fit" '
+                'style="width:100%; height:calc(100vh - 74px); border:none; '
+                'border-radius:10px; background:white;"></iframe>')
+    if mime.startswith('text/'):
+        return ('<iframe src="' + blob_url + '" style="width:100%; height:calc(100vh - 74px); '
                 'border:1px solid #e3ddd0; border-radius:10px; background:white;"></iframe>')
     if mime.startswith('audio/'):
         return '<audio controls src="' + blob_url + '" style="width:100%;"></audio>'
@@ -1350,9 +1355,9 @@ def page_staff_file_view_storage(file_id):
     body = _preview_body(mime, fname, blob_url, row[1])
     return ('<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
             '<title>' + str(escape(fname)) + '</title></head>'
-            '<body style="font-family:sans-serif; background:#fdfbf6; padding:20px; max-width:900px; margin:0 auto;">'
-            '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">'
-            '<h3 style="margin:0; color:#14213d; word-break:break-all;">🗂️ ' + str(escape(fname)) + '</h3>'
+            '<body style="font-family:sans-serif; background:#fdfbf6; margin:0; padding:10px 14px;">'
+            '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px;">'
+            '<h3 style="margin:0; font-size:14px; color:#14213d; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">🗂️ ' + str(escape(fname)) + '</h3>'
             '<span style="flex-shrink:0;">'
             '<a href="' + blob_url + '?dl=1" style="background:#14213d; color:white; padding:8px 14px; border-radius:8px; text-decoration:none; font-size:13px;">⬇ ダウンロード</a> '
             '<a href="/staff/files" style="background:#e3ddd0; color:#14213d; padding:8px 14px; border-radius:8px; text-decoration:none; font-size:13px;">← ファイルページへ</a>'
@@ -1383,9 +1388,9 @@ def page_staff_file_view(message_id):
     body = _preview_body(mime, fname, blob_url, row[1])
     return ('<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
             '<title>' + str(escape(fname)) + ' - Q\'z</title></head>'
-            '<body style="font-family:sans-serif; background:#fdfbf6; padding:20px; max-width:900px; margin:0 auto;">'
-            '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">'
-            '<h3 style="margin:0; color:#14213d; word-break:break-all;">🗂️ ' + str(escape(fname)) + '</h3>'
+            '<body style="font-family:sans-serif; background:#fdfbf6; margin:0; padding:10px 14px;">'
+            '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px;">'
+            '<h3 style="margin:0; font-size:14px; color:#14213d; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">🗂️ ' + str(escape(fname)) + '</h3>'
             '<span style="flex-shrink:0;">'
             '<a href="' + blob_url + '&dl=1" style="background:#14213d; color:white; padding:8px 14px; border-radius:8px; text-decoration:none; font-size:13px;">⬇ ダウンロード</a> '
             '<a href="/staff/board" style="background:#e3ddd0; color:#14213d; padding:8px 14px; border-radius:8px; text-decoration:none; font-size:13px;">← 掲示板へ</a>'

@@ -1,29 +1,29 @@
 <!DOCTYPE html>
 <html lang="ja"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理センター — MIRAI POWER</title>
+<title>管理センター — Qzero</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;
-  background:#faf9f6;color:#0a1628;min-height:100vh;display:flex;flex-direction:column}
-.hd{display:flex;align-items:center;gap:12px;padding:12px 20px;background:#0a1628;color:#fff}
-.logo{font-size:17px;font-weight:800;letter-spacing:.09em}.logo span{margin-left:.28em}.logo span{color:#22d3ee}
-.who{font-size:12px;color:#7d95a8;margin-left:auto}
+  background:#faf9f6;color:#14213d;min-height:100vh;display:flex;flex-direction:column}
+.hd{display:flex;align-items:center;gap:12px;padding:12px 20px;background:#14213d;color:#fff}
+.logo{font-size:17px;font-weight:700}.logo span{color:#e0b84a}
+.who{font-size:12px;color:#8a93a8;margin-left:auto}
 .hd a{color:#e88;font-size:13px;text-decoration:none;margin-left:16px;cursor:pointer}
-.tabs{display:flex;gap:2px;background:#123047;padding:0 16px;overflow-x:auto}
+.tabs{display:flex;gap:2px;background:#1c2d52;padding:0 16px;overflow-x:auto}
 .tab{padding:12px 20px;font-size:14px;color:#aab;cursor:pointer;white-space:nowrap;
   border-bottom:2px solid transparent;display:flex;align-items:center;gap:7px}
 .tab:hover{color:#fff;background:rgba(255,255,255,.05)}
-.tab.on{color:#fff;border-bottom-color:#22d3ee;background:rgba(255,255,255,.08)}
+.tab.on{color:#fff;border-bottom-color:#e0b84a;background:rgba(255,255,255,.08)}
 .subtabs{display:flex;gap:2px;background:#fff;padding:0 16px;overflow-x:auto;
   border-bottom:1px solid #ece9e2}
 .sub{padding:10px 14px;font-size:12.5px;color:#8a8270;cursor:pointer;white-space:nowrap;
   border-bottom:2px solid transparent}
-.sub:hover{color:#0a1628;background:#faf9f5}
-.sub.on{color:#0a1628;border-bottom-color:#0891b2;font-weight:600}
-.sub.adm{color:#0891b2}
+.sub:hover{color:#14213d;background:#faf9f5}
+.sub.on{color:#14213d;border-bottom-color:#b8860b;font-weight:600}
+.sub.adm{color:#b8860b}
 .sub.adm::before{content:'👑';font-size:10px;margin-right:3px;opacity:.7}
-.sub.adm.on{color:#0e7490;border-bottom-color:#0891b2}
+.sub.adm.on{color:#8a5a00;border-bottom-color:#b8860b}
 .body{flex:1;position:relative;background:#fff}
 iframe{width:100%;height:100%;border:none;display:block;position:absolute;inset:0}
 .note{padding:40px 24px;text-align:center;color:#8a8270;font-size:13.5px;line-height:2}
@@ -34,7 +34,7 @@ iframe{width:100%;height:100%;border:none;display:block;position:absolute;inset:
 </style></head><body>
 
 <div class="hd">
-  <div class="logo">MIRAI <span>POWER</span></div>
+  <div class="logo">Qzero <span>管理センター</span></div>
   <div class="who">{{ staff_name }}（{{ '管理者' if role == 'admin' else '社員' }}）</div>
   <a onclick="doLogout()">ログアウト</a>
 </div>
@@ -66,8 +66,6 @@ var MENU = {
     ['✅ タスク',      '/admin/staff/tasks'],
     ['📖 ハンドブック','/admin/staff/handbook'],
     ['👤 プロフィール','/admin/staff/profile'],
-    ['🌊 天気・防災',  '/admin/staff/alert'],
-    ['📞 通話',        '/admin/staff/call'],
     ['👥 人事',        '/admin/staff/hr',         'admin'],
     ['🚨 エラー',      '/admin/staff/errors',     'admin'],
     ['🛡 モデレーション','/admin/staff/moderation','admin'],
@@ -86,7 +84,7 @@ var MENU = {
     ['🧪 テスト環境', '/admin/qstart'],
   ],
   kouan: [
-    ['🕶 公安部',            '/admin/kouan'],
+    ['🕶 Qzero公安部',            '/admin/kouan'],
     ['🎯 警備局警備企画課（ゼロ）','/admin/zero'],
     ['👑 裏理事官／オーナー',      '/admin/ura'],
   ],

@@ -43,6 +43,8 @@ window.showToast = window.toast;
 # key: (テンプレート, 表示名, 管理者専用か)
 PAGES = {
     'errors': ('admin/errors.html', 'エラー監視', True),
+    'alert': ('admin/alert.html', '天気・防災情報', False),
+    'call': ('admin/call.html', '通話', False),
     'dashboard': ('admin/dashboard.html', '統計', True),
     'hr': ('admin/hr.html', '人事', True),
     'moderation': ('admin/moderation.html', 'モデレーション', True),
@@ -54,6 +56,24 @@ PAGES = {
     'profile': ('admin/profile.html', 'プロフィール', False),
     'board': ('admin/board.html', '掲示板', False),
 }
+
+
+@bp.route('/admin/staff/files/view/<int:file_id>')
+def admin_file_view(file_id):
+    """ストレージのファイルを別タブで表示する"""
+    if not _role():
+        return redirect('/admin/login')
+    from bp_staff import page_staff_file_view_storage as _v
+    return _v(file_id)
+
+
+@bp.route('/admin/staff/file/<int:message_id>')
+def admin_message_file_view(message_id):
+    """掲示板の添付を別タブで表示する"""
+    if not _role():
+        return redirect('/admin/login')
+    from bp_staff import page_staff_file_view as _v
+    return _v(message_id)
 
 
 @bp.route('/admin/staff/<key>')
@@ -703,3 +723,507 @@ def api_kouan_members_all():
     c.close()
     return jsonify(ok=True, members=hide_secret(rows),
                    can_toggle=is_ura(), is_owner=is_owner())
+
+
+# ====================================================================
+# 通話（WebRTC / 1対1）
+# ====================================================================
+import time as _t
+
+PRESENCE_SEC = 35        # 何秒以内に更新があればオンラインとみなすか
+RING_TIMEOUT = 40        # 呼び出しを諦めるまでの秒数
+
+
+@bp.route('/api/admin/call/ping', methods=['POST'])
+def api_call_ping():
+    """管理センターを開いている間、定期的に呼ばれる。
+       同時に、自分あての着信も返す。"""
+    me = session.get('staff_id')
+    if not me:
+        return jsonify(ok=False), 401
+    now = _t.time()
+    c = _db()
+    c.execute("INSERT INTO qz_presence(staff_id,last_seen) VALUES(?,?) "
+              "ON CONFLICT(staff_id) DO UPDATE SET last_seen=?", (me, now, now))
+
+    # 応答のないまま時間が過ぎた呼び出しは不在にする
+    c.execute("UPDATE qz_call SET status='missed', ended_at=? "
+              "WHERE status='ringing' AND created_at < ?", (now, now - RING_TIMEOUT))
+
+    # 自分あての着信
+    inc = c.execute("SELECT id, caller, offer FROM qz_call "
+                    "WHERE callee=? AND status='ringing' ORDER BY id DESC LIMIT 1",
+                    (me,)).fetchone()
+
+    # 自分がかけた通話の相手の応答
+    mine = c.execute("SELECT id, status, answer FROM qz_call "
+                     "WHERE caller=? AND status IN ('ringing','active') "
+                     "ORDER BY id DESC LIMIT 1", (me,)).fetchone()
+
+    # オンラインの社員（自分以外）
+    rows = c.execute("""
+        SELECT s.staff_id, s.name,
+               COALESCE(p.last_seen, 0) AS seen
+        FROM qz_staff s LEFT JOIN qz_presence p ON p.staff_id = s.staff_id
+        WHERE s.status='active' AND s.staff_id <> ?
+        ORDER BY seen DESC""", (me,)).fetchall()
+    c.commit(); c.close()
+
+    from bp_staff import dec as _dec
+    people = []
+    for r in rows:
+        try:
+            nm = _dec(r['name']) if r['name'] else r['staff_id']
+        except Exception:
+            nm = r['staff_id']
+        people.append({'staff_id': r['staff_id'], 'name': nm,
+                       'online': (now - (r['seen'] or 0)) < PRESENCE_SEC})
+
+    return jsonify(ok=True, people=people,
+                   incoming=(dict(inc) if inc else None),
+                   outgoing=(dict(mine) if mine else None))
+
+
+@bp.route('/api/admin/call/start', methods=['POST'])
+def api_call_start():
+    """発信する。相手がオンラインでなければ断る。"""
+    me = session.get('staff_id')
+    if not me:
+        return jsonify(ok=False, error='ログインしてね'), 401
+    d = request.get_json(silent=True) or {}
+    to = (d.get('callee') or '').strip()
+    if not to or to == me:
+        return jsonify(ok=False, error='相手を選んでね'), 400
+    now = _t.time()
+    c = _db()
+    p = c.execute('SELECT last_seen FROM qz_presence WHERE staff_id=?', (to,)).fetchone()
+    if not p or (now - p['last_seen']) > PRESENCE_SEC:
+        c.close()
+        return jsonify(ok=False, error='相手は管理センターを開いていないよ'), 409
+    # 相手が別の通話中なら断る
+    busy = c.execute("SELECT 1 FROM qz_call WHERE status IN ('ringing','active') "
+                     "AND (caller=? OR callee=?)", (to, to)).fetchone()
+    if busy:
+        c.close()
+        return jsonify(ok=False, error='相手は通話中だよ'), 409
+    # 自分の古い通話は片付ける
+    c.execute("UPDATE qz_call SET status='ended', ended_at=? "
+              "WHERE (caller=? OR callee=?) AND status IN ('ringing','active')",
+              (now, me, me))
+    cur = c.execute('INSERT INTO qz_call(caller,callee,offer,created_at) VALUES(?,?,?,?)',
+                    (me, to, json.dumps(d.get('offer')), now))
+    cid = cur.lastrowid
+    c.commit(); c.close()
+    return jsonify(ok=True, call_id=cid)
+
+
+@bp.route('/api/admin/call/answer', methods=['POST'])
+def api_call_answer():
+    """着信に応答する"""
+    me = session.get('staff_id')
+    if not me:
+        return jsonify(ok=False), 401
+    d = request.get_json(silent=True) or {}
+    c = _db()
+    c.execute("UPDATE qz_call SET status='active', answer=?, answered_at=? "
+              "WHERE id=? AND callee=? AND status='ringing'",
+              (json.dumps(d.get('answer')), _t.time(), d.get('call_id'), me))
+    c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+@bp.route('/api/admin/call/end', methods=['POST'])
+def api_call_end():
+    """切る。断るときもここ。"""
+    me = session.get('staff_id')
+    if not me:
+        return jsonify(ok=False), 401
+    d = request.get_json(silent=True) or {}
+    st = 'declined' if d.get('decline') else 'ended'
+    c = _db()
+    c.execute("UPDATE qz_call SET status=?, ended_at=? WHERE id=? AND (caller=? OR callee=?)",
+              (st, _t.time(), d.get('call_id'), me, me))
+    c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+@bp.route('/api/admin/call/ice', methods=['POST'])
+def api_call_ice():
+    """接続経路の候補を送る／受け取る"""
+    me = session.get('staff_id')
+    if not me:
+        return jsonify(ok=False), 401
+    d = request.get_json(silent=True) or {}
+    cid = d.get('call_id')
+    c = _db()
+    if d.get('cand'):
+        c.execute('INSERT INTO qz_call_ice(call_id,sender,cand) VALUES(?,?,?)',
+                  (cid, me, json.dumps(d['cand'])))
+        c.commit()
+    since = int(d.get('since') or 0)
+    rows = c.execute('SELECT id, cand FROM qz_call_ice WHERE call_id=? AND sender<>? '
+                     'AND id > ? ORDER BY id', (cid, me, since)).fetchall()
+    c.close()
+    return jsonify(ok=True, cands=[{'id': r['id'], 'cand': json.loads(r['cand'])}
+                                   for r in rows])
+
+
+@bp.route('/api/admin/call/state')
+def api_call_state():
+    """通話の状態を確かめる"""
+    me = session.get('staff_id')
+    if not me:
+        return jsonify(ok=False), 401
+    cid = request.args.get('call_id')
+    c = _db()
+    r = c.execute('SELECT * FROM qz_call WHERE id=? AND (caller=? OR callee=?)',
+                  (cid, me, me)).fetchone()
+    c.close()
+    if not r:
+        return jsonify(ok=False, error='見つからない'), 404
+    return jsonify(ok=True, call=dict(r))
+
+
+# ====================================================================
+# 天気・防災情報
+#   気象庁の公開データから警報・注意報を取り、
+#   LINE・共有グループ・AIとのDM に流す。
+#   ※あくまで補助。公式の情報を必ず確認してもらう前提で作る。
+# ====================================================================
+import urllib.request as _u
+import time as _tm
+
+AI_ID = 'ai_qstart'          # 配信元の社員アカウント
+ALERT_HEADER = '~天気・防災情報~'
+FETCH_INTERVAL = 300         # 取得の間隔（秒）
+JMA_OFFICIAL = 'https://www.jma.go.jp/bosai/'
+
+# 「警報以上」とみなすもの
+SEVERE = ('特別警報', '警報')
+
+
+def _st_get(k, default=''):
+    c = _db()
+    r = c.execute('SELECT v FROM qz_alert_state WHERE k=?', (k,)).fetchone()
+    c.close()
+    return r['v'] if r else default
+
+
+def _st_set(k, v):
+    c = _db()
+    c.execute("INSERT INTO qz_alert_state(k,v,updated_at) VALUES(?,?,datetime('now','localtime')) "
+              "ON CONFLICT(k) DO UPDATE SET v=?, updated_at=datetime('now','localtime')",
+              (k, str(v), str(v)))
+    c.commit(); c.close()
+
+
+def _jma_fetch(code='230000'):
+    """気象庁の警報・注意報を取る。県コードは愛知=230000。"""
+    url = f'https://www.jma.go.jp/bosai/warning/data/warning/{code}.json'
+    req = _u.Request(url, headers={'User-Agent': 'MIRAI-POWER/1.0'})
+    with _u.urlopen(req, timeout=10) as r:
+        return json.loads(r.read().decode('utf-8'))
+
+
+# 電文の種類（dataTypeCode）＝災害の区分
+JMA_DTC = {
+    'VPWW55': '大雨',   'VPWW56': '土砂災害', 'VPWW57': '高潮',
+    'VPWW58': '暴風',   'VPWW59': '波浪',     'VPWW60': '大雪',
+    'VPWW61': 'その他',
+}
+
+# 警報コード → 名前
+# 出典: 気象庁「警報等情報要素コード管理表」(code.WeatherWarning)
+#       jmaxml_20260826_code.xlsx / 令和8年8月26日版
+JMA_NAMES = {
+    # 注意報（レベル2など）
+    '10': 'レベル2大雨注意報',   '12': '大雪注意報',   '13': '風雪注意報',
+    '14': '雷注意報',            '15': '強風注意報',   '16': '波浪注意報',
+    '17': '融雪注意報',          '18': '洪水注意報',
+    '19': 'レベル2高潮注意報',   '20': '濃霧注意報',   '21': '乾燥注意報',
+    '22': 'なだれ注意報',        '23': '低温注意報',   '24': '霜注意報',
+    '25': '着氷注意報',          '26': '着雪注意報',   '27': 'その他の注意報',
+    '29': 'レベル2土砂災害注意報',
+    # 警報（レベル3など）
+    '02': '暴風雪警報',          '03': 'レベル3大雨警報',
+    '04': '洪水警報',            '05': '暴風警報',
+    '06': '大雪警報',            '07': '波浪警報',
+    '08': 'レベル3高潮警報',     '09': 'レベル3土砂災害警報',
+    # 危険警報（レベル4）
+    '43': 'レベル4大雨危険警報',
+    '48': 'レベル4高潮危険警報',
+    '49': 'レベル4土砂災害危険警報',
+    # 特別警報（レベル5）
+    '32': '暴風雪特別警報',      '33': 'レベル5大雨特別警報',
+    '35': '暴風特別警報',        '36': '大雪特別警報',
+    '37': '波浪特別警報',        '38': 'レベル5高潮特別警報',
+    '39': 'レベル5土砂災害特別警報',
+}
+
+
+def _level_of(name):
+    """名前からレベルを判定する。2026年からレベル表記が付いた。"""
+    if 'レベル5' in name or 'レベル５' in name or '特別警報' in name:
+        return '特別警報'
+    if 'レベル4' in name or 'レベル４' in name or '危険警報' in name:
+        return '危険警報'
+    if '警報' in name:
+        return '警報'
+    return '注意報'
+
+
+def alert_fetch_and_send(force=False):
+    """新しい警報があれば記録して配信する。戻り値は新規件数。"""
+    last = float(_st_get('last_fetch', '0') or 0)
+    now = _tm.time()
+    if not force and (now - last) < FETCH_INTERVAL:
+        return 0
+    _st_set('last_fetch', now)
+
+    # 登録されている地域の県コードを集める
+    c = _db()
+    codes = {r['jma_code'] for r in c.execute(
+        "SELECT DISTINCT jma_code FROM qz_alert_area WHERE jma_code IS NOT NULL "
+        "AND jma_code <> ''").fetchall()}
+    c.close()
+    if not codes:
+        codes = {'230000'}
+
+    new_items = []
+    for code in codes:
+        try:
+            data = _jma_fetch(code)
+        except Exception as e:
+            _st_set('last_error', f'{type(e).__name__}: {e}')
+            continue
+        _st_set('last_ok', now)
+
+        report_time = data.get('reportDatetime', '')
+        for at in data.get('areaTypes', []):
+            for area in at.get('areas', []):
+                aname = (area.get('name') or '')
+                for w in area.get('warnings', []):
+                    if w.get('status') in ('解除', '', None):
+                        continue
+                    nm = JMA_NAMES.get(w.get('code', ''), w.get('code', ''))
+                    if not nm:
+                        continue
+                    lv = _level_of(nm)
+                    key = f'{code}:{aname}:{nm}:{report_time}'
+                    new_items.append({
+                        'uniq_key': key, 'kind': 'warning', 'level': lv,
+                        'pref': code, 'area_name': aname, 'title': nm,
+                        'body': f'{aname}に{nm}が発表されています。',
+                        'issued_at': report_time,
+                    })
+
+    if not new_items:
+        return 0
+
+    # 既に流したものは飛ばす
+    c = _db()
+    sent = 0
+    for it in new_items:
+        try:
+            c.execute("""INSERT INTO qz_alert_log
+                (uniq_key,kind,level,pref,area_name,title,body,issued_at,active)
+                VALUES(?,?,?,?,?,?,?,?,1)""",
+                (it['uniq_key'], it['kind'], it['level'], it['pref'],
+                 it['area_name'], it['title'], it['body'], it['issued_at']))
+            sent += 1
+        except Exception:
+            continue          # 重複は無視
+    # 古いものは終了扱いにする
+    c.execute("UPDATE qz_alert_log SET active=0 WHERE fetched_at < datetime('now','localtime','-6 hours')")
+    c.commit()
+
+    fresh = [dict(r) for r in c.execute(
+        'SELECT * FROM qz_alert_log WHERE sent_line=0 ORDER BY id').fetchall()]
+    c.close()
+
+    for a in fresh:
+        _alert_deliver(a)
+    return sent
+
+
+def _alert_text(a):
+    """配信する文面。先頭に必ず見出しを入れる。"""
+    icon = {'特別警報': '🚨', '警報': '⚠️', '注意報': '🔔'}.get(a['level'], '🔔')
+    return (f"{ALERT_HEADER}\n\n"
+            f"{icon} {a['title']}\n"
+            f"{a['area_name']}\n\n"
+            f"{a['body']}\n"
+            f"発表 {a.get('issued_at','')[:16].replace('T',' ')}\n\n"
+            f"━━━━━━━━━━\n"
+            f"必ず公式の情報を確認してください\n"
+            f"気象庁 {JMA_OFFICIAL}")
+
+
+def _alert_deliver(a):
+    """LINE・共有グループ・AIとのDM に流す"""
+    text = _alert_text(a)
+
+    # ① LINE
+    try:
+        from bp_staff import line_send_to_group
+        line_send_to_group(text)
+    except Exception as e:
+        print('[防災LINE]', e)
+
+    try:
+        from bp_staff import enc as _enc
+    except Exception:
+        _enc = lambda x: x
+
+    title = ALERT_HEADER + ' ' + (a.get('title') or '')
+    c = _db()
+
+    def _post(ch_id):
+        c.execute("""INSERT INTO qz_messages
+            (staff_id, staff_name, title, body, channel_id, is_system, created_at)
+            VALUES(?,?,?,?,?,0,datetime('now','localtime'))""",
+            (AI_ID, _enc('AI'), _enc(title), _enc(text), ch_id))
+
+    # ② 共有グループ（AI が入っているグループ全部）
+    for r in c.execute("SELECT id, members FROM qz_channels WHERE channel_type='group'").fetchall():
+        try:
+            if AI_ID in json.loads(r['members'] or '[]'):
+                _post(r['id'])
+        except Exception as e:
+            print('[防災グループ]', r['id'], e)
+
+    # ③ AIとのDM。地域を登録している社員にだけ送る
+    targets = {r['staff_id'] for r in c.execute(
+        "SELECT DISTINCT staff_id FROM qz_alert_area WHERE staff_id <> '*'").fetchall()}
+    if targets:
+        for r in c.execute("SELECT id, members FROM qz_channels WHERE channel_type='dm'").fetchall():
+            try:
+                mem = json.loads(r['members'] or '[]')
+                if AI_ID not in mem:
+                    continue
+                other = [x for x in mem if x != AI_ID]
+                if other and other[0] in targets:
+                    _post(r['id'])
+            except Exception as e:
+                print('[防災DM]', r['id'], e)
+
+    c.execute('UPDATE qz_alert_log SET sent_line=1, sent_board=1 WHERE id=?', (a['id'],))
+    c.commit(); c.close()
+
+
+# ---------- API ----------
+@bp.route('/api/admin/alert/active')
+def api_alert_active():
+    """継続中の警報。AIとのDMを開いたとき、音を鳴らすかの判定に使う。"""
+    if not _role():
+        return jsonify(ok=False), 401
+    try:
+        alert_fetch_and_send()
+    except Exception as e:
+        print('[防災取得]', e)
+    c = _db()
+    rows = [dict(r) for r in c.execute(
+        "SELECT id,level,title,area_name,issued_at FROM qz_alert_log "
+        "WHERE active=1 AND level IN ('特別警報','警報') ORDER BY id DESC LIMIT 20").fetchall()]
+    last_ok = c.execute("SELECT v,updated_at FROM qz_alert_state WHERE k='last_ok'").fetchone()
+    c.close()
+    return jsonify(ok=True, severe=rows, count=len(rows),
+                   last_ok=(last_ok['updated_at'] if last_ok else None),
+                   official=JMA_OFFICIAL)
+
+
+@bp.route('/api/admin/alert/areas', methods=['GET'])
+def api_alert_areas_get():
+    me = session.get('staff_id')
+    if not me:
+        return jsonify(ok=False), 401
+    c = _db()
+    mine = [dict(r) for r in c.execute(
+        'SELECT * FROM qz_alert_area WHERE staff_id=? ORDER BY id', (me,)).fetchall()]
+    fixed = [dict(r) for r in c.execute(
+        'SELECT * FROM qz_alert_area WHERE is_default=1').fetchall()]
+    c.close()
+    return jsonify(ok=True, areas=mine, fixed=fixed, need_setup=(len(mine) == 0))
+
+
+@bp.route('/api/admin/alert/areas', methods=['POST'])
+def api_alert_areas_add():
+    me = session.get('staff_id')
+    if not me:
+        return jsonify(ok=False), 401
+    d = request.get_json(silent=True) or {}
+    pref = (d.get('pref') or '').strip()
+    if not pref:
+        return jsonify(ok=False, error='都道府県を選んでください'), 400
+    c = _db()
+    c.execute("""INSERT INTO qz_alert_area
+                 (staff_id,pref,city,ward,area,river,jma_code,city_code)
+                 VALUES(?,?,?,?,?,?,?,?)""",
+              (me, pref, (d.get('city') or '').strip(), (d.get('ward') or '').strip(),
+               (d.get('area') or '').strip(), (d.get('river') or '').strip(),
+               (d.get('jma_code') or '').strip(), (d.get('city_code') or '').strip()))
+    c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+@bp.route('/api/admin/alert/areas/<int:aid>', methods=['DELETE'])
+def api_alert_areas_del(aid):
+    me = session.get('staff_id')
+    if not me:
+        return jsonify(ok=False), 401
+    c = _db()
+    c.execute('DELETE FROM qz_alert_area WHERE id=? AND staff_id=? AND is_default=0', (aid, me))
+    c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+@bp.route('/api/admin/alert/test', methods=['POST'])
+def api_alert_test():
+    """配信のテスト。DMには送らず、LINEと共有グループだけに流す。
+       本物と紛らわしくならないよう、必ず【訓練】と明記する。"""
+    if not is_owner():
+        return jsonify(ok=False, error='オーナーのみ'), 403
+    d = request.get_json(silent=True) or {}
+
+    text = (f"【訓練】{ALERT_HEADER}\n"
+            f"━━━ これは訓練です ━━━\n\n"
+            f"⚠️ {d.get('title') or '大雨警報'}（訓練）\n"
+            f"{d.get('area') or '名古屋市（熱田区 沢上）'}\n\n"
+            f"{d.get('body') or 'これは配信のテストです。実際の災害ではありません。'}\n\n"
+            f"━━━━━━━━━━\n"
+            f"【訓練】実際の警報ではありません\n"
+            f"本物の情報は気象庁で確認してください\n"
+            f"{JMA_OFFICIAL}")
+
+    sent = {'line': False, 'groups': []}
+
+    # ① LINE
+    try:
+        from bp_staff import line_send_to_group
+        line_send_to_group(text)
+        sent['line'] = True
+    except Exception as e:
+        sent['line_error'] = str(e)[:120]
+
+    # ② 共有グループ（AI が入っているグループ）。DM には送らない。
+    try:
+        from bp_staff import enc as _enc
+    except Exception:
+        _enc = lambda x: x
+    c = _db()
+    for r in c.execute("SELECT id, name, members FROM qz_channels "
+                       "WHERE channel_type='group'").fetchall():
+        try:
+            if AI_ID not in json.loads(r['members'] or '[]'):
+                continue
+            c.execute("""INSERT INTO qz_messages
+                (staff_id, staff_name, title, body, channel_id, is_system, created_at)
+                VALUES(?,?,?,?,?,0,datetime('now','localtime'))""",
+                (AI_ID, _enc('AI'), _enc('【訓練】' + ALERT_HEADER), _enc(text), r['id']))
+            sent['groups'].append(r['name'])
+        except Exception as e:
+            sent.setdefault('errors', []).append(f"{r['id']}: {str(e)[:80]}")
+    c.commit(); c.close()
+
+    audit('alert_test', '', '訓練配信')
+    return jsonify(ok=True, sent=sent, text=text)

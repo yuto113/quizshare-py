@@ -1,18 +1,18 @@
 <style>
 .kw{max-width:980px;margin:0 auto;padding:18px 20px 60px;
-  font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;color:#0a1628}
+  font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;color:#14213d}
 .kw h2{font-size:19px;margin:0 0 4px;display:flex;align-items:center;gap:9px}
 .kw .lead{font-size:12.5px;color:#8a8270;margin:0 0 16px;line-height:1.7}
 .kw .badges{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:18px}
 .kbadge{font-size:11px;padding:3px 10px;border-radius:99px;font-weight:700}
 .kbadge.k{background:#e8ecf7;color:#2c3e66}
 .kbadge.b{background:#f3e8f7;color:#5c2c66}
-.kbadge.u{background:#0a1628;color:#22d3ee}
+.kbadge.u{background:#14213d;color:#e0b84a}
 .ktabs{display:flex;gap:2px;border-bottom:1px solid #ece9e2;margin-bottom:16px;overflow-x:auto}
 .ktab{padding:9px 15px;font-size:12.5px;color:#8a8270;cursor:pointer;white-space:nowrap;
   background:none;border:none;border-bottom:2px solid transparent;font-family:inherit}
-.ktab:hover{color:#0a1628}
-.ktab.on{color:#0a1628;border-bottom-color:#0891b2;font-weight:600}
+.ktab:hover{color:#14213d}
+.ktab.on{color:#14213d;border-bottom-color:#b8860b;font-weight:600}
 .kpane{display:none}.kpane.on{display:block}
 .kcard{background:#fff;border:1px solid #ece9e2;border-radius:10px;padding:13px 15px;margin-bottom:10px}
 .kcard .top{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:6px}
@@ -25,10 +25,10 @@
 .st.pending{background:#fdf0e2;color:#a35a1c}
 .st.approved{background:#e4f4f1;color:#1d6f65}
 .st.rejected{background:#fdf2f1;color:#a83a30}
-.kbtn{background:#0a1628;color:#fff;border:none;padding:6px 13px;border-radius:7px;
+.kbtn{background:#14213d;color:#fff;border:none;padding:6px 13px;border-radius:7px;
   font-size:11.5px;cursor:pointer;font-family:inherit}
-.kbtn:hover{background:#123047}
-.kbtn.gh{background:none;border:1px solid #ece9e2;color:#0a1628}
+.kbtn:hover{background:#1c2d52}
+.kbtn.gh{background:none;border:1px solid #ece9e2;color:#14213d}
 .kbtn.gh:hover{background:#faf9f5}
 .kbtn.ng{background:#c0453b}
 .kinp,.ksel,.kta{padding:7px 10px;border:1px solid #ece9e2;border-radius:7px;
@@ -47,7 +47,7 @@
 </style>
 
 <div class="kw">
-  <h2 id="kTitle">🕶 公安部</h2>
+  <h2 id="kTitle">🕶 Qzero公安部</h2>
   <p class="lead" id="kLead">会社の秩序を守るための部署です。通報の受理と対応、協力者の管理をします。</p>
 
   <div class="badges" id="kBadges"></div>
@@ -108,7 +108,7 @@
       <div class="krow">
         <select class="ksel" id="mbStaff" style="max-width:200px"></select>
         <select class="ksel" id="mbDiv" style="max-width:170px" onchange="mbRankOpts()">
-          <option value="kouan">公安部</option>
+          <option value="kouan">Qzero公安部</option>
           <option value="keibi">警備</option>
         </select>
         <select class="ksel" id="mbRank" style="max-width:170px"></select>
@@ -149,7 +149,7 @@ async function load(){
     '<div class="kempty">'+K(D.error)+'</div>'; return; }
 
   var b = [];
-  if (D.rank_kouan) b.push('<span class="kbadge k">公安部 · '+K(RANK[D.rank_kouan]||D.rank_kouan)+'</span>');
+  if (D.rank_kouan) b.push('<span class="kbadge k">Qzero公安部 · '+K(RANK[D.rank_kouan]||D.rank_kouan)+'</span>');
   if (D.rank_keibi) b.push('<span class="kbadge b">警備 · '+K(RANK[D.rank_keibi]||D.rank_keibi)+'</span>');
   if (D.is_owner)  b.push('<span class="kbadge u">オーナー</span>');
   document.getElementById('kBadges').innerHTML = b.join('');
@@ -212,7 +212,7 @@ function drawMembers(){
     var rm = (D.is_owner && m.staff_id !== 'yuto')
       ? '<button class="kbtn gh" onclick="mbDel(\''+K(m.staff_id)+'\',\''+K(m.division)+'\')">解任</button>' : '';
     return '<tr><td><b>'+K(m.staff_id)+'</b></td>'
-      + '<td>'+(m.division==='keibi'?'警備':'公安部')+'</td>'
+      + '<td>'+(m.division==='keibi'?'警備':'Qzero公安部')+'</td>'
       + '<td>'+K(RANK[m.rank]||m.rank)+'</td>'
       + '<td class="kmono">'+K(m.assigned_at)+'</td><td>'+rm+'</td></tr>';
   });
