@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MIRAI POWER 会員</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--navy:#0a1628;--navy2:#123047;--cy:#22d3ee;--cy2:#0891b2;
+  --paper:#f7fafb;--line:#dde5ea;--muted:#7a8794}
+body{font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;
+  background:var(--paper);color:var(--navy);line-height:1.7}
+body.furi{font-size:16px}
+
+.hd{background:var(--navy);color:#fff;padding:11px 18px;display:flex;
+  align-items:center;gap:12px;position:sticky;top:0;z-index:50}
+.logo{font-size:16px;font-weight:800;letter-spacing:.09em}
+.logo span{color:var(--cy);margin-left:.28em}
+.hd .sp{flex:1}
+.hd button{background:none;border:none;color:#cfe3ea;font-size:12.5px;
+  cursor:pointer;padding:6px 10px;border-radius:7px;font-family:inherit}
+.hd button:hover{background:rgba(255,255,255,.1)}
+.hd button.on{background:var(--cy2);color:#fff}
+
+.wrap{max-width:1000px;margin:0 auto;padding:20px 18px 70px}
+.pane{display:none}.pane.on{display:block}
+
+h1{font-size:22px;margin:0 0 6px}
+h2{font-size:17px;margin:26px 0 10px}
+.lead{font-size:13px;color:var(--muted);margin-bottom:18px}
+
+.hero{background:linear-gradient(135deg,#0a1628,#123047);color:#fff;
+  border-radius:14px;padding:28px 26px;margin-bottom:22px}
+.hero h1{font-size:24px;margin-bottom:8px}
+.hero p{font-size:13.5px;color:#b8d4e0;margin-bottom:16px}
+.hero .stats{display:flex;gap:24px;flex-wrap:wrap}
+.hero .stat b{display:block;font-size:26px;color:var(--cy);line-height:1.2}
+.hero .stat span{font-size:11.5px;color:#8fa6b5}
+
+.card{background:#fff;border:1px solid var(--line);border-radius:11px;padding:15px 17px;
+  margin-bottom:11px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.app{background:#fff;border:1px solid var(--line);border-radius:11px;padding:14px 15px;
+  cursor:pointer;transition:.15s}
+.app:hover{border-color:var(--cy2);transform:translateY(-2px);
+  box-shadow:0 4px 14px rgba(10,22,40,.08)}
+.app .t{font-weight:700;font-size:14px;margin-bottom:4px}
+.app .s{font-size:12px;color:var(--muted);min-height:34px}
+.app .m{font-size:11px;color:#9aa8b2;margin-top:8px;display:flex;gap:10px;flex-wrap:wrap}
+.tag{display:inline-block;font-size:10.5px;padding:2px 8px;border-radius:99px;
+  background:#e0f7fb;color:#0e7490;margin-right:4px}
+.tag.d1{background:#dcfce7;color:#166534}
+.tag.d2{background:#fef3c7;color:#92400e}
+.tag.d3{background:#fee2e2;color:#991b1b}
+.tag.draft{background:#e5e7eb;color:#4b5563}
+
+.btn{background:var(--navy);color:#fff;border:none;padding:9px 18px;border-radius:9px;
+  font-size:13px;cursor:pointer;font-family:inherit}
+.btn:hover{background:var(--navy2)}
+.btn:disabled{background:#ccd6dc;cursor:not-allowed}
+.btn.cy{background:var(--cy2)}.btn.cy:hover{background:#0e7490}
+.btn.gh{background:none;border:1px solid var(--line);color:var(--navy)}
+.btn.gh:hover{background:#eef4f6}
+.btn.sm{padding:5px 12px;font-size:11.5px}
+.btn.ng{background:#dc2626}
+
+.inp,.sel,.ta{padding:9px 12px;border:1px solid var(--line);border-radius:9px;
+  font-size:13px;font-family:inherit;width:100%}
+.ta{resize:vertical}
+.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+label.lb{font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px}
+
+.warn{background:#fff8e6;border:1px solid #f0dfa8;border-radius:10px;padding:13px 16px;
+  font-size:12.5px;color:#6b5a15;margin-bottom:16px}
+.err{background:#fdf2f1;border:1px solid #f3d5d2;border-radius:10px;padding:13px 16px;
+  font-size:12.5px;color:#8a3028;margin-bottom:16px}
+.note{background:#eefcff;border:1px solid #b8e8f2;border-radius:10px;padding:12px 15px;
+  font-size:12px;color:#1a5966;margin-bottom:16px}
+
+/* エディタ */
+.etabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:0}
+.etab{padding:8px 15px;font-size:12.5px;color:var(--muted);cursor:pointer;
+  background:none;border:none;border-bottom:2px solid transparent;font-family:inherit}
+.etab.on{color:var(--navy);border-bottom-color:var(--cy2);font-weight:600}
+.etab .dot{display:inline-block;width:5px;height:5px;border-radius:50%;
+  background:var(--cy2);margin-left:5px;vertical-align:middle}
+.code{width:100%;min-height:300px;font-family:ui-monospace,Menlo,Consolas,monospace;
+  font-size:13px;line-height:1.6;padding:13px;border:1px solid var(--line);
+  border-top:none;border-radius:0 0 10px 10px;resize:vertical;tab-size:4}
+.out{background:#0a1628;color:#cfe3ea;font-family:ui-monospace,Menlo,Consolas,monospace;
+  font-size:12.5px;padding:13px;border-radius:10px;min-height:110px;max-height:340px;
+  overflow:auto;white-space:pre-wrap;word-break:break-all;margin-top:11px}
+.out .e{color:#fca5a5}
+.out .ok{color:#86efac}
+#preview{width:100%;height:340px;border:1px solid var(--line);border-radius:10px;
+  background:#fff;margin-top:11px}
+
+.rule{border-left:3px solid var(--cy2);padding:9px 0 9px 14px;margin-bottom:14px}
+.rule b{display:block;font-size:13.5px;margin-bottom:3px}
+.rule span{font-size:12.5px;color:var(--muted)}
+
+.empty{padding:44px 0;text-align:center;color:#9aa8b2;font-size:13px}
+.modal{position:fixed;inset:0;background:rgba(10,22,40,.6);z-index:100;
+  display:none;align-items:center;justify-content:center;padding:20px}
+.modal.on{display:flex}
+.mbox{background:#fff;border-radius:14px;padding:24px;max-width:520px;width:100%;
+  max-height:86vh;overflow:auto}
+@media(max-width:600px){.wrap{padding:14px 12px 60px}.hero{padding:20px 18px}}
+</style></head><body>
+
+<div class="hd">
+  <span class="logo">MIRAI<span>POWER</span></span>
+  <span class="sp"></span>
+  <button id="nvHome" class="on" onclick="go('home')">みんなの作品</button>
+  <button id="nvMine" onclick="go('mine')" style="display:none">自分の作品</button>
+  <button id="nvEdit" onclick="newApp()" style="display:none">＋作る</button>
+  <button id="nvRules" onclick="go('rules')">きまり</button>
+  <button id="nvLogin" onclick="go('login')">ログイン</button>
+  <button id="nvOut" onclick="logout()" style="display:none">ログアウト</button>
+</div>
+
+<div class="wrap">
+
+  <!-- みんなの作品 -->
+  <div class="pane on" id="p-home">
+    <div class="hero">
+      <h1>つくったものを、見せあう場所</h1>
+      <p>プログラミングは、大人だけのものじゃない。<br>
+         小学生でも、中学生でも、作ったものをここに置けます。</p>
+      <div class="stats">
+        <div class="stat"><b id="stApps">0</b><span>作品</span></div>
+        <div class="stat"><b id="stPeople">0</b><span>作った人</span></div>
+      </div>
+    </div>
+    <div class="row">
+      <input class="inp" id="qText" placeholder="さがす" style="flex:1;min-width:150px"
+             onkeydown="if(event.key==='Enter')loadApps()">
+      <select class="sel" id="qSort" style="max-width:130px" onchange="loadApps()">
+        <option value="new">新しい順</option>
+        <option value="like">いいね順</option>
+        <option value="view">見られた順</option>
+      </select>
+      <button class="btn gh sm" onclick="loadApps()">さがす</button>
+    </div>
+    <div class="grid" id="appList"><div class="empty">読み込み中…</div></div>
+  </div>
+
+  <!-- 自分の作品 -->
+  <div class="pane" id="p-mine">
+    <h1>自分の作品</h1>
+    <p class="lead" id="mineInfo"></p>
+    <div class="grid" id="mineList"></div>
+  </div>
+
+  <!-- 作品を見る -->
+  <div class="pane" id="p-view">
+    <button class="btn gh sm" onclick="go('home')" style="margin-bottom:14px">← もどる</button>
+    <div id="viewBody"></div>
+  </div>
+
+  <!-- エディタ -->
+  <div class="pane" id="p-edit">
+    <div class="row">
+      <input class="inp" id="eTitle" placeholder="題名" style="flex:1;min-width:180px">
+      <select class="sel" id="eDiff" style="max-width:130px">
+        <option value="1">かんたん</option>
+        <option value="2">ふつう</option>
+        <option value="3">むずかしい</option>
+      </select>
+    </div>
+    <div class="row">
+      <input class="inp" id="eSummary" placeholder="どんな作品か（ひとこと）" style="flex:1;min-width:180px">
+      <input class="inp" id="eTags" placeholder="タグ（ゲーム,計算）" style="max-width:190px">
+    </div>
+
+    <div class="etabs" id="eTabs"></div>
+    <textarea class="code" id="eCode" spellcheck="false"></textarea>
+
+    <div class="row" style="margin-top:11px">
+      <button class="btn cy" onclick="runCode()">▶ うごかす</button>
+      <button class="btn gh" onclick="saveApp(false)">下書きに保存</button>
+      <button class="btn" onclick="saveApp(true)">公開する</button>
+      <span class="sp" style="flex:1"></span>
+      <button class="btn gh sm" id="eDel" onclick="delApp()" style="display:none">削除</button>
+    </div>
+    <div id="eMsg" style="font-size:12.5px;margin-top:6px"></div>
+
+    <iframe id="preview" sandbox="allow-scripts" style="display:none"></iframe>
+    <div class="out" id="eOut">ここに結果が出ます</div>
+  </div>
+
+  <!-- きまり -->
+  <div class="pane" id="p-rules">
+    <h1>みんなで守るきまり</h1>
+    <p class="lead">小さい子も見にきます。だれもが安心して作れるように。</p>
+    <div id="ruleList"></div>
+    <div class="row" style="margin-top:18px">
+      <button class="btn" id="agreeBtn" onclick="agree()">読みました</button>
+      <span id="agreeMsg" style="font-size:12.5px;color:var(--muted)"></span>
+    </div>
+  </div>
+
+  <!-- ログイン -->
+  <div class="pane" id="p-login">
+    <h1>会員になる</h1>
+    <p class="lead">作品を公開したり、いいねを付けたりできます。</p>
+    <div class="note">
+      <b>気をつけること</b><br>
+      本名・住所・電話番号は書かないでください。ニックネームで大丈夫です。
+    </div>
+    <div class="card">
+      <h2 style="margin-top:0">はじめての人</h2>
+      <div class="row">
+        <div style="flex:1;min-width:150px"><label class="lb">ID（英数字）</label>
+          <input class="inp" id="rId" placeholder="mirai_taro"></div>
+        <div style="flex:1;min-width:150px"><label class="lb">ニックネーム</label>
+          <input class="inp" id="rNick" placeholder="みらい"></div>
+      </div>
+      <div class="row">
+        <div style="flex:1;min-width:150px"><label class="lb">パスワード（6文字以上）</label>
+          <input class="inp" id="rPw" type="password"></div>
+        <div style="flex:1;min-width:120px"><label class="lb">学年（任意）</label>
+          <input class="inp" id="rGrade" placeholder="小5 / 中1"></div>
+      </div>
+      <div class="row">
+        <div style="flex:1;min-width:150px"><label class="lb">学校（任意・くわしく書かない）</label>
+          <input class="inp" id="rSchool" placeholder="沢上中"></div>
+        <div style="flex:1;min-width:150px"><label class="lb">招待コード（あれば）</label>
+          <input class="inp" id="rInv" placeholder="MP-XXXX"></div>
+      </div>
+      <div class="row"><button class="btn" onclick="register()">会員になる</button>
+        <span id="rMsg" style="font-size:12.5px"></span></div>
+    </div>
+    <div class="card">
+      <h2 style="margin-top:0">もう会員の人</h2>
+      <div class="row">
+        <input class="inp" id="lId" placeholder="ID" style="flex:1;min-width:130px">
+        <input class="inp" id="lPw" type="password" placeholder="パスワード"
+               style="flex:1;min-width:130px"
+               onkeydown="if(event.key==='Enter')login()">
+        <button class="btn" onclick="login()">ログイン</button>
+      </div>
+      <div id="lMsg" style="font-size:12.5px"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modal"><div class="mbox" id="modalBody"></div></div>
+
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+<script>
+var ME = null, APP = {id:null}, LANG = 'code', PYO = null, SQLJS = null;
+var LANGS = [['code','Python'],['html','HTML'],['css','CSS'],['js','JavaScript'],['sql','SQL']];
+var SRC = {code:'', html:'', css:'', js:'', sql:''};
+
+function K(s){ var d=document.createElement('div'); d.textContent=(s==null?'':s); return d.innerHTML; }
+function $(i){ return document.getElementById(i); }
+async function J(u,o){ var r=await fetch(u,o);
+  return await r.json().catch(function(){ return {ok:false,error:'応答を読めません'}; }); }
+function P(u,b){ return J(u,{method:'POST',headers:{'Content-Type':'application/json'},
+                             body:JSON.stringify(b||{})}); }
+
+function go(p){
+  document.querySelectorAll('.pane').forEach(function(x){ x.classList.toggle('on', x.id==='p-'+p); });
+  document.querySelectorAll('.hd button').forEach(function(b){ b.classList.remove('on'); });
+  var nv = {home:'nvHome', mine:'nvMine', rules:'nvRules', login:'nvLogin'}[p];
+  if (nv && $(nv)) $(nv).classList.add('on');
+  if (p==='home') loadApps();
+  if (p==='mine') loadMine();
+  if (p==='rules') loadRules();
+  window.scrollTo(0,0);
+}
+
+/* ---------- 会員 ---------- */
+async function refreshMe(){
+  var d = await J('/api/mp/me');
+  ME = d.logged_in ? d : null;
+  if (ME && ME.need_nick){ askNick(); }
+  ['nvMine','nvEdit','nvOut'].forEach(function(i){
+    $(i).style.display = ME ? '' : 'none'; });
+  $('nvLogin').style.display = ME ? 'none' : '';
+  document.body.classList.toggle('furi', !!(ME && ME.furigana));
+}
+async function register(){
+  var d = await P('/api/mp/register', {
+    member_id:$('rId').value.trim(), nickname:$('rNick').value.trim(),
+    password:$('rPw').value, grade:$('rGrade').value.trim(),
+    school:$('rSchool').value.trim(), invite:$('rInv').value.trim()});
+  var m = $('rMsg');
+  if (!d.ok){ m.style.color='#c0453b'; m.textContent = d.error; return; }
+  m.style.color='#0e7490';
+  m.textContent = '会員になりました！公開できる作品は ' + d.limit + ' 個です';
+  await refreshMe(); setTimeout(function(){ go('rules'); }, 900);
+}
+async function login(){
+  var d = await P('/api/mp/login', {member_id:$('lId').value.trim(), password:$('lPw').value});
+  var m = $('lMsg');
+  if (!d.ok){ m.style.color='#c0453b'; m.textContent = d.error; return; }
+  await refreshMe(); go('home');
+}
+async function logout(){ await P('/api/mp/logout'); ME=null; await refreshMe(); go('home'); }
+
+/* ---------- 一覧 ---------- */
+function appCard(a, mine){
+  var D = ['','かんたん','ふつう','むずかしい'][a.difficulty||1];
+  return '<div class="app" onclick="'+(mine?'editApp('+a.id+')':'viewApp('+a.id+')')+'">'
+    + '<div class="t">'+K(a.title)+'</div>'
+    + '<div class="s">'+K(a.summary||'')+'</div>'
+    + '<div class="m">'
+    + '<span class="tag d'+(a.difficulty||1)+'">'+D+'</span>'
+    + (a.status==='draft' ? '<span class="tag draft">下書き</span>' : '')
+    + (a.tags ? K(a.tags).split(',').slice(0,2).map(function(t){
+        return '<span class="tag">'+t.trim()+'</span>'; }).join('') : '')
+    + '</div>'
+    + '<div class="m"><span>'+K(a.nickname||a.member_id)
+    + (a.grade ? '（'+K(a.grade)+'）' : '')+'</span>'
+    + '<span>♡ '+(a.likes||0)+'</span><span>👁 '+(a.views||0)+'</span>'
+    + (a.forked_from ? '<span>🔀 コピー元あり</span>' : '') + '</div></div>';
+}
+async function loadApps(){
+  var d = await J('/api/mp/apps?sort=' + $('qSort').value
+    + '&q=' + encodeURIComponent($('qText').value));
+  if (!d.ok) return;
+  $('stApps').textContent = d.total_apps;
+  $('stPeople').textContent = d.total_people;
+  $('appList').innerHTML = d.apps.length
+    ? d.apps.map(function(a){ return appCard(a,false); }).join('')
+    : '<div class="empty">まだ作品がありません。<br>いちばんに作ってみませんか。</div>';
+}
+async function loadMine(){
+  var d = await J('/api/mp/apps?mine=1');
+  if (!d.ok) return;
+  var pub = d.apps.filter(function(a){ return a.status==='published'; }).length;
+  $('mineInfo').textContent = ME
+    ? '公開中 ' + pub + ' / ' + (ME.limit >= 1e8 ? '無制限' : ME.limit)
+      + '　下書きはいくつでも作れます'
+    : '';
+  $('mineList').innerHTML = d.apps.length
+    ? d.apps.map(function(a){ return appCard(a,true); }).join('')
+    : '<div class="empty">まだありません。「＋作る」から始めましょう。</div>';
+}
+
+/* ---------- 作品を見る ---------- */
+async function viewApp(id){
+  var d = await J('/api/mp/app/' + id);
+  if (!d.ok){ alert(d.error); return; }
+  var a = d.app;
+  var langs = LANGS.filter(function(l){ return (a[l[0]]||'').trim(); });
+  $('viewBody').innerHTML =
+      '<h1>'+K(a.title)+'</h1>'
+    + '<p class="lead">'+K(a.nickname||a.member_id)+(a.grade?'（'+K(a.grade)+'）':'')
+    + ' · ♡'+a.likes+' · 👁'+a.views+'</p>'
+    + (a.summary ? '<div class="card">'+K(a.summary)+'</div>' : '')
+    + '<div class="row">'
+    + '<button class="btn cy" onclick="runView('+id+')">▶ うごかす</button>'
+    + (ME ? '<button class="btn gh" onclick="like('+id+')">'+(a.liked?'♥ いいね済み':'♡ いいね')+'</button>'
+          + '<button class="btn gh" onclick="fork('+id+')">コピーして作る</button>'
+          + '<button class="btn gh sm" onclick="report('+id+')">通報</button>' : '')
+    + '</div>'
+    + '<iframe id="vPreview" sandbox="allow-scripts" style="width:100%;height:340px;'
+    + 'border:1px solid var(--line);border-radius:10px;background:#fff;'
+    + 'margin-top:11px;display:none"></iframe>'
+    + '<div class="out" id="vOut">「うごかす」を押してください</div>'
+    + '<h2>コード</h2>'
+    + langs.map(function(l){
+        return '<div class="card"><b style="font-size:12px;color:var(--muted)">'+l[1]+'</b>'
+          + '<pre style="font-family:ui-monospace,monospace;font-size:12.5px;'
+          + 'white-space:pre-wrap;margin-top:7px">'+K(a[l[0]])+'</pre></div>'; }).join('');
+  window.VIEW_APP = a;
+  go('view');
+}
+async function like(id){ var d = await P('/api/mp/app/'+id+'/like'); if (d.ok) viewApp(id); }
+async function fork(id){
+  var d = await P('/api/mp/app/'+id+'/fork');
+  if (!d.ok){ alert(d.error); return; }
+  alert('自分の下書きにコピーしました。書きかえて公開できます。');
+  editApp(d.id);
+}
+async function report(id){
+  var why = prompt('どこが気になりましたか？');
+  if (!why) return;
+  var d = await P('/api/mp/report', {app_id:id, reason:'other', body:why});
+  alert(d.ok ? '知らせました。ありがとう。' : (d.error||'失敗しました'));
+}
+
+/* ---------- エディタ ---------- */
+function drawTabs(){
+  $('eTabs').innerHTML = LANGS.map(function(l){
+    return '<button class="etab'+(l[0]===LANG?' on':'')+'" onclick="setLang(\''+l[0]+'\')">'
+      + l[1] + ((SRC[l[0]]||'').trim() ? '<span class="dot"></span>' : '') + '</button>';
+  }).join('');
+}
+function setLang(l){ SRC[LANG] = $('eCode').value; LANG = l;
+  $('eCode').value = SRC[l] || ''; drawTabs(); }
+function newApp(){
+  if (!ME){ go('login'); return; }
+  APP = {id:null};
+  SRC = {code:'# ここに Python を書いてみよう\nprint("こんにちは")\n', html:'', css:'', js:'', sql:''};
+  LANG = 'code';
+  ['eTitle','eSummary','eTags'].forEach(function(i){ $(i).value=''; });
+  $('eDiff').value = '1'; $('eDel').style.display='none';
+  $('eCode').value = SRC.code; $('eMsg').textContent=''; $('eOut').textContent='';
+  $('preview').style.display='none';
+  drawTabs(); go('edit');
+}
+async function editApp(id){
+  var d = await J('/api/mp/app/'+id);
+  if (!d.ok){ alert(d.error); return; }
+  var a = d.app;
+  APP = {id:a.id};
+  SRC = {code:a.code||'', html:a.html||'', css:a.css||'', js:a.js||'', sql:a.sql||''};
+  LANG = 'code';
+  $('eTitle').value=a.title; $('eSummary').value=a.summary||'';
+  $('eTags').value=a.tags||''; $('eDiff').value=String(a.difficulty||1);
+  $('eCode').value=SRC.code; $('eDel').style.display='';
+  $('eMsg').textContent = a.status==='published' ? '公開中' : '下書き';
+  drawTabs(); go('edit');
+}
+async function saveApp(pub, confirmed){
+  SRC[LANG] = $('eCode').value;
+  var body = Object.assign({}, SRC, {
+    id:APP.id, title:$('eTitle').value.trim(), summary:$('eSummary').value.trim(),
+    tags:$('eTags').value.trim(), difficulty:parseInt($('eDiff').value),
+    publish:pub, confirmed:confirmed});
+  var d = await P('/api/mp/app', body);
+  var m = $('eMsg');
+  if (!d.ok){
+    m.style.color = '#c0453b';
+    m.textContent = d.error;
+    if (d.need_agree){ setTimeout(function(){ go('rules'); }, 1200); }
+    if (d.need_confirm && confirm(d.error + '\n\nそれでも公開しますか？')){
+      saveApp(pub, true);
+    }
+    return;
+  }
+  APP.id = d.id; $('eDel').style.display='';
+  m.style.color = '#0e7490';
+  m.textContent = d.status==='published' ? '公開しました' : '下書きに保存しました';
+  await refreshMe();
+}
+async function delApp(){
+  if (!APP.id || !confirm('この作品を削除しますか？')) return;
+  var d = await P('/api/mp/app/'+APP.id+'/delete');
+  if (d.ok){ alert('削除しました'); go('mine'); }
+}
+
+/* ---------- 実行（すべてブラウザの中） ---------- */
+function outWrite(el, s, cls){
+  var d = document.createElement('div');
+  if (cls) d.className = cls;
+  d.textContent = s;
+  el.appendChild(d);
+}
+
+async function runAny(src, outEl, frameEl){
+  outEl.innerHTML = '';
+  if ((src.html||'').trim() || (src.css||'').trim() || (src.js||'').trim()){
+    frameEl.style.display = '';
+    frameEl.srcdoc =
+        '<style>body{font-family:sans-serif;padding:12px}' + (src.css||'') + '</style>'
+      + (src.html || '')
+      + '<script>try{' + (src.js||'') + '}catch(e){document.body.innerHTML+='
+      + '"<pre style=color:red>"+e+"</pre>"}<\/script>';
+    outWrite(outEl, '画面に表示しました', 'ok');
+  } else {
+    frameEl.style.display = 'none';
+  }
+  if ((src.sql||'').trim()) await runSql(src.sql, outEl);
+  if ((src.code||'').trim()) await runPy(src.code, outEl);
+  if (!outEl.innerHTML) outWrite(outEl, '（何も書かれていません）');
+}
+
+async function runPy(code, outEl){
+  outWrite(outEl, '── Python ──');
+  try {
+    if (!PYO){
+      outWrite(outEl, 'Python を用意しています…（初回だけ時間がかかります）');
+      PYO = await loadPyodide();
+    }
+    PYO.setStdout({batched:function(s){ outWrite(outEl, s); }});
+    PYO.setStderr({batched:function(s){ outWrite(outEl, s, 'e'); }});
+    await PYO.runPythonAsync(code);
+  } catch(e){
+    outWrite(outEl, String(e).split('\n').slice(-4).join('\n'), 'e');
+  }
+}
+
+async function runSql(sql, outEl){
+  outWrite(outEl, '── SQL ──');
+  try {
+    if (!SQLJS){
+      SQLJS = await initSqlJs({locateFile:function(f){
+        return 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/'+f; }});
+    }
+    var db = new SQLJS.Database();
+    var res = db.exec(sql);
+    if (!res.length){ outWrite(outEl, '（結果なし）'); }
+    res.forEach(function(r){
+      outWrite(outEl, r.columns.join(' | '));
+      outWrite(outEl, r.columns.map(function(){ return '---'; }).join('-'));
+      r.values.forEach(function(v){ outWrite(outEl, v.join(' | ')); });
+    });
+    db.close();
+  } catch(e){
+    outWrite(outEl, String(e), 'e');
+  }
+}
+
+function runCode(){ SRC[LANG] = $('eCode').value; runAny(SRC, $('eOut'), $('preview')); }
+function runView(){ var a = window.VIEW_APP;
+  runAny({code:a.code,html:a.html,css:a.css,js:a.js,sql:a.sql},
+         $('vOut'), $('vPreview')); }
+
+/* ---------- きまり ---------- */
+async function loadRules(){
+  var d = await J('/api/mp/rules');
+  $('ruleList').innerHTML = d.rules.map(function(r,i){
+    return '<div class="rule"><b>'+(i+1)+'. '+K(r.title)+'</b><span>'+K(r.body)+'</span></div>';
+  }).join('');
+  $('agreeBtn').style.display = (ME && !d.agreed) ? '' : 'none';
+  $('agreeMsg').textContent = !ME ? '会員になると同意できます'
+    : (d.agreed ? '同意ずみです' : '公開する前に「読みました」を押してください');
+}
+async function agree(){
+  var d = await P('/api/mp/agree');
+  if (d.ok){ loadRules(); }
+}
+
+function askNick(){
+  $('modalBody').innerHTML =
+      '<h1 style="font-size:19px;margin-bottom:6px">ようこそ</h1>'
+    + '<p class="lead">会員のなかで使う名前を決めてください。'
+    + '本名ではなく、ニックネームにしてください。</p>'
+    + '<div class="row"><div style="flex:1;min-width:150px">'
+    + '<label class="lb">ニックネーム</label>'
+    + '<input class="inp" id="nkName" placeholder="みらい" maxlength="20"></div></div>'
+    + '<div class="row"><div style="flex:1;min-width:110px">'
+    + '<label class="lb">学年（任意）</label>'
+    + '<input class="inp" id="nkGrade" placeholder="中1"></div>'
+    + '<div style="flex:1;min-width:110px">'
+    + '<label class="lb">学校（任意）</label>'
+    + '<input class="inp" id="nkSchool" placeholder="沢上中"></div></div>'
+    + '<div class="row" style="margin-top:12px">'
+    + '<button class="btn" onclick="saveNick()">はじめる</button>'
+    + '<span id="nkMsg" style="font-size:12.5px;color:#c0453b"></span></div>';
+  $('modal').classList.add('on');
+}
+async function saveNick(){
+  var n = $('nkName').value.trim();
+  if (!n){ $('nkMsg').textContent = '名前を入れてください'; return; }
+  var d = await P('/api/mp/setup', {nickname:n,
+    grade:$('nkGrade').value.trim(), school:$('nkSchool').value.trim()});
+  if (!d.ok){ $('nkMsg').textContent = d.error; return; }
+  $('modal').classList.remove('on');
+  await refreshMe();
+  loadApps();
+}
+
+// 会員でなければ、ログイン画面だけを見せる
+function gate(){
+  var inside = !!ME;
+  ['nvHome','nvMine','nvEdit','nvRules'].forEach(function(i){
+    if ($(i)) $(i).style.display = inside ? '' : 'none'; });
+  $('nvLogin').style.display = inside ? 'none' : '';
+  $('nvOut').style.display = inside ? '' : 'none';
+  if (!inside) go('login'); else go('home');
+}
+
+refreshMe().then(gate);
+</script></body></html>

@@ -31,25 +31,52 @@ def _db():
     return c
 
 
-def me():
-    """ログイン中の会員。いなければ None"""
-    mid = session.get('mp_member')
-    if not mid:
+def staff_as_member():
+    """社員として管理センターにログインしていれば、そのまま会員として扱う。
+       会員登録をしなくても試せるようにするため。
+       AI と退職者は除く。"""
+    sid = session.get('staff_id')
+    if not sid or sid == 'ai_qstart':
         return None
     c = _db()
-    r = c.execute('SELECT * FROM mp_member WHERE member_id=?', (mid,)).fetchone()
+    r = c.execute("SELECT staff_id, name, status FROM qz_staff "
+                  "WHERE staff_id=? AND status='active'", (sid,)).fetchone()
     c.close()
-    if not r or r['status'] != 'active':
+    if not r:
         return None
-    return dict(r)
+    # 会員としてのニックネームは mp_member に持つ。
+    # 社員名は暗号化されていて会員の場では使わないので、初回に決めてもらう。
+    c2 = _db()
+    prof = c2.execute('SELECT * FROM mp_member WHERE member_id=?', (sid,)).fetchone()
+    c2.close()
+    if prof:
+        d = dict(prof)
+        d['is_staff'] = True
+        d['need_nick'] = False
+        return d
+    return {'member_id': sid, 'nickname': '', 'tier': 'staff',
+            'status': 'active', 'grade': '', 'school': '', 'furigana': 0,
+            'is_staff': True, 'need_nick': True}
+
+
+def me():
+    """ログイン中の会員。会員登録がなくても、社員なら社員として扱う。"""
+    mid = session.get('mp_member')
+    if mid:
+        c = _db()
+        r = c.execute('SELECT * FROM mp_member WHERE member_id=?', (mid,)).fetchone()
+        c.close()
+        if r and r['status'] == 'active':
+            d = dict(r); d['is_staff'] = False
+            return d
+    return staff_as_member()
 
 
 def my_tier(m):
-    """公開できる数を決める区分。社員と管理者は管理センター側で判定。"""
+    """公開できる数の区分。管理者は無制限、社員と招待者は20、ほかは15。"""
     if not m:
         return 'regular'
-    sid = session.get('staff_id')
-    if sid:
+    if session.get('staff_id'):
         try:
             from app import admin_center_role
             role = admin_center_role()
@@ -159,7 +186,9 @@ def mp_me():
                    nickname=m['nickname'], tier=t, limit=LIMITS[t],
                    published=published_count(m['member_id']),
                    grade=m.get('grade'), school=m.get('school'),
-                   furigana=bool(m.get('furigana')))
+                   furigana=bool(m.get('furigana')),
+                   is_staff=bool(m.get('is_staff')),
+                   need_nick=bool(m.get('need_nick')))
 
 
 @bp.route('/api/mp/profile', methods=['POST'])
@@ -188,6 +217,8 @@ def _clip(v):
 @bp.route('/api/mp/apps')
 def mp_apps():
     """公開されているアプリの一覧。会員でなくても見られる（宣伝になる）。"""
+    if not me():
+        return jsonify(ok=False, error='会員だけが見られます'), 401
     q = (request.args.get('q') or '').strip()
     tag = (request.args.get('tag') or '').strip()
     school = (request.args.get('school') or '').strip()
@@ -232,6 +263,8 @@ def mp_apps():
 
 @bp.route('/api/mp/app/<int:aid>')
 def mp_app_get(aid):
+    if not me():
+        return jsonify(ok=False, error='会員だけが見られます'), 401
     c = _db()
     r = c.execute("SELECT a.*, m.nickname, m.grade FROM mp_app a "
                   "LEFT JOIN mp_member m ON m.member_id=a.member_id "
@@ -274,7 +307,7 @@ def mp_app_save():
         agreed = c0.execute('SELECT 1 FROM mp_agree WHERE member_id=? AND version=?',
                             (u['member_id'], RULES_VERSION)).fetchone()
         c0.close()
-        if not agreed:
+        if not agreed and not u.get('is_staff'):
             return jsonify(ok=False, need_agree=True,
                            error='公開する前に、決まりごとを読んでください'), 403
         # 個人情報らしきものがないか見る
@@ -500,3 +533,38 @@ def mp_report():
                (d.get('reason') or 'other')[:40], (d.get('body') or '')[:1000]))
     c.commit(); c.close()
     return jsonify(ok=True)
+
+
+@bp.route('/member')
+def page_member():
+    return render_template('member.html')
+
+
+@bp.route('/api/mp/setup', methods=['POST'])
+def mp_setup():
+    """社員が会員として使いはじめるとき、ニックネームを決める。"""
+    sid = session.get('staff_id')
+    if not sid or sid == 'ai_qstart':
+        return jsonify(ok=False, error='社員としてログインしてください'), 401
+    c = _db()
+    r = c.execute("SELECT 1 FROM qz_staff WHERE staff_id=? AND status='active'",
+                  (sid,)).fetchone()
+    if not r:
+        c.close()
+        return jsonify(ok=False, error='使えるアカウントではありません'), 403
+    d = request.get_json(silent=True) or {}
+    nick = (d.get('nickname') or '').strip()
+    if not nick or len(nick) > 20:
+        c.close()
+        return jsonify(ok=False, error='ニックネームは1〜20文字で'), 400
+    if c.execute('SELECT 1 FROM mp_member WHERE member_id=?', (sid,)).fetchone():
+        c.execute('UPDATE mp_member SET nickname=?, grade=?, school=? WHERE member_id=?',
+                  (nick, (d.get('grade') or '')[:20], (d.get('school') or '')[:40], sid))
+    else:
+        # 社員なので、パスワードは使わない（管理センターのログインを使う）
+        c.execute("""INSERT INTO mp_member
+            (member_id,nickname,password_hash,tier,grade,school)
+            VALUES(?,?,'-','staff',?,?)""",
+            (sid, nick, (d.get('grade') or '')[:20], (d.get('school') or '')[:40]))
+    c.commit(); c.close()
+    return jsonify(ok=True, nickname=nick)
