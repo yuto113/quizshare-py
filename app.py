@@ -1980,8 +1980,26 @@ def daily_db_backup():
         # 旧形式(非圧縮)も掃除
         for _old in _glob.glob(_bk + '/quizshare_*.db'):
             os.remove(_old)
-    except Exception:
-        pass  # バックアップ失敗でもサイトは止めない
+
+        # 成否を記録する。失敗に気づけないのが一番こわい。
+        try:
+            import sqlite3 as _sq_lg
+            _lg = _sq_lg.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+            _lg.execute('INSERT INTO qz_backup_log(ok,path,bytes) VALUES(1,?,?)',
+                        (_dst, os.path.getsize(_dst)))
+            _lg.commit(); _lg.close()
+        except Exception:
+            pass
+    except Exception as _be:
+        # サイトは止めないが、失敗したことは残す
+        try:
+            import sqlite3 as _sq_lg
+            _lg = _sq_lg.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
+            _lg.execute('INSERT INTO qz_backup_log(ok,error) VALUES(0,?)',
+                        (f'{type(_be).__name__}: {_be}'[:300],))
+            _lg.commit(); _lg.close()
+        except Exception:
+            pass
 
 
 # ===== redenモード（AIチャット・管理者のみ） =====

@@ -43,6 +43,7 @@ window.showToast = window.toast;
 # key: (テンプレート, 表示名, 管理者専用か)
 PAGES = {
     'errors': ('admin/errors.html', 'エラー監視', True),
+    'ops': ('admin/ops.html', 'システム状況', True),
     'alert': ('admin/alert.html', '天気・防災情報', False),
     'call': ('admin/call.html', '通話', False),
     'dashboard': ('admin/dashboard.html', '統計', True),
@@ -1227,3 +1228,260 @@ def api_alert_test():
 
     audit('alert_test', '', '訓練配信')
     return jsonify(ok=True, sent=sent, text=text)
+
+
+# ====================================================================
+# 運営まわり
+#   システム状況 / お問い合わせ / 削除依頼 / 一斉通知 / 規約の版管理
+# ====================================================================
+import shutil as _sh
+import glob as _gl
+
+DISK_LIMIT = 512 * 1024 * 1024      # PythonAnywhere 無料枠
+
+
+def _dir_bytes(path):
+    total = 0
+    for root, _dirs, files in os.walk(path):
+        for f in files:
+            try:
+                total += os.path.getsize(os.path.join(root, f))
+            except OSError:
+                pass
+    return total
+
+
+@bp.route('/api/admin/ops/status')
+def api_ops_status():
+    """システム状況。容量とバックアップを見えるようにする。"""
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+
+    home = os.path.expanduser('~')
+    used = _dir_bytes(home)
+    dbp = os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db')
+
+    # バックアップの一覧
+    bks = []
+    for p in sorted(_gl.glob(home + '/backups/db/*'), reverse=True)[:10]:
+        try:
+            bks.append({'name': os.path.basename(p),
+                        'bytes': os.path.getsize(p),
+                        'at': _tm.strftime('%Y-%m-%d %H:%M',
+                                           _tm.localtime(os.path.getmtime(p)))})
+        except OSError:
+            pass
+
+    c = _db()
+    log = [dict(r) for r in c.execute(
+        'SELECT * FROM qz_backup_log ORDER BY id DESC LIMIT 10').fetchall()]
+    # 直近のエラー。テーブル名が環境で違うことがあるので、あるものを探す。
+    err_n = 0
+    for t in ('error_logs', 'qstart_errors', 'qz_errors', 'error_log'):
+        try:
+            r0 = c.execute(f"SELECT COUNT(*) AS n FROM {t} "
+                           "WHERE created_at > datetime('now','localtime','-7 days')").fetchone()
+            err_n = r0['n']; break
+        except Exception:
+            continue
+
+    def _one(sql, default=None):
+        try:
+            return c.execute(sql).fetchone()
+        except Exception:
+            return default
+
+    open_contacts = _one("SELECT COUNT(*) AS n FROM qz_contact WHERE status='open'")
+    alert_ok = _one("SELECT updated_at FROM qz_alert_state WHERE k='last_ok'")
+    c.close()
+
+    from app import app as _app
+    return jsonify(ok=True,
+        disk={'used': used, 'limit': DISK_LIMIT,
+              'pct': round(used / DISK_LIMIT * 100, 1),
+              'free': DISK_LIMIT - used},
+        db_bytes=(os.path.getsize(dbp) if os.path.exists(dbp) else 0),
+        backups=bks, backup_log=log,
+        routes=len(list(_app.url_map.iter_rules())),
+        errors_7d=err_n,
+        open_contacts=(open_contacts['n'] if open_contacts else 0),
+        alert_last_ok=(alert_ok['updated_at'] if alert_ok else None))
+
+
+# ---------- お問い合わせ ----------
+@bp.route('/api/contact', methods=['POST'])
+def api_contact_new():
+    """外部からの問い合わせ。ログイン不要。"""
+    d = request.get_json(silent=True) or {}
+    body = (d.get('body') or '').strip()
+    if not body:
+        return jsonify(ok=False, error='内容を書いてください'), 400
+    if len(body) > 4000:
+        return jsonify(ok=False, error='長すぎます'), 400
+    import hashlib as _h
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr or '').split(',')[0]
+    c = _db()
+    c.execute("""INSERT INTO qz_contact(kind,name,email,body,ip_hash)
+                 VALUES(?,?,?,?,?)""",
+              (d.get('kind') or 'question', (d.get('name') or '')[:60],
+               (d.get('email') or '')[:200], body,
+               _h.sha256(ip.encode()).hexdigest()[:16]))
+    c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+@bp.route('/api/admin/ops/contacts')
+def api_contacts_list():
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    c = _db()
+    rows = [dict(r) for r in c.execute(
+        'SELECT * FROM qz_contact ORDER BY id DESC LIMIT 100').fetchall()]
+    dels = [dict(r) for r in c.execute(
+        'SELECT * FROM qz_deletion ORDER BY id DESC LIMIT 50').fetchall()]
+    c.close()
+    return jsonify(ok=True, contacts=rows, deletions=dels)
+
+
+@bp.route('/api/admin/ops/contacts/<int:cid>', methods=['POST'])
+def api_contact_update(cid):
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    d = request.get_json(silent=True) or {}
+    c = _db()
+    c.execute("UPDATE qz_contact SET status=?, reply=?, handler=?, "
+              "handled_at=datetime('now','localtime') WHERE id=?",
+              (d.get('status') or 'working', (d.get('reply') or '')[:2000],
+               session.get('staff_id'), cid))
+    c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+@bp.route('/api/admin/ops/deletion', methods=['POST'])
+def api_deletion_new():
+    """削除依頼への対応を記録する。個人情報保護法の観点で記録が要る。"""
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    d = request.get_json(silent=True) or {}
+    tgt = (d.get('target') or '').strip()
+    if not tgt:
+        return jsonify(ok=False, error='何を削除したか書いてください'), 400
+    c = _db()
+    c.execute("""INSERT INTO qz_deletion(contact_id,target,scope,reason,done_by,
+                 done_at,note) VALUES(?,?,?,?,?,datetime('now','localtime'),?)""",
+              (d.get('contact_id'), tgt, d.get('scope') or 'other',
+               (d.get('reason') or '')[:500], session.get('staff_id'),
+               (d.get('note') or '')[:500]))
+    c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+# ---------- 一斉通知 ----------
+@bp.route('/api/admin/ops/broadcast', methods=['GET'])
+def api_broadcast_list():
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    c = _db()
+    rows = [dict(r) for r in c.execute(
+        'SELECT * FROM qz_broadcast ORDER BY id DESC LIMIT 50').fetchall()]
+    c.close()
+    return jsonify(ok=True, items=rows)
+
+
+@bp.route('/api/admin/ops/broadcast', methods=['POST'])
+def api_broadcast_new():
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    d = request.get_json(silent=True) or {}
+    t = (d.get('title') or '').strip()
+    b = (d.get('body') or '').strip()
+    if not t or not b:
+        return jsonify(ok=False, error='題名と内容が必要です'), 400
+    c = _db()
+    c.execute("""INSERT INTO qz_broadcast(title,body,level,starts_at,ends_at,created_by)
+                 VALUES(?,?,?,?,?,?)""",
+              (t[:120], b[:2000], d.get('level') or 'info',
+               d.get('starts_at') or None, d.get('ends_at') or None,
+               session.get('staff_id')))
+    c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+@bp.route('/api/admin/ops/broadcast/<int:bid>', methods=['POST'])
+def api_broadcast_toggle(bid):
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    d = request.get_json(silent=True) or {}
+    c = _db()
+    c.execute('UPDATE qz_broadcast SET active=? WHERE id=?',
+              (1 if d.get('active') else 0, bid))
+    c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+@bp.route('/api/broadcast')
+def api_broadcast_public():
+    """QuizShare 側が読む。いま出ているお知らせ。"""
+    c = _db()
+    rows = [dict(r) for r in c.execute(
+        "SELECT id,title,body,level FROM qz_broadcast WHERE active=1 "
+        "AND (starts_at IS NULL OR starts_at <= datetime('now','localtime')) "
+        "AND (ends_at IS NULL OR ends_at >= datetime('now','localtime')) "
+        "ORDER BY id DESC LIMIT 5").fetchall()]
+    c.close()
+    return jsonify(ok=True, items=rows)
+
+
+# ---------- 規約の版管理 ----------
+@bp.route('/api/admin/ops/policy', methods=['GET'])
+def api_policy_list():
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    c = _db()
+    rows = [dict(r) for r in c.execute(
+        'SELECT * FROM qz_policy ORDER BY id DESC').fetchall()]
+    c.close()
+    return jsonify(ok=True, items=rows)
+
+
+@bp.route('/api/admin/ops/policy', methods=['POST'])
+def api_policy_new():
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    d = request.get_json(silent=True) or {}
+    v = (d.get('version') or '').strip()
+    if not v:
+        return jsonify(ok=False, error='版を入力してください'), 400
+    c = _db()
+    c.execute("""INSERT INTO qz_policy(kind,version,summary,effective,created_by)
+                 VALUES(?,?,?,?,?)""",
+              (d.get('kind') or 'terms', v[:20], (d.get('summary') or '')[:600],
+               d.get('effective') or None, session.get('staff_id')))
+    c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+# ---------- アクセス統計 ----------
+@bp.route('/api/admin/ops/access')
+def api_access_stats():
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    c = _db()
+    try:
+        daily = [dict(r) for r in c.execute("""
+            SELECT date(created_at) AS d, COUNT(*) AS n
+            FROM access_logs WHERE created_at > datetime('now','localtime','-30 days')
+            GROUP BY date(created_at) ORDER BY d DESC LIMIT 30""").fetchall()]
+        dev = [dict(r) for r in c.execute("""
+            SELECT device, COUNT(*) AS n FROM access_logs
+            WHERE created_at > datetime('now','localtime','-30 days')
+            GROUP BY device ORDER BY n DESC LIMIT 10""").fetchall()]
+        hours = [dict(r) for r in c.execute("""
+            SELECT strftime('%H', created_at) AS h, COUNT(*) AS n
+            FROM access_logs WHERE created_at > datetime('now','localtime','-30 days')
+            GROUP BY h ORDER BY h""").fetchall()]
+    except Exception as e:
+        c.close()
+        return jsonify(ok=False, error=str(e)[:120]), 500
+    c.close()
+    return jsonify(ok=True, daily=daily, devices=dev, hours=hours)

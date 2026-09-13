@@ -1,0 +1,374 @@
+<style>
+.ow{max-width:940px;margin:0 auto;padding:18px 20px 60px;
+  font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;color:#0a1628}
+.ow h2{font-size:19px;margin:0 0 4px;display:flex;align-items:center;gap:9px}
+.ow .lead{font-size:12.5px;color:#7a8794;margin:0 0 16px;line-height:1.7}
+
+.otabs{display:flex;gap:2px;border-bottom:1px solid #dde5ea;margin-bottom:18px;overflow-x:auto}
+.otab{padding:9px 15px;font-size:12.5px;color:#7a8794;cursor:pointer;white-space:nowrap;
+  background:none;border:none;border-bottom:2px solid transparent;font-family:inherit}
+.otab:hover{color:#0a1628}
+.otab.on{color:#0a1628;border-bottom-color:#0891b2;font-weight:600}
+.opane{display:none}.opane.on{display:block}
+
+.ocards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:20px}
+.ocard{background:#fff;border:1px solid #dde5ea;border-radius:10px;padding:13px 15px}
+.ocard .n{font-size:22px;font-weight:700;letter-spacing:-.02em}
+.ocard .l{font-size:11.5px;color:#7a8794;margin-top:3px}
+.ocard.warn{border-color:#f0c060;background:#fffbf0}
+.ocard.warn .n{color:#a06010}
+.ocard.bad{border-color:#f3aaa4;background:#fdf4f3}
+.ocard.bad .n{color:#c0453b}
+
+.obar{height:9px;background:#e8eef1;border-radius:99px;overflow:hidden;margin-top:8px}
+.obar i{display:block;height:100%;background:#22d3ee;border-radius:99px}
+.obar i.warn{background:#f0a030}
+.obar i.bad{background:#dc2626}
+
+.osec{font-size:12.5px;font-weight:700;margin:22px 0 9px;padding-bottom:6px;border-bottom:1px solid #dde5ea}
+.otbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.otbl th{text-align:left;font-size:11px;color:#7a8794;padding:7px 9px;border-bottom:1px solid #dde5ea;white-space:nowrap}
+.otbl td{padding:8px 9px;border-bottom:1px solid #eef3f5;vertical-align:top}
+.omono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;color:#7a8794}
+.oempty{padding:26px 0;text-align:center;color:#9aa8b2;font-size:12.5px}
+
+.otag{font-size:10.5px;padding:2px 8px;border-radius:99px;font-weight:700;white-space:nowrap}
+.otag.ok{background:#d1fae5;color:#046c4e}
+.otag.ng{background:#fee2e2;color:#b91c1c}
+.otag.open{background:#fef3c7;color:#92400e}
+.otag.working{background:#dbeafe;color:#1e40af}
+.otag.closed{background:#e5e7eb;color:#4b5563}
+.otag.info{background:#dbeafe;color:#1e40af}
+.otag.warn{background:#fef3c7;color:#92400e}
+.otag.maint{background:#fee2e2;color:#b91c1c}
+
+.oform{background:#f7f9fa;border:1px solid #dde5ea;border-radius:10px;padding:14px;margin-bottom:18px}
+.oform h4{font-size:12.5px;margin:0 0 10px}
+.orow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:9px}
+.oinp,.osel,.ota{padding:7px 10px;border:1px solid #dde5ea;border-radius:7px;
+  font-size:12.5px;font-family:inherit}
+.oinp{flex:1;min-width:140px}
+.ota{width:100%;min-height:70px;resize:vertical}
+.obtn{background:#0a1628;color:#fff;border:none;padding:7px 14px;border-radius:7px;
+  font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap}
+.obtn:hover{background:#123047}
+.obtn.gh{background:none;border:1px solid #dde5ea;color:#0a1628;padding:4px 11px;font-size:11px}
+.obtn.gh:hover{background:#f0f4f6}
+
+.onote{background:#eefcff;border:1px solid #b8e8f2;border-radius:8px;padding:10px 13px;
+  font-size:11.5px;color:#1a5966;line-height:1.7;margin-bottom:16px}
+.obody{font-size:12.5px;line-height:1.7;white-space:pre-wrap;margin:5px 0}
+.ohours{display:flex;align-items:flex-end;gap:2px;height:70px;margin-top:8px}
+.ohours div{flex:1;background:#22d3ee;border-radius:2px 2px 0 0;min-height:2px}
+.ohlabel{display:flex;gap:2px;font-size:9px;color:#9aa8b2;margin-top:3px}
+.ohlabel span{flex:1;text-align:center}
+</style>
+
+<div class="ow">
+  <h2>🩺 システム状況</h2>
+  <p class="lead">サーバーの空きぐあい、バックアップ、問い合わせをまとめて見られます。</p>
+
+  <div class="otabs">
+    <button class="otab on" data-p="status">📊 状況</button>
+    <button class="otab" data-p="contact">📮 お問い合わせ</button>
+    <button class="otab" data-p="cast">📢 一斉通知</button>
+    <button class="otab" data-p="policy">📜 規約の版</button>
+    <button class="otab" data-p="access">📈 アクセス</button>
+  </div>
+
+  <div class="opane on" id="o-status">
+    <div class="ocards" id="sCards"></div>
+    <div class="osec">バックアップ</div>
+    <div id="sBackups"></div>
+    <div class="osec">バックアップの記録</div>
+    <div id="sLog"></div>
+  </div>
+
+  <div class="opane" id="o-contact">
+    <div class="onote">
+      保護者や学校からの連絡を受ける窓口です。削除の依頼を受けたら、対応した記録を必ず残してください。
+    </div>
+    <div id="cList"></div>
+    <div class="osec">削除の対応記録</div>
+    <div class="oform">
+      <h4>＋ 記録を残す</h4>
+      <div class="orow">
+        <input class="oinp" id="dTarget" placeholder="何を削除したか（例: グループ abc123 のクイズ5件）">
+        <select class="osel" id="dScope">
+          <option value="quiz">クイズ</option><option value="group">グループ</option>
+          <option value="account">アカウント</option><option value="other">その他</option>
+        </select>
+      </div>
+      <input class="oinp" id="dReason" placeholder="理由（例: 本人からの削除依頼）" style="width:100%;margin-bottom:9px">
+      <div class="orow"><button class="obtn" onclick="delRec()">記録する</button></div>
+    </div>
+    <div id="dList"></div>
+  </div>
+
+  <div class="opane" id="o-cast">
+    <div class="onote">
+      QuizShare を使っている人へのお知らせです。メンテナンスの予告などに使います。
+    </div>
+    <div class="oform">
+      <h4>＋ お知らせを出す</h4>
+      <div class="orow">
+        <input class="oinp" id="bTitle" placeholder="題名">
+        <select class="osel" id="bLevel">
+          <option value="info">お知らせ</option>
+          <option value="warn">注意</option>
+          <option value="maint">メンテナンス</option>
+        </select>
+      </div>
+      <textarea class="ota" id="bBody" placeholder="内容"></textarea>
+      <div class="orow" style="margin-top:9px">
+        <input class="oinp" id="bStart" type="datetime-local" style="max-width:200px">
+        <span style="font-size:12px;color:#7a8794">〜</span>
+        <input class="oinp" id="bEnd" type="datetime-local" style="max-width:200px">
+        <button class="obtn" onclick="castNew()">出す</button>
+      </div>
+    </div>
+    <div id="bList"></div>
+  </div>
+
+  <div class="opane" id="o-policy">
+    <div class="onote">
+      利用規約とプライバシーポリシーを変えたら、ここに記録します。
+      いつ何を変えたかが残っていないと、あとで説明できません。
+    </div>
+    <div class="oform">
+      <h4>＋ 改定を記録する</h4>
+      <div class="orow">
+        <select class="osel" id="pKind">
+          <option value="terms">利用規約</option>
+          <option value="privacy">プライバシーポリシー</option>
+        </select>
+        <input class="oinp" id="pVer" placeholder="版（例: 1.2）" style="max-width:130px">
+        <input class="oinp" id="pEff" type="date" style="max-width:170px">
+      </div>
+      <input class="oinp" id="pSum" placeholder="何を変えたか" style="width:100%;margin-bottom:9px">
+      <div class="orow"><button class="obtn" onclick="polNew()">記録する</button></div>
+    </div>
+    <div id="pList"></div>
+  </div>
+
+  <div class="opane" id="o-access">
+    <div id="aStats"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+var K = function(s){ return String(s==null?'':s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+function T(m,t){ if(window.toast) window.toast(m,t); else alert(m); }
+function MB(b){ return (b/1048576).toFixed(1) + 'MB'; }
+async function J(u,o){ var r=await fetch(u,o);
+  return await r.json().catch(function(){ return {ok:false,error:'応答を読めません'}; }); }
+function P(u,b){ return J(u,{method:'POST',headers:{'Content-Type':'application/json'},
+                             body:JSON.stringify(b||{})}); }
+function tbl(cols, rows){
+  if (!rows.length) return '<div class="oempty">まだありません</div>';
+  return '<table class="otbl"><thead><tr>'
+    + cols.map(function(c){ return '<th>'+K(c)+'</th>'; }).join('')
+    + '</tr></thead><tbody>' + rows.join('') + '</tbody></table>';
+}
+
+/* ---------- 状況 ---------- */
+async function loadStatus(){
+  var d = await J('/api/admin/ops/status');
+  if (!d.ok){ document.getElementById('sCards').innerHTML =
+    '<div class="oempty">'+K(d.error)+'</div>'; return; }
+
+  var p = d.disk.pct;
+  var cls = p >= 90 ? 'bad' : (p >= 75 ? 'warn' : '');
+  document.getElementById('sCards').innerHTML =
+      '<div class="ocard '+cls+'" style="grid-column:span 2">'
+    + '<div class="n">' + MB(d.disk.used) + ' <span style="font-size:13px;color:#7a8794">/ '
+    + MB(d.disk.limit) + '</span></div>'
+    + '<div class="l">ディスク（残り ' + MB(d.disk.free) + '）</div>'
+    + '<div class="obar"><i class="'+cls+'" style="width:'+Math.min(p,100)+'%"></i></div></div>'
+    + '<div class="ocard"><div class="n">' + MB(d.db_bytes) + '</div><div class="l">データベース</div></div>'
+    + '<div class="ocard"><div class="n">' + d.routes + '</div><div class="l">ルート</div></div>'
+    + '<div class="ocard'+(d.errors_7d>0?' warn':'')+'"><div class="n">' + d.errors_7d
+    + '</div><div class="l">エラー（7日）</div></div>'
+    + '<div class="ocard'+(d.open_contacts>0?' warn':'')+'"><div class="n">' + d.open_contacts
+    + '</div><div class="l">未対応の問い合わせ</div></div>'
+    + '<div class="ocard" style="grid-column:span 2"><div class="n" style="font-size:13px">'
+    + K(d.alert_last_ok || '取得できていません')
+    + '</div><div class="l">防災情報の最終取得</div></div>';
+
+  document.getElementById('sBackups').innerHTML = tbl(['ファイル','大きさ','日時'],
+    (d.backups||[]).map(function(b){
+      return '<tr><td class="omono">'+K(b.name)+'</td><td>'+MB(b.bytes)
+        +'</td><td class="omono">'+K(b.at)+'</td></tr>'; }));
+
+  document.getElementById('sLog').innerHTML = tbl(['結果','日時','内容'],
+    (d.backup_log||[]).map(function(l){
+      return '<tr><td><span class="otag '+(l.ok?'ok':'ng')+'">'+(l.ok?'成功':'失敗')+'</span></td>'
+        + '<td class="omono">'+K(l.created_at)+'</td>'
+        + '<td class="omono">'+K(l.ok ? (l.path||'') : (l.error||''))+'</td></tr>'; }));
+}
+
+/* ---------- お問い合わせ ---------- */
+var KIND = {question:'質問', bug:'不具合', parent:'保護者から', school:'学校から',
+            delete:'削除の依頼', other:'その他'};
+var STAT = {open:'未対応', working:'対応中', closed:'完了'};
+
+async function loadContact(){
+  var d = await J('/api/admin/ops/contacts');
+  if (!d.ok){ document.getElementById('cList').innerHTML =
+    '<div class="oempty">'+K(d.error)+'</div>'; return; }
+
+  document.getElementById('cList').innerHTML = (d.contacts||[]).length
+    ? d.contacts.map(function(x){
+        var act = x.status === 'closed' ? ''
+          : '<button class="obtn gh" onclick="cSet('+x.id+',\'working\')">対応中</button> '
+          + '<button class="obtn gh" onclick="cSet('+x.id+',\'closed\')">完了</button>';
+        return '<div class="ocard" style="margin-bottom:9px">'
+          + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+          + '<span class="otag '+K(x.status)+'">'+K(STAT[x.status]||x.status)+'</span>'
+          + '<b>'+K(KIND[x.kind]||x.kind)+'</b>'
+          + (x.name ? '<span>'+K(x.name)+'</span>' : '')
+          + (x.email ? '<span class="omono">'+K(x.email)+'</span>' : '')
+          + '<span class="omono" style="margin-left:auto">'+K(x.created_at)+'</span></div>'
+          + '<div class="obody">'+K(x.body)+'</div>'
+          + (x.reply ? '<div class="omono">返答: '+K(x.reply)+'</div>' : '')
+          + (act ? '<div class="orow" style="margin:8px 0 0">'+act+'</div>' : '')
+          + '</div>';
+      }).join('')
+    : '<div class="oempty">問い合わせはありません</div>';
+
+  document.getElementById('dList').innerHTML = tbl(['対象','種類','理由','対応者','日時'],
+    (d.deletions||[]).map(function(x){
+      return '<tr><td>'+K(x.target)+'</td><td>'+K(x.scope)+'</td>'
+        + '<td>'+K(x.reason)+'</td><td class="omono">'+K(x.done_by)+'</td>'
+        + '<td class="omono">'+K(x.done_at)+'</td></tr>'; }));
+}
+window.cSet = async function(id, st){
+  var reply = st === 'closed' ? (prompt('返答の記録（任意）') || '') : '';
+  var r = await P('/api/admin/ops/contacts/' + id, {status:st, reply:reply});
+  if (!r.ok) return T(r.error||'失敗しました','error');
+  T('更新しました','ok'); loadContact();
+};
+window.delRec = async function(){
+  var t = document.getElementById('dTarget').value.trim();
+  if (!t) return T('何を削除したか書いてください','error');
+  var r = await P('/api/admin/ops/deletion', {target:t,
+    scope: document.getElementById('dScope').value,
+    reason: document.getElementById('dReason').value});
+  if (!r.ok) return T(r.error||'失敗しました','error');
+  document.getElementById('dTarget').value = '';
+  document.getElementById('dReason').value = '';
+  T('記録しました','ok'); loadContact();
+};
+
+/* ---------- 一斉通知 ---------- */
+var LVL = {info:'お知らせ', warn:'注意', maint:'メンテナンス'};
+async function loadCast(){
+  var d = await J('/api/admin/ops/broadcast');
+  if (!d.ok){ document.getElementById('bList').innerHTML =
+    '<div class="oempty">'+K(d.error)+'</div>'; return; }
+  document.getElementById('bList').innerHTML = tbl(
+    ['状態','種類','題名','期間','作成',''],
+    (d.items||[]).map(function(x){
+      return '<tr><td><span class="otag '+(x.active?'ok':'closed')+'">'
+        + (x.active?'公開中':'停止')+'</span></td>'
+        + '<td><span class="otag '+K(x.level)+'">'+K(LVL[x.level]||x.level)+'</span></td>'
+        + '<td><b>'+K(x.title)+'</b><div class="omono">'+K(String(x.body).slice(0,60))+'</div></td>'
+        + '<td class="omono">'+K(x.starts_at||'—')+'<br>'+K(x.ends_at||'—')+'</td>'
+        + '<td class="omono">'+K(x.created_at)+'</td>'
+        + '<td><button class="obtn gh" onclick="castTog('+x.id+','+(x.active?0:1)+')">'
+        + (x.active?'停止':'再開')+'</button></td></tr>'; }));
+}
+window.castNew = async function(){
+  var t = document.getElementById('bTitle').value.trim();
+  var b = document.getElementById('bBody').value.trim();
+  if (!t || !b) return T('題名と内容が必要です','error');
+  var r = await P('/api/admin/ops/broadcast', {title:t, body:b,
+    level: document.getElementById('bLevel').value,
+    starts_at: document.getElementById('bStart').value.replace('T',' '),
+    ends_at: document.getElementById('bEnd').value.replace('T',' ')});
+  if (!r.ok) return T(r.error||'失敗しました','error');
+  document.getElementById('bTitle').value = '';
+  document.getElementById('bBody').value = '';
+  T('出しました','ok'); loadCast();
+};
+window.castTog = async function(id, v){
+  var r = await P('/api/admin/ops/broadcast/' + id, {active: !!v});
+  if (!r.ok) return T(r.error||'失敗しました','error');
+  loadCast();
+};
+
+/* ---------- 規約の版 ---------- */
+async function loadPolicy(){
+  var d = await J('/api/admin/ops/policy');
+  if (!d.ok){ document.getElementById('pList').innerHTML =
+    '<div class="oempty">'+K(d.error)+'</div>'; return; }
+  document.getElementById('pList').innerHTML = tbl(
+    ['種類','版','施行日','変更点','記録者','記録日'],
+    (d.items||[]).map(function(x){
+      return '<tr><td>'+(x.kind==='privacy'?'プライバシー':'利用規約')+'</td>'
+        + '<td><b>'+K(x.version)+'</b></td>'
+        + '<td class="omono">'+K(x.effective||'—')+'</td>'
+        + '<td>'+K(x.summary)+'</td>'
+        + '<td class="omono">'+K(x.created_by)+'</td>'
+        + '<td class="omono">'+K(String(x.created_at).slice(0,10))+'</td></tr>'; }));
+}
+window.polNew = async function(){
+  var v = document.getElementById('pVer').value.trim();
+  if (!v) return T('版を入力してください','error');
+  var r = await P('/api/admin/ops/policy', {
+    kind: document.getElementById('pKind').value, version: v,
+    summary: document.getElementById('pSum').value,
+    effective: document.getElementById('pEff').value});
+  if (!r.ok) return T(r.error||'失敗しました','error');
+  document.getElementById('pVer').value = '';
+  document.getElementById('pSum').value = '';
+  T('記録しました','ok'); loadPolicy();
+};
+
+/* ---------- アクセス ---------- */
+async function loadAccess(){
+  var el = document.getElementById('aStats');
+  var d = await J('/api/admin/ops/access');
+  if (!d.ok){ el.innerHTML = '<div class="oempty">'+K(d.error)+'</div>'; return; }
+
+  var hours = d.hours || [];
+  var mx = Math.max.apply(null, hours.map(function(h){ return h.n; }).concat([1]));
+  var bars = [];
+  for (var i = 0; i < 24; i++) {
+    var hh = ('0'+i).slice(-2);
+    var f = hours.filter(function(x){ return x.h === hh; })[0];
+    var n = f ? f.n : 0;
+    bars.push('<div style="height:'+Math.round(n/mx*100)+'%" title="'+hh+'時 '+n+'件"></div>');
+  }
+  var labels = [];
+  for (var j = 0; j < 24; j++) labels.push('<span>'+(j%6===0?j:'')+'</span>');
+
+  el.innerHTML =
+      '<div class="osec">時間帯（30日）</div>'
+    + '<div class="ohours">' + bars.join('') + '</div>'
+    + '<div class="ohlabel">' + labels.join('') + '</div>'
+    + '<div class="osec">日ごと（30日）</div>'
+    + tbl(['日', '件数'], (d.daily||[]).map(function(x){
+        return '<tr><td class="omono">'+K(x.d)+'</td><td>'+x.n+'</td></tr>'; }))
+    + '<div class="osec">端末</div>'
+    + tbl(['端末', '件数'], (d.devices||[]).map(function(x){
+        return '<tr><td>'+K(x.device||'不明')+'</td><td>'+x.n+'</td></tr>'; }));
+}
+
+var LOADERS = {status:loadStatus, contact:loadContact, cast:loadCast,
+               policy:loadPolicy, access:loadAccess};
+var loaded = {};
+document.querySelectorAll('.otab').forEach(function(t){
+  t.onclick = function(){
+    document.querySelectorAll('.otab').forEach(function(x){ x.classList.toggle('on', x===t); });
+    document.querySelectorAll('.opane').forEach(function(p){
+      p.classList.toggle('on', p.id === 'o-'+t.dataset.p); });
+    if (!loaded[t.dataset.p]){ loaded[t.dataset.p] = 1; LOADERS[t.dataset.p](); }
+  };
+});
+loaded.status = 1;
+loadStatus();
+})();
+</script>
