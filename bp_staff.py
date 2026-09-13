@@ -39,6 +39,13 @@ def api_staff_login():
     password = (data.get('password') or '')
     if not staff_id or not password:
         return err('IDとパスワードを入力してね')
+
+    # 総当たり対策。IPごとに1分5回、IDごとに1分5回まで。
+    _ip = client_ip()
+    if not rate_limit('stafflogin:' + _ip, 5):
+        return err('ログインの試行が多すぎるよ。少し待ってね', 429)
+    if not rate_limit('stafflogin_id:' + staff_id, 5):
+        return err('ログインの試行が多すぎるよ。少し待ってね', 429)
     import sqlite3 as _sq
     conn = _sq.connect(os.environ.get('SQLITE_PATH', '/home/yuto113/quizshare.db'))
     row = conn.execute('SELECT id, password_hash, name, status, active_from FROM qz_staff WHERE staff_id=?', (staff_id,)).fetchone()

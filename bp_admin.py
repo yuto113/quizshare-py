@@ -1320,12 +1320,41 @@ def api_contact_new():
         return jsonify(ok=False, error='長すぎます'), 400
     import hashlib as _h
     ip = request.headers.get('X-Forwarded-For', request.remote_addr or '').split(',')[0]
+
+    iph = _h.sha256(ip.encode()).hexdigest()[:16]
+
+    # 連打を防ぐ（1分に2件まで）
+    try:
+        from qz_common import rate_limit as _rl
+        if not _rl('contact:' + ip, 2):
+            return jsonify(ok=False,
+                error='送信が早すぎます。少し待ってください'), 429
+    except Exception:
+        pass
+
+    # 同じ相手から1時間に3件まで。DBの記録で数える。
+    c0 = _db()
+    mine = c0.execute("SELECT COUNT(*) AS n FROM qz_contact WHERE ip_hash=? "
+                      "AND created_at > datetime('now','localtime','-1 hour')",
+                      (iph,)).fetchone()
+    c0.close()
+    if mine and mine['n'] >= 3:
+        return jsonify(ok=False,
+            error='送信が多すぎます。しばらく待ってから送ってください'), 429
+
+    # 全体の件数にも上限。DBが膨らんで容量を食い潰さないように。
+    c0 = _db()
+    tot = c0.execute("SELECT COUNT(*) AS n FROM qz_contact "
+                     "WHERE created_at > datetime('now','localtime','-1 day')").fetchone()
+    c0.close()
+    if tot and tot['n'] >= 200:
+        return jsonify(ok=False, error='受付が混み合っています。時間をおいてください'), 429
     c = _db()
     c.execute("""INSERT INTO qz_contact(kind,name,email,body,ip_hash)
                  VALUES(?,?,?,?,?)""",
               (d.get('kind') or 'question', (d.get('name') or '')[:60],
                (d.get('email') or '')[:200], body,
-               _h.sha256(ip.encode()).hexdigest()[:16]))
+               iph))
     c.commit(); c.close()
     return jsonify(ok=True)
 
