@@ -1,0 +1,271 @@
+<!-- ブロックでプログラムを組む画面。member.html の <div class="wrap"> の中に足す -->
+<div class="pane" id="p-block">
+  <h1>🧩 ブロックで つくる</h1>
+  <p class="lead">ブロックを ならべると、Python の コードに なります。
+    できたら「コードに する」を おして、つづきを 書いてみてください。</p>
+
+  <div class="blk-wrap">
+    <div class="blk-palette">
+      <div class="blk-cat">きほん</div>
+      <div class="blk-item" onclick="addBlk('print')">💬 かく</div>
+      <div class="blk-item" onclick="addBlk('var')">📦 いれる</div>
+      <div class="blk-item" onclick="addBlk('input')">⌨️ きく</div>
+
+      <div class="blk-cat">くりかえし</div>
+      <div class="blk-item" onclick="addBlk('for')">🔁 ◯かい くりかえす</div>
+      <div class="blk-item" onclick="addBlk('forlist')">📋 ひとつずつ</div>
+
+      <div class="blk-cat">もし</div>
+      <div class="blk-item" onclick="addBlk('if')">❓ もし …なら</div>
+      <div class="blk-item" onclick="addBlk('else')">↔️ そうでなければ</div>
+
+      <div class="blk-cat">けいさん</div>
+      <div class="blk-item" onclick="addBlk('calc')">🔢 けいさん</div>
+      <div class="blk-item" onclick="addBlk('random')">🎲 ランダム</div>
+
+      <div class="blk-cat">まとめ</div>
+      <div class="blk-item" onclick="addBlk('list')">📚 リスト</div>
+      <div class="blk-item" onclick="addBlk('wait')">⏱ まつ</div>
+      <div class="blk-item" onclick="addBlk('comment')"># メモ</div>
+    </div>
+
+    <div class="blk-main">
+      <div id="blkList" class="blk-list"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn cy" onclick="blkRun()">▶ うごかす</button>
+        <button class="btn" onclick="blkToCode()">📝 コードに する</button>
+        <button class="btn gh" onclick="blkClear()">ぜんぶ けす</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin:10px 0 4px">
+        できる コード</div>
+      <pre id="blkCode" class="blk-code"></pre>
+      <div class="out" id="blkOut" style="margin-top:10px">ここに 結果が 出ます</div>
+    </div>
+  </div>
+</div>
+
+<style>
+.blk-wrap{display:flex;gap:12px;align-items:flex-start}
+.blk-palette{width:182px;flex:none;background:#f7fafb;border:1px solid var(--line);
+  border-radius:11px;padding:10px;max-height:520px;overflow-y:auto}
+.blk-cat{font-size:10.5px;color:var(--muted);font-weight:700;
+  margin:10px 0 5px;letter-spacing:.05em}
+.blk-cat:first-child{margin-top:0}
+.blk-item{background:#fff;border:1px solid var(--line);border-radius:8px;
+  padding:8px 10px;font-size:12.5px;margin-bottom:5px;cursor:pointer;
+  transition:.12s;user-select:none}
+.blk-item:hover{border-color:var(--cy2);background:#f0fdff;transform:translateX(2px)}
+
+.blk-main{flex:1;min-width:0}
+.blk-list{min-height:230px;background:#fff;border:1px solid var(--line);
+  border-radius:11px;padding:12px}
+.blk{background:#eef9fc;border:1px solid #b8e8f2;border-left:4px solid var(--cy2);
+  border-radius:8px;padding:9px 11px;margin-bottom:7px;display:flex;
+  align-items:center;gap:7px;flex-wrap:wrap}
+.blk.lv1{margin-left:26px}
+.blk.lv2{margin-left:52px}
+.blk.kw-for{background:#fef6e7;border-color:#f5d9a0;border-left-color:#d97706}
+.blk.kw-if{background:#f4f0fd;border-color:#ddd2f7;border-left-color:#7c3aed}
+.blk.kw-com{background:#f0fdf4;border-color:#bbf7d0;border-left-color:#16a34a}
+.blk .lbl{font-size:12.5px;font-weight:600;white-space:nowrap}
+.blk input{padding:5px 9px;border:1px solid #cfe3ea;border-radius:6px;
+  font-size:12.5px;font-family:inherit;min-width:70px}
+.blk input.wide{flex:1;min-width:120px}
+.blk select{padding:5px 8px;border:1px solid #cfe3ea;border-radius:6px;font-size:12.5px}
+.blk .sp{flex:1}
+.blk .x{cursor:pointer;color:#9aa8b2;font-size:15px;padding:0 3px}
+.blk .x:hover{color:#dc2626}
+.blk .mv{cursor:pointer;color:#9aa8b2;font-size:13px;padding:0 2px}
+.blk .mv:hover{color:var(--cy2)}
+.blk-code{background:#0a1628;color:#cfe3ea;border-radius:10px;padding:13px;
+  font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;
+  line-height:1.65;overflow-x:auto;min-height:70px;margin:0;white-space:pre}
+.blk-empty{color:#9aa8b2;font-size:12.5px;text-align:center;padding:40px 0}
+@media(max-width:700px){
+  .blk-wrap{flex-direction:column}
+  .blk-palette{width:auto;max-height:150px}
+}
+</style>
+
+<script>
+/* ============ ブロックで つくる ============ */
+var BLK = [];
+var BLK_ID = 0;
+
+var BLK_DEF = {
+  print:   {lbl:'💬 かく', cls:'', f:['text|かく もじ|こんにちは']},
+  var:     {lbl:'📦 いれる', cls:'', f:['name|なまえ|kazu', 'val|なかみ|10']},
+  input:   {lbl:'⌨️ きく', cls:'', f:['name|なまえ|namae', 'ask|しつもん|なまえは？']},
+  for:     {lbl:'🔁 くりかえす', cls:'kw-for', f:['n|かいすう|5'], open:1},
+  forlist: {lbl:'📋 ひとつずつ', cls:'kw-for', f:['name|なまえ|x', 'list|リスト|kudamono'], open:1},
+  if:      {lbl:'❓ もし', cls:'kw-if', f:['cond|じょうけん|kazu > 5'], open:1},
+  else:    {lbl:'↔️ そうでなければ', cls:'kw-if', f:[], open:1},
+  calc:    {lbl:'🔢 けいさん', cls:'', f:['name|なまえ|kotae', 'expr|しき|1 + 2']},
+  random:  {lbl:'🎲 ランダム', cls:'', f:['name|なまえ|deta', 'from|から|1', 'to|まで|6']},
+  list:    {lbl:'📚 リスト', cls:'', f:['name|なまえ|kudamono', 'items|なかみ（コンマで）|りんご,みかん,ぶどう']},
+  wait:    {lbl:'⏱ まつ', cls:'', f:['sec|びょう|1']},
+  comment: {lbl:'# メモ', cls:'kw-com', f:['text|メモ|ここで なにを するか']}
+};
+
+function addBlk(type){
+  var d = BLK_DEF[type];
+  if (!d) return;
+  var v = {};
+  d.f.forEach(function(x){ var p = x.split('|'); v[p[0]] = p[2] || ''; });
+  BLK.push({id: ++BLK_ID, type: type, v: v, lv: 0});
+  drawBlk();
+}
+
+function drawBlk(){
+  var el = $('blkList');
+  if (!BLK.length){
+    el.innerHTML = '<div class="blk-empty">左から ブロックを えらんで ください</div>';
+    $('blkCode').textContent = '';
+    return;
+  }
+  el.innerHTML = BLK.map(function(b, i){
+    var d = BLK_DEF[b.type];
+    var fields = d.f.map(function(x){
+      var p = x.split('|');
+      var wide = (p[0] === 'text' || p[0] === 'expr' || p[0] === 'cond'
+                  || p[0] === 'items' || p[0] === 'ask');
+      return '<span style="font-size:11px;color:#7a8794">' + K(p[1]) + '</span>'
+        + '<input' + (wide ? ' class="wide"' : '') + ' value="' + K(b.v[p[0]] || '')
+        + '" oninput="BLK[' + i + '].v[\'' + p[0] + '\']=this.value;blkCode()">';
+    }).join('');
+    return '<div class="blk ' + d.cls + ' lv' + Math.min(b.lv, 2) + '">'
+      + '<span class="lbl">' + d.lbl + '</span>' + fields
+      + '<span class="sp"></span>'
+      + '<span class="mv" onclick="blkIndent(' + i + ',-1)" title="ひだりへ">◀</span>'
+      + '<span class="mv" onclick="blkIndent(' + i + ',1)" title="みぎへ">▶</span>'
+      + '<span class="mv" onclick="blkMove(' + i + ',-1)" title="うえへ">▲</span>'
+      + '<span class="mv" onclick="blkMove(' + i + ',1)" title="したへ">▼</span>'
+      + '<span class="x" onclick="blkDel(' + i + ')">×</span></div>';
+  }).join('');
+  blkCode();
+}
+
+function blkMove(i, d){
+  var j = i + d;
+  if (j < 0 || j >= BLK.length) return;
+  var t = BLK[i]; BLK[i] = BLK[j]; BLK[j] = t;
+  drawBlk();
+}
+function blkIndent(i, d){
+  BLK[i].lv = Math.max(0, Math.min(2, (BLK[i].lv || 0) + d));
+  drawBlk();
+}
+function blkDel(i){ BLK.splice(i, 1); drawBlk(); }
+function blkClear(){
+  if (BLK.length && !confirm('ぜんぶ けしますか？')) return;
+  BLK = []; drawBlk(); $('blkOut').textContent = '';
+}
+
+/* ブロックを Python の コードに する */
+function blkCode(){
+  var out = [], needRandom = false, needTime = false;
+  BLK.forEach(function(b){
+    var pad = '    '.repeat(b.lv || 0);
+    var v = b.v;
+    var line = '';
+    switch (b.type){
+      case 'print':
+        line = 'print("' + esc2q(v.text) + '")'; break;
+      case 'var':
+        line = v.name + ' = ' + lit(v.val); break;
+      case 'input':
+        line = v.name + ' = input("' + esc2q(v.ask) + '")'; break;
+      case 'for':
+        line = 'for i in range(' + (v.n || '5') + '):'; break;
+      case 'forlist':
+        line = 'for ' + (v.name || 'x') + ' in ' + (v.list || '[]') + ':'; break;
+      case 'if':
+        line = 'if ' + (v.cond || 'True') + ':'; break;
+      case 'else':
+        line = 'else:'; break;
+      case 'calc':
+        line = v.name + ' = ' + (v.expr || '0'); break;
+      case 'random':
+        needRandom = true;
+        line = v.name + ' = random.randint(' + (v.from || 1) + ', ' + (v.to || 6) + ')';
+        break;
+      case 'list':
+        var items = (v.items || '').split(',').map(function(x){
+          return '"' + esc2q(x.trim()) + '"'; }).filter(function(x){ return x !== '""'; });
+        line = v.name + ' = [' + items.join(', ') + ']'; break;
+      case 'wait':
+        needTime = true;
+        line = 'time.sleep(' + (v.sec || 1) + ')'; break;
+      case 'comment':
+        line = '# ' + (v.text || ''); break;
+    }
+    out.push(pad + line);
+  });
+  var head = [];
+  if (needRandom) head.push('import random');
+  if (needTime) head.push('import time');
+  if (head.length) head.push('');
+  var code = head.concat(out).join(String.fromCharCode(10));
+  $('blkCode').textContent = code || '（まだ ありません）';
+  return code;
+}
+
+function esc2q(s){
+  return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+function lit(s){
+  s = String(s == null ? '' : s).trim();
+  if (s === '') return '""';
+  if (/^-?[0-9]+(\.[0-9]+)?$/.test(s)) return s;         // かず
+  if (/^(True|False|None)$/.test(s)) return s;
+  if (/^[\[\{\(]/.test(s)) return s;                      // リストなど
+  if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(s)) return s;       // へんすうの なまえ
+  return '"' + esc2q(s) + '"';
+}
+
+/* ブロックの まま うごかす */
+async function blkRun(){
+  var code = blkCode();
+  if (!code || code === '（まだ ありません）') return;
+  var out = $('blkOut');
+  out.innerHTML = '';
+  try {
+    if (!PYO){
+      outWrite(out, 'Python を よういして います…');
+      PYO = await loadPyodide();
+    }
+    PYO.setStdout({batched: function(s){ outWrite(out, s); }});
+    PYO.setStderr({batched: function(s){ outWrite(out, s, 'e'); }});
+    setupInput();
+    out.innerHTML = '';
+    await PYO.runPythonAsync(code);
+    if (!out.innerHTML) outWrite(out, '（うごきました）', 'ok');
+  } catch(e){
+    outWrite(out, String(e).split(String.fromCharCode(10)).slice(-4)
+      .join(String.fromCharCode(10)), 'e');
+    var h = errHint(String(e));
+    if (h) outWrite(out, '💡 ' + h);
+  }
+}
+
+/* コードに して、いつもの エディタへ */
+function blkToCode(){
+  var code = blkCode();
+  if (!code || code === '（まだ ありません）'){
+    alert('まだ ブロックが ありません'); return;
+  }
+  if (!ME){ go('login'); return; }
+  APP = {id: null};
+  FILES = [{path: 'main.py', content: code + String.fromCharCode(10),
+            kind: 'py', is_entry: 1}];
+  TABLES = []; DB = {name: 'app.db', schema: '', seed: ''};
+  CUR = 0;
+  $('eTitle').value = 'ブロックで つくった プログラム';
+  $('eSummary').value = ''; $('eTags').value = 'はじめて';
+  $('eDiff').value = '1'; $('eDel').style.display = 'none';
+  $('eMsg').style.color = '#0e7490';
+  $('eMsg').textContent = 'ブロックから コードに しました。ここから 自由に 書きかえられます';
+  $('eOut').textContent = ''; $('preview').style.display = 'none';
+  pickFile(0, true); go('edit');
+}
+</script>
