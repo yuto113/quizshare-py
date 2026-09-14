@@ -104,6 +104,71 @@ label.lb{font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px}
 .mbox{background:#fff;border-radius:14px;padding:24px;max-width:520px;width:100%;
   max-height:86vh;overflow:auto}
 @media(max-width:600px){.wrap{padding:14px 12px 60px}.hero{padding:20px 18px}}
+
+.ide{display:flex;border:1px solid var(--line);border-radius:10px;
+  overflow:hidden;background:#fff;margin-top:4px}
+.ide .side{width:190px;flex:none;background:#f7fafb;border-right:1px solid var(--line);
+  padding:10px;overflow-y:auto;max-height:440px}
+.ide .main{flex:1;min-width:0;display:flex;flex-direction:column}
+.side-hd{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);
+  font-weight:700;margin-bottom:6px}
+.side-hd span{flex:1}
+.side-note{font-size:11.5px;color:#9aa8b2;padding:4px 6px}
+.ffolder{font-size:11.5px;color:var(--muted);padding:4px 6px;font-weight:600}
+.ffile{padding:5px 8px;border-radius:6px;cursor:pointer;display:flex;
+  align-items:center;gap:6px;white-space:nowrap;overflow:hidden;font-size:12.5px}
+.ffile:hover{background:#e8f4f7}
+.ffile.on{background:#cffafe;color:#0e7490;font-weight:600}
+.ffile .ic{flex:none;font-size:11px}
+.ffile.sub{padding-left:20px}
+.ffile .entry{font-size:9px;background:#0891b2;color:#fff;padding:1px 5px;
+  border-radius:99px;margin-left:auto}
+.ed-hd{display:flex;align-items:center;gap:7px;padding:7px 11px;
+  border-bottom:1px solid var(--line);background:#fbfdfe;font-size:12px}
+.ed-hd .sp{flex:1}
+.ed-hd>span:first-child{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:600}
+.code-wrap{position:relative;flex:1;min-height:360px;display:flex}
+.code-hl{position:absolute;inset:0;margin:0;padding:12px;overflow:auto;
+  font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;
+  white-space:pre-wrap;word-break:break-all;pointer-events:none;
+  background:#fff;tab-size:4;color:#0a1628}
+.code-hl code{font:inherit}
+.hl-com{color:#16a34a}
+.hl-str{color:#c2410c}
+.hl-kw{color:#7c3aed;font-weight:600}
+.hl-num{color:#0891b2}
+.hl-fn{color:#1d4ed8}
+.hl-tag{color:#be185d}
+.hl-attr{color:#a16207}
+.code2{position:relative;background:transparent;color:transparent;
+  caret-color:#0a1628;z-index:1;flex:1;min-height:360px;font-family:ui-monospace,Menlo,Consolas,monospace;
+  font-size:13px;line-height:1.6;padding:12px;border:none;resize:vertical;
+  tab-size:4;outline:none;width:100%}
+.com{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;
+  padding:11px 14px;margin-bottom:9px}
+.com .who{font-size:12px;color:#15803d;font-weight:600}
+.com .when{font-size:11px;color:#86a893;margin-left:6px;font-weight:400}
+.com .body{font-size:13px;line-height:1.75;white-space:pre-wrap;
+  margin-top:4px;color:#14532d}
+.com-form{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;
+  padding:12px 14px;margin-bottom:12px}
+.com-form textarea{width:100%;min-height:62px;padding:9px 11px;font-size:13px;
+  border:1px solid #bbf7d0;border-radius:8px;font-family:inherit;resize:vertical;
+  background:#fff}
+.com-btn{background:#16a34a;color:#fff;border:none;padding:7px 16px;
+  border-radius:8px;font-size:12.5px;cursor:pointer;font-family:inherit}
+.com-btn:hover{background:#15803d}
+@keyframes pop{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes fall{to{transform:translateY(105vh) rotate(680deg);opacity:.2}}
+body.furi{font-size:16.5px;line-height:1.9}
+body.furi .app .t{font-size:15px}
+body.furi .code2{font-size:14.5px}
+body.furi .lead{font-size:13.5px}
+@media(max-width:700px){
+  .ide{flex-direction:column}
+  .ide .side{width:auto;max-height:150px;border-right:none;
+    border-bottom:1px solid var(--line)}
+}
 </style></head><body>
 
 <div class="hd">
@@ -112,6 +177,9 @@ label.lb{font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px}
   <button id="nvHome" class="on" onclick="go('home')">みんなの作品</button>
   <button id="nvMine" onclick="go('mine')" style="display:none">自分の作品</button>
   <button id="nvEdit" onclick="newApp()" style="display:none">＋作る</button>
+  <button id="nvFavs" onclick="go('favs')" style="display:none">お気に入り</button>
+  <button id="nvNotice" onclick="go('notices')" style="display:none">🔔<span id="nvBadge"></span></button>
+  <button id="nvProf" onclick="openProfile()" style="display:none">設定</button>
   <button id="nvRules" onclick="go('rules')">きまり</button>
   <button id="nvLogin" onclick="go('login')">ログイン</button>
   <button id="nvOut" onclick="logout()" style="display:none">ログアウト</button>
@@ -133,13 +201,15 @@ label.lb{font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px}
     <div class="row">
       <input class="inp" id="qText" placeholder="さがす" style="flex:1;min-width:150px"
              onkeydown="if(event.key==='Enter')loadApps()">
-      <select class="sel" id="qSort" style="max-width:130px" onchange="loadApps()">
+      <select class="sel" id="qSort" style="max-width:150px" onchange="loadApps()">
         <option value="new">新しい順</option>
+        <option value="first">はじめての人</option>
         <option value="like">いいね順</option>
         <option value="view">見られた順</option>
       </select>
       <button class="btn gh sm" onclick="loadApps()">さがす</button>
     </div>
+    <div class="row" id="tagBar" style="margin-bottom:12px"></div>
     <div class="grid" id="appList"><div class="empty">読み込み中…</div></div>
   </div>
 
@@ -171,20 +241,80 @@ label.lb{font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px}
       <input class="inp" id="eTags" placeholder="タグ（ゲーム,計算）" style="max-width:190px">
     </div>
 
-    <div class="etabs" id="eTabs"></div>
-    <textarea class="code" id="eCode" spellcheck="false"></textarea>
+    <div class="ide">
+      <div class="side">
+        <div class="side-hd"><span>ファイル</span>
+          <button class="btn gh sm" onclick="showAdd()">＋</button></div>
+        <div id="fileTree"></div>
+        <div class="side-hd" style="margin-top:10px"><span>データベース</span>
+          <button class="btn gh sm" onclick="openDb()">開く</button></div>
+        <div id="dbInfo" class="side-note">なし</div>
+      </div>
+      <div class="main">
+        <div class="ed-hd">
+          <span id="edPath">main.py</span>
+          <span class="sp"></span>
+          <button class="btn gh sm" id="btnEntry" onclick="setEntry()">▶ 最初に動かす</button>
+          <button class="btn gh sm" onclick="renameFile()">名前をかえる</button>
+          <button class="btn gh sm" onclick="removeFile()">けす</button>
+        </div>
+        <div class="code-wrap">
+          <pre class="code-hl" id="eHl" aria-hidden="true"><code></code></pre>
+          <textarea class="code2" id="eCode" spellcheck="false"
+            oninput="hlSync()" onscroll="hlScroll()"></textarea>
+        </div>
+      </div>
+    </div>
 
     <div class="row" style="margin-top:11px">
       <button class="btn cy" onclick="runCode()">▶ うごかす</button>
+      <button class="btn gh" onclick="stepStart()">⏯ 1つずつ</button>
       <button class="btn gh" onclick="saveApp(false)">下書きに保存</button>
       <button class="btn" onclick="saveApp(true)">公開する</button>
+      <button class="btn gh sm" onclick="showVersions()">前のに もどす</button>
       <span class="sp" style="flex:1"></span>
-      <button class="btn gh sm" id="eDel" onclick="delApp()" style="display:none">削除</button>
+      <button class="btn gh sm" id="eDel" onclick="delApp()" style="display:none">作品を削除</button>
     </div>
     <div id="eMsg" style="font-size:12.5px;margin-top:6px"></div>
 
-    <iframe id="preview" sandbox="allow-scripts" style="display:none"></iframe>
+    <div id="stepBar" style="display:none;margin-top:11px;background:#f7fafb;
+      border:1px solid var(--line);border-radius:10px;padding:12px 14px">
+      <div class="row" style="margin-bottom:8px">
+        <b style="font-size:13px">1つずつ うごかす</b>
+        <span class="sp" style="flex:1"></span>
+        <button class="btn cy sm" onclick="stepNext()">▶ つぎへ</button>
+        <button class="btn gh sm" onclick="stepAll()">さいごまで</button>
+        <button class="btn gh sm" onclick="stepStop()">やめる</button>
+      </div>
+      <div id="stepCode" style="font-family:ui-monospace,Menlo,Consolas,monospace;
+        font-size:12.5px;background:#fff;border:1px solid var(--line);
+        border-radius:8px;padding:10px;max-height:170px;overflow:auto"></div>
+      <div style="font-size:11px;color:var(--muted);margin:9px 0 4px">
+        いまの へんすう</div>
+      <div id="stepVars" style="font-family:ui-monospace,Menlo,Consolas,monospace;
+        font-size:12px"></div>
+    </div>
+    <iframe id="preview" sandbox="allow-scripts allow-modals" style="display:none"></iframe>
     <div class="out" id="eOut">ここに結果が出ます</div>
+  </div>
+
+  <!-- お気に入り -->
+  <div class="pane" id="p-favs">
+    <h1>お気に入り</h1>
+    <p class="lead">☆を つけた 作品です。</p>
+    <div class="grid" id="favList"></div>
+  </div>
+
+  <!-- 通知 -->
+  <div class="pane" id="p-notices">
+    <h1>おしらせ</h1>
+    <div id="noticeList"></div>
+  </div>
+
+  <!-- 作った人 -->
+  <div class="pane" id="p-author">
+    <button class="btn gh sm" onclick="go('home')" style="margin-bottom:14px">← もどる</button>
+    <div id="authorBody"></div>
   </div>
 
   <!-- きまり -->
@@ -259,14 +389,26 @@ async function J(u,o){ var r=await fetch(u,o);
 function P(u,b){ return J(u,{method:'POST',headers:{'Content-Type':'application/json'},
                              body:JSON.stringify(b||{})}); }
 
+var URLS = {home:'/member', mine:'/member/mine', rules:'/member/rules',
+            login:'/member/login', edit:'/member/edit', view:null,
+            favs:'/member/favs', notices:'/member/notices', author:null};
+
+function setUrl(path){
+  if (path && location.pathname !== path)
+    history.pushState({}, '', path);
+}
+
 function go(p){
   document.querySelectorAll('.pane').forEach(function(x){ x.classList.toggle('on', x.id==='p-'+p); });
+  if (URLS[p]) setUrl(URLS[p]);
   document.querySelectorAll('.hd button').forEach(function(b){ b.classList.remove('on'); });
   var nv = {home:'nvHome', mine:'nvMine', rules:'nvRules', login:'nvLogin'}[p];
   if (nv && $(nv)) $(nv).classList.add('on');
   if (p==='home') loadApps();
   if (p==='mine') loadMine();
   if (p==='rules') loadRules();
+  if (p==='favs') loadFavs();
+  if (p==='notices') loadNotices();
   window.scrollTo(0,0);
 }
 
@@ -289,19 +431,22 @@ async function register(){
   if (!d.ok){ m.style.color='#c0453b'; m.textContent = d.error; return; }
   m.style.color='#0e7490';
   m.textContent = '会員になりました！公開できる作品は ' + d.limit + ' 個です';
-  await refreshMe(); setTimeout(function(){ go('rules'); }, 900);
+  await refreshMe(); gate(); setTimeout(function(){ go('rules'); }, 900);
 }
 async function login(){
   var d = await P('/api/mp/login', {member_id:$('lId').value.trim(), password:$('lPw').value});
   var m = $('lMsg');
   if (!d.ok){ m.style.color='#c0453b'; m.textContent = d.error; return; }
-  await refreshMe(); go('home');
+  await refreshMe(); gate();
 }
-async function logout(){ await P('/api/mp/logout'); ME=null; await refreshMe(); go('home'); }
+async function logout(){ await P('/api/mp/logout'); ME=null; await refreshMe(); gate(); }
 
 /* ---------- 一覧 ---------- */
 function appCard(a, mine){
   var D = ['','かんたん','ふつう','むずかしい'][a.difficulty||1];
+  var day = a.day_no ? '<span>はじめて' + a.day_no + '日目</span>' : '';
+  var fav = (!mine && ME) ? '<span onclick="toggleFav(' + a.id + ',event)" '
+      + 'style="cursor:pointer;margin-left:auto" title="お気に入り">☆</span>' : '';
   return '<div class="app" onclick="'+(mine?'editApp('+a.id+')':'viewApp('+a.id+')')+'">'
     + '<div class="t">'+K(a.title)+'</div>'
     + '<div class="s">'+K(a.summary||'')+'</div>'
@@ -311,15 +456,19 @@ function appCard(a, mine){
     + (a.tags ? K(a.tags).split(',').slice(0,2).map(function(t){
         return '<span class="tag">'+t.trim()+'</span>'; }).join('') : '')
     + '</div>'
-    + '<div class="m"><span>'+K(a.nickname||a.member_id)
+    + '<div class="m">'
+    + '<span onclick="viewAuthor(\''+K(a.member_id)+'\');event.stopPropagation()" '
+    + 'style="cursor:pointer;text-decoration:underline">'+K(a.nickname||a.member_id)
     + (a.grade ? '（'+K(a.grade)+'）' : '')+'</span>'
     + '<span>♡ '+(a.likes||0)+'</span><span>👁 '+(a.views||0)+'</span>'
-    + (a.forked_from ? '<span>🔀 コピー元あり</span>' : '') + '</div></div>';
+    + day + (a.forked_from ? '<span>🔀 コピー</span>' : '') + fav + '</div></div>';
 }
 async function loadApps(){
   var d = await J('/api/mp/apps?sort=' + $('qSort').value
-    + '&q=' + encodeURIComponent($('qText').value));
+    + '&q=' + encodeURIComponent($('qText').value)
+    + '&tag=' + encodeURIComponent(CURTAG));
   if (!d.ok) return;
+  loadTags();
   $('stApps').textContent = d.total_apps;
   $('stPeople').textContent = d.total_people;
   $('appList').innerHTML = d.apps.length
@@ -344,29 +493,64 @@ async function viewApp(id){
   var d = await J('/api/mp/app/' + id);
   if (!d.ok){ alert(d.error); return; }
   var a = d.app;
-  var langs = LANGS.filter(function(l){ return (a[l[0]]||'').trim(); });
+  var f = await J('/api/mp/app/' + id + '/files');
+  var files = (f.files || []);
+  var tb = await J('/api/mp/app/' + id + '/tables');
+  var tabs = (tb.ok ? tb.tables : []) || [];
+  var sql = tablesToSql(tabs);
+  var db = sql ? {name:'app.db', schema:sql, seed:''}
+               : ((f.dbs && f.dbs[0]) ? f.dbs[0] : null);
+
+  window.VIEW_APP = a;
+  window.VIEW_FILES = files;
+  window.VIEW_DB = db;
+
   $('viewBody').innerHTML =
-      '<h1>'+K(a.title)+'</h1>'
-    + '<p class="lead">'+K(a.nickname||a.member_id)+(a.grade?'（'+K(a.grade)+'）':'')
-    + ' · ♡'+a.likes+' · 👁'+a.views+'</p>'
-    + (a.summary ? '<div class="card">'+K(a.summary)+'</div>' : '')
+      '<h1>' + K(a.title) + '</h1>'
+    + '<p class="lead">' + K(a.nickname || a.member_id)
+    + (a.grade ? '（' + K(a.grade) + '）' : '')
+    + ' · ♡' + a.likes + ' · 👁' + a.views + '</p>'
+    + (a.summary ? '<div class="card">' + K(a.summary) + '</div>' : '')
     + '<div class="row">'
-    + '<button class="btn cy" onclick="runView('+id+')">▶ うごかす</button>'
-    + (ME ? '<button class="btn gh" onclick="like('+id+')">'+(a.liked?'♥ いいね済み':'♡ いいね')+'</button>'
-          + '<button class="btn gh" onclick="fork('+id+')">コピーして作る</button>'
-          + '<button class="btn gh sm" onclick="report('+id+')">通報</button>' : '')
+    + '<button class="btn cy" onclick="runView()">▶ うごかす</button>'
+    + (ME ? '<button class="btn gh" onclick="like(' + id + ')">'
+            + (a.liked ? '♥ いいね済み' : '♡ いいね') + '</button>'
+          + '<button class="btn gh" onclick="fork(' + id + ')">コピーして作る</button>'
+          + '<button class="btn gh sm" onclick="report(' + id + ')">通報</button>' : '')
+    + '<button class="btn gh sm" onclick="copyLink(\'' + K(a.member_id) + '\',' + id + ')">'
+    + '🔗 リンクをコピー</button>'
     + '</div>'
-    + '<iframe id="vPreview" sandbox="allow-scripts" style="width:100%;height:340px;'
+    + '<iframe id="vPreview" sandbox="allow-scripts allow-modals" style="width:100%;height:340px;'
     + 'border:1px solid var(--line);border-radius:10px;background:#fff;'
     + 'margin-top:11px;display:none"></iframe>'
     + '<div class="out" id="vOut">「うごかす」を押してください</div>'
-    + '<h2>コード</h2>'
-    + langs.map(function(l){
-        return '<div class="card"><b style="font-size:12px;color:var(--muted)">'+l[1]+'</b>'
+    + '<h2>コメント</h2><div id="comBox"></div>'
+    + '<h2>ファイル</h2>'
+    + (files.length
+        ? files.map(function(x){
+            return '<div class="card"><b style="font-family:ui-monospace,monospace;'
+              + 'font-size:12px;color:var(--muted)">' + fileIcon(x.path) + ' '
+              + K(x.path) + (x.is_entry ? ' <span class="tag">最初に動く</span>' : '')
+              + '</b><pre style="font-family:ui-monospace,monospace;font-size:12.5px;'
+              + 'white-space:pre-wrap;margin-top:7px;overflow-x:auto">'
+              + K(x.content) + '</pre></div>'; }).join('')
+        : '<div class="empty">ファイルがありません</div>')
+    + (db && (db.schema || db.seed)
+        ? '<h2>データベース（' + K(db.name) + '）</h2><div class="card">'
           + '<pre style="font-family:ui-monospace,monospace;font-size:12.5px;'
-          + 'white-space:pre-wrap;margin-top:7px">'+K(a[l[0]])+'</pre></div>'; }).join('');
-  window.VIEW_APP = a;
+          + 'white-space:pre-wrap">' + K((db.schema||'') + '\n' + (db.seed||'')) + '</pre></div>'
+        : '');
   go('view');
+  setUrl('/member/program/' + a.member_id + '/' + id);
+  loadComments(id);
+}
+function copyLink(author, id){
+  var url = location.origin + '/member/program/' + author + '/' + id;
+  if (navigator.clipboard){
+    navigator.clipboard.writeText(url).then(function(){ alert('コピーしました\n' + url); });
+  } else {
+    prompt('このリンクを コピーしてください', url);
+  }
 }
 async function like(id){ var d = await P('/api/mp/app/'+id+'/like'); if (d.ok) viewApp(id); }
 async function fork(id){
@@ -383,60 +567,6 @@ async function report(id){
 }
 
 /* ---------- エディタ ---------- */
-function drawTabs(){
-  $('eTabs').innerHTML = LANGS.map(function(l){
-    return '<button class="etab'+(l[0]===LANG?' on':'')+'" onclick="setLang(\''+l[0]+'\')">'
-      + l[1] + ((SRC[l[0]]||'').trim() ? '<span class="dot"></span>' : '') + '</button>';
-  }).join('');
-}
-function setLang(l){ SRC[LANG] = $('eCode').value; LANG = l;
-  $('eCode').value = SRC[l] || ''; drawTabs(); }
-function newApp(){
-  if (!ME){ go('login'); return; }
-  APP = {id:null};
-  SRC = {code:'# ここに Python を書いてみよう\nprint("こんにちは")\n', html:'', css:'', js:'', sql:''};
-  LANG = 'code';
-  ['eTitle','eSummary','eTags'].forEach(function(i){ $(i).value=''; });
-  $('eDiff').value = '1'; $('eDel').style.display='none';
-  $('eCode').value = SRC.code; $('eMsg').textContent=''; $('eOut').textContent='';
-  $('preview').style.display='none';
-  drawTabs(); go('edit');
-}
-async function editApp(id){
-  var d = await J('/api/mp/app/'+id);
-  if (!d.ok){ alert(d.error); return; }
-  var a = d.app;
-  APP = {id:a.id};
-  SRC = {code:a.code||'', html:a.html||'', css:a.css||'', js:a.js||'', sql:a.sql||''};
-  LANG = 'code';
-  $('eTitle').value=a.title; $('eSummary').value=a.summary||'';
-  $('eTags').value=a.tags||''; $('eDiff').value=String(a.difficulty||1);
-  $('eCode').value=SRC.code; $('eDel').style.display='';
-  $('eMsg').textContent = a.status==='published' ? '公開中' : '下書き';
-  drawTabs(); go('edit');
-}
-async function saveApp(pub, confirmed){
-  SRC[LANG] = $('eCode').value;
-  var body = Object.assign({}, SRC, {
-    id:APP.id, title:$('eTitle').value.trim(), summary:$('eSummary').value.trim(),
-    tags:$('eTags').value.trim(), difficulty:parseInt($('eDiff').value),
-    publish:pub, confirmed:confirmed});
-  var d = await P('/api/mp/app', body);
-  var m = $('eMsg');
-  if (!d.ok){
-    m.style.color = '#c0453b';
-    m.textContent = d.error;
-    if (d.need_agree){ setTimeout(function(){ go('rules'); }, 1200); }
-    if (d.need_confirm && confirm(d.error + '\n\nそれでも公開しますか？')){
-      saveApp(pub, true);
-    }
-    return;
-  }
-  APP.id = d.id; $('eDel').style.display='';
-  m.style.color = '#0e7490';
-  m.textContent = d.status==='published' ? '公開しました' : '下書きに保存しました';
-  await refreshMe();
-}
 async function delApp(){
   if (!APP.id || !confirm('この作品を削除しますか？')) return;
   var d = await P('/api/mp/app/'+APP.id+'/delete');
@@ -451,38 +581,7 @@ function outWrite(el, s, cls){
   el.appendChild(d);
 }
 
-async function runAny(src, outEl, frameEl){
-  outEl.innerHTML = '';
-  if ((src.html||'').trim() || (src.css||'').trim() || (src.js||'').trim()){
-    frameEl.style.display = '';
-    frameEl.srcdoc =
-        '<style>body{font-family:sans-serif;padding:12px}' + (src.css||'') + '</style>'
-      + (src.html || '')
-      + '<script>try{' + (src.js||'') + '}catch(e){document.body.innerHTML+='
-      + '"<pre style=color:red>"+e+"</pre>"}<\/script>';
-    outWrite(outEl, '画面に表示しました', 'ok');
-  } else {
-    frameEl.style.display = 'none';
-  }
-  if ((src.sql||'').trim()) await runSql(src.sql, outEl);
-  if ((src.code||'').trim()) await runPy(src.code, outEl);
-  if (!outEl.innerHTML) outWrite(outEl, '（何も書かれていません）');
-}
 
-async function runPy(code, outEl){
-  outWrite(outEl, '── Python ──');
-  try {
-    if (!PYO){
-      outWrite(outEl, 'Python を用意しています…（初回だけ時間がかかります）');
-      PYO = await loadPyodide();
-    }
-    PYO.setStdout({batched:function(s){ outWrite(outEl, s); }});
-    PYO.setStderr({batched:function(s){ outWrite(outEl, s, 'e'); }});
-    await PYO.runPythonAsync(code);
-  } catch(e){
-    outWrite(outEl, String(e).split('\n').slice(-4).join('\n'), 'e');
-  }
-}
 
 async function runSql(sql, outEl){
   outWrite(outEl, '── SQL ──');
@@ -505,10 +604,19 @@ async function runSql(sql, outEl){
   }
 }
 
-function runCode(){ SRC[LANG] = $('eCode').value; runAny(SRC, $('eOut'), $('preview')); }
-function runView(){ var a = window.VIEW_APP;
-  runAny({code:a.code,html:a.html,css:a.css,js:a.js,sql:a.sql},
-         $('vOut'), $('vPreview')); }
+/* 書いたものが消えないように、ブラウザに残しておく */
+function restore(){
+  try {
+    var d = JSON.parse(localStorage.getItem('mp_draft') || 'null');
+    if (!d || Date.now() - d.at > 86400000) return null;   // 1日で捨てる
+    return d;
+  } catch(e){ return null; }
+}
+function clearStash(){ try { localStorage.removeItem('mp_draft'); } catch(e){} }
+setInterval(stash, 15000);
+window.addEventListener('beforeunload', stash);
+document.addEventListener('visibilitychange', stash);
+
 
 /* ---------- きまり ---------- */
 async function loadRules(){
@@ -552,18 +660,1218 @@ async function saveNick(){
   if (!d.ok){ $('nkMsg').textContent = d.error; return; }
   $('modal').classList.remove('on');
   await refreshMe();
-  loadApps();
+  go('home');
 }
 
 // 会員でなければ、ログイン画面だけを見せる
 function gate(){
   var inside = !!ME;
-  ['nvHome','nvMine','nvEdit','nvRules'].forEach(function(i){
+  ['nvHome','nvMine','nvEdit','nvRules','nvFavs','nvNotice','nvProf'].forEach(function(i){
     if ($(i)) $(i).style.display = inside ? '' : 'none'; });
+  if (inside) checkNotices();
   $('nvLogin').style.display = inside ? 'none' : '';
   $('nvOut').style.display = inside ? '' : 'none';
-  if (!inside) go('login'); else go('home');
+  if (!inside){ go('login'); return; }
+  if (ME.need_nick){ askNick(); return; }
+  go('home');
 }
 
-refreshMe().then(gate);
+
+
+
+
+
+
+
+
+
+/* ============ input() を つかえるように する ============ */
+function setupInput(){
+  if (!PYO) return;
+  // ブラウザの 入力まどを Python の input() に つなぐ
+  PYO.setStdin({
+    stdin: function(){
+      var v = window.prompt('入力してください');
+      return (v === null ? '' : v) + String.fromCharCode(10);
+    }
+  });
+}
+
+/* ============ 1つずつ うごかす ============ */
+var STEP = {parts:[], at:0, on:false};
+
+/* Python を「かたまり」に わける。
+   for や def の 中身は ひとまとまりに する。 */
+function splitPy(code){
+  var lines = code.split(String.fromCharCode(10));
+  var parts = [], buf = [], baseIndent = null;
+  function flush(){
+    if (buf.length){
+      var t = buf.join(String.fromCharCode(10));
+      if (t.trim()) parts.push({code:t, line:buf.lineNo});
+      buf = []; buf.lineNo = 0;
+    }
+  }
+  buf.lineNo = 0;
+  for (var i = 0; i < lines.length; i++){
+    var l = lines[i];
+    var t = l.trim();
+    if (!t || t.charAt(0) === '#'){
+      if (!buf.length) continue;
+    }
+    var indent = l.length - l.replace(/^\s+/, '').length;
+    if (buf.length === 0){
+      buf.lineNo = i + 1;
+      buf.push(l);
+      baseIndent = indent;
+      continue;
+    }
+    // 前の行より 下がって いれば、同じ かたまり
+    if (indent > baseIndent || (t && l.match(/^\s/) && indent > 0)){
+      buf.push(l);
+    } else {
+      flush();
+      buf.lineNo = i + 1;
+      buf.push(l);
+      baseIndent = indent;
+    }
+  }
+  flush();
+  return parts;
+}
+
+async function stepStart(){
+  if (FILES[CUR]) FILES[CUR].content = $('eCode').value;
+  var pys = FILES.filter(function(f){ return f.kind === 'py'; });
+  var ep = pys.filter(function(f){ return f.is_entry; })[0] || pys[0];
+  if (!ep){ alert('Python の ファイルが ありません'); return; }
+
+  $('eOut').innerHTML = '';
+  outWrite($('eOut'), 'Python を よういして います…');
+  try {
+    if (!PYO) PYO = await loadPyodide();
+  } catch(e){ outWrite($('eOut'), String(e), 'e'); return; }
+
+  PYO.setStdout({batched:function(x){ outWrite($('eOut'), x); }});
+  PYO.setStderr({batched:function(x){ outWrite($('eOut'), x, 'e'); }});
+
+  // ファイルを おいて、まっさらな ところから はじめる
+  try { PYO.FS.mkdir('/work'); } catch(e){}
+  FILES.forEach(function(f){
+    var ps = f.path.split('/'), dir = '/work';
+    for (var i = 0; i < ps.length - 1; i++){
+      dir += '/' + ps[i];
+      try { PYO.FS.mkdir(dir); } catch(e){}
+    }
+    try { PYO.FS.writeFile('/work/' + f.path, f.content); } catch(e){}
+  });
+  await PYO.runPythonAsync(
+    'import sys, os' + String.fromCharCode(10) +
+    'os.chdir("/work")' + String.fromCharCode(10) +
+    'if "/work" not in sys.path: sys.path.insert(0, "/work")' + String.fromCharCode(10) +
+    '_mp_env = {}' + String.fromCharCode(10));
+  setupInput();
+
+  STEP.parts = splitPy(ep.content);
+  STEP.at = 0;
+  STEP.on = true;
+  $('stepBar').style.display = '';
+  $('eOut').innerHTML = '';
+  outWrite($('eOut'), '「つぎへ」を おすと、1つずつ うごきます', 'ok');
+  drawStep();
+}
+
+function drawStep(){
+  $('stepCode').innerHTML = STEP.parts.map(function(p, i){
+    var done = i < STEP.at, now = i === STEP.at;
+    return '<div style="padding:2px 6px;border-radius:4px;white-space:pre;'
+      + (now ? 'background:#cffafe;font-weight:600;' : '')
+      + (done ? 'opacity:.45;' : '') + '">'
+      + (now ? '▶ ' : '  ') + K(p.code) + '</div>';
+  }).join('') || '<div style="color:#9aa8b2">なにも ありません</div>';
+  var el = $('stepCode').querySelector('div[style*="cffafe"]');
+  if (el) el.scrollIntoView({block:'nearest'});
+}
+
+async function stepNext(){
+  if (!STEP.on) return;
+  if (STEP.at >= STEP.parts.length){
+    outWrite($('eOut'), '── さいごまで いきました ──', 'ok');
+    stepStop(); return;
+  }
+  var p = STEP.parts[STEP.at];
+  try {
+    await PYO.runPythonAsync(p.code);
+  } catch(e){
+    outWrite($('eOut'), String(e).split(String.fromCharCode(10)).slice(-4)
+      .join(String.fromCharCode(10)), 'e');
+    var h = errHint(String(e));
+    if (h) outWrite($('eOut'), '💡 ' + h);
+    stepStop(); return;
+  }
+  STEP.at++;
+  drawStep();
+  await showVars();
+}
+
+async function stepAll(){
+  while (STEP.on && STEP.at < STEP.parts.length){
+    await stepNext();
+  }
+}
+
+function stepStop(){
+  STEP.on = false;
+  $('stepBar').style.display = 'none';
+}
+
+async function showVars(){
+  try {
+    var js = await PYO.runPythonAsync(
+      'import json' + String.fromCharCode(10) +
+      '_o = {}' + String.fromCharCode(10) +
+      'for _k, _v in list(globals().items()):' + String.fromCharCode(10) +
+      '    if _k.startswith("_") or _k in ("sys","os","json"): continue' + String.fromCharCode(10) +
+      '    if callable(_v) or type(_v).__name__ == "module": continue' + String.fromCharCode(10) +
+      '    try: _o[_k] = str(_v)[:120]' + String.fromCharCode(10) +
+      '    except Exception: pass' + String.fromCharCode(10) +
+      'json.dumps(_o, ensure_ascii=False)' + String.fromCharCode(10));
+    var vars = JSON.parse(js);
+    var keys = Object.keys(vars);
+    $('stepVars').innerHTML = keys.length
+      ? '<table style="width:100%;border-collapse:collapse">'
+        + keys.map(function(k){
+            return '<tr><td style="padding:3px 8px;color:#0891b2;font-weight:600;'
+              + 'white-space:nowrap">' + K(k) + '</td>'
+              + '<td style="padding:3px 8px;border-bottom:1px solid #eef3f5;'
+              + 'word-break:break-all">' + K(vars[k]) + '</td></tr>'; }).join('')
+        + '</table>'
+      : '<span style="color:#9aa8b2">まだ ありません</span>';
+  } catch(e){
+    $('stepVars').innerHTML = '<span style="color:#9aa8b2">見られません</span>';
+  }
+}
+
+/* エラーの ヒント（よくある ものだけ） */
+function errHint(e){
+  var H = [
+    ['SyntaxError', '書き方が ちがうみたいです。かっこの 閉じわすれや、コロン（:）の つけわすれを 見てみて。'],
+    ['IndentationError', '行の あたまの スペースが そろって いません。'],
+    ['NameError', 'その 名前は まだ ありません。つづりの まちがいか、先に つくり忘れて いないか 見てみて。'],
+    ['ZeroDivisionError', '0 で わることは できません。'],
+    ['IndexError', 'ならびの 番号が おおきすぎます。0 から はじまることに 気を つけて。'],
+    ['KeyError', 'その 名前の データは まだ 入って いません。'],
+    ['TypeError', 'もじ と かず が まざって いるかも。str() や int() で そろえて みて。'],
+    ['ValueError', 'かずに できない もじを、かずに しようと して います。'],
+    ['ModuleNotFoundError', 'その ぶひんは ここでは 使えません。ファイル名も 見てみて。'],
+    ['AttributeError', 'その ものに、その はたらきは ありません。'],
+    ['RecursionError', 'じぶんを よびつづけて います。とまる ところを つくって。']
+  ];
+  for (var i = 0; i < H.length; i++){
+    if (e.indexOf(H[i][0]) >= 0) return H[i][1];
+  }
+  return null;
+}
+
+
+
+
+/* ============ あぶない書き方を みつける ============ */
+var RISKS = [
+  [/while\s+True\s*:(?![\s\S]{0,400}?\b(break|return)\b)/,
+   'while True: のなかに break が ないみたいです。'
+   + 'ずっと 止まらなくなるので、if …: break を 入れてください。'],
+  [/while\s*\(\s*true\s*\)(?![\s\S]{0,400}?\bbreak\b)/i,
+   'while(true) のなかに break が ないみたいです。ブラウザが 固まります。'],
+  [/\btime\.sleep\s*\(\s*([1-9][0-9]|[0-9]{3,})/,
+   'time.sleep() が ながすぎます。そのあいだ 画面が 止まって見えます。'],
+  [/\bimport\s+requests\b/,
+   'requests は ここでは 使えません。よそのサイトには つなげない ようにして あります。'],
+  [/\bimport\s+(tkinter|turtle)\b/,
+   'その ぶひんは ブラウザでは 使えません。HTML と JavaScript で 絵を かいてみて。'],
+  [/\bimport\s+(threading|multiprocessing|subprocess)\b/,
+   'その ぶひんは ブラウザでは 使えません。'],
+  [/\bos\.system\s*\(/,
+   'コマンドは 実行できません。'],
+  [/\bfor\s+\w+\s+in\s+range\s*\(\s*[0-9]{7,}/,
+   'くりかえしが おおすぎます。100万回を こえると とても 遅くなります。']
+];
+
+function checkRisk(files){
+  var found = [];
+  files.forEach(function(f){
+    if (f.kind !== 'py' && f.kind !== 'js') return;
+    RISKS.forEach(function(r){
+      if (r[0].test(f.content) && found.indexOf(r[1]) < 0) found.push(r[1]);
+    });
+  });
+  return found;
+}
+/* ============ 色を つける（コメントは みどり） ============ */
+var PY_KW = ['and','as','assert','async','await','break','class','continue','def',
+  'del','elif','else','except','False','finally','for','from','global','if','import',
+  'in','is','lambda','None','nonlocal','not','or','pass','raise','return','True',
+  'try','while','with','yield'];
+var JS_KW = ['var','let','const','function','return','if','else','for','while','do',
+  'break','continue','new','this','class','extends','try','catch','finally','throw',
+  'typeof','instanceof','null','undefined','true','false','async','await','of','in'];
+
+function esc(t){
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function hlCode(text, kind){
+  var out = '';
+  var i = 0, n = text.length;
+  var kw = (kind === 'py') ? PY_KW : JS_KW;
+  var comLine = (kind === 'py') ? '#' : '//';
+
+  while (i < n){
+    var ch = text[i];
+
+    // コメント（行のおわりまで）
+    if (kind === 'py' && ch === '#'){
+      var e = text.indexOf(String.fromCharCode(10), i);
+      if (e < 0) e = n;
+      out += '<span class="hl-com">' + esc(text.slice(i, e)) + '</span>';
+      i = e; continue;
+    }
+    if ((kind === 'js' || kind === 'css') && ch === '/' && text[i+1] === '/'){
+      var e2 = text.indexOf(String.fromCharCode(10), i);
+      if (e2 < 0) e2 = n;
+      out += '<span class="hl-com">' + esc(text.slice(i, e2)) + '</span>';
+      i = e2; continue;
+    }
+    if (ch === '/' && text[i+1] === '*'){
+      var e3 = text.indexOf('*/', i);
+      e3 = (e3 < 0) ? n : e3 + 2;
+      out += '<span class="hl-com">' + esc(text.slice(i, e3)) + '</span>';
+      i = e3; continue;
+    }
+    if (kind === 'html' && text.slice(i, i+4) === '<!--'){
+      var e4 = text.indexOf('-->', i);
+      e4 = (e4 < 0) ? n : e4 + 3;
+      out += '<span class="hl-com">' + esc(text.slice(i, e4)) + '</span>';
+      i = e4; continue;
+    }
+    if (kind === 'sql' && ch === '-' && text[i+1] === '-'){
+      var e5 = text.indexOf(String.fromCharCode(10), i);
+      if (e5 < 0) e5 = n;
+      out += '<span class="hl-com">' + esc(text.slice(i, e5)) + '</span>';
+      i = e5; continue;
+    }
+
+    // 文字列
+    if (ch === '"' || ch === "'" || ch === '`'){
+      var q = ch, j = i + 1;
+      while (j < n && text[j] !== q){
+        if (text[j] === String.fromCharCode(92)) j++;
+        j++;
+      }
+      out += '<span class="hl-str">' + esc(text.slice(i, j + 1)) + '</span>';
+      i = j + 1; continue;
+    }
+
+    // HTML のタグ
+    if (kind === 'html' && ch === '<'){
+      var e6 = text.indexOf('>', i);
+      e6 = (e6 < 0) ? n : e6 + 1;
+      out += '<span class="hl-tag">' + esc(text.slice(i, e6)) + '</span>';
+      i = e6; continue;
+    }
+
+    // かず
+    if (/[0-9]/.test(ch) && !/[A-Za-z_]/.test(text[i-1] || '')){
+      var j2 = i;
+      while (j2 < n && /[0-9._]/.test(text[j2])) j2++;
+      out += '<span class="hl-num">' + esc(text.slice(i, j2)) + '</span>';
+      i = j2; continue;
+    }
+
+    // ことば
+    if (/[A-Za-z_]/.test(ch)){
+      var j3 = i;
+      while (j3 < n && /[A-Za-z0-9_]/.test(text[j3])) j3++;
+      var w = text.slice(i, j3);
+      if (kw.indexOf(w) >= 0){
+        out += '<span class="hl-kw">' + esc(w) + '</span>';
+      } else if (text[j3] === '('){
+        out += '<span class="hl-fn">' + esc(w) + '</span>';
+      } else {
+        out += esc(w);
+      }
+      i = j3; continue;
+    }
+
+    out += esc(ch);
+    i++;
+  }
+  return out;
+}
+
+function hlSync(){
+  var el = $('eHl');
+  if (!el) return;
+  var f = FILES[CUR];
+  var kind = f ? f.kind : 'py';
+  if (['py','js','html','css','sql'].indexOf(kind) < 0) kind = 'txt';
+  var t = $('eCode').value;
+  el.querySelector('code').innerHTML =
+    (kind === 'txt') ? esc(t) : hlCode(t, kind);
+  hlScroll();
+}
+
+function hlScroll(){
+  var a = $('eCode'), b = $('eHl');
+  if (a && b){ b.scrollTop = a.scrollTop; b.scrollLeft = a.scrollLeft; }
+}
+
+/* ============ コメント ============ */
+async function loadComments(aid){
+  var el = $('comBox');
+  if (!el) return;
+  var d = await J('/api/mp/app/' + aid + '/comments');
+  if (!d.ok){ el.innerHTML = '<div class="empty">' + K(d.error) + '</div>'; return; }
+  var form = ME
+    ? '<div class="com-form">'
+      + '<textarea id="comBody" maxlength="400" '
+      + 'placeholder="ここが いいね、こうしたら もっと よくなるかも…"></textarea>'
+      + '<div class="row" style="margin:8px 0 0">'
+      + '<button class="com-btn" onclick="sendComment(' + aid + ')">おくる</button>'
+      + '<span style="font-size:11.5px;color:#86a893">'
+      + '本名や 住所は 書かないでください</span>'
+      + '<span class="sp" style="flex:1"></span>'
+      + '<span id="comMsg" style="font-size:12px"></span></div></div>'
+    : '';
+  el.innerHTML = form + (d.comments.length
+    ? d.comments.map(function(x){
+        var mine = ME && (ME.member_id === x.member_id);
+        var can = mine || d.is_owner;
+        return '<div class="com"><div class="who">'
+          + '<span style="cursor:pointer;text-decoration:underline" '
+          + 'onclick="viewAuthor(\'' + K(x.member_id) + '\')">'
+          + K(x.nickname || x.member_id) + '</span>'
+          + '<span class="when">' + K(x.created_at) + '</span>'
+          + (can ? '<button class="btn gh sm" style="float:right" '
+              + 'onclick="hideComment(' + x.id + ',' + aid + ')">けす</button>' : '')
+          + '</div><div class="body">' + K(x.body) + '</div></div>';
+      }).join('')
+    : '<div class="empty" style="padding:22px 0">まだ コメントは ありません</div>');
+}
+
+async function sendComment(aid){
+  var t = $('comBody').value.trim();
+  if (!t){ return; }
+  var d = await P('/api/mp/app/' + aid + '/comments', {body:t});
+  var m = $('comMsg');
+  if (!d.ok){ m.style.color = '#c0453b'; m.textContent = d.error; return; }
+  $('comBody').value = '';
+  loadComments(aid);
+}
+
+async function hideComment(cid, aid){
+  if (!confirm('この コメントを けしますか？')) return;
+  var d = await P('/api/mp/comment/' + cid + '/hide');
+  if (!d.ok){ alert(d.error); return; }
+  loadComments(aid);
+}
+
+/* ============ みんなで書けるデータ（Python用） ============ */
+var MIRAI_PY = [
+'"""みんなで つかえる データの ひきだし。',
+'',
+'つかいかた:',
+'    import mirai',
+'    mirai.add("zukan", namae="カブトムシ", basho="森")',
+'    for row in mirai.all("zukan"):',
+'        print(row["namae"])',
+'"""',
+'import json as _json',
+'from pyodide.http import open_url as _open',
+'import js as _js',
+'',
+'_APP = _mp_appid',
+'',
+'',
+'def all(table):',
+'    """その ひょうの データを ぜんぶ 読む"""',
+'    u = "/api/mp/app/%d/data/%s" % (_APP, table)',
+'    d = _json.loads(_open(u).read())',
+'    if not d.get("ok"):',
+'        raise RuntimeError(d.get("error", "よめませんでした"))',
+'    return [r["vals"] for r in d["rows"]]',
+'',
+'',
+'def rows(table):',
+'    """だれが 書いたかも いっしょに 読む"""',
+'    u = "/api/mp/app/%d/data/%s" % (_APP, table)',
+'    d = _json.loads(_open(u).read())',
+'    return d.get("rows", [])',
+'',
+'',
+'def add(table, **vals):',
+'    """データを 1つ ふやす"""',
+'    r = _js.mpAddData(_APP, table, _json.dumps(vals))',
+'    d = _json.loads(r)',
+'    if not d.get("ok"):',
+'        raise RuntimeError(d.get("error", "かけませんでした"))',
+'    return d.get("id")',
+'',
+'',
+'def count(table):',
+'    """いくつ あるか"""',
+'    return len(all(table))',
+''].join(String.fromCharCode(10));
+
+window.mpAddData = function(appId, table, valsJson){
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/mp/app/' + appId + '/data/' + table, false);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  try {
+    xhr.send(JSON.stringify({vals: JSON.parse(valsJson)}));
+    return xhr.responseText;
+  } catch(e){
+    return JSON.stringify({ok:false, error:String(e)});
+  }
+};
+
+/* ============ 最初に動かすファイルを決める ============ */
+function setEntry(){
+  var f = FILES[CUR];
+  if (!f) return;
+  if (f.is_entry){
+    alert(f.path + ' は もう「最初に動かす」に なっています');
+    return;
+  }
+  // 同じ しゅるいの 中で 1つだけ
+  FILES.forEach(function(x){ if (x.kind === f.kind) x.is_entry = 0; });
+  f.is_entry = 1;
+  drawTree(); updateEntryBtn();
+  var name = {py:'Python', html:'HTML'}[f.kind] || f.kind;
+  $('eMsg').style.color = '#0e7490';
+  $('eMsg').textContent = '「うごかす」を おすと、' + name + ' は '
+    + f.path + ' から はじまります';
+}
+
+function updateEntryBtn(){
+  var b = $('btnEntry'), f = FILES[CUR];
+  if (!b || !f) return;
+  var can = (f.kind === 'py' || f.kind === 'html');
+  b.style.display = can ? '' : 'none';
+  if (f.is_entry){
+    b.textContent = '▶ 最初に動く';
+    b.style.background = '#0891b2'; b.style.color = '#fff'; b.style.borderColor = '#0891b2';
+  } else {
+    b.textContent = '▶ 最初に動かす';
+    b.style.background = ''; b.style.color = ''; b.style.borderColor = '';
+  }
+}
+
+/* ============ できたよ！ ============ */
+function celebrate(){
+  var d = document.createElement('div');
+  d.style.cssText = 'position:fixed;inset:0;z-index:200;display:flex;'
+    + 'align-items:center;justify-content:center;pointer-events:none';
+  d.innerHTML = '<div style="background:#fff;border-radius:20px;padding:30px 40px;'
+    + 'text-align:center;box-shadow:0 12px 40px rgba(10,22,40,.25);'
+    + 'animation:pop .4s cubic-bezier(.2,1.4,.4,1)">'
+    + '<div style="font-size:52px">🎉</div>'
+    + '<div style="font-size:20px;font-weight:800;margin-top:6px">うごいた！</div>'
+    + '<div style="font-size:12.5px;color:#7a8794;margin-top:4px">'
+    + 'はじめて 動きました。この ちょうしで。</div></div>';
+  document.body.appendChild(d);
+  // 紙ふぶき
+  for (var i = 0; i < 40; i++){
+    var p = document.createElement('div');
+    var c = ['#22d3ee','#fbbf24','#f472b6','#86efac','#c4b5fd'][i % 5];
+    p.style.cssText = 'position:fixed;top:-14px;left:' + Math.random()*100 + '%;'
+      + 'width:9px;height:14px;background:' + c + ';z-index:201;pointer-events:none;'
+      + 'animation:fall ' + (1.6 + Math.random()*1.4) + 's linear ' + (Math.random()*0.5) + 's forwards';
+    document.body.appendChild(p);
+    setTimeout(function(x){ return function(){ x.remove(); }; }(p), 3400);
+  }
+  setTimeout(function(){ d.remove(); }, 2600);
+}
+
+async function reportRan(ok){
+  if (!ok || !APP.id) return;
+  var d = await P('/api/mp/app/' + APP.id + '/ran');
+  if (d.ok && d.first) celebrate();
+}
+
+/* ============ 自分の設定 ============ */
+function openProfile(){
+  if (!ME) return;
+  $('modalBody').innerHTML =
+      '<h1 style="font-size:18px;margin-bottom:4px">じぶんの せってい</h1>'
+    + '<p class="lead">本名は 書かないでください。</p>'
+    + '<label class="lb">ニックネーム</label>'
+    + '<input class="inp" id="pfNick" maxlength="20" value="' + K(ME.nickname||'')
+    + '" style="margin-bottom:11px">'
+    + '<div class="row">'
+    + '<div style="flex:1;min-width:110px"><label class="lb">学年</label>'
+    + '<input class="inp" id="pfGrade" placeholder="小5 / 中1" value="'
+    + K(ME.grade||'') + '"></div>'
+    + '<div style="flex:1;min-width:110px"><label class="lb">学校（任意）</label>'
+    + '<input class="inp" id="pfSchool" value="' + K(ME.school||'') + '"></div></div>'
+    + '<div class="card" style="margin-top:6px">'
+    + '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">'
+    + '<input type="checkbox" id="pfShowGrade"' + (ME.show_grade ? ' checked' : '') + '>'
+    + '<span><b>学年を みんなに 見せる</b>'
+    + '<div style="font-size:11.5px;color:var(--muted)">'
+    + '「小4が つくった」と 出ます。プログラミングは 大人だけの ものじゃない、と '
+    + '見せられます。いやなら オフのままで だいじょうぶです。</div></span></label></div>'
+    + '<div class="card">'
+    + '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">'
+    + '<input type="checkbox" id="pfFuri"' + (ME.furigana ? ' checked' : '') + '>'
+    + '<span><b>文字を 大きくする</b>'
+    + '<div style="font-size:11.5px;color:var(--muted)">'
+    + '読みやすく なります</div></span></label></div>'
+    + '<div class="row" style="margin-top:12px">'
+    + '<button class="btn" onclick="saveProfile()">ほぞん</button>'
+    + '<button class="btn gh" onclick="closeModal()">やめる</button>'
+    + '<span id="pfMsg" style="font-size:12.5px"></span></div>';
+  $('modal').classList.add('on');
+}
+
+async function saveProfile(){
+  var nick = $('pfNick').value.trim();
+  if (!nick){ $('pfMsg').style.color='#c0453b';
+    $('pfMsg').textContent='ニックネームを 入れてください'; return; }
+  var d = await P('/api/mp/profile', {
+    nickname: nick, grade: $('pfGrade').value.trim(),
+    school: $('pfSchool').value.trim(),
+    show_grade: $('pfShowGrade').checked,
+    furigana: $('pfFuri').checked});
+  if (!d.ok){ $('pfMsg').style.color='#c0453b'; $('pfMsg').textContent=d.error; return; }
+  closeModal();
+  await refreshMe();
+  if ($('p-home').classList.contains('on')) loadApps();
+}
+
+/* ============ セットA・B の画面 ============ */
+var CURTAG = '';
+
+async function loadTags(){
+  var d = await J('/api/mp/tags');
+  if (!d.ok) return;
+  var el = $('tagBar');
+  if (!d.tags.length){ el.innerHTML = ''; return; }
+  el.innerHTML = '<span style="font-size:11.5px;color:var(--muted)">タグ:</span>'
+    + '<button class="btn ' + (CURTAG===''?'':'gh') + ' sm" onclick="pickTag(\'\')">'
+    + 'ぜんぶ</button>'
+    + d.tags.map(function(t){
+        return '<button class="btn ' + (CURTAG===t.name?'':'gh') + ' sm" '
+          + 'onclick="pickTag(\'' + K(t.name) + '\')">' + K(t.name)
+          + ' <span style="opacity:.6">' + t.count + '</span></button>'; }).join('');
+}
+function pickTag(t){ CURTAG = t; loadApps(); }
+
+async function loadFavs(){
+  var d = await J('/api/mp/favs');
+  $('favList').innerHTML = (d.ok && d.apps.length)
+    ? d.apps.map(function(a){ return appCard(a, false); }).join('')
+    : '<div class="empty">まだ ありません。作品の ☆を おしてみてください。</div>';
+}
+
+async function toggleFav(id, ev){
+  if (ev) ev.stopPropagation();
+  var d = await P('/api/mp/app/' + id + '/fav');
+  if (!d.ok){ alert(d.error); return; }
+  if ($('p-favs').classList.contains('on')) loadFavs();
+  else if ($('p-view').classList.contains('on')) viewApp(id);
+  else loadApps();
+}
+
+async function loadNotices(){
+  var d = await J('/api/mp/notices');
+  if (!d.ok){ $('noticeList').innerHTML = '<div class="empty">' + K(d.error) + '</div>'; return; }
+  var LBL = {like:'♡ いいねが つきました', fork:'🔀 コピーされました',
+             featured:'⭐ 注目作品に えらばれました', comment:'💬 コメントが つきました'};
+  $('noticeList').innerHTML = d.notices.length
+    ? d.notices.map(function(n){
+        return '<div class="card" style="' + (n.is_read ? 'opacity:.6' : '') + '">'
+          + '<b>' + K(LBL[n.kind] || n.kind) + '</b>'
+          + (n.title ? '<div style="font-size:12.5px;margin-top:3px">'
+              + (n.app_id ? '<a href="#" onclick="viewApp(' + n.app_id
+                  + ');return false" style="color:var(--cy2)">' + K(n.title) + '</a>'
+                : K(n.title)) + '</div>' : '')
+          + '<div style="font-size:11.5px;color:var(--muted);margin-top:3px">'
+          + (n.actor_name ? K(n.actor_name) + ' · ' : '') + K(n.created_at) + '</div></div>';
+      }).join('')
+    : '<div class="empty">まだ おしらせは ありません</div>';
+  await P('/api/mp/notices/read');
+  updateBadge(0);
+}
+
+function updateBadge(n){
+  var b = $('nvBadge');
+  if (!b) return;
+  b.textContent = n > 0 ? ' ' + n : '';
+  b.style.cssText = n > 0
+    ? 'background:#dc2626;color:#fff;border-radius:99px;padding:1px 6px;font-size:10px;margin-left:3px'
+    : '';
+}
+
+async function checkNotices(){
+  if (!ME) return;
+  var d = await J('/api/mp/notices');
+  if (d.ok) updateBadge(d.unread);
+}
+
+async function viewAuthor(author){
+  var d = await J('/api/mp/u/' + author);
+  if (!d.ok){ alert(d.error); return; }
+  var a = d.author;
+  $('authorBody').innerHTML =
+      '<div class="hero"><h1>' + K(a.nickname) + '</h1>'
+    + '<p>' + (a.grade ? K(a.grade) + ' · ' : '')
+    + 'はじめて ' + a.days + '日目</p>'
+    + '<div class="stats">'
+    + '<div class="stat"><b>' + a.apps + '</b><span>作品</span></div>'
+    + '<div class="stat"><b>' + a.likes + '</b><span>もらった いいね</span></div>'
+    + '<div class="stat"><b>' + a.views + '</b><span>見られた</span></div>'
+    + '<div class="stat"><b>' + a.forked + '</b><span>コピーされた</span></div>'
+    + '</div></div>'
+    + '<div class="grid">'
+    + (d.apps.length ? d.apps.map(function(x){ return appCard(x, false); }).join('')
+                     : '<div class="empty">まだ 公開作品が ありません</div>')
+    + '</div>';
+  go('author');
+  setUrl('/member/u/' + author);
+}
+
+/* ============ ＋ボタン（ファイル / フォルダ / データベース） ============ */
+function showAdd(){
+  $('modalBody').innerHTML =
+      '<h1 style="font-size:18px;margin-bottom:12px">なにを 作りますか？</h1>'
+    + '<div class="card" style="cursor:pointer" onclick="addFile()">'
+    + '<b>📄 ファイル</b><div style="font-size:12px;color:var(--muted)">'
+    + 'プログラムを 書く ところ。名前の さいごに .py や .html を つけます'
+    + '（つけないと .txt になります）</div></div>'
+    + '<div class="card" style="cursor:pointer" onclick="addFolder()">'
+    + '<b>📁 フォルダ</b><div style="font-size:12px;color:var(--muted)">'
+    + 'ファイルを まとめる 入れもの</div></div>'
+    + '<div class="card" style="cursor:pointer" onclick="closeModal();openDb()">'
+    + '<b>🗄 データベース</b><div style="font-size:12px;color:var(--muted)">'
+    + 'ひょうを つくって、データを ためられます</div></div>'
+    + '<div class="row" style="margin-top:8px">'
+    + '<button class="btn gh" onclick="closeModal()">やめる</button></div>';
+  $('modal').classList.add('on');
+}
+
+function addFolder(){
+  closeModal();
+  var d = prompt('フォルダの 名前\n\n例: lib / data');
+  if (!d) return;
+  d = d.trim().replace(/^\/+|\/+$/g, '');
+  if (!/^[A-Za-z0-9_\-\/]{1,40}$/.test(d)){
+    alert('英数字と _ - / だけで つけてください'); return; }
+  var f = prompt('その中に つくる ファイルの 名前\n\n例: utils.py');
+  if (!f) return;
+  f = f.trim();
+  if (f.indexOf('.') < 0) f += '.txt';
+  var p = d + '/' + f;
+  if (!/^[A-Za-z0-9_\-.\/]{1,60}$/.test(p) || p.indexOf('..') >= 0){
+    alert('使えない 名前です'); return; }
+  if (FILES.some(function(x){ return x.path === p; })){
+    alert('同じ 名前が あります'); return; }
+  if (FILES[CUR]) FILES[CUR].content = $('eCode').value;
+  FILES.push({path:p, content:'', kind:kindOf(p), is_entry:0});
+  pickFile(FILES.length - 1);
+}
+
+/* ============ データベース（表をつくる） ============ */
+var TABLES = [];
+var TCUR = 0;
+
+function openDb(){
+  closeModal();
+  drawDb();
+  $('modal').classList.add('on');
+}
+
+function drawDb(){
+  var h = '<h1 style="font-size:18px;margin-bottom:4px">データベース</h1>'
+    + '<p class="lead">ひょうを つくると、Python からも HTML からも 使えます。</p>';
+  if (!TABLES.length){
+    h += '<div class="empty">まだ ひょうが ありません</div>';
+  } else {
+    h += '<div class="row">' + TABLES.map(function(t,i){
+      return '<button class="btn ' + (i===TCUR?'':'gh') + ' sm" '
+        + 'onclick="TCUR=' + i + ';drawDb()">' + K(t.name) + '</button>'; }).join('')
+      + '</div>';
+    var t = TABLES[TCUR];
+    if (t){
+      h += '<div style="overflow-x:auto"><table class="otbl" style="width:100%;'
+        + 'border-collapse:collapse;font-size:12.5px"><thead><tr>'
+        + t.cols.map(function(c,ci){
+            return '<th style="text-align:left;padding:6px;border-bottom:1px solid #dde5ea;'
+              + 'font-size:11px;color:#7a8794">' + K(c.name)
+              + '<div style="font-weight:400">' + c.type + '</div></th>'; }).join('')
+        + '<th style="padding:6px"></th></tr></thead><tbody>'
+        + t.rows.map(function(r,ri){
+            return '<tr>' + t.cols.map(function(c,ci){
+              return '<td style="padding:3px;border-bottom:1px solid #eef3f5">'
+                + '<input class="inp" style="padding:5px 7px;font-size:12.5px" '
+                + 'value="' + K(r[ci]==null?'':r[ci]) + '" '
+                + 'oninput="TABLES[' + TCUR + '].rows[' + ri + '][' + ci + ']=this.value">'
+                + '</td>'; }).join('')
+              + '<td style="padding:3px"><button class="btn gh sm" '
+              + 'onclick="delRow(' + ri + ')">×</button></td></tr>'; }).join('')
+        + '</tbody></table></div>'
+        + '<div class="row" style="margin-top:8px">'
+        + '<button class="btn gh sm" onclick="addRow()">＋ 行</button>'
+        + '<button class="btn gh sm" onclick="addCol()">＋ 列</button>'
+        + '<button class="btn gh sm" onclick="delTable()">この ひょうを けす</button></div>'
+        + '<div class="card" style="margin-top:8px">'
+        + '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">'
+        + '<input type="checkbox" ' + (t.shared ? 'checked ' : '')
+        + 'onchange="TABLES[' + TCUR + '].shared = this.checked ? 1 : 0">'
+        + '<span><b>みんなで 書きこめる ようにする</b>'
+        + '<div style="font-size:11.5px;color:var(--muted)">'
+        + 'あそんだ 人が データを ふやせます。図鑑や 記録に つかえます。'
+        + '書いた 人の 名前が のこります。</div></span></label></div>';
+    }
+  }
+  h += '<div class="row" style="margin-top:14px">'
+    + '<button class="btn" onclick="addTable()">＋ ひょうを つくる</button>'
+    + '<button class="btn gh" onclick="closeModal();drawTree()">とじる</button></div>';
+  $('modalBody').innerHTML = h;
+}
+
+function addTable(){
+  var n = prompt('ひょうの 名前（英字ではじめる）\n\n例: friends / kaimono');
+  if (!n) return;
+  n = n.trim();
+  if (!/^[A-Za-z_][A-Za-z0-9_]{0,30}$/.test(n)){
+    alert('英字で はじめて、英数字と _ だけに してください'); return; }
+  if (TABLES.some(function(t){ return t.name === n; })){
+    alert('同じ 名前が あります'); return; }
+  TABLES.push({name:n, cols:[{name:'name', type:'TEXT'}], rows:[], shared:0});
+  TCUR = TABLES.length - 1;
+  drawDb();
+}
+function addCol(){
+  var n = prompt('列の 名前（英字ではじめる）\n\n例: namae / tensu');
+  if (!n) return;
+  n = n.trim();
+  if (!/^[A-Za-z_][A-Za-z0-9_]{0,30}$/.test(n)){ alert('英字で はじめてください'); return; }
+  var t = prompt('しゅるい\n\nTEXT = もじ\nINTEGER = せいすう\nREAL = しょうすう', 'TEXT');
+  t = (t||'TEXT').toUpperCase();
+  if (['TEXT','INTEGER','REAL'].indexOf(t) < 0) t = 'TEXT';
+  TABLES[TCUR].cols.push({name:n, type:t});
+  TABLES[TCUR].rows.forEach(function(r){ r.push(''); });
+  drawDb();
+}
+function addRow(){
+  TABLES[TCUR].rows.push(TABLES[TCUR].cols.map(function(){ return ''; }));
+  drawDb();
+}
+function delRow(i){ TABLES[TCUR].rows.splice(i,1); drawDb(); }
+function delTable(){
+  if (!confirm(TABLES[TCUR].name + ' を けしますか？')) return;
+  TABLES.splice(TCUR,1); TCUR = 0; drawDb();
+}
+
+/* 表の定義から SQL を組み立てる（動かすときに使う） */
+function tablesToSql(tables){
+  var out = [];
+  (tables||[]).forEach(function(t){
+    out.push('CREATE TABLE ' + t.name + '(' +
+      t.cols.map(function(c){ return c.name + ' ' + c.type; }).join(', ') + ');');
+    t.rows.forEach(function(r){
+      var vals = t.cols.map(function(c, i){
+        var v = r[i];
+        if (v === '' || v == null) return 'NULL';
+        if (c.type === 'TEXT') return "'" + String(v).replace(/'/g, "''") + "'";
+        return isNaN(Number(v)) ? "'" + String(v).replace(/'/g,"''") + "'" : Number(v);
+      });
+      out.push('INSERT INTO ' + t.name + ' VALUES(' + vals.join(', ') + ');');
+    });
+  });
+  return out.join('\n');
+}
+
+/* ============ 見本からはじめる ============ */
+async function showSamples(){
+  var d = await J('/api/mp/samples');
+  if (!d.ok){ newBlank(); return; }
+  $('modalBody').innerHTML =
+      '<h1 style="font-size:18px;margin-bottom:4px">なにから はじめますか？</h1>'
+    + '<p class="lead">見本を えらぶと、その つづきから 作れます。'
+    + '書きかえて 自分の ものに してください。</p>'
+    + d.samples.map(function(x){
+        var D = ['','かんたん','ふつう','むずかしい'][x.difficulty||1];
+        return '<div class="card" style="cursor:pointer" onclick="useSample('+x.id+')">'
+          + '<b>' + K(x.title) + '</b> <span class="tag d' + (x.difficulty||1) + '">'
+          + D + '</span>'
+          + '<div style="font-size:12px;color:var(--muted);margin-top:3px">'
+          + K(x.summary||'') + '</div></div>'; }).join('')
+    + '<div class="card" style="cursor:pointer;border-style:dashed" onclick="newBlank()">'
+    + '<b>📄 白紙からはじめる</b><div style="font-size:12px;color:var(--muted)">'
+    + '自分で ぜんぶ 書きたい人へ</div></div>'
+    + '<div class="row" style="margin-top:8px">'
+    + '<button class="btn gh" onclick="closeModal()">やめる</button></div>';
+  $('modal').classList.add('on');
+}
+
+async function useSample(sid){
+  var d = await J('/api/mp/sample/' + sid);
+  if (!d.ok){ alert(d.error); return; }
+  closeModal();
+  APP = {id:null};
+  FILES = d.files.map(function(f){ return {path:f.path, content:f.content,
+    kind:f.kind, is_entry:f.is_entry}; });
+  TABLES = [];
+  DB = d.db || {name:'app.db', schema:'', seed:''};
+  CUR = 0;
+  $('eTitle').value = d.title + ' を つくってみた';
+  $('eSummary').value = ''; $('eTags').value = d.tags || '';
+  $('eDiff').value = String(d.difficulty || 1);
+  $('eDel').style.display = 'none';
+  $('eMsg').textContent = '見本から はじめました。書きかえて 保存してください';
+  $('eOut').textContent = ''; $('preview').style.display = 'none';
+  pickFile(0, true); go('edit');
+}
+
+/* ============ 複数ファイル対応 ============ */
+var FILES = [], CUR = 0;
+var DB = {name:'app.db', schema:'', seed:''};
+var ICON = {py:'🐍', html:'📄', css:'🎨', js:'⚡', json:'📋',
+            md:'📝', txt:'📃', csv:'📊'};
+
+function kindOf(p){
+  var e = p.indexOf('.') >= 0 ? p.split('.').pop().toLowerCase() : 'txt';
+  return ({htm:'html'})[e] || e;
+}
+function fileIcon(p){ return ICON[kindOf(p)] || '📃'; }
+
+function drawTree(){
+  var el = $('fileTree');
+  if (!FILES.length){ el.innerHTML = '<div class="side-note">ファイルなし</div>'; return; }
+  var groups = {};
+  FILES.forEach(function(f, i){
+    var parts = f.path.split('/');
+    var dir = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
+    (groups[dir] = groups[dir] || []).push({f:f, i:i, name:parts[parts.length-1]});
+  });
+  var html = '';
+  Object.keys(groups).sort().forEach(function(dir){
+    if (dir) html += '<div class="ffolder">📁 ' + K(dir) + '</div>';
+    groups[dir].forEach(function(x){
+      html += '<div class="ffile' + (x.i===CUR?' on':'') + (dir?' sub':'') + '" '
+        + 'onclick="pickFile(' + x.i + ')"><span class="ic">' + fileIcon(x.f.path)
+        + '</span><span style="overflow:hidden;text-overflow:ellipsis">'
+        + K(x.name) + '</span>'
+        + (x.f.is_entry ? '<span class="entry">最初</span>' : '') + '</div>';
+    });
+  });
+  el.innerHTML = html;
+  $('dbInfo').textContent = TABLES.length
+    ? TABLES.map(function(t){ return t.name + '(' + t.rows.length + ')'; }).join(' ')
+    : ((DB.schema || DB.seed) ? DB.name : 'なし');
+}
+
+function pickFile(i, keep){
+  // keep が true のときは、今のテキストを書きもどさない。
+  // 見本を読み込んだ直後など、テキストエリアが空のときに使う。
+  if (!keep && FILES[CUR]) FILES[CUR].content = $('eCode').value;
+  CUR = i;
+  $('eCode').value = FILES[i].content || '';
+  $('edPath').textContent = FILES[i].path;
+  drawTree(); updateEntryBtn(); hlSync();
+}
+
+function addFile(){
+  if (FILES[CUR]) FILES[CUR].content = $('eCode').value;
+  var p = prompt('ファイルの名前\n\nフォルダに入れたいときは / を使います\n'
+    + '例: utils.py / lib/tools.py / data/items.json');
+  if (!p) return;
+  p = p.trim().replace(/^\/+/, '');
+  if (!/^[A-Za-z0-9_\-.\/]{1,60}$/.test(p) || p.indexOf('..') >= 0){
+    alert('使えない名前です。英数字と _ - . / だけにしてください'); return; }
+  if (FILES.some(function(f){ return f.path === p; })){ alert('同じ名前があります'); return; }
+  FILES.push({path:p, content:'', kind:kindOf(p), is_entry:0});
+  pickFile(FILES.length - 1);
+}
+
+function renameFile(){
+  if (!FILES[CUR]) return;
+  var p = prompt('新しい名前', FILES[CUR].path);
+  if (!p) return;
+  p = p.trim().replace(/^\/+/, '');
+  if (!/^[A-Za-z0-9_\-.\/]{1,60}$/.test(p) || p.indexOf('..') >= 0){
+    alert('使えない名前です'); return; }
+  if (FILES.some(function(f,i){ return i!==CUR && f.path===p; })){
+    alert('同じ名前があります'); return; }
+  FILES[CUR].path = p; FILES[CUR].kind = kindOf(p);
+  $('edPath').textContent = p; drawTree(); updateEntryBtn();
+}
+
+function removeFile(){
+  if (FILES.length <= 1){ alert('最後の1つは消せません'); return; }
+  if (!confirm(FILES[CUR].path + ' を消しますか？')) return;
+  FILES.splice(CUR, 1); CUR = 0; pickFile(0);
+}
+
+function openDb(){
+  $('modalBody').innerHTML =
+      '<h1 style="font-size:18px;margin-bottom:4px">データベース</h1>'
+    + '<p class="lead">表を作っておくと、Python からも HTML からも使えます。</p>'
+    + '<label class="lb">名前</label>'
+    + '<input class="inp" id="dbName" value="' + K(DB.name) + '" style="margin-bottom:10px">'
+    + '<label class="lb">表を作る（CREATE TABLE）</label>'
+    + '<textarea class="ta" id="dbSchema" style="min-height:90px;'
+    + 'font-family:ui-monospace,monospace;font-size:12.5px;margin-bottom:10px">'
+    + K(DB.schema) + '</textarea>'
+    + '<label class="lb">はじめに入れるデータ（INSERT）</label>'
+    + '<textarea class="ta" id="dbSeed" style="min-height:80px;'
+    + 'font-family:ui-monospace,monospace;font-size:12.5px;margin-bottom:12px">'
+    + K(DB.seed) + '</textarea>'
+    + '<div class="row"><button class="btn" onclick="saveDb()">決定</button>'
+    + '<button class="btn gh" onclick="closeModal()">やめる</button></div>';
+  $('modal').classList.add('on');
+}
+function closeModal(){ $('modal').classList.remove('on'); }
+function saveDb(){
+  DB.name = $('dbName').value.trim() || 'app.db';
+  DB.schema = $('dbSchema').value; DB.seed = $('dbSeed').value;
+  closeModal(); drawTree();
+}
+
+function newApp(){
+  if (!ME){ go('login'); return; }
+  showSamples();
+}
+
+function newBlank(){
+  closeModal();
+  APP = {id:null};
+  TABLES = [];
+  FILES = [{path:'main.py', content:'# ここに Python を書いてみよう\nprint("こんにちは")\n',
+            kind:'py', is_entry:1}];
+  DB = {name:'app.db', schema:'', seed:''}; CUR = 0;
+  ['eTitle','eSummary','eTags'].forEach(function(i){ $(i).value=''; });
+  $('eDiff').value='1'; $('eDel').style.display='none';
+  $('eMsg').textContent=''; $('eOut').textContent='';
+  $('preview').style.display='none';
+  pickFile(0, true); go('edit');
+  var d = restore();
+  if (d && !d.id && d.files && confirm('前に書きかけのものがあります。もどしますか？')){
+    FILES = d.files; DB = d.db || DB;
+    $('eTitle').value=d.title||''; $('eSummary').value=d.summary||'';
+    $('eTags').value=d.tags||''; $('eDiff').value=d.diff||'1';
+    CUR = 0; pickFile(0, true);
+  }
+}
+
+async function editApp(id){
+  var a = (await J('/api/mp/app/'+id)).app;
+  if (!a){ alert('開けません'); return; }
+  var f = await J('/api/mp/app/'+id+'/files');
+  APP = {id:id};
+  FILES = (f.files||[]).map(function(x){
+    return {path:x.path, content:x.content, kind:x.kind, is_entry:x.is_entry}; });
+  if (!FILES.length) FILES = [{path:'main.py', content:'', kind:'py', is_entry:1}];
+  DB = (f.dbs && f.dbs[0]) ? {name:f.dbs[0].name, schema:f.dbs[0].schema, seed:f.dbs[0].seed}
+                           : {name:'app.db', schema:'', seed:''};
+  var tb = await J('/api/mp/app/'+id+'/tables');
+  TABLES = (tb.ok ? tb.tables : []) || [];
+  TCUR = 0;
+  CUR = 0;
+  $('eTitle').value=a.title; $('eSummary').value=a.summary||'';
+  $('eTags').value=a.tags||''; $('eDiff').value=String(a.difficulty||1);
+  $('eDel').style.display='';
+  $('eMsg').textContent = a.status==='published' ? '公開中' : '下書き';
+  pickFile(0, true); go('edit');
+  setUrl('/member/edit/' + id);
+}
+
+async function saveApp(pub, confirmed){
+  if (FILES[CUR]) FILES[CUR].content = $('eCode').value;
+  if (!FILES.some(function(f){ return f.is_entry; })) FILES[0].is_entry = 1;
+  var pick = function(k){
+    var x = FILES.filter(function(f){ return f.kind===k; })[0];
+    return x ? x.content : ''; };
+  var d = await P('/api/mp/app', {
+    id:APP.id, title:$('eTitle').value.trim(), summary:$('eSummary').value.trim(),
+    tags:$('eTags').value.trim(), difficulty:parseInt($('eDiff').value),
+    publish:pub, confirmed:confirmed,
+    code:pick('py'), html:pick('html'), css:pick('css'), js:pick('js'),
+    sql:DB.schema || ''});
+  var m = $('eMsg');
+  if (!d.ok){
+    m.style.color='#c0453b'; m.textContent = d.error;
+    if (d.need_agree) setTimeout(function(){ go('rules'); }, 1200);
+    if (d.need_confirm && confirm(d.error + '\n\nそれでも公開しますか？')) saveApp(pub, true);
+    return;
+  }
+  APP.id = d.id; $('eDel').style.display='';
+  var f = await P('/api/mp/app/'+APP.id+'/files', {files:FILES});
+  if (!f.ok){ m.style.color='#c0453b'; m.textContent = f.error; return; }
+  var t = await P('/api/mp/app/'+APP.id+'/tables', {tables:TABLES});
+  if (!t.ok){ m.style.color='#c0453b'; m.textContent = t.error; return; }
+  clearStash();
+  m.style.color='#0e7490';
+  m.textContent = (d.status==='published' ? '公開しました' : '下書きに保存しました')
+    + '（' + f.count + 'ファイル）';
+  await refreshMe();
+}
+
+async function showVersions(){
+  if (!APP.id){ alert('まだ保存していません'); return; }
+  var d = await J('/api/mp/app/'+APP.id+'/versions');
+  if (!d.ok){ alert(d.error); return; }
+  $('modalBody').innerHTML =
+      '<h1 style="font-size:18px;margin-bottom:4px">前のに もどす</h1>'
+    + '<p class="lead">保存するたびに残しています。最大20回ぶん。</p>'
+    + (d.versions.length ? d.versions.map(function(v){
+        return '<div class="card" style="display:flex;align-items:center;gap:10px">'
+          + '<div style="flex:1"><b style="font-size:12.5px">'+K(v.saved_at)+'</b>'
+          + '<div style="font-size:11.5px;color:var(--muted)">'+v.files+'ファイル'
+          + (v.note ? ' · '+K(v.note) : '')+'</div></div>'
+          + '<button class="btn gh sm" onclick="doRestore('+v.id+')">もどす</button></div>';
+      }).join('') : '<div class="empty">まだ履歴がありません</div>')
+    + '<div class="row" style="margin-top:10px">'
+    + '<button class="btn gh" onclick="closeModal()">とじる</button></div>';
+  $('modal').classList.add('on');
+}
+async function doRestore(vid){
+  if (!confirm('この状態にもどしますか？\n（いまの状態も履歴に残ります）')) return;
+  var d = await P('/api/mp/app/'+APP.id+'/restore/'+vid);
+  if (!d.ok){ alert(d.error); return; }
+  closeModal(); editApp(APP.id);
+}
+
+function stash(){
+  if (!$('p-edit').classList.contains('on')) return;
+  if (FILES[CUR]) FILES[CUR].content = $('eCode').value;
+  try {
+    localStorage.setItem('mp_draft', JSON.stringify({
+      id:APP.id, files:FILES, db:DB, title:$('eTitle').value,
+      summary:$('eSummary').value, tags:$('eTags').value,
+      diff:$('eDiff').value, at:Date.now()}));
+  } catch(e){}
+}
+
+async function runFiles(files, db, outEl, frameEl){
+  outEl.innerHTML = '';
+  var find = function(k){ return files.filter(function(f){ return f.kind===k; }); };
+  var htmls=find('html'), csss=find('css'), jss=find('js'), pys=find('py');
+
+  if (htmls.length){
+    frameEl.style.display = '';
+    var head = csss.map(function(f){ return '<style>'+f.content+'</style>'; }).join('');
+    var tail = jss.map(function(f){
+      return '<scr'+'ipt>try{'+f.content+'}catch(e){'
+        + 'document.body.innerHTML+="<pre style=color:red>"+e+"</pre>"}</scr'+'ipt>';
+    }).join('');
+    var eh = htmls.filter(function(f){ return f.is_entry; })[0] || htmls[0];
+    frameEl.srcdoc = '<style>body{font-family:sans-serif;padding:12px}</style>'
+      + head + eh.content + tail;
+    outWrite(outEl, '画面に表示しました（' + eh.path + '）', 'ok');
+  } else { frameEl.style.display = 'none'; }
+
+  if (db && (db.schema || db.seed))
+    await runSql((db.schema||'') + '\n' + (db.seed||''), outEl);
+
+  if (pys.length){
+    outWrite(outEl, '── Python ──');
+    try {
+      if (!PYO){
+        outWrite(outEl, 'Python を用意しています…（初回だけ時間がかかります）');
+        PYO = await loadPyodide();
+      }
+      PYO.setStdout({batched:function(s){ outWrite(outEl, s); }});
+      PYO.setStderr({batched:function(s){ outWrite(outEl, s, 'e'); }});
+      try { PYO.FS.mkdir('/work'); } catch(e){}
+      files.forEach(function(f){
+        var parts = f.path.split('/'), dir = '/work';
+        for (var i = 0; i < parts.length - 1; i++){
+          dir += '/' + parts[i];
+          try { PYO.FS.mkdir(dir); } catch(e){}
+        }
+        try { PYO.FS.writeFile('/work/' + f.path, f.content); } catch(e){}
+      });
+      await PYO.runPythonAsync('import sys, os\nos.chdir("/work")\n'
+        + 'if "/work" not in sys.path: sys.path.insert(0, "/work")\n');
+      setupInput();
+      // 表があれば Python の sqlite3 からも触れるようにしておく
+      if (db && db.schema){
+        PYO.globals.set('_mp_sql', db.schema);
+        PYO.globals.set('_mp_dbname', db.name || 'app.db');
+        await PYO.runPythonAsync(
+          'import sqlite3\n' +
+          '_c = sqlite3.connect(_mp_dbname)\n' +
+          '_c.executescript(_mp_sql)\n' +
+          '_c.commit()\n' +
+          '_c.close()\n');
+      }
+      if (window.MP_APP_ID){
+        PYO.globals.set('_mp_appid', window.MP_APP_ID);
+        try { PYO.FS.writeFile('/work/mirai.py', MIRAI_PY); } catch(e){}
+      }
+      var ep = pys.filter(function(f){ return f.is_entry; })[0] || pys[0];
+      outWrite(outEl, '（' + ep.path + ' を動かします）');
+      await PYO.runPythonAsync(ep.content);
+    } catch(e){
+      outWrite(outEl, String(e).split('\n').slice(-5).join('\n'), 'e');
+    }
+  }
+  if (!outEl.innerHTML) outWrite(outEl, '（何も書かれていません）');
+}
+
+async function runCode(){
+  window.MP_APP_ID = APP.id;
+  if (FILES[CUR]) FILES[CUR].content = $('eCode').value;
+  var risks = checkRisk(FILES);
+  if (risks.length){
+    if (!confirm('⚠ 気を つけて\n\n' + risks.join('\n\n')
+        + '\n\nそれでも うごかしますか？')) return;
+  }
+  var sql = tablesToSql(TABLES);
+  await runFiles(FILES, {name:DB.name, schema:sql || DB.schema, seed:sql ? '' : DB.seed},
+                 $('eOut'), $('preview'));
+  // エラーが出ていなければ「うごいた」とみなす
+  var bad = $('eOut').querySelectorAll('.e').length;
+  reportRan(bad === 0);
+}
+function runView(){
+  var a = window.VIEW_APP || {};
+  window.MP_APP_ID = a.id;
+  var fs = (window.VIEW_FILES || []).map(function(f){
+    return {path:f.path, content:f.content, kind:f.kind, is_entry:f.is_entry}; });
+  runFiles(fs, window.VIEW_DB, $('vOut'), $('vPreview'));
+}
+
+setInterval(stash, 15000);
+window.addEventListener('beforeunload', stash);
+document.addEventListener('visibilitychange', stash);
+
+
+// ブラウザの「戻る」に合わせる
+window.addEventListener('popstate', function(){
+  var m = location.pathname.match(/^\/member\/program\/[^/]+\/(\d+)/);
+  if (m){ viewApp(parseInt(m[1])); return; }
+  m = location.pathname.match(/^\/member\/edit\/(\d+)/);
+  if (m){ editApp(parseInt(m[1])); return; }
+  var p = {'/member':'home', '/member/mine':'mine', '/member/rules':'rules',
+           '/member/login':'login'}[location.pathname];
+  if (p) go(p);
+});
+
+// URL で作品が指定されていれば、それを開く
+var OPEN_APP = {% if open_app %}{{ open_app }}{% else %}null{% endif %};
+var OPEN_EDIT = {% if open_edit %}{{ open_edit }}{% else %}null{% endif %};
+
+refreshMe().then(function(){
+  gate();
+  if (OPEN_APP && ME) viewApp(OPEN_APP);
+  else if (OPEN_EDIT && ME) editApp(OPEN_EDIT);
+  else if (ME){
+    var p = {'/member/mine':'mine', '/member/rules':'rules'}[location.pathname];
+    if (p) go(p);
+  }
+});
 </script></body></html>
