@@ -1320,3 +1320,655 @@ def mp_comment_hide(cid):
               (u['member_id'], (d.get('why') or '')[:200], cid))
     c.commit(); c.close()
     return jsonify(ok=True)
+
+
+# ====================================================================
+# ① つぶやき（X型）
+# ====================================================================
+POST_MAX = 300
+
+
+@bp.route('/api/mp/posts')
+def mp_posts():
+    u = me()
+    if not u:
+        return jsonify(ok=False, error='会員だけが 見られます'), 401
+    gid = request.args.get('group')
+    who = request.args.get('who')
+    following = request.args.get('following')
+
+    sql = """SELECT p.*, m.nickname, g.name AS group_name,
+                    (SELECT COUNT(*) FROM mp_post r WHERE r.reply_to = p.id
+                     AND r.hidden = 0) AS replies,
+                    (SELECT COUNT(*) FROM mp_post_like l WHERE l.post_id = p.id
+                     AND l.member_id = ?) AS liked
+             FROM mp_post p
+             LEFT JOIN mp_member m ON m.member_id = p.member_id
+             LEFT JOIN mp_group g ON g.id = p.group_id
+             WHERE p.hidden = 0 AND p.reply_to IS NULL """
+    args = [u['member_id']]
+    if gid:
+        sql += 'AND p.group_id = ? '; args.append(gid)
+    elif who:
+        sql += 'AND p.member_id = ? '; args.append(who)
+    elif following:
+        sql += ('AND (p.member_id = ? OR p.member_id IN '
+                '(SELECT followee FROM mp_follow WHERE follower = ?)) ')
+        args += [u['member_id'], u['member_id']]
+    else:
+        sql += 'AND p.group_id IS NULL '
+    sql += 'ORDER BY p.id DESC LIMIT 60'
+
+    c = _db()
+    rows = [dict(r) for r in c.execute(sql, args).fetchall()]
+    groups = [dict(r) for r in c.execute("""
+        SELECT g.*, (SELECT COUNT(*) FROM mp_group_member gm
+                     WHERE gm.group_id = g.id) AS members,
+               (SELECT COUNT(*) FROM mp_group_member gm
+                WHERE gm.group_id = g.id AND gm.member_id = ?) AS joined
+        FROM mp_group g ORDER BY g.id DESC LIMIT 30""",
+        (u['member_id'],)).fetchall()]
+    c.close()
+    return jsonify(ok=True, posts=rows, groups=groups)
+
+
+@bp.route('/api/mp/post/<int:pid>/replies')
+def mp_post_replies(pid):
+    if not me():
+        return jsonify(ok=False), 401
+    c = _db()
+    rows = [dict(r) for r in c.execute("""
+        SELECT p.*, m.nickname FROM mp_post p
+        LEFT JOIN mp_member m ON m.member_id = p.member_id
+        WHERE p.reply_to = ? AND p.hidden = 0 ORDER BY p.id""", (pid,)).fetchall()]
+    c.close()
+    return jsonify(ok=True, replies=rows)
+
+
+@bp.route('/api/mp/post', methods=['POST'])
+def mp_post_new():
+    u = me()
+    if not u:
+        return jsonify(ok=False, error='ログインしてください'), 401
+    if not rate_limit('mppost:' + u['member_id'], 5):
+        return jsonify(ok=False, error='はやすぎます。すこし 待ってください'), 429
+    d = request.get_json(silent=True) or {}
+    body = (d.get('body') or '').strip()
+    if not body:
+        return jsonify(ok=False, error='なにか 書いてください'), 400
+    if len(body) > POST_MAX:
+        return jsonify(ok=False, error=f'{POST_MAX}文字までです'), 400
+    ng = check_content(body)
+    if ng:
+        return jsonify(ok=False,
+            error='個人情報かも しれないものが あります: ' + '、'.join(ng)), 400
+    c = _db()
+    c.execute("""INSERT INTO mp_post(member_id,body,group_id,reply_to,app_id)
+                 VALUES(?,?,?,?,?)""",
+              (u['member_id'], body, d.get('group_id') or None,
+               d.get('reply_to') or None, d.get('app_id') or None))
+    c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+@bp.route('/api/mp/post/<int:pid>/like', methods=['POST'])
+def mp_post_like(pid):
+    u = me()
+    if not u:
+        return jsonify(ok=False), 401
+    c = _db()
+    hit = c.execute('SELECT 1 FROM mp_post_like WHERE post_id=? AND member_id=?',
+                    (pid, u['member_id'])).fetchone()
+    if hit:
+        c.execute('DELETE FROM mp_post_like WHERE post_id=? AND member_id=?',
+                  (pid, u['member_id']))
+        c.execute('UPDATE mp_post SET likes=MAX(0,likes-1) WHERE id=?', (pid,))
+        liked = False
+    else:
+        c.execute('INSERT INTO mp_post_like(post_id,member_id) VALUES(?,?)',
+                  (pid, u['member_id']))
+        c.execute('UPDATE mp_post SET likes=likes+1 WHERE id=?', (pid,))
+        liked = True
+    c.commit(); c.close()
+    return jsonify(ok=True, liked=liked)
+
+
+@bp.route('/api/mp/post/<int:pid>/hide', methods=['POST'])
+def mp_post_hide(pid):
+    u = me()
+    if not u:
+        return jsonify(ok=False), 401
+    c = _db()
+    r = c.execute('SELECT member_id FROM mp_post WHERE id=?', (pid,)).fetchone()
+    if not r or (r['member_id'] != u['member_id'] and my_tier(u) != 'admin'):
+        c.close(); return jsonify(ok=False, error='けせません'), 403
+    c.execute('UPDATE mp_post SET hidden=1, hidden_by=? WHERE id=?',
+              (u['member_id'], pid))
+    c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+@bp.route('/api/mp/group', methods=['POST'])
+def mp_group_new():
+    u = me()
+    if not u:
+        return jsonify(ok=False), 401
+    d = request.get_json(silent=True) or {}
+    nm = (d.get('name') or '').strip()
+    if not nm or len(nm) > 40:
+        return jsonify(ok=False, error='名前は 1〜40文字で'), 400
+    c = _db()
+    cur = c.execute('INSERT INTO mp_group(name,summary,owner,is_open) VALUES(?,?,?,?)',
+                    (nm, (d.get('summary') or '')[:200], u['member_id'],
+                     0 if d.get('closed') else 1))
+    gid = cur.lastrowid
+    c.execute('INSERT INTO mp_group_member(group_id,member_id) VALUES(?,?)',
+              (gid, u['member_id']))
+    c.commit(); c.close()
+    return jsonify(ok=True, id=gid)
+
+
+@bp.route('/api/mp/group/<int:gid>/join', methods=['POST'])
+def mp_group_join(gid):
+    u = me()
+    if not u:
+        return jsonify(ok=False), 401
+    c = _db()
+    hit = c.execute('SELECT 1 FROM mp_group_member WHERE group_id=? AND member_id=?',
+                    (gid, u['member_id'])).fetchone()
+    if hit:
+        c.execute('DELETE FROM mp_group_member WHERE group_id=? AND member_id=?',
+                  (gid, u['member_id']))
+        joined = False
+    else:
+        c.execute('INSERT INTO mp_group_member(group_id,member_id) VALUES(?,?)',
+                  (gid, u['member_id']))
+        joined = True
+    c.commit(); c.close()
+    return jsonify(ok=True, joined=joined)
+
+
+@bp.route('/api/mp/follow/<who>', methods=['POST'])
+def mp_follow(who):
+    u = me()
+    if not u or who == u['member_id']:
+        return jsonify(ok=False), 400
+    c = _db()
+    hit = c.execute('SELECT 1 FROM mp_follow WHERE follower=? AND followee=?',
+                    (u['member_id'], who)).fetchone()
+    if hit:
+        c.execute('DELETE FROM mp_follow WHERE follower=? AND followee=?',
+                  (u['member_id'], who))
+        on = False
+    else:
+        c.execute('INSERT INTO mp_follow(follower,followee) VALUES(?,?)',
+                  (u['member_id'], who))
+        on = True
+    c.commit(); c.close()
+    return jsonify(ok=True, following=on)
+
+
+# ====================================================================
+# ④ みんなの図鑑（Wiki）
+#   だれでも 直せる。だから 履歴を のこして いつでも 戻せるように する。
+# ====================================================================
+WIKI_MAX = 20000
+
+
+@bp.route('/api/mp/wiki')
+def mp_wiki_list():
+    if not me():
+        return jsonify(ok=False, error='会員だけが 見られます'), 401
+    q = (request.args.get('q') or '').strip()
+    cat = (request.args.get('cat') or '').strip()
+    sql = ("SELECT id,slug,title,category,tags,views,updated_by,updated_at "
+           "FROM mp_wiki WHERE 1=1 ")
+    args = []
+    if q:
+        sql += 'AND (title LIKE ? OR body LIKE ?) '; args += ['%'+q+'%', '%'+q+'%']
+    if cat:
+        sql += 'AND category = ? '; args.append(cat)
+    sql += 'ORDER BY updated_at DESC LIMIT 100'
+    c = _db()
+    rows = [dict(r) for r in c.execute(sql, args).fetchall()]
+    cats = [dict(r) for r in c.execute(
+        "SELECT category AS name, COUNT(*) AS n FROM mp_wiki "
+        "WHERE category IS NOT NULL AND category <> '' "
+        "GROUP BY category ORDER BY n DESC").fetchall()]
+    c.close()
+    return jsonify(ok=True, pages=rows, cats=cats)
+
+
+@bp.route('/api/mp/wiki/<slug>')
+def mp_wiki_get(slug):
+    if not me():
+        return jsonify(ok=False, error='会員だけが 見られます'), 401
+    c = _db()
+    r = c.execute('SELECT * FROM mp_wiki WHERE slug=?', (slug,)).fetchone()
+    if not r:
+        c.close(); return jsonify(ok=False, error='まだ ありません', slug=slug), 404
+    c.execute('UPDATE mp_wiki SET views=views+1 WHERE id=?', (r['id'],))
+    revs = [{'id': x['id'], 'by': x['by_member'], 'at': x['saved_at'],
+             'note': x['note']}
+            for x in c.execute('SELECT * FROM mp_wiki_rev WHERE wiki_id=? '
+                               'ORDER BY id DESC LIMIT 20', (r['id'],)).fetchall()]
+    c.commit(); c.close()
+    return jsonify(ok=True, page=dict(r), revs=revs)
+
+
+@bp.route('/api/mp/wiki/<slug>', methods=['POST'])
+def mp_wiki_save(slug):
+    u = me()
+    if not u:
+        return jsonify(ok=False, error='ログインしてください'), 401
+    if not rate_limit('mpwiki:' + u['member_id'], 5):
+        return jsonify(ok=False, error='はやすぎます'), 429
+    import re as _r
+    if not _r.fullmatch(r'[a-z0-9_-]{1,60}', slug):
+        return jsonify(ok=False, error='URLの名前は 小文字の英数字と - _ だけです'), 400
+    d = request.get_json(silent=True) or {}
+    title = (d.get('title') or '').strip()
+    body = (d.get('body') or '')[:WIKI_MAX]
+    if not title:
+        return jsonify(ok=False, error='だいめいを 入れてください'), 400
+    ng = check_content(title + ' ' + body)
+    if ng and not d.get('confirmed'):
+        return jsonify(ok=False, need_confirm=True,
+            error='個人情報かも しれないものが あります: ' + '、'.join(ng)), 400
+
+    c = _db()
+    old = c.execute('SELECT * FROM mp_wiki WHERE slug=?', (slug,)).fetchone()
+    if old:
+        if old['locked'] and my_tier(u) != 'admin':
+            c.close(); return jsonify(ok=False, error='この ページは 直せません'), 403
+        # 直す前の状態を のこす
+        c.execute("""INSERT INTO mp_wiki_rev(wiki_id,title,body,by_member,note)
+                     VALUES(?,?,?,?,?)""",
+                  (old['id'], old['title'], old['body'], old['updated_by'],
+                   (d.get('note') or '')[:120]))
+        c.execute("""UPDATE mp_wiki SET title=?,body=?,category=?,tags=?,
+                     updated_by=?, updated_at=datetime('now','localtime')
+                     WHERE id=?""",
+                  (title[:80], body, (d.get('category') or '')[:30],
+                   (d.get('tags') or '')[:120], u['member_id'], old['id']))
+        wid = old['id']
+    else:
+        cur = c.execute("""INSERT INTO mp_wiki(slug,title,body,category,tags,
+                           created_by,updated_by) VALUES(?,?,?,?,?,?,?)""",
+                        (slug, title[:80], body, (d.get('category') or '')[:30],
+                         (d.get('tags') or '')[:120], u['member_id'], u['member_id']))
+        wid = cur.lastrowid
+    c.commit(); c.close()
+    return jsonify(ok=True, id=wid)
+
+
+@bp.route('/api/mp/wiki/<slug>/restore/<int:rev>', methods=['POST'])
+def mp_wiki_restore(slug, rev):
+    u = me()
+    if not u:
+        return jsonify(ok=False), 401
+    c = _db()
+    w = c.execute('SELECT * FROM mp_wiki WHERE slug=?', (slug,)).fetchone()
+    r = c.execute('SELECT * FROM mp_wiki_rev WHERE id=? AND wiki_id=?',
+                  (rev, w['id'] if w else 0)).fetchone()
+    if not w or not r:
+        c.close(); return jsonify(ok=False, error='見つかりません'), 404
+    c.execute("""INSERT INTO mp_wiki_rev(wiki_id,title,body,by_member,note)
+                 VALUES(?,?,?,?,'もどす前')""",
+              (w['id'], w['title'], w['body'], w['updated_by']))
+    c.execute("""UPDATE mp_wiki SET title=?,body=?,updated_by=?,
+                 updated_at=datetime('now','localtime') WHERE id=?""",
+              (r['title'], r['body'], u['member_id'], w['id']))
+    c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+# ====================================================================
+# ⑯ 質問と回答（知恵袋）
+# ====================================================================
+@bp.route('/api/mp/qa')
+def mp_qa_list():
+    if not me():
+        return jsonify(ok=False, error='会員だけが 見られます'), 401
+    f = request.args.get('filter') or 'all'
+    sql = """SELECT q.*, m.nickname,
+             (SELECT COUNT(*) FROM mp_qa_answer a WHERE a.qa_id=q.id
+              AND a.hidden=0) AS answers
+             FROM mp_qa q LEFT JOIN mp_member m ON m.member_id=q.member_id
+             WHERE q.hidden=0 """
+    if f == 'open':
+        sql += 'AND q.solved=0 '
+    elif f == 'solved':
+        sql += 'AND q.solved=1 '
+    sql += 'ORDER BY q.id DESC LIMIT 60'
+    c = _db()
+    rows = [dict(r) for r in c.execute(sql).fetchall()]
+    c.close()
+    return jsonify(ok=True, questions=rows)
+
+
+@bp.route('/api/mp/qa/<int:qid>')
+def mp_qa_get(qid):
+    if not me():
+        return jsonify(ok=False), 401
+    c = _db()
+    q = c.execute("""SELECT q.*, m.nickname FROM mp_qa q
+                     LEFT JOIN mp_member m ON m.member_id=q.member_id
+                     WHERE q.id=? AND q.hidden=0""", (qid,)).fetchone()
+    if not q:
+        c.close(); return jsonify(ok=False, error='見つかりません'), 404
+    c.execute('UPDATE mp_qa SET views=views+1 WHERE id=?', (qid,))
+    ans = [dict(r) for r in c.execute("""
+        SELECT a.*, m.nickname FROM mp_qa_answer a
+        LEFT JOIN mp_member m ON m.member_id=a.member_id
+        WHERE a.qa_id=? AND a.hidden=0 ORDER BY a.good DESC, a.id""",
+        (qid,)).fetchall()]
+    c.commit(); c.close()
+    return jsonify(ok=True, question=dict(q), answers=ans)
+
+
+@bp.route('/api/mp/qa', methods=['POST'])
+def mp_qa_new():
+    u = me()
+    if not u:
+        return jsonify(ok=False, error='ログインしてください'), 401
+    if not rate_limit('mpqa:' + u['member_id'], 3):
+        return jsonify(ok=False, error='はやすぎます'), 429
+    d = request.get_json(silent=True) or {}
+    t = (d.get('title') or '').strip()
+    if not t:
+        return jsonify(ok=False, error='しつもんを 書いてください'), 400
+    ng = check_content(t + ' ' + (d.get('body') or ''))
+    if ng:
+        return jsonify(ok=False,
+            error='個人情報かも しれないものが あります: ' + '、'.join(ng)), 400
+    c = _db()
+    cur = c.execute('INSERT INTO mp_qa(member_id,title,body,app_id) VALUES(?,?,?,?)',
+                    (u['member_id'], t[:120], (d.get('body') or '')[:2000],
+                     d.get('app_id') or None))
+    qid = cur.lastrowid
+    c.commit(); c.close()
+    return jsonify(ok=True, id=qid)
+
+
+@bp.route('/api/mp/qa/<int:qid>/answer', methods=['POST'])
+def mp_qa_answer(qid):
+    u = me()
+    if not u:
+        return jsonify(ok=False, error='ログインしてください'), 401
+    if not rate_limit('mpans:' + u['member_id'], 5):
+        return jsonify(ok=False, error='はやすぎます'), 429
+    d = request.get_json(silent=True) or {}
+    body = (d.get('body') or '').strip()
+    if not body:
+        return jsonify(ok=False, error='こたえを 書いてください'), 400
+    ng = check_content(body)
+    if ng:
+        return jsonify(ok=False,
+            error='個人情報かも しれないものが あります: ' + '、'.join(ng)), 400
+    c = _db()
+    q = c.execute('SELECT member_id, title FROM mp_qa WHERE id=?', (qid,)).fetchone()
+    c.execute('INSERT INTO mp_qa_answer(qa_id,member_id,body) VALUES(?,?,?)',
+              (qid, u['member_id'], body[:2000]))
+    c.commit(); c.close()
+    if q:
+        notify(q['member_id'], 'comment', None, u['member_id'],
+               'しつもんに こたえが つきました')
+    return jsonify(ok=True)
+
+
+@bp.route('/api/mp/qa/<int:qid>/best/<int:aid>', methods=['POST'])
+def mp_qa_best(qid, aid):
+    """いちばん たすかった こたえを えらぶ。しつもんした人だけ。"""
+    u = me()
+    if not u:
+        return jsonify(ok=False), 401
+    c = _db()
+    q = c.execute('SELECT member_id FROM mp_qa WHERE id=?', (qid,)).fetchone()
+    if not q or q['member_id'] != u['member_id']:
+        c.close(); return jsonify(ok=False, error='しつもんした人だけ えらべます'), 403
+    a = c.execute('SELECT member_id FROM mp_qa_answer WHERE id=?', (aid,)).fetchone()
+    c.execute('UPDATE mp_qa SET solved=1, best_id=? WHERE id=?', (aid, qid))
+    c.execute('UPDATE mp_qa_answer SET good=good+1 WHERE id=?', (aid,))
+    c.commit(); c.close()
+    if a:
+        notify(a['member_id'], 'comment', None, u['member_id'],
+               'あなたの こたえが えらばれました')
+    return jsonify(ok=True)
+
+
+# ====================================================================
+# ⑭ 作品の棚（Scratch のスタジオ）
+# ====================================================================
+@bp.route('/api/mp/shelves')
+def mp_shelves():
+    u = me()
+    if not u:
+        return jsonify(ok=False, error='会員だけが 見られます'), 401
+    c = _db()
+    rows = [dict(r) for r in c.execute("""
+        SELECT s.*, m.nickname AS owner_name,
+               (SELECT COUNT(*) FROM mp_shelf_app sa WHERE sa.shelf_id=s.id) AS apps
+        FROM mp_shelf s LEFT JOIN mp_member m ON m.member_id=s.owner
+        ORDER BY s.id DESC LIMIT 60""").fetchall()]
+    c.close()
+    return jsonify(ok=True, shelves=rows)
+
+
+@bp.route('/api/mp/shelf/<int:sid>')
+def mp_shelf_get(sid):
+    u = me()
+    if not u:
+        return jsonify(ok=False), 401
+    c = _db()
+    s = c.execute("""SELECT s.*, m.nickname AS owner_name FROM mp_shelf s
+                     LEFT JOIN mp_member m ON m.member_id=s.owner
+                     WHERE s.id=?""", (sid,)).fetchone()
+    if not s:
+        c.close(); return jsonify(ok=False, error='見つかりません'), 404
+    apps = [dict(r) for r in c.execute("""
+        SELECT a.id,a.title,a.summary,a.tags,a.difficulty,a.likes,a.views,
+               a.member_id,a.status,a.forked_from, m.nickname, sa.added_by
+        FROM mp_shelf_app sa JOIN mp_app a ON a.id=sa.app_id
+        LEFT JOIN mp_member m ON m.member_id=a.member_id
+        WHERE sa.shelf_id=? AND a.status='published'
+        ORDER BY sa.added_at DESC""", (sid,)).fetchall()]
+    mine = [dict(r) for r in c.execute("""
+        SELECT id,title FROM mp_app WHERE member_id=? AND status='published'
+        ORDER BY id DESC""", (u['member_id'],)).fetchall()]
+    c.close()
+    return jsonify(ok=True, shelf=dict(s), apps=apps, my_apps=mine,
+                   is_owner=(s['owner'] == u['member_id']))
+
+
+@bp.route('/api/mp/shelf', methods=['POST'])
+def mp_shelf_new():
+    u = me()
+    if not u:
+        return jsonify(ok=False), 401
+    d = request.get_json(silent=True) or {}
+    t = (d.get('title') or '').strip()
+    if not t or len(t) > 60:
+        return jsonify(ok=False, error='なまえは 1〜60文字で'), 400
+    c = _db()
+    cur = c.execute("""INSERT INTO mp_shelf(title,summary,owner,open_add)
+                       VALUES(?,?,?,?)""",
+                    (t, (d.get('summary') or '')[:200], u['member_id'],
+                     0 if d.get('closed') else 1))
+    c.commit(); sid = cur.lastrowid; c.close()
+    return jsonify(ok=True, id=sid)
+
+
+@bp.route('/api/mp/shelf/<int:sid>/add', methods=['POST'])
+def mp_shelf_add(sid):
+    u = me()
+    if not u:
+        return jsonify(ok=False), 401
+    d = request.get_json(silent=True) or {}
+    aid = d.get('app_id')
+    c = _db()
+    s = c.execute('SELECT owner, open_add FROM mp_shelf WHERE id=?', (sid,)).fetchone()
+    a = c.execute('SELECT member_id FROM mp_app WHERE id=?', (aid,)).fetchone()
+    if not s or not a:
+        c.close(); return jsonify(ok=False, error='見つかりません'), 404
+    # 棚の主 か、自分の作品を 入れる人だけ
+    if s['owner'] != u['member_id'] and not (s['open_add'] and a['member_id'] == u['member_id']):
+        c.close(); return jsonify(ok=False, error='入れられません'), 403
+    try:
+        c.execute('INSERT INTO mp_shelf_app(shelf_id,app_id,added_by) VALUES(?,?,?)',
+                  (sid, aid, u['member_id']))
+    except Exception:
+        pass
+    c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+@bp.route('/api/mp/shelf/<int:sid>/remove/<int:aid>', methods=['POST'])
+def mp_shelf_remove(sid, aid):
+    u = me()
+    if not u:
+        return jsonify(ok=False), 401
+    c = _db()
+    s = c.execute('SELECT owner FROM mp_shelf WHERE id=?', (sid,)).fetchone()
+    a = c.execute('SELECT member_id FROM mp_app WHERE id=?', (aid,)).fetchone()
+    if not s or (s['owner'] != u['member_id'] and
+                 (not a or a['member_id'] != u['member_id'])):
+        c.close(); return jsonify(ok=False, error='出せません'), 403
+    c.execute('DELETE FROM mp_shelf_app WHERE shelf_id=? AND app_id=?', (sid, aid))
+    c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+# ====================================================================
+# ⑰ 投票・アンケート（1人1回）
+# ====================================================================
+@bp.route('/api/mp/polls')
+def mp_polls():
+    u = me()
+    if not u:
+        return jsonify(ok=False), 401
+    c = _db()
+    rows = [dict(r) for r in c.execute("""
+        SELECT p.id,p.title,p.summary,p.owner,p.active,p.open_until,p.created_at,
+               m.nickname AS owner_name,
+               (SELECT COUNT(*) FROM mp_poll_answer a WHERE a.poll_id=p.id) AS answers,
+               (SELECT COUNT(*) FROM mp_poll_answer a WHERE a.poll_id=p.id
+                AND a.member_id=?) AS mine
+        FROM mp_poll p LEFT JOIN mp_member m ON m.member_id=p.owner
+        ORDER BY p.id DESC LIMIT 40""", (u['member_id'],)).fetchall()]
+    c.close()
+    return jsonify(ok=True, polls=rows)
+
+
+@bp.route('/api/mp/poll/<int:pid>')
+def mp_poll_get(pid):
+    u = me()
+    if not u:
+        return jsonify(ok=False), 401
+    c = _db()
+    p = c.execute('SELECT * FROM mp_poll WHERE id=?', (pid,)).fetchone()
+    if not p:
+        c.close(); return jsonify(ok=False, error='見つかりません'), 404
+    mine = c.execute('SELECT ans FROM mp_poll_answer WHERE poll_id=? AND member_id=?',
+                     (pid, u['member_id'])).fetchone()
+    rows = [dict(r) for r in c.execute(
+        'SELECT * FROM mp_poll_answer WHERE poll_id=?', (pid,)).fetchall()]
+    c.close()
+
+    qs = json.loads(p['qs'])
+    # えらんだ数を かぞえる
+    tally = []
+    for i, q in enumerate(qs):
+        cnt = {}
+        for r in rows:
+            try:
+                a = json.loads(r['ans'])
+            except Exception:
+                continue
+            v = a.get(str(i))
+            for x in (v if isinstance(v, list) else [v]):
+                if x is None or x == '':
+                    continue
+                cnt[str(x)] = cnt.get(str(x), 0) + 1
+        tally.append(cnt)
+
+    return jsonify(ok=True, poll={
+        'id': p['id'], 'title': p['title'], 'summary': p['summary'],
+        'owner': p['owner'], 'active': p['active'], 'anonymous': p['anonymous'],
+        'open_until': p['open_until'], 'qs': qs},
+        answered=bool(mine), my_answer=(json.loads(mine['ans']) if mine else None),
+        total=len(rows), tally=tally,
+        is_owner=(p['owner'] == u['member_id']))
+
+
+@bp.route('/api/mp/poll', methods=['POST'])
+def mp_poll_new():
+    u = me()
+    if not u:
+        return jsonify(ok=False), 401
+    d = request.get_json(silent=True) or {}
+    t = (d.get('title') or '').strip()
+    qs = d.get('qs') or []
+    if not t:
+        return jsonify(ok=False, error='だいめいを 入れてください'), 400
+    if not qs or len(qs) > 15:
+        return jsonify(ok=False, error='しつもんは 1〜15こ です'), 400
+    clean = []
+    for q in qs:
+        qt = (q.get('q') or '').strip()
+        if not qt:
+            continue
+        typ = q.get('type') if q.get('type') in ('one', 'many', 'text') else 'one'
+        ch = [str(x).strip()[:60] for x in (q.get('choices') or []) if str(x).strip()]
+        if typ in ('one', 'many') and len(ch) < 2:
+            return jsonify(ok=False, error='えらぶ ものは 2つ いじょう ならべてください'), 400
+        clean.append({'q': qt[:150], 'type': typ, 'choices': ch[:12]})
+    if not clean:
+        return jsonify(ok=False, error='しつもんが ありません'), 400
+    c = _db()
+    cur = c.execute("""INSERT INTO mp_poll(title,summary,qs,owner,anonymous,open_until)
+                       VALUES(?,?,?,?,?,?)""",
+                    (t[:100], (d.get('summary') or '')[:300],
+                     json.dumps(clean, ensure_ascii=False), u['member_id'],
+                     1 if d.get('anonymous') else 0, d.get('open_until') or None))
+    c.commit(); pid = cur.lastrowid; c.close()
+    return jsonify(ok=True, id=pid)
+
+
+@bp.route('/api/mp/poll/<int:pid>/answer', methods=['POST'])
+def mp_poll_answer(pid):
+    """こたえる。1人1回だけ（DBの鍵で ふせぐ）。"""
+    u = me()
+    if not u:
+        return jsonify(ok=False, error='ログインしてください'), 401
+    d = request.get_json(silent=True) or {}
+    c = _db()
+    p = c.execute('SELECT active, open_until FROM mp_poll WHERE id=?', (pid,)).fetchone()
+    if not p:
+        c.close(); return jsonify(ok=False, error='見つかりません'), 404
+    if not p['active']:
+        c.close(); return jsonify(ok=False, error='この 投票は おわりました'), 403
+    try:
+        c.execute('INSERT INTO mp_poll_answer(poll_id,member_id,ans) VALUES(?,?,?)',
+                  (pid, u['member_id'],
+                   json.dumps(d.get('ans') or {}, ensure_ascii=False)[:4000]))
+    except Exception:
+        c.close(); return jsonify(ok=False, error='もう こたえて います'), 409
+    c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+@bp.route('/api/mp/poll/<int:pid>/close', methods=['POST'])
+def mp_poll_close(pid):
+    u = me()
+    if not u:
+        return jsonify(ok=False), 401
+    d = request.get_json(silent=True) or {}
+    c = _db()
+    p = c.execute('SELECT owner FROM mp_poll WHERE id=?', (pid,)).fetchone()
+    if not p or (p['owner'] != u['member_id'] and my_tier(u) != 'admin'):
+        c.close(); return jsonify(ok=False, error='つくった人だけです'), 403
+    c.execute('UPDATE mp_poll SET active=? WHERE id=?',
+              (1 if d.get('open') else 0, pid))
+    c.commit(); c.close()
+    return jsonify(ok=True)
