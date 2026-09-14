@@ -43,6 +43,7 @@ window.showToast = window.toast;
 # key: (テンプレート, 表示名, 管理者専用か)
 PAGES = {
     'errors': ('admin/errors.html', 'エラー監視', True),
+    'mpadmin': ('admin/mpadmin.html', '会員システム', True),
     'ops': ('admin/ops.html', 'システム状況', True),
     'alert': ('admin/alert.html', '天気・防災情報', False),
     'call': ('admin/call.html', '通話', False),
@@ -1514,3 +1515,145 @@ def api_access_stats():
         return jsonify(ok=False, error=str(e)[:120]), 500
     c.close()
     return jsonify(ok=True, daily=daily, devices=dev, hours=hours)
+
+
+# ====================================================================
+# 会員システムの管理
+# ====================================================================
+
+@bp.route('/api/admin/mp/overview')
+def api_mp_overview():
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    c = _db()
+
+    def one(sql, d=0):
+        try:
+            r = c.execute(sql).fetchone()
+            return list(r)[0] if r else d
+        except Exception:
+            return d
+
+    stats = {
+        'members':  one("SELECT COUNT(*) FROM mp_member"),
+        'active':   one("SELECT COUNT(*) FROM mp_member WHERE status='active'"),
+        'apps':     one("SELECT COUNT(*) FROM mp_app WHERE status='published'"),
+        'drafts':   one("SELECT COUNT(*) FROM mp_app WHERE status='draft'"),
+        'files':    one("SELECT COUNT(*) FROM mp_file"),
+        'comments': one("SELECT COUNT(*) FROM mp_comment WHERE hidden=0"),
+        'data':     one("SELECT COUNT(*) FROM mp_appdata WHERE hidden=0"),
+        'reports':  one("SELECT COUNT(*) FROM mp_report WHERE status='open'"),
+        'new7':     one("SELECT COUNT(*) FROM mp_member "
+                        "WHERE created_at > datetime('now','localtime','-7 days')"),
+        'apps7':    one("SELECT COUNT(*) FROM mp_app "
+                        "WHERE created_at > datetime('now','localtime','-7 days')"),
+    }
+
+    members = [dict(r) for r in c.execute("""
+        SELECT m.member_id, m.nickname, m.tier, m.status, m.grade, m.show_grade,
+               m.created_at, m.last_login, m.invited_by,
+               (SELECT COUNT(*) FROM mp_app a WHERE a.member_id=m.member_id
+                AND a.status='published') AS apps,
+               (SELECT COALESCE(SUM(likes),0) FROM mp_app a
+                WHERE a.member_id=m.member_id) AS likes
+        FROM mp_member m ORDER BY m.id DESC LIMIT 200""").fetchall()]
+
+    apps = [dict(r) for r in c.execute("""
+        SELECT a.id, a.title, a.member_id, a.status, a.likes, a.views,
+               a.created_at, m.nickname
+        FROM mp_app a LEFT JOIN mp_member m ON m.member_id=a.member_id
+        ORDER BY a.id DESC LIMIT 100""").fetchall()]
+
+    reports = [dict(r) for r in c.execute("""
+        SELECT r.*, a.title, a.member_id AS author
+        FROM mp_report r LEFT JOIN mp_app a ON a.id=r.app_id
+        ORDER BY r.id DESC LIMIT 50""").fetchall()]
+
+    invites = [dict(r) for r in c.execute(
+        'SELECT * FROM mp_invite ORDER BY rowid DESC LIMIT 50').fetchall()]
+
+    c.close()
+    return jsonify(ok=True, stats=stats, members=members, apps=apps,
+                   reports=reports, invites=invites)
+
+
+@bp.route('/api/admin/mp/member/<mid>', methods=['POST'])
+def api_mp_member(mid):
+    """会員の状態を変える。止める・もどす・区分を変える。"""
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    d = request.get_json(silent=True) or {}
+    c = _db()
+    if d.get('status') in ('active', 'suspended', 'banned'):
+        c.execute('UPDATE mp_member SET status=?, note=? WHERE member_id=?',
+                  (d['status'], (d.get('note') or '')[:300], mid))
+    if d.get('tier') in ('regular', 'invited', 'staff'):
+        c.execute('UPDATE mp_member SET tier=? WHERE member_id=?', (d['tier'], mid))
+    c.commit(); c.close()
+    audit('mp_member_' + (d.get('status') or d.get('tier') or 'edit'), mid,
+          d.get('note') or '')
+    return jsonify(ok=True)
+
+
+@bp.route('/api/admin/mp/app/<int:aid>', methods=['POST'])
+def api_mp_app(aid):
+    """作品を隠す・もどす。消さずに下書きへ戻す。"""
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    d = request.get_json(silent=True) or {}
+    st = d.get('status')
+    if st not in ('published', 'draft', 'removed'):
+        return jsonify(ok=False, error='状態が不正です'), 400
+    c = _db()
+    c.execute('UPDATE mp_app SET status=?, removed_by=?, removed_why=? WHERE id=?',
+              (st, session.get('staff_id') if st == 'removed' else None,
+               (d.get('why') or '')[:300] if st == 'removed' else None, aid))
+    c.commit(); c.close()
+    audit('mp_app_' + st, str(aid), d.get('why') or '')
+    return jsonify(ok=True)
+
+
+@bp.route('/api/admin/mp/report/<int:rid>', methods=['POST'])
+def api_mp_report(rid):
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    d = request.get_json(silent=True) or {}
+    c = _db()
+    c.execute("UPDATE mp_report SET status=?, handled_by=?, "
+              "handled_at=datetime('now','localtime') WHERE id=?",
+              (d.get('status') or 'closed', session.get('staff_id'), rid))
+    c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+@bp.route('/api/admin/mp/invite', methods=['POST'])
+def api_mp_invite():
+    """会員の招待コードを作る"""
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    import secrets as _s
+    d = request.get_json(silent=True) or {}
+    code = (d.get('code') or '').strip().upper() or ('MP-' + _s.token_hex(3).upper())
+    c = _db()
+    try:
+        c.execute("""INSERT INTO mp_invite(code,owner,note,max_uses,created_by)
+                     VALUES(?,?,?,?,?)""",
+                  (code, (d.get('owner') or '').strip() or None,
+                   (d.get('note') or '')[:200], int(d.get('max_uses') or 10),
+                   session.get('staff_id')))
+    except Exception:
+        c.close(); return jsonify(ok=False, error='そのコードは既にあります'), 409
+    c.commit(); c.close()
+    return jsonify(ok=True, code=code)
+
+
+@bp.route('/api/admin/mp/invite/<code>', methods=['POST'])
+def api_mp_invite_edit(code):
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    d = request.get_json(silent=True) or {}
+    c = _db()
+    c.execute('UPDATE mp_invite SET active=? WHERE code=?',
+              (1 if d.get('active') else 0, code))
+    c.commit(); c.close()
+    return jsonify(ok=True)
