@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ title }}</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>{{ favicon }}</text></svg>">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;
+  background:#f7fafb;color:#0a1628;display:flex;flex-direction:column}
+#stage{flex:1;position:relative;min-height:0}
+iframe{width:100%;height:100%;border:none;display:block;background:#fff}
+#out{position:absolute;inset:0;overflow:auto;padding:20px;background:#0a1628;
+  color:#cfe3ea;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13.5px;
+  line-height:1.7;white-space:pre-wrap;word-break:break-all;display:none}
+#out.on{display:block}
+#out .e{color:#fca5a5}
+#loading{position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;flex-direction:column;gap:12px;background:#fff;z-index:5}
+#loading i{width:30px;height:30px;border:3px solid #e2e8f0;border-top-color:#22d3ee;
+  border-radius:50%;animation:sp .7s linear infinite;display:block}
+@keyframes sp{to{transform:rotate(360deg)}}
+#loading span{font-size:12.5px;color:#7a8794}
+.ft{padding:7px 14px;font-size:11px;color:#9aa8b2;text-align:center;
+  background:#fff;border-top:1px solid #e8eef1;display:flex;
+  align-items:center;justify-content:center;gap:8px;flex:none}
+.ft a{color:#0891b2;text-decoration:none}
+.ft a:hover{text-decoration:underline}
+.ft button{background:none;border:1px solid #e2e8f0;border-radius:6px;
+  padding:3px 9px;font-size:11px;cursor:pointer;color:#7a8794;font-family:inherit}
+.ft button:hover{background:#f1f5f9}
+</style></head><body>
+
+<div id="stage">
+  <div id="loading"><i></i><span>よみこみ中…</span></div>
+  <iframe id="fr" sandbox="allow-scripts allow-modals"></iframe>
+  <div id="out"></div>
+</div>
+<div class="ft">
+  <span>{{ title }}</span>
+  <button onclick="fullScreen()">⛶ 全画面</button>
+  <button onclick="location.reload()">↻ もう一度</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+<script>
+var FILES = {{ files_json | safe }};
+var TABLES = {{ tables_json | safe }};
+var APP_ID = {{ app_id }};
+var PYO = null, SQLJS = null;
+
+function $(i){ return document.getElementById(i); }
+function W(s, cls){
+  var d = document.createElement('div');
+  if (cls) d.className = cls;
+  d.textContent = s;
+  $('out').appendChild(d);
+  $('out').classList.add('on');
+}
+
+function fullScreen(){
+  var el = document.documentElement;
+  if (document.fullscreenElement) document.exitFullscreen();
+  else if (el.requestFullscreen) el.requestFullscreen();
+}
+
+function tablesToSql(ts){
+  var out = [];
+  (ts||[]).forEach(function(t){
+    out.push('CREATE TABLE ' + t.name + '(' +
+      t.cols.map(function(c){ return c.name + ' ' + c.type; }).join(', ') + ');');
+    t.rows.forEach(function(r){
+      var v = t.cols.map(function(c, i){
+        var x = r[i];
+        if (x === '' || x == null) return 'NULL';
+        if (c.type === 'TEXT') return "'" + String(x).split("'").join("''") + "'";
+        return isNaN(Number(x)) ? "'" + String(x).split("'").join("''") + "'" : Number(x);
+      });
+      out.push('INSERT INTO ' + t.name + ' VALUES(' + v.join(', ') + ');');
+    });
+  });
+  return out.join('\n');
+}
+
+async function run(){
+  var find = function(k){ return FILES.filter(function(f){ return f.kind === k; }); };
+  var htmls = find('html'), csss = find('css'), jss = find('js'), pys = find('py');
+  var sql = tablesToSql(TABLES);
+
+  // HTML が あれば それを 画面に する
+  if (htmls.length){
+    var head = csss.map(function(f){ return '<style>' + f.content + '</style>'; }).join('');
+    var tail = jss.map(function(f){
+      return '<scr' + 'ipt>try{' + f.content + '}catch(e){'
+        + 'document.body.innerHTML+="<pre style=color:red>"+e+"</pre>"}</scr' + 'ipt>';
+    }).join('');
+    var eh = htmls.filter(function(f){ return f.is_entry; })[0] || htmls[0];
+    $('fr').srcdoc = '<style>html,body{height:100%;margin:0}'
+      + 'body{font-family:sans-serif;padding:14px}</style>' + head + eh.content + tail;
+    $('loading').style.display = 'none';
+    if (!pys.length) return;
+  }
+
+  if (sql){
+    try {
+      if (!SQLJS) SQLJS = await initSqlJs({locateFile: function(f){
+        return 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/' + f; }});
+      var db = new SQLJS.Database();
+      var res = db.exec(sql);
+      res.forEach(function(r){
+        W(r.columns.join(' | '));
+        r.values.forEach(function(v){ W(v.join(' | ')); });
+      });
+      db.close();
+    } catch(e){ W(String(e), 'e'); }
+  }
+
+  if (pys.length){
+    try {
+      if (!PYO) PYO = await loadPyodide();
+      PYO.setStdout({batched: function(s){ W(s); }});
+      PYO.setStderr({batched: function(s){ W(s, 'e'); }});
+      PYO.setStdin({stdin: function(){
+        var v = window.prompt('入力してください');
+        return (v === null ? '' : v) + String.fromCharCode(10);
+      }});
+      try { PYO.FS.mkdir('/work'); } catch(e){}
+      FILES.forEach(function(f){
+        var ps = f.path.split('/'), dir = '/work';
+        for (var i = 0; i < ps.length - 1; i++){
+          dir += '/' + ps[i];
+          try { PYO.FS.mkdir(dir); } catch(e){}
+        }
+        try { PYO.FS.writeFile('/work/' + f.path, f.content); } catch(e){}
+      });
+      await PYO.runPythonAsync('import sys, os\nos.chdir("/work")\n'
+        + 'if "/work" not in sys.path: sys.path.insert(0, "/work")\n');
+      if (sql){
+        PYO.globals.set('_mp_sql', sql);
+        await PYO.runPythonAsync('import sqlite3\n_c = sqlite3.connect("app.db")\n'
+          + '_c.executescript(_mp_sql)\n_c.commit()\n_c.close()\n');
+      }
+      var ep = pys.filter(function(f){ return f.is_entry; })[0] || pys[0];
+      $('loading').style.display = 'none';
+      await PYO.runPythonAsync(ep.content);
+    } catch(e){
+      W(String(e).split('\n').slice(-4).join('\n'), 'e');
+    }
+  }
+  $('loading').style.display = 'none';
+  if (!htmls.length && !$('out').innerHTML) W('（なにも 出ませんでした）');
+}
+run();
+</script></body></html>

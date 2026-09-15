@@ -211,36 +211,134 @@ body.furi .lead{font-size:13.5px}
   .blk-palette{width:auto;max-height:150px}
 }
 
+
+.menu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+  gap:12px}
+.menu-card{background:#fff;border:1px solid var(--line);border-radius:14px;
+  padding:18px 16px;cursor:pointer;transition:.15s;text-align:center}
+.menu-card:hover{border-color:var(--cy2);transform:translateY(-3px);
+  box-shadow:0 6px 18px rgba(10,22,40,.1)}
+.menu-card .ic{font-size:32px;line-height:1.2}
+.menu-card .t{font-weight:700;font-size:14px;margin-top:7px}
+.menu-card .d{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.6}
+.rulebox{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;
+  padding:11px 14px;font-size:12px;color:#78350f;line-height:1.8;margin-bottom:16px}
+.rulebox b{display:block;margin-bottom:3px;font-size:12.5px}
+
+/* --- 上のバー --- */
+.hd{padding:12px 20px}
+.hd .whoami{font-size:12px;color:#7d95a8;margin-right:6px;white-space:nowrap}
+.cat{background:#123047;padding:0 18px;display:flex;gap:1px;overflow-x:auto;
+  position:sticky;top:45px;z-index:49;scrollbar-width:none}
+.cat::-webkit-scrollbar{display:none}
+.cat button{background:none;border:none;color:#9fc4d4;font-size:13px;cursor:pointer;
+  padding:11px 17px;font-family:inherit;white-space:nowrap;
+  border-bottom:2px solid transparent;transition:.12s}
+.cat button:hover{color:#fff;background:rgba(255,255,255,.07)}
+.cat button.on{color:#fff;border-bottom-color:#22d3ee;font-weight:700}
+.cat button.soon{opacity:.5}
+.sub{background:#fff;border-bottom:1px solid var(--line);padding:0 18px;
+  display:flex;gap:2px;overflow-x:auto;position:sticky;top:87px;z-index:48;
+  scrollbar-width:none;min-height:40px;align-items:center}
+.sub::-webkit-scrollbar{display:none}
+.sub button{background:none;border:none;color:#7a8794;font-size:12.5px;cursor:pointer;
+  padding:9px 14px;font-family:inherit;white-space:nowrap;border-radius:8px;
+  transition:.12s}
+.sub button:hover{background:#eef4f6;color:var(--navy)}
+.sub button.on{background:#cffafe;color:#0e7490;font-weight:600}
+.sub .note{font-size:11.5px;color:#9aa8b2;margin-left:auto;padding-right:4px;
+  white-space:nowrap}
+
+/* --- ホーム --- */
+.hero{padding:34px 32px;margin-bottom:24px}
+.hero h1{font-size:25px;margin-bottom:10px}
+.hero p{font-size:14px;line-height:1.9;margin-bottom:22px}
+.hero .stats{gap:34px}
+.hero .stat b{font-size:32px;line-height:1.1}
+.hero .stat span{font-size:12px;display:block;margin-top:2px}
+.menu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:13px}
+.menu-card{background:#fff;border:1px solid var(--line);border-radius:14px;
+  padding:22px 16px 20px;cursor:pointer;transition:.15s;text-align:center;
+  display:flex;flex-direction:column;align-items:center;min-height:156px}
+.menu-card:hover{border-color:var(--cy2);transform:translateY(-3px);
+  box-shadow:0 6px 18px rgba(10,22,40,.1)}
+.menu-card .ic{font-size:34px;line-height:1;margin-bottom:10px}
+.menu-card .t{font-size:14.5px;font-weight:700;margin:0 0 6px;
+  display:flex;align-items:center;gap:6px;justify-content:center;flex-wrap:wrap}
+.menu-card .d{font-size:12px;line-height:1.65;color:var(--muted);max-width:15em}
+.menu-card.soon{background:#f7f9fa;border-style:dashed}
+.menu-card.soon .ic{filter:grayscale(1);opacity:.5}
+.menu-card.soon .t,.menu-card.soon .d{color:#9aa8b2}
+.menu-card.soon:hover{transform:none;border-color:var(--line);box-shadow:none}
+.soon-tag{font-size:10px;background:#e2e8f0;color:#64748b;padding:2px 8px;
+  border-radius:99px;font-weight:600}
+
+.rulebox{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;
+  padding:11px 14px;font-size:12px;color:#78350f;line-height:1.8;margin-bottom:16px}
+.rulebox b{display:block;margin-bottom:3px;font-size:12.5px}
+.wrap{max-width:1040px;padding:24px 20px 80px}
+
+@media(max-width:600px){
+  .hd{padding:10px 14px}
+  .cat{padding:0 10px;top:41px}
+  .cat button{padding:10px 13px;font-size:12.5px}
+  .sub{padding:0 10px;top:80px}
+  .sub button{padding:8px 11px;font-size:12px}
+  .hero{padding:24px 20px}
+  .hero h1{font-size:20px}
+  .wrap{padding:16px 13px 70px}
+  .menu-grid{grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px}
+}
+
+#bigWrap{position:fixed;inset:0;z-index:150;background:#f7fafb;
+  display:none;flex-direction:column}
+#bigWrap.on{display:flex}
+#bigBar{background:#0a1628;color:#fff;padding:8px 14px;display:flex;
+  align-items:center;gap:8px;font-size:13px;flex:none}
+#bigBar .btn{padding:4px 11px;font-size:11.5px}
+#bigBar .btn.gh{border-color:#2a4360;color:#cfe3ea}
+#bigBar .btn.gh:hover{background:#123047}
+#bigStage{flex:1;position:relative;min-height:0}
+#bigFrame{width:100%;height:100%;border:none;background:#fff;display:block}
+#bigOut{position:absolute;inset:0;overflow:auto;padding:18px;background:#0a1628;
+  color:#cfe3ea;display:none;border-radius:0;max-height:none}
+#bigOut.on{display:block}
 </style></head><body>
 
 <div class="hd">
-  <span class="logo">MIRAI<span>POWER</span></span>
+  <span class="logo" onclick="go('home')" title="ホームへ">MIRAI<span>POWER</span></span>
   <span class="sp"></span>
-  <button id="nvHome" class="on" onclick="go('home')">みんなの作品</button>
-  <button id="nvMine" onclick="go('mine')" style="display:none">自分の作品</button>
-  <button id="nvEdit" onclick="newApp()" style="display:none">＋作る</button>
-  <button id="nvBlock" onclick="go('block')" style="display:none">🧩ブロック</button>
-  <button id="nvFavs" onclick="go('favs')" style="display:none">お気に入り</button>
-  <button id="nvNotice" onclick="go('notices')" style="display:none">🔔<span id="nvBadge"></span></button>
-  <button id="nvProf" onclick="openProfile()" style="display:none">設定</button>
-  <button id="nvRules" onclick="go('rules')">きまり</button>
+  <span class="whoami" id="whoami"></span>
+  <button id="nvNotice" onclick="go('notices')" title="おしらせ"
+    style="display:none">🔔<span id="nvBadge"></span></button>
+  <button id="nvProf" onclick="openProfile()" title="せってい"
+    style="display:none">⚙</button>
   <button id="nvLogin" onclick="go('login')">ログイン</button>
   <button id="nvOut" onclick="logout()" style="display:none">ログアウト</button>
 </div>
+<div class="cat" id="catBar"></div>
+<div class="sub" id="subBar"></div>
 
 <div class="wrap">
 
-  <!-- みんなの作品 -->
+  <!-- ホーム（入口） -->
   <div class="pane on" id="p-home">
     <div class="hero">
       <h1>つくったものを、見せあう場所</h1>
-      <p>プログラミングは、大人だけのものじゃない。<br>
-         小学生でも、中学生でも、作ったものをここに置けます。</p>
+      <p>プログラミングは、大人だけの ものじゃない。<br>
+         小学生でも、中学生でも、つくった ものを ここに 置けます。</p>
       <div class="stats">
         <div class="stat"><b id="stApps">0</b><span>作品</span></div>
-        <div class="stat"><b id="stPeople">0</b><span>作った人</span></div>
+        <div class="stat"><b id="stPeople">0</b><span>つくった人</span></div>
       </div>
     </div>
+    <div class="menu-grid" id="homeMenu"></div>
+  </div>
+
+  <!-- みんなの作品 -->
+  <div class="pane" id="p-apps">
+    <h1>📦 みんなの作品</h1>
+    <div class="rulebox" id="rb-apps"></div>
     <div class="row">
       <input class="inp" id="qText" placeholder="さがす" style="flex:1;min-width:150px"
              onkeydown="if(event.key==='Enter')loadApps()">
@@ -254,6 +352,41 @@ body.furi .lead{font-size:13.5px}
     </div>
     <div class="row" id="tagBar" style="margin-bottom:12px"></div>
     <div class="grid" id="appList"><div class="empty">読み込み中…</div></div>
+  </div>
+
+  <!-- つぶやき -->
+  <div class="pane" id="p-talk">
+    <h1>💬 つぶやき</h1>
+    <div class="rulebox" id="rb-talk"></div>
+    <div id="talkBody"></div>
+  </div>
+
+  <!-- みんなの図鑑 -->
+  <div class="pane" id="p-wiki">
+    <h1>📖 みんなの図鑑</h1>
+    <div class="rulebox" id="rb-wiki"></div>
+    <div id="wikiBody"></div>
+  </div>
+
+  <!-- 作品の棚 -->
+  <div class="pane" id="p-shelf">
+    <h1>🗂 作品の棚</h1>
+    <div class="rulebox" id="rb-shelf"></div>
+    <div id="shelfBody"></div>
+  </div>
+
+  <!-- しつもん -->
+  <div class="pane" id="p-qa">
+    <h1>❓ しつもん</h1>
+    <div class="rulebox" id="rb-qa"></div>
+    <div id="qaBody"></div>
+  </div>
+
+  <!-- とうひょう -->
+  <div class="pane" id="p-poll">
+    <h1>🗳 とうひょう</h1>
+    <div class="rulebox" id="rb-poll"></div>
+    <div id="pollBody"></div>
   </div>
 
   <!-- 自分の作品 -->
@@ -315,6 +448,8 @@ body.furi .lead{font-size:13.5px}
       <button class="btn gh" onclick="saveApp(false)">下書きに保存</button>
       <button class="btn" onclick="saveApp(true)">公開する</button>
       <button class="btn gh sm" onclick="showVersions()">前のに もどす</button>
+      <button class="btn gh sm" onclick="bigRun()">⛶ 大きく</button>
+      <button class="btn gh sm" onclick="openPages()">🌐 ページ</button>
       <span class="sp" style="flex:1"></span>
       <button class="btn gh sm" id="eDel" onclick="delApp()" style="display:none">作品を削除</button>
     </div>
@@ -462,6 +597,18 @@ body.furi .lead{font-size:13.5px}
 </div>
 
 <div class="modal" id="modal"><div class="mbox" id="modalBody"></div></div>
+<div id="bigWrap">
+  <div id="bigBar">
+    <span id="bigTitle">けっか</span>
+    <span style="flex:1"></span>
+    <button class="btn gh sm" onclick="bigRun()">↻ もう一度</button>
+    <button class="btn gh sm" onclick="bigClose()">✕ とじる</button>
+  </div>
+  <div id="bigStage">
+    <iframe id="bigFrame" sandbox="allow-scripts allow-modals"></iframe>
+    <div id="bigOut" class="out"></div>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
@@ -480,6 +627,8 @@ function P(u,b){ return J(u,{method:'POST',headers:{'Content-Type':'application/
 var URLS = {home:'/member', mine:'/member/mine', rules:'/member/rules',
             login:'/member/login', edit:'/member/edit', view:null,
             favs:'/member/favs', notices:'/member/notices', author:null,
+            apps:'/member/apps', talk:'/member/talk', wiki:'/member/wiki',
+            shelf:'/member/shelf', qa:'/member/qa', poll:'/member/poll',
             block:'/member/block'};
 
 function setUrl(path){
@@ -487,13 +636,25 @@ function setUrl(path){
     history.pushState({}, '', path);
 }
 
+var CURPAGE = 'home';
 function go(p){
+  CURPAGE = p;
+  if (PAGE_CAT[p] && PAGE_CAT[p] !== CURCAT){ CURCAT = PAGE_CAT[p]; }
+  drawCat();
   document.querySelectorAll('.pane').forEach(function(x){ x.classList.toggle('on', x.id==='p-'+p); });
   if (URLS[p]) setUrl(URLS[p]);
   document.querySelectorAll('.hd button').forEach(function(b){ b.classList.remove('on'); });
-  var nv = {home:'nvHome', mine:'nvMine', rules:'nvRules', login:'nvLogin'}[p];
+  var nv = {home:'nvHome', apps:'nvApps', mine:'nvMine', rules:'nvRules',
+            login:'nvLogin', favs:'nvFavs', block:'nvBlock',
+            notices:'nvNotice'}[p];
   if (nv && $(nv)) $(nv).classList.add('on');
-  if (p==='home') loadApps();
+  if (p==='home'){ drawHomeMenu(); loadStats(); }
+  if (p==='apps'){ drawRule('apps'); loadApps(); }
+  ['talk','wiki','shelf','qa','poll'].forEach(function(x){
+    if (p===x){ drawRule(x);
+      comingSoon(x, {talk:'つぶやき', wiki:'みんなの図鑑', shelf:'作品の棚',
+                     qa:'しつもん', poll:'とうひょう'}[x]); }
+  });
   if (p==='mine') loadMine();
   if (p==='rules') loadRules();
   if (p==='favs') loadFavs();
@@ -507,7 +668,7 @@ async function refreshMe(){
   var d = await J('/api/mp/me');
   ME = d.logged_in ? d : null;
   if (ME && ME.need_nick){ askNick(); }
-  ['nvMine','nvEdit','nvOut'].forEach(function(i){
+  ['nvNotice','nvProf','nvOut'].forEach(function(i){
     $(i).style.display = ME ? '' : 'none'; });
   $('nvLogin').style.display = ME ? 'none' : '';
   document.body.classList.toggle('furi', !!(ME && ME.furigana));
@@ -553,6 +714,13 @@ function appCard(a, mine){
     + '<span>♡ '+(a.likes||0)+'</span><span>👁 '+(a.views||0)+'</span>'
     + day + (a.forked_from ? '<span>🔀 コピー</span>' : '') + fav + '</div></div>';
 }
+async function loadStats(){
+  var d = await J('/api/mp/apps?sort=new');
+  if (!d.ok) return;
+  if ($('stApps')) $('stApps').textContent = d.total_apps;
+  if ($('stPeople')) $('stPeople').textContent = d.total_people;
+}
+
 async function loadApps(){
   var d = await J('/api/mp/apps?sort=' + $('qSort').value
     + '&q=' + encodeURIComponent($('qText').value)
@@ -756,8 +924,9 @@ async function saveNick(){
 // 会員でなければ、ログイン画面だけを見せる
 function gate(){
   var inside = !!ME;
-  ['nvHome','nvMine','nvEdit','nvRules','nvFavs','nvNotice','nvProf','nvBlock'].forEach(function(i){
+  ['nvNotice','nvProf'].forEach(function(i){
     if ($(i)) $(i).style.display = inside ? '' : 'none'; });
+  if ($('whoami')) $('whoami').textContent = inside ? (ME.nickname || '') : '';
   if (inside) checkNotices();
   $('nvLogin').style.display = inside ? 'none' : '';
   $('nvOut').style.display = inside ? '' : 'none';
@@ -1524,6 +1693,244 @@ async function saveProfile(){
   if ($('p-home').classList.contains('on')) loadApps();
 }
 
+
+/* ============ ホーム と ページごとの きまり ============ */
+var HOME_MENU = [
+  ['🧩','ブロックで つくる','ならべるだけ。はじめての人へ','block',1],
+  ['✏️','コードで つくる','Python や HTML で 自由に','edit',1],
+  ['📦','みんなの作品','ほかの人の 作品を 見る','apps',1],
+  ['💬','つぶやき','いまの きもちを ひとこと','talk',0],
+  ['📖','みんなの図鑑','みんなで ひとつの 図鑑を つくる','wiki',0],
+  ['🗂','作品の棚','テーマごとに 作品を あつめる','shelf',0],
+  ['❓','しつもん','こまったら きいてみる','qa',0],
+  ['🗳','とうひょう','みんなで きめる','poll',0]
+];
+
+var PAGE_RULES = {
+  apps:  ['見るときの きまり',
+          'いいと おもったら ♡ を おしてあげて ください。'
+          + 'まねしたい ときは「コピーして つくる」を つかうと、'
+          + 'つくった人の 名前が のこります。'],
+  talk:  ['つぶやきの きまり',
+          '本名・住所・学校の くわしい 場所は 書かないで ください。'
+          + '人が いやがる ことは 書かない。けんかに なりそうな ときは 手を とめる。'],
+  wiki:  ['図鑑の きまり',
+          'だれでも 直せます。だから まちがえても だいじょうぶ。'
+          + 'ほかの人が 書いた ものを けすときは、りゆうを 書いて ください。'
+          + 'コピーして きた 文は はりつけない。'],
+  shelf: ['棚の きまり',
+          'テーマに あう 作品を 入れて ください。'
+          + '自分の 作品だけを 入れつづける のは やめましょう。'],
+  qa:    ['しつもんの きまり',
+          'こまって いることを くわしく 書くと、こたえが つきやすい です。'
+          + 'こたえて もらったら、お礼を いいましょう。'
+          + 'わからない ことを きくのは、はずかしい ことでは ありません。'],
+  poll:  ['とうひょうの きまり',
+          'ひとり 1回 だけです。あとから 変えられません。'
+          + '人を きずつける しつもんは つくらない。']
+};
+
+function drawHomeMenu(){
+  var el = $('homeMenu');
+  if (!el) return;
+  el.innerHTML = HOME_MENU.map(function(m){
+    var ready = m[4];
+    return '<div class="menu-card' + (ready ? '' : ' soon') + '" onclick="'
+      + (ready ? (m[3] === 'edit' ? 'newApp()' : "go('" + m[3] + "')")
+               : "notReady('" + K(m[1]) + "')") + '">'
+      + '<div class="ic">' + m[0] + '</div>'
+      + '<div class="t">' + K(m[1])
+      + (ready ? '' : '<span class="soon-tag">調整中</span>') + '</div>'
+      + '<div class="d">' + K(m[2]) + '</div></div>';
+  }).join('');
+}
+
+function notReady(name){
+  alert(name + ' は いま 調整中です。\nもう すこし 待って ください。');
+}
+
+function drawRule(page){
+  var el = $('rb-' + page);
+  if (!el) return;
+  var r = PAGE_RULES[page];
+  el.innerHTML = r ? '<b>' + K(r[0]) + '</b>' + K(r[1]) : '';
+}
+
+function comingSoon(page, title){
+  var el = $(page + 'Body');
+  if (el) el.innerHTML = '<div class="empty" style="padding:60px 0">'
+    + '<div style="font-size:42px">🚧</div>'
+    + '<div style="margin-top:10px;font-size:14px">' + K(title) + ' は いま つくって います</div>'
+    + '<div style="font-size:12px;margin-top:5px">もう すこし 待って ください</div>'
+    + '<button class="btn gh sm" style="margin-top:16px" onclick="go(\'home\')">'
+    + 'ホームへ もどる</button></div>';
+}
+
+
+
+/* ============ 大きく うごかす ============ */
+async function bigRun(){
+  if (FILES[CUR]) FILES[CUR].content = $('eCode').value;
+  var risks = checkRisk(FILES);
+  if (risks.length && !confirm('⚠ 気を つけて\n\n' + risks.join('\n\n')
+      + '\n\nそれでも うごかしますか？')) return;
+  $('bigTitle').textContent = $('eTitle').value || 'けっか';
+  $('bigWrap').classList.add('on');
+  $('bigOut').classList.remove('on');
+  $('bigOut').innerHTML = '';
+  window.MP_APP_ID = APP.id;
+  var sql = tablesToSql(TABLES);
+  await runFiles(FILES, {name:DB.name, schema:sql || DB.schema, seed:sql ? '' : DB.seed},
+                 $('bigOut'), $('bigFrame'));
+  if ($('bigOut').innerHTML) $('bigOut').classList.add('on');
+}
+function bigClose(){
+  $('bigWrap').classList.remove('on');
+  $('bigFrame').srcdoc = '';
+}
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape' && $('bigWrap').classList.contains('on')) bigClose();
+});
+
+/* ============ 公開ページ ============ */
+async function openPages(){
+  var d = await J('/api/mp/pages');
+  if (!d.ok){ alert(d.error); return; }
+  $('modalBody').innerHTML =
+      '<h1 style="font-size:18px;margin-bottom:4px">🌐 公開ページ</h1>'
+    + '<p class="lead">じぶんの URL で、作品だけを 見せられます。'
+    + '会員じゃない人にも 見せられます（家族や 友だちに どうぞ）。</p>'
+    + '<div class="note">つくれるのは ' + d.used + ' / '
+    + (d.limit >= 1e8 ? '無制限' : d.limit) + ' 個です</div>'
+    + '<div class="card" style="background:#f7f9fa">'
+    + '<b style="font-size:12.5px">＋ あたらしい ページ</b>'
+    + '<div class="row" style="margin-top:9px">'
+    + '<span style="font-size:12px;color:var(--muted)">/page/</span>'
+    + '<input class="inp" id="pgSlug" placeholder="mygame" style="flex:1;min-width:110px">'
+    + '<input class="inp" id="pgIcon" placeholder="🎮" maxlength="4" style="max-width:62px">'
+    + '</div>'
+    + '<div class="row">'
+    + '<select class="sel" id="pgApp" style="flex:1;min-width:130px">'
+    + (d.my_apps.length
+        ? d.my_apps.map(function(a){
+            return '<option value="' + a.id + '"' + (a.id===APP.id ? ' selected' : '')
+              + '>' + K(a.title) + '</option>'; }).join('')
+        : '<option value="">公開ずみの 作品が ありません</option>')
+    + '</select>'
+    + '<input class="inp" id="pgTitle" placeholder="タブに 出す 名前（任意）" '
+    + 'style="flex:1;min-width:130px"></div>'
+    + '<div class="row"><button class="btn" onclick="savePage()">つくる</button>'
+    + '<span id="pgMsg" style="font-size:12.5px"></span></div></div>'
+    + (d.pages.length
+        ? '<div class="sec" style="margin-top:16px">つくった ページ</div>'
+          + d.pages.map(function(p){
+              var url = location.origin + '/page/' + p.slug;
+              return '<div class="card" style="display:flex;align-items:center;gap:10px">'
+                + '<span style="font-size:22px">' + K(p.favicon || '🎈') + '</span>'
+                + '<div style="flex:1;min-width:0">'
+                + '<a href="/page/' + K(p.slug) + '" target="_blank" '
+                + 'style="color:var(--cy2);font-weight:600;font-size:13px">/page/'
+                + K(p.slug) + '</a>'
+                + '<div style="font-size:11.5px;color:var(--muted)">'
+                + K(p.app_title) + ' · 👁' + p.views + '</div></div>'
+                + '<button class="btn gh sm" onclick="copyPage(\'' + K(p.slug) + '\')">'
+                + 'リンク</button>'
+                + '<button class="btn gh sm" onclick="delPage(\'' + K(p.slug) + '\')">'
+                + 'けす</button></div>'; }).join('')
+        : '')
+    + '<div class="row" style="margin-top:12px">'
+    + '<button class="btn gh" onclick="closeModal()">とじる</button></div>';
+  $('modal').classList.add('on');
+}
+
+async function savePage(){
+  var slug = $('pgSlug').value.trim().toLowerCase();
+  var app = $('pgApp').value;
+  if (!slug){ $('pgMsg').style.color='#c0453b';
+    $('pgMsg').textContent='URLの名前を 入れてください'; return; }
+  if (!app){ $('pgMsg').style.color='#c0453b';
+    $('pgMsg').textContent='先に 作品を 公開してください'; return; }
+  var d = await P('/api/mp/page', {slug:slug, app_id:parseInt(app),
+    title:$('pgTitle').value, favicon:$('pgIcon').value});
+  if (!d.ok){ $('pgMsg').style.color='#c0453b'; $('pgMsg').textContent=d.error; return; }
+  openPages();
+}
+function copyPage(slug){
+  var url = location.origin + '/page/' + slug;
+  if (navigator.clipboard) navigator.clipboard.writeText(url).then(function(){
+    alert('コピーしました\n' + url); });
+  else prompt('この リンクを コピーしてください', url);
+}
+async function delPage(slug){
+  if (!confirm('/page/' + slug + ' を けしますか？')) return;
+  await fetch('/api/mp/page/' + slug, {method:'DELETE'});
+  openPages();
+}
+
+/* ============ 2段のメニュー ============ */
+var CATS = [
+  ['prog', '🧩 プログラミング', 1, [
+      ['block','🧩 ブロックで つくる',1],
+      ['edit','✏️ コードで つくる',1],
+      ['apps','📦 みんなの作品',1],
+      ['mine','📁 自分の作品',1],
+      ['favs','☆ お気に入り',1]]],
+  ['talk', '💬 つぶやき', 0, [
+      ['talk','ぜんぶ',0], ['talkg','グループ',0], ['talkf','フォロー中',0]]],
+  ['wiki', '📖 みんなの図鑑', 0, [
+      ['wiki','さがす',0], ['wikinew','新しく 書く',0]]],
+  ['shelf','🗂 作品の棚', 0, [
+      ['shelf','棚を さがす',0], ['shelfnew','棚を つくる',0]]],
+  ['qa',   '❓ しつもん', 0, [
+      ['qa','しつもんを 見る',0], ['qanew','しつもんする',0]]],
+  ['poll', '🗳 とうひょう', 0, [
+      ['poll','とうひょうする',0], ['pollnew','つくる',0]]]
+];
+
+var CURCAT = 'prog';
+
+/* どの ページが どの カテゴリか */
+var PAGE_CAT = {};
+CATS.forEach(function(c){ c[3].forEach(function(x){ PAGE_CAT[x[0]] = c[0]; }); });
+
+function drawCat(){
+  var el = $('catBar');
+  if (!el) return;
+  el.innerHTML = CATS.map(function(c){
+    return '<button class="' + (c[0]===CURCAT ? 'on' : '') + (c[2] ? '' : ' soon')
+      + '" onclick="pickCat(\'' + c[0] + '\')">' + c[1] + '</button>';
+  }).join('');
+  drawSub();
+}
+
+function drawSub(){
+  var el = $('subBar');
+  if (!el) return;
+  var c = CATS.filter(function(x){ return x[0] === CURCAT; })[0];
+  if (!c){ el.innerHTML = ''; return; }
+  var now = (typeof CURPAGE !== 'undefined') ? CURPAGE : '';
+  el.innerHTML = c[3].map(function(x){
+    return '<button class="' + (x[0]===now ? 'on' : '') + '" onclick="'
+      + (x[2] ? (x[0]==='edit' ? 'newApp()' : "go('" + x[0] + "')")
+              : "notReady('" + K(x[1].replace(/^[^ ]+ /, '')) + "')")
+      + '">' + K(x[1]) + (x[2] ? '' : ' <span class="soon-tag">準備中</span>') + '</button>';
+  }).join('') + (c[2] ? '' : '<span class="note">この ページは いま つくって います</span>');
+}
+
+function pickCat(cat){
+  var c = CATS.filter(function(x){ return x[0] === cat; })[0];
+  if (!c) return;
+  CURCAT = cat;
+  drawCat();
+  if (!c[2]){ return; }              // まだ つくって いない
+  var first = c[3].filter(function(x){ return x[2]; })[0];
+  if (first) go(first[0]);
+}
+
+/* ============ ホーム ============ */
+
+
+
 /* ============ セットA・B の画面 ============ */
 var CURTAG = '';
 
@@ -2140,6 +2547,7 @@ window.addEventListener('popstate', function(){
 var OPEN_APP = {% if open_app %}{{ open_app }}{% else %}null{% endif %};
 var OPEN_EDIT = {% if open_edit %}{{ open_edit }}{% else %}null{% endif %};
 
+drawCat();
 refreshMe().then(function(){
   gate();
   if (OPEN_APP && ME) viewApp(OPEN_APP);

@@ -1972,3 +1972,116 @@ def mp_poll_close(pid):
               (1 if d.get('open') else 0, pid))
     c.commit(); c.close()
     return jsonify(ok=True)
+
+
+# ====================================================================
+# 公開ページ
+#   /page/<slug> で、その作品だけを 出す。
+#   MIRAI POWER の 見た目は 出さない。自分の サイトのように 見せられる。
+# ====================================================================
+PAGE_LIMITS = {'admin': 10 ** 9, 'staff': 10, 'invited': 10, 'regular': 5}
+SLUG_RE = _re2.compile(r'^[a-z0-9][a-z0-9_-]{1,40}$')
+SLUG_NG = {'admin','api','member','static','page','login','qstart','setting',
+           'staff','s','home','about','terms','privacy','help','new','edit'}
+
+
+@bp.route('/api/mp/pages')
+def mp_pages():
+    u = me()
+    if not u:
+        return jsonify(ok=False, error='ログインしてください'), 401
+    c = _db()
+    rows = [dict(r) for r in c.execute("""
+        SELECT p.*, a.title AS app_title, a.status
+        FROM mp_page p JOIN mp_app a ON a.id = p.app_id
+        WHERE p.member_id=? ORDER BY p.created_at DESC""",
+        (u['member_id'],)).fetchall()]
+    apps = [dict(r) for r in c.execute(
+        "SELECT id,title FROM mp_app WHERE member_id=? AND status='published' "
+        "ORDER BY id DESC", (u['member_id'],)).fetchall()]
+    c.close()
+    t = my_tier(u)
+    return jsonify(ok=True, pages=rows, my_apps=apps,
+                   limit=PAGE_LIMITS[t], used=len(rows))
+
+
+@bp.route('/api/mp/page', methods=['POST'])
+def mp_page_new():
+    u = me()
+    if not u:
+        return jsonify(ok=False, error='ログインしてください'), 401
+    d = request.get_json(silent=True) or {}
+    slug = (d.get('slug') or '').strip().lower()
+    if not SLUG_RE.match(slug):
+        return jsonify(ok=False,
+            error='URLの名前は 小文字の英数字と - _ で、2〜41文字です'), 400
+    if slug in SLUG_NG:
+        return jsonify(ok=False, error='その名前は つかえません'), 400
+
+    t = my_tier(u)
+    limit = PAGE_LIMITS[t]
+    c = _db()
+    n = c.execute('SELECT COUNT(*) AS n FROM mp_page WHERE member_id=?',
+                  (u['member_id'],)).fetchone()
+    old = c.execute('SELECT member_id FROM mp_page WHERE slug=?', (slug,)).fetchone()
+    if old and old['member_id'] != u['member_id']:
+        c.close(); return jsonify(ok=False, error='その名前は つかわれています'), 409
+    if not old and n and n['n'] >= limit:
+        c.close()
+        return jsonify(ok=False, over_limit=True, limit=limit,
+            error=f'ページは {limit}個までです。どれかを けすと また つくれます'), 409
+
+    a = c.execute("SELECT id FROM mp_app WHERE id=? AND member_id=? "
+                  "AND status='published'",
+                  (d.get('app_id'), u['member_id'])).fetchone()
+    if not a:
+        c.close(); return jsonify(ok=False, error='公開ずみの 自分の作品を えらんで ください'), 400
+
+    c.execute("""INSERT INTO mp_page(slug,app_id,member_id,title,favicon)
+                 VALUES(?,?,?,?,?)
+                 ON CONFLICT(slug) DO UPDATE SET app_id=excluded.app_id,
+                 title=excluded.title, favicon=excluded.favicon""",
+              (slug, a['id'], u['member_id'],
+               (d.get('title') or '')[:60], (d.get('favicon') or '')[:8]))
+    c.commit(); c.close()
+    return jsonify(ok=True, slug=slug)
+
+
+@bp.route('/api/mp/page/<slug>', methods=['DELETE'])
+def mp_page_del(slug):
+    u = me()
+    if not u:
+        return jsonify(ok=False), 401
+    c = _db()
+    c.execute('DELETE FROM mp_page WHERE slug=? AND member_id=?',
+              (slug, u['member_id']))
+    c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+@bp.route('/page/<slug>')
+def page_public(slug):
+    """だれでも 見られる 公開ページ。MIRAI POWER の 見た目は 出さない。"""
+    c = _db()
+    p = c.execute("""SELECT p.*, a.title AS app_title FROM mp_page p
+                     JOIN mp_app a ON a.id = p.app_id
+                     WHERE p.slug=? AND p.active=1 AND a.status='published'""",
+                  (slug,)).fetchone()
+    if not p:
+        c.close()
+        return render_template('page_404.html', slug=slug), 404
+    c.execute('UPDATE mp_page SET views=views+1 WHERE slug=?', (slug,))
+    files = [dict(r) for r in c.execute(
+        'SELECT path,content,kind,is_entry FROM mp_file WHERE app_id=? ORDER BY path',
+        (p['app_id'],)).fetchall()]
+    tables = []
+    for r in c.execute('SELECT name,cols,rows FROM mp_table WHERE app_id=? '
+                       'ORDER BY order_no', (p['app_id'],)).fetchall():
+        tables.append({'name': r['name'], 'cols': json.loads(r['cols']),
+                       'rows': json.loads(r['rows'])})
+    c.commit(); c.close()
+    return render_template('page_public.html',
+        title=(p['title'] or p['app_title']), favicon=(p['favicon'] or '🎈'),
+        app_id=p['app_id'], slug=slug,
+        files_json=json.dumps(files, ensure_ascii=False),
+        tables_json=json.dumps(tables, ensure_ascii=False))
