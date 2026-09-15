@@ -44,6 +44,7 @@ window.showToast = window.toast;
 PAGES = {
     'errors': ('admin/errors.html', 'エラー監視', True),
     'mpadmin': ('admin/mpadmin.html', '会員システム', True),
+    'mpsocial': ('admin/mpsocial.html', '会員システム（ひろい）', True),
     'ops': ('admin/ops.html', 'システム状況', True),
     'alert': ('admin/alert.html', '天気・防災情報', False),
     'call': ('admin/call.html', '通話', False),
@@ -1656,4 +1657,116 @@ def api_mp_invite_edit(code):
     c.execute('UPDATE mp_invite SET active=? WHERE code=?',
               (1 if d.get('active') else 0, code))
     c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+# ====================================================================
+# 会員システムの ひろい管理（つぶやき・図鑑・しつもん・ページ・データ）
+# ====================================================================
+
+@bp.route('/api/admin/mp/social')
+def api_mp_social():
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    c = _db()
+
+    def rows(sql, args=()):
+        try:
+            return [dict(r) for r in c.execute(sql, args).fetchall()]
+        except Exception:
+            return []
+
+    posts = rows("""SELECT p.id,p.member_id,p.body,p.likes,p.hidden,p.created_at,
+                    g.name AS group_name, m.nickname
+                    FROM mp_post p
+                    LEFT JOIN mp_member m ON m.member_id=p.member_id
+                    LEFT JOIN mp_group g ON g.id=p.group_id
+                    ORDER BY p.id DESC LIMIT 80""")
+    groups = rows("""SELECT g.*, (SELECT COUNT(*) FROM mp_group_member gm
+                     WHERE gm.group_id=g.id) AS members,
+                     (SELECT COUNT(*) FROM mp_post p WHERE p.group_id=g.id) AS posts
+                     FROM mp_group g ORDER BY g.id DESC""")
+    wikis = rows("""SELECT w.slug,w.title,w.category,w.views,w.locked,
+                    w.updated_by,w.updated_at,
+                    (SELECT COUNT(*) FROM mp_wiki_rev r WHERE r.wiki_id=w.id) AS revs
+                    FROM mp_wiki w ORDER BY w.updated_at DESC LIMIT 60""")
+    qas = rows("""SELECT q.id,q.member_id,q.title,q.solved,q.hidden,q.views,
+                  q.created_at, m.nickname,
+                  (SELECT COUNT(*) FROM mp_qa_answer a WHERE a.qa_id=q.id) AS answers
+                  FROM mp_qa q LEFT JOIN mp_member m ON m.member_id=q.member_id
+                  ORDER BY q.id DESC LIMIT 60""")
+    pages = rows("""SELECT p.*, a.title AS app_title, m.nickname
+                    FROM mp_page p JOIN mp_app a ON a.id=p.app_id
+                    LEFT JOIN mp_member m ON m.member_id=p.member_id
+                    ORDER BY p.views DESC LIMIT 60""")
+    data = rows("""SELECT d.id,d.app_id,d.tname,d.vals,d.by_member,d.hidden,
+                   d.created_at, a.title
+                   FROM mp_appdata d LEFT JOIN mp_app a ON a.id=d.app_id
+                   ORDER BY d.id DESC LIMIT 80""")
+    polls = rows("""SELECT p.*, m.nickname,
+                    (SELECT COUNT(*) FROM mp_poll_answer x WHERE x.poll_id=p.id) AS answers
+                    FROM mp_poll p LEFT JOIN mp_member m ON m.member_id=p.owner
+                    ORDER BY p.id DESC LIMIT 40""")
+    shelves = rows("""SELECT s.*, (SELECT COUNT(*) FROM mp_shelf_app sa
+                      WHERE sa.shelf_id=s.id) AS apps
+                      FROM mp_shelf s ORDER BY s.id DESC LIMIT 40""")
+    comments = rows("""SELECT co.id,co.app_id,co.member_id,co.body,co.hidden,
+                       co.created_at, a.title FROM mp_comment co
+                       LEFT JOIN mp_app a ON a.id=co.app_id
+                       ORDER BY co.id DESC LIMIT 60""")
+    c.close()
+    return jsonify(ok=True, posts=posts, groups=groups, wikis=wikis, qas=qas,
+                   pages=pages, data=data, polls=polls, shelves=shelves,
+                   comments=comments)
+
+
+@bp.route('/api/admin/mp/hide', methods=['POST'])
+def api_mp_hide():
+    """けさずに かくす。なにを かくしたか 記録に のこす。"""
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    d = request.get_json(silent=True) or {}
+    kind, rid = d.get('kind'), d.get('id')
+    on = 1 if d.get('hide') else 0
+    T = {'post': ('mp_post', 'id'), 'comment': ('mp_comment', 'id'),
+         'qa': ('mp_qa', 'id'), 'data': ('mp_appdata', 'id')}
+    if kind not in T:
+        return jsonify(ok=False, error='しゅるいが ちがいます'), 400
+    tbl, key = T[kind]
+    c = _db()
+    try:
+        c.execute(f'UPDATE {tbl} SET hidden=? WHERE {key}=?', (on, rid))
+        c.commit()
+    except Exception as e:
+        c.close(); return jsonify(ok=False, error=str(e)[:100]), 500
+    c.close()
+    audit('mp_' + kind + ('_hide' if on else '_show'), str(rid), d.get('why') or '')
+    return jsonify(ok=True)
+
+
+@bp.route('/api/admin/mp/wiki/<slug>/lock', methods=['POST'])
+def api_mp_wiki_lock(slug):
+    """図鑑の ページを 直せなく する"""
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    d = request.get_json(silent=True) or {}
+    c = _db()
+    c.execute('UPDATE mp_wiki SET locked=? WHERE slug=?',
+              (1 if d.get('lock') else 0, slug))
+    c.commit(); c.close()
+    audit('mp_wiki_' + ('lock' if d.get('lock') else 'unlock'), slug)
+    return jsonify(ok=True)
+
+
+@bp.route('/api/admin/mp/page/<slug>', methods=['POST'])
+def api_mp_page_toggle(slug):
+    """公開ページを 止める・もどす"""
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    d = request.get_json(silent=True) or {}
+    c = _db()
+    c.execute('UPDATE mp_page SET active=? WHERE slug=?',
+              (1 if d.get('active') else 0, slug))
+    c.commit(); c.close()
+    audit('mp_page_' + ('on' if d.get('active') else 'off'), slug, d.get('why') or '')
     return jsonify(ok=True)

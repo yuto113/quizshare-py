@@ -1,0 +1,291 @@
+<style>
+.sw{max-width:980px;margin:0 auto;padding:18px 20px 60px;
+  font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;color:#0a1628}
+.sw h2{font-size:19px;margin:0 0 4px;display:flex;align-items:center;gap:9px}
+.sw .lead{font-size:12.5px;color:#7a8794;margin:0 0 16px;line-height:1.7}
+
+.stabs{display:flex;gap:2px;border-bottom:1px solid #dde5ea;margin-bottom:18px;overflow-x:auto}
+.stab{padding:9px 15px;font-size:12.5px;color:#7a8794;cursor:pointer;white-space:nowrap;
+  background:none;border:none;border-bottom:2px solid transparent;font-family:inherit}
+.stab:hover{color:#0a1628}
+.stab.on{color:#0a1628;border-bottom-color:#0891b2;font-weight:600}
+.spane{display:none}.spane.on{display:block}
+
+.snote{background:#eefcff;border:1px solid #b8e8f2;border-radius:8px;padding:10px 13px;
+  font-size:11.5px;color:#1a5966;line-height:1.7;margin-bottom:16px}
+.swarn{background:#fdf2f1;border:1px solid #f3d5d2;border-radius:8px;padding:10px 13px;
+  font-size:11.5px;color:#8a3028;line-height:1.7;margin-bottom:16px}
+
+.stbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.stbl th{text-align:left;font-size:11px;color:#7a8794;padding:7px 9px;
+  border-bottom:1px solid #dde5ea;white-space:nowrap}
+.stbl td{padding:8px 9px;border-bottom:1px solid #eef3f5;vertical-align:top}
+.stbl tr:hover td{background:#fafcfd}
+.stbl tr.hid td{opacity:.45;background:#fafafa}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;color:#7a8794}
+.body{max-width:330px;white-space:pre-wrap;word-break:break-word;line-height:1.7}
+
+.tg{font-size:10.5px;padding:2px 8px;border-radius:99px;font-weight:700;white-space:nowrap}
+.tg.on{background:#d1fae5;color:#046c4e}
+.tg.off{background:#e5e7eb;color:#4b5563}
+.tg.hid{background:#fee2e2;color:#b91c1c}
+.tg.lock{background:#fef3c7;color:#92400e}
+
+.sbtn{background:none;border:1px solid #dde5ea;color:#0a1628;padding:4px 10px;
+  border-radius:7px;font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap}
+.sbtn:hover{background:#f0f4f6}
+.sbtn.ng{background:#dc2626;color:#fff;border-color:#dc2626}
+.sbtn.ng:hover{background:#b91c1c}
+.sempty{padding:30px 0;text-align:center;color:#9aa8b2;font-size:12.5px}
+.scards{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));
+  gap:9px;margin-bottom:18px}
+.scard{background:#fff;border:1px solid #dde5ea;border-radius:10px;padding:11px 13px}
+.scard .n{font-size:20px;font-weight:700}
+.scard .l{font-size:11px;color:#7a8794;margin-top:2px}
+</style>
+
+<div class="sw">
+  <h2 id="sTitle">🎓 会員システム — みまもり</h2>
+  <p class="lead">小学生も つかう 場所です。荒れて いないか 見て ください。</p>
+
+  <div class="swarn">
+    <b>けさずに かくします。</b>
+    かくした ものは あとから もどせます。だれが なぜ かくしたかは
+    対応記録に のこります。
+  </div>
+
+  <div class="scards" id="sCards"></div>
+
+
+  <div class="spane on" id="s-post"><div id="postList"></div>
+    <div class="sec" style="margin-top:22px;font-size:12.5px;font-weight:700;
+      padding-bottom:6px;border-bottom:1px solid #dde5ea">グループ</div>
+    <div id="groupList"></div></div>
+  <div class="spane" id="s-comment"><div id="comList"></div></div>
+  <div class="spane" id="s-wiki">
+    <div class="snote">だれでも 直せる ページです。あらされた ときは、
+      その ページの 履歴から もどせます。ひどい ときは「なおせなくする」を。</div>
+    <div id="wikiList"></div></div>
+  <div class="spane" id="s-qa"><div id="qaList"></div></div>
+  <div class="spane" id="s-page">
+    <div class="snote">/page/◯◯ で 会員以外にも 見えます。
+      中身に 気を つけて ください。</div>
+    <div id="pageList"></div></div>
+  <div class="spane" id="s-data">
+    <div class="snote">みんなで 書きこめる ひょうに 入った データです。</div>
+    <div id="dataList"></div></div>
+  <div class="spane" id="s-other">
+    <div id="shelfList"></div>
+    <div class="sec" style="margin-top:22px;font-size:12.5px;font-weight:700;
+      padding-bottom:6px;border-bottom:1px solid #dde5ea">とうひょう</div>
+    <div id="pollList"></div></div>
+</div>
+
+<script>
+(function(){
+var D = null;
+var K = function(s){ return String(s==null?'':s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+function T(m,t){ if(window.toast) window.toast(m,t); else alert(m); }
+async function J(u,o){ var r=await fetch(u,o);
+  return await r.json().catch(function(){ return {ok:false,error:'応答を読めません'}; }); }
+function P(u,b){ return J(u,{method:'POST',headers:{'Content-Type':'application/json'},
+                             body:JSON.stringify(b||{})}); }
+function tbl(cols, rows){
+  if (!rows.length) return '<div class="sempty">まだ ありません</div>';
+  return '<div style="overflow-x:auto"><table class="stbl"><thead><tr>'
+    + cols.map(function(c){ return '<th>'+K(c)+'</th>'; }).join('')
+    + '</tr></thead><tbody>' + rows.join('') + '</tbody></table></div>';
+}
+function dt(s){ return K(String(s||'').slice(5,16)); }
+
+async function load(){
+  D = await J('/api/admin/mp/social');
+  if (!D.ok){ document.getElementById('postList').innerHTML =
+    '<div class="sempty">'+K(D.error)+'</div>'; return; }
+
+  var hid = function(a){ return (a||[]).filter(function(x){ return x.hidden; }).length; };
+  document.getElementById('sCards').innerHTML =
+      card(D.posts.length, 'つぶやき', hid(D.posts))
+    + card(D.comments.length, 'コメント', hid(D.comments))
+    + card(D.wikis.length, '図鑑')
+    + card(D.qas.length, 'しつもん', hid(D.qas))
+    + card(D.pages.length, '公開ページ')
+    + card(D.data.length, 'データ', hid(D.data))
+    + card(D.shelves.length, '棚')
+    + card(D.polls.length, 'とうひょう')
+    + card(D.groups.length, 'グループ');
+
+  drawPosts(); drawComments(); drawWiki(); drawQa();
+  drawPages(); drawData(); drawOther();
+}
+function card(n, l, h){
+  return '<div class="scard"><div class="n">' + (n||0)
+    + (h ? ' <span style="font-size:12px;color:#dc2626">(' + h + ')</span>' : '')
+    + '</div><div class="l">' + K(l) + '</div></div>';
+}
+
+function drawPosts(){
+  document.getElementById('postList').innerHTML = tbl(
+    ['書いた人','なかみ','グループ','♡','日',''],
+    D.posts.map(function(p){
+      return '<tr' + (p.hidden?' class="hid"':'') + '>'
+        + '<td>' + K(p.nickname||p.member_id) + '<div class="mono">'
+        + K(p.member_id) + '</div></td>'
+        + '<td class="body">' + K(p.body) + '</td>'
+        + '<td>' + K(p.group_name||'ぜんたい') + '</td>'
+        + '<td>' + (p.likes||0) + '</td><td class="mono">' + dt(p.created_at) + '</td>'
+        + '<td>' + hideBtn('post', p.id, p.hidden) + '</td></tr>';
+    }));
+  document.getElementById('groupList').innerHTML = tbl(
+    ['なまえ','つくった人','人数','つぶやき','できた日'],
+    D.groups.map(function(g){
+      return '<tr><td><b>'+K(g.name)+'</b></td><td class="mono">'+K(g.owner)+'</td>'
+        + '<td>'+g.members+'</td><td>'+g.posts+'</td>'
+        + '<td class="mono">'+dt(g.created_at)+'</td></tr>';
+    }));
+}
+
+function drawComments(){
+  document.getElementById('comList').innerHTML = tbl(
+    ['書いた人','なかみ','作品','日',''],
+    D.comments.map(function(x){
+      return '<tr' + (x.hidden?' class="hid"':'') + '>'
+        + '<td class="mono">' + K(x.member_id) + '</td>'
+        + '<td class="body">' + K(x.body) + '</td>'
+        + '<td>' + K(x.title||('#'+x.app_id)) + '</td>'
+        + '<td class="mono">' + dt(x.created_at) + '</td>'
+        + '<td>' + hideBtn('comment', x.id, x.hidden) + '</td></tr>';
+    }));
+}
+
+function drawWiki(){
+  document.getElementById('wikiList').innerHTML = tbl(
+    ['ページ','なかま','直した人','直した数','👁',''],
+    D.wikis.map(function(w){
+      return '<tr><td><b>'+K(w.title)+'</b><div class="mono">/'+K(w.slug)+'</div></td>'
+        + '<td>'+K(w.category||'')+'</td>'
+        + '<td class="mono">'+K(w.updated_by||'')+'<br>'+dt(w.updated_at)+'</td>'
+        + '<td>'+(w.revs||0)+'</td><td>'+(w.views||0)+'</td>'
+        + '<td>' + (w.locked
+            ? '<span class="tg lock">なおせない</span> '
+              + '<button class="sbtn" onclick="lockWiki(\'' + K(w.slug) + '\',0)">'
+              + 'もどす</button>'
+            : '<button class="sbtn" onclick="lockWiki(\'' + K(w.slug) + '\',1)">'
+              + 'なおせなくする</button>')
+        + '</td></tr>';
+    }));
+}
+window.lockWiki = async function(slug, on){
+  if (on && !confirm(slug + ' を だれも 直せなく しますか？')) return;
+  var r = await P('/api/admin/mp/wiki/' + slug + '/lock', {lock: !!on});
+  if (!r.ok) return T(r.error||'失敗しました','error');
+  T('かえました','ok'); load();
+};
+
+function drawQa(){
+  document.getElementById('qaList').innerHTML = tbl(
+    ['しつもん','書いた人','こたえ','状態','日',''],
+    D.qas.map(function(q){
+      return '<tr' + (q.hidden?' class="hid"':'') + '>'
+        + '<td class="body"><b>' + K(q.title) + '</b></td>'
+        + '<td>' + K(q.nickname||q.member_id) + '</td>'
+        + '<td>' + (q.answers||0) + '</td>'
+        + '<td>' + (q.solved ? '<span class="tg on">かいけつ</span>'
+                             : '<span class="tg off">まち</span>') + '</td>'
+        + '<td class="mono">' + dt(q.created_at) + '</td>'
+        + '<td>' + hideBtn('qa', q.id, q.hidden) + '</td></tr>';
+    }));
+}
+
+function drawPages(){
+  document.getElementById('pageList').innerHTML = tbl(
+    ['URL','作品','つくった人','👁','状態',''],
+    D.pages.map(function(p){
+      return '<tr><td><a href="/page/' + K(p.slug) + '" target="_blank" '
+        + 'style="color:#0891b2;font-weight:600">' + K(p.favicon||'') + ' /page/'
+        + K(p.slug) + '</a></td>'
+        + '<td>' + K(p.app_title) + '</td>'
+        + '<td class="mono">' + K(p.nickname||p.member_id) + '</td>'
+        + '<td>' + (p.views||0) + '</td>'
+        + '<td>' + (p.active ? '<span class="tg on">公開中</span>'
+                             : '<span class="tg off">止めた</span>') + '</td>'
+        + '<td><button class="sbtn' + (p.active?' ng':'') + '" onclick="togPage(\''
+        + K(p.slug) + '\',' + (p.active?0:1) + ')">'
+        + (p.active?'止める':'もどす') + '</button></td></tr>';
+    }));
+}
+window.togPage = async function(slug, on){
+  var why = !on ? (prompt('止める わけ（記録に のこります）')||'') : '';
+  if (!on && !why) return;
+  var r = await P('/api/admin/mp/page/' + slug, {active: !!on, why: why});
+  if (!r.ok) return T(r.error||'失敗しました','error');
+  T('かえました','ok'); load();
+};
+
+function drawData(){
+  document.getElementById('dataList').innerHTML = tbl(
+    ['作品','ひょう','なかみ','書いた人','日',''],
+    D.data.map(function(x){
+      var v = '';
+      try { v = Object.entries(JSON.parse(x.vals)).map(function(e){
+        return e[0] + ': ' + e[1]; }).join(' / '); } catch(e){ v = x.vals; }
+      return '<tr' + (x.hidden?' class="hid"':'') + '>'
+        + '<td>' + K(x.title||('#'+x.app_id)) + '</td>'
+        + '<td class="mono">' + K(x.tname) + '</td>'
+        + '<td class="body">' + K(v) + '</td>'
+        + '<td class="mono">' + K(x.by_member) + '</td>'
+        + '<td class="mono">' + dt(x.created_at) + '</td>'
+        + '<td>' + hideBtn('data', x.id, x.hidden) + '</td></tr>';
+    }));
+}
+
+function drawOther(){
+  document.getElementById('shelfList').innerHTML = tbl(
+    ['棚','つくった人','作品','だれでも入れる','できた日'],
+    D.shelves.map(function(x){
+      return '<tr><td><b>'+K(x.title)+'</b></td><td class="mono">'+K(x.owner)+'</td>'
+        + '<td>'+(x.apps||0)+'</td>'
+        + '<td>'+(x.open_add?'はい':'いいえ')+'</td>'
+        + '<td class="mono">'+dt(x.created_at)+'</td></tr>';
+    }));
+  document.getElementById('pollList').innerHTML = tbl(
+    ['とうひょう','つくった人','こたえ','状態','できた日'],
+    D.polls.map(function(x){
+      return '<tr><td><b>'+K(x.title)+'</b></td>'
+        + '<td class="mono">'+K(x.nickname||x.owner)+'</td>'
+        + '<td>'+(x.answers||0)+'</td>'
+        + '<td>'+(x.active?'<span class="tg on">うけつけ中</span>'
+                          :'<span class="tg off">おわり</span>')+'</td>'
+        + '<td class="mono">'+dt(x.created_at)+'</td></tr>';
+    }));
+}
+
+function hideBtn(kind, id, hidden){
+  return hidden
+    ? '<button class="sbtn" onclick="doHide(\'' + kind + '\',' + id + ',0)">もどす</button>'
+    : '<button class="sbtn ng" onclick="doHide(\'' + kind + '\',' + id + ',1)">かくす</button>';
+}
+window.doHide = async function(kind, id, on){
+  var why = on ? (prompt('かくす わけ（記録に のこります）')||'') : '';
+  if (on && !why) return;
+  var r = await P('/api/admin/mp/hide', {kind:kind, id:id, hide:!!on, why:why});
+  if (!r.ok) return T(r.error||'失敗しました','error');
+  T(on ? 'かくしました' : 'もどしました','ok'); load();
+};
+
+// URL の ?t= で どれを 出すか きめる（タブは 管理センターの 2段目）
+var TITLES = {post:'💬 つぶやき', comment:'💭 コメント', wiki:'📖 みんなの図鑑',
+              qa:'❓ しつもん', page:'🌐 公開ページ', data:'💾 データ',
+              other:'🗂 棚・とうひょう'};
+(function(){
+  var m = /[?&]t=([a-z]+)/.exec(location.search);
+  var t = (m && TITLES[m[1]]) ? m[1] : 'post';
+  document.querySelectorAll('.spane').forEach(function(p){
+    p.classList.toggle('on', p.id === 's-' + t); });
+  var h = document.getElementById('sTitle');
+  if (h) h.textContent = TITLES[t] + ' — みまもり';
+})();
+load();
+})();
+</script>
