@@ -2059,6 +2059,47 @@ def mp_page_del(slug):
     return jsonify(ok=True)
 
 
+@bp.route('/page/<slug>/raw')
+def page_raw(slug):
+    """作品の HTML を そのまま 返す。iframe が これを よむ。"""
+    from flask import Response
+    c = _db()
+    p = c.execute("""SELECT p.app_id FROM mp_page p JOIN mp_app a ON a.id=p.app_id
+                     WHERE p.slug=? AND p.active=1 AND a.status='published'""",
+                  (slug,)).fetchone()
+    if not p:
+        c.close()
+        return 'not found', 404
+    files = [dict(r) for r in c.execute(
+        'SELECT path,content,kind,is_entry FROM mp_file WHERE app_id=?',
+        (p['app_id'],)).fetchall()]
+    c.close()
+
+    htmls = [f for f in files if f['kind'] == 'html' and (f['content'] or '').strip()]
+    if not htmls:
+        return Response('<p>HTML が ありません</p>', mimetype='text/html')
+    eh = ([f for f in htmls if f['is_entry']] or htmls)[0]
+    body = eh['content']
+
+    head = ''.join('<style>' + (f['content'] or '') + '</style>'
+                   for f in files if f['kind'] == 'css')
+    tail = ''.join('<scr' + 'ipt>' + (f['content'] or '') + '</scr' + 'ipt>'
+                   for f in files if f['kind'] == 'js')
+
+    low = body.lstrip()[:20].lower()
+    if low.startswith('<!doctype') or low.startswith('<html'):
+        if head:
+            body = body.replace('</head>', head + '</head>', 1)
+        if tail:
+            body = body.replace('</body>', tail + '</body>', 1)
+    else:
+        body = ('<!DOCTYPE html><html><head><meta charset="utf-8">'
+                '<style>html,body{margin:0;height:100%}'
+                'body{font-family:sans-serif;padding:12px}</style>'
+                + head + '</head><body>' + body + tail + '</body></html>')
+    return Response(body, mimetype='text/html')
+
+
 @bp.route('/page/<slug>')
 def page_public(slug):
     """だれでも 見られる 公開ページ。MIRAI POWER の 見た目は 出さない。"""
@@ -2080,8 +2121,14 @@ def page_public(slug):
         tables.append({'name': r['name'], 'cols': json.loads(r['cols']),
                        'rows': json.loads(r['rows'])})
     c.commit(); c.close()
+    has_html = any(f['kind'] == 'html' and (f['content'] or '').strip()
+                   for f in files)
+    # HTML は /raw が そのまま 返すので、ここでは 渡さない。
+    # Python だけ 渡す（</script> が 混ざると JSON が こわれるため）
+    pys = [f for f in files if f['kind'] == 'py']
+    safe = json.dumps(pys, ensure_ascii=False).replace('</', '<\\/')
+    tabs = json.dumps(tables, ensure_ascii=False).replace('</', '<\\/')
     return render_template('page_public.html',
         title=(p['title'] or p['app_title']), favicon=(p['favicon'] or '🎈'),
-        app_id=p['app_id'], slug=slug,
-        files_json=json.dumps(files, ensure_ascii=False),
-        tables_json=json.dumps(tables, ensure_ascii=False))
+        app_id=p['app_id'], slug=slug, has_html=(1 if has_html else 0),
+        files_json=safe, tables_json=tabs)

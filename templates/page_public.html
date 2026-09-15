@@ -14,6 +14,7 @@ iframe{width:100%;height:100%;border:none;display:block;background:#fff}
   color:#cfe3ea;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13.5px;
   line-height:1.7;white-space:pre-wrap;word-break:break-all;display:none}
 #out.on{display:block}
+#out.side{top:auto;bottom:0;max-height:30%;border-top:2px solid #1e3148}
 #out .e{color:#fca5a5}
 #loading{position:absolute;inset:0;display:flex;align-items:center;
   justify-content:center;flex-direction:column;gap:12px;background:#fff;z-index:5}
@@ -42,12 +43,15 @@ iframe{width:100%;height:100%;border:none;display:block;background:#fff}
   <button onclick="location.reload()">↻ もう一度</button>
 </div>
 
+<script type="application/json" id="d-files">{{ files_json | safe }}</script>
+<script type="application/json" id="d-tables">{{ tables_json | safe }}</script>
 <script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
 <script>
-var FILES = {{ files_json | safe }};
-var TABLES = {{ tables_json | safe }};
+var FILES = JSON.parse(document.getElementById('d-files').textContent);
+var TABLES = JSON.parse(document.getElementById('d-tables').textContent);
 var APP_ID = {{ app_id }};
+var HAS_HTML = {{ has_html }};
 var PYO = null, SQLJS = null;
 
 function $(i){ return document.getElementById(i); }
@@ -56,7 +60,9 @@ function W(s, cls){
   if (cls) d.className = cls;
   d.textContent = s;
   $('out').appendChild(d);
+  // HTML が 出ているときは 下に よせる（かぶせない）
   $('out').classList.add('on');
+  if (window.HAS_HTML) $('out').classList.add('side');
 }
 
 function fullScreen(){
@@ -84,22 +90,16 @@ function tablesToSql(ts){
 }
 
 async function run(){
-  var find = function(k){ return FILES.filter(function(f){ return f.kind === k; }); };
-  var htmls = find('html'), csss = find('css'), jss = find('js'), pys = find('py');
+  var pys = FILES.filter(function(f){ return f.kind === 'py'; });
   var sql = tablesToSql(TABLES);
 
-  // HTML が あれば それを 画面に する
-  if (htmls.length){
-    var head = csss.map(function(f){ return '<style>' + f.content + '</style>'; }).join('');
-    var tail = jss.map(function(f){
-      return '<scr' + 'ipt>try{' + f.content + '}catch(e){'
-        + 'document.body.innerHTML+="<pre style=color:red>"+e+"</pre>"}</scr' + 'ipt>';
-    }).join('');
-    var eh = htmls.filter(function(f){ return f.is_entry; })[0] || htmls[0];
-    $('fr').srcdoc = '<style>html,body{height:100%;margin:0}'
-      + 'body{font-family:sans-serif;padding:14px}</style>' + head + eh.content + tail;
+  // HTML は サーバーが 作った ものを そのまま よむ
+  if (HAS_HTML){
+    $('fr').src = '/page/{{ slug }}/raw';
     $('loading').style.display = 'none';
-    if (!pys.length) return;
+    if (!pys.length && !sql) return;
+  } else {
+    $('fr').style.display = 'none';
   }
 
   if (sql){
@@ -107,8 +107,7 @@ async function run(){
       if (!SQLJS) SQLJS = await initSqlJs({locateFile: function(f){
         return 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/' + f; }});
       var db = new SQLJS.Database();
-      var res = db.exec(sql);
-      res.forEach(function(r){
+      db.exec(sql).forEach(function(r){
         W(r.columns.join(' | '));
         r.values.forEach(function(v){ W(v.join(' | ')); });
       });
@@ -134,22 +133,28 @@ async function run(){
         }
         try { PYO.FS.writeFile('/work/' + f.path, f.content); } catch(e){}
       });
-      await PYO.runPythonAsync('import sys, os\nos.chdir("/work")\n'
-        + 'if "/work" not in sys.path: sys.path.insert(0, "/work")\n');
+      await PYO.runPythonAsync('import sys, os' + String.fromCharCode(10)
+        + 'os.chdir("/work")' + String.fromCharCode(10)
+        + 'if "/work" not in sys.path: sys.path.insert(0, "/work")'
+        + String.fromCharCode(10));
       if (sql){
         PYO.globals.set('_mp_sql', sql);
-        await PYO.runPythonAsync('import sqlite3\n_c = sqlite3.connect("app.db")\n'
-          + '_c.executescript(_mp_sql)\n_c.commit()\n_c.close()\n');
+        await PYO.runPythonAsync('import sqlite3' + String.fromCharCode(10)
+          + '_c = sqlite3.connect("app.db")' + String.fromCharCode(10)
+          + '_c.executescript(_mp_sql)' + String.fromCharCode(10)
+          + '_c.commit()' + String.fromCharCode(10)
+          + '_c.close()' + String.fromCharCode(10));
       }
       var ep = pys.filter(function(f){ return f.is_entry; })[0] || pys[0];
       $('loading').style.display = 'none';
       await PYO.runPythonAsync(ep.content);
     } catch(e){
-      W(String(e).split('\n').slice(-4).join('\n'), 'e');
+      W(String(e).split(String.fromCharCode(10)).slice(-4)
+        .join(String.fromCharCode(10)), 'e');
     }
   }
   $('loading').style.display = 'none';
-  if (!htmls.length && !$('out').innerHTML) W('（なにも 出ませんでした）');
+  if (!HAS_HTML && !$('out').innerHTML) W('（なにも 出ませんでした）');
 }
 run();
 </script></body></html>

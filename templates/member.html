@@ -310,6 +310,11 @@ body.furi .lead{font-size:13.5px}
 #prevBar .btn.gh:hover{background:#123047}
 #preview{border-radius:0 0 10px 10px !important;border-top:none !important}
 #preview.tall{height:78vh !important}
+
+#bigOut{background:#0a1628;border-top:1px solid #1e3148}
+#bigOut.side{position:absolute;left:0;right:0;bottom:0;top:auto;
+  max-height:32%;display:block;border-radius:0}
+#bigWrap #bigFrame{height:100%}
 </style></head><body>
 
 <div class="hd">
@@ -788,6 +793,7 @@ async function viewApp(id){
     + (a.summary ? '<div class="card">' + K(a.summary) + '</div>' : '')
     + '<div class="row">'
     + '<button class="btn cy" onclick="runView()">▶ うごかす</button>'
+    + '<button class="btn gh" onclick="bigView()">⛶ 大きく</button>'
     + (ME ? '<button class="btn gh" onclick="like(' + id + ')">'
             + (a.liked ? '♥ いいね済み' : '♡ いいね') + '</button>'
           + '<button class="btn gh" onclick="fork(' + id + ')">コピーして作る</button>'
@@ -2286,7 +2292,10 @@ async function bigRun(){
   var sql = tablesToSql(TABLES);
   await runFiles(FILES, {name:DB.name, schema:sql || DB.schema, seed:sql ? '' : DB.seed},
                  $('bigOut'), $('bigFrame'));
-  if ($('bigOut').innerHTML) $('bigOut').classList.add('on');
+  // HTML が 出ているなら 出力欄は かぶせない
+  var hasHtml = FILES.some(function(f){
+    return f.kind === 'html' && (f.content||'').trim(); });
+  if (!hasHtml && $('bigOut').innerHTML) $('bigOut').classList.add('on');
 }
 function bigClose(){
   $('bigWrap').classList.remove('on');
@@ -2949,8 +2958,15 @@ async function runFiles(files, db, outEl, frameEl){
         + 'document.body.innerHTML+="<pre style=color:red>"+e+"</pre>"}</scr'+'ipt>';
     }).join('');
     var eh = htmls.filter(function(f){ return f.is_entry; })[0] || htmls[0];
-    frameEl.srcdoc = '<style>body{font-family:sans-serif;padding:12px}</style>'
-      + head + eh.content + tail;
+    var body = eh.content;
+    if (/^\s*<!DOCTYPE/i.test(body) || /^\s*<html/i.test(body)){
+      if (head) body = body.replace(/<\/head>/i, head + '</head>');
+      if (tail) body = body.replace(/<\/body>/i, tail + '</body>');
+      frameEl.srcdoc = body;
+    } else {
+      frameEl.srcdoc = '<style>body{font-family:sans-serif;padding:12px}</style>'
+        + head + body + tail;
+    }
     outWrite(outEl, '画面に表示しました（' + eh.path + '）', 'ok');
     if (frameEl.id === 'preview' && $('prevBar')) $('prevBar').style.display = 'flex';
   } else {
@@ -3022,6 +3038,20 @@ async function runCode(){
   var bad = $('eOut').querySelectorAll('.e').length;
   reportRan(bad === 0);
 }
+async function bigView(){
+  var a = window.VIEW_APP || {};
+  window.MP_APP_ID = a.id;
+  var fs = (window.VIEW_FILES || []);
+  $('bigTitle').textContent = a.title || 'けっか';
+  $('bigWrap').classList.add('on');
+  $('bigOut').classList.remove('on');
+  $('bigOut').innerHTML = '';
+  await runFiles(fs, window.VIEW_DB, $('bigOut'), $('bigFrame'));
+  var hasHtml = fs.some(function(f){
+    return f.kind === 'html' && (f.content||'').trim(); });
+  if (!hasHtml && $('bigOut').innerHTML) $('bigOut').classList.add('on');
+}
+
 function runView(){
   var a = window.VIEW_APP || {};
   window.MP_APP_ID = a.id;
