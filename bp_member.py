@@ -22,7 +22,7 @@ bp = Blueprint('member', __name__)
 # 公開できるアプリの数
 LIMITS = {'admin': 10 ** 9, 'staff': 20, 'invited': 20, 'regular': 15}
 
-CODE_MAX = 50000        # 1つの言語につき50KB
+CODE_MAX = 400000       # 1ファイルにつき約400KB（1万行くらい）
 
 
 def _db():
@@ -1512,7 +1512,7 @@ def mp_follow(who):
 # ④ みんなの図鑑（Wiki）
 #   だれでも 直せる。だから 履歴を のこして いつでも 戻せるように する。
 # ====================================================================
-WIKI_MAX = 20000
+WIKI_MAX = 100000
 
 
 @bp.route('/api/mp/wiki')

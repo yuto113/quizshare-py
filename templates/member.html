@@ -303,6 +303,13 @@ body.furi .lead{font-size:13.5px}
 #bigOut{position:absolute;inset:0;overflow:auto;padding:18px;background:#0a1628;
   color:#cfe3ea;display:none;border-radius:0;max-height:none}
 #bigOut.on{display:block}
+
+#prevBar{display:flex;align-items:center;gap:7px;margin-top:11px;padding:6px 11px;
+  background:#0a1628;color:#cfe3ea;border-radius:10px 10px 0 0;font-size:12px}
+#prevBar .btn.gh{border-color:#2a4360;color:#cfe3ea;padding:3px 10px;font-size:11px}
+#prevBar .btn.gh:hover{background:#123047}
+#preview{border-radius:0 0 10px 10px !important;border-top:none !important}
+#preview.tall{height:78vh !important}
 </style></head><body>
 
 <div class="hd">
@@ -471,6 +478,11 @@ body.furi .lead{font-size:13.5px}
         いまの へんすう</div>
       <div id="stepVars" style="font-family:ui-monospace,Menlo,Consolas,monospace;
         font-size:12px"></div>
+    </div>
+    <div id="prevBar" style="display:none">
+      <span>けっか</span><span style="flex:1"></span>
+      <button class="btn gh sm" onclick="bigRun()">⛶ 大きく</button>
+      <button class="btn gh sm" onclick="prevTall()">↕ たてに のばす</button>
     </div>
     <iframe id="preview" sandbox="allow-scripts allow-modals" style="display:none"></iframe>
     <div class="out" id="eOut">ここに結果が出ます</div>
@@ -650,7 +662,12 @@ function go(p){
   if (nv && $(nv)) $(nv).classList.add('on');
   if (p==='home'){ drawHomeMenu(); loadStats(); }
   if (p==='apps'){ drawRule('apps'); loadApps(); }
-  ['talk','wiki','shelf','qa','poll'].forEach(function(x){
+  if (p==='talk'){ drawRule('talk'); loadTalk('all'); return; }
+  if (p==='wiki'){ drawRule('wiki'); loadWiki(); return; }
+  if (p==='shelf'){ drawRule('shelf'); loadShelf(); return; }
+  if (p==='qa'){ drawRule('qa'); loadQa(); return; }
+  if (p==='poll'){ drawRule('poll'); loadPoll(); return; }
+  [].forEach(function(x){
     if (p===x){ drawRule(x);
       comingSoon(x, {talk:'つぶやき', wiki:'みんなの図鑑', shelf:'作品の棚',
                      qa:'しつもん', poll:'とうひょう'}[x]); }
@@ -1699,14 +1716,29 @@ var HOME_MENU = [
   ['🧩','ブロックで つくる','ならべるだけ。はじめての人へ','block',1],
   ['✏️','コードで つくる','Python や HTML で 自由に','edit',1],
   ['📦','みんなの作品','ほかの人の 作品を 見る','apps',1],
-  ['💬','つぶやき','いまの きもちを ひとこと','talk',0],
-  ['📖','みんなの図鑑','みんなで ひとつの 図鑑を つくる','wiki',0],
-  ['🗂','作品の棚','テーマごとに 作品を あつめる','shelf',0],
-  ['❓','しつもん','こまったら きいてみる','qa',0],
-  ['🗳','とうひょう','みんなで きめる','poll',0]
+  ['💬','つぶやき','いまの きもちを ひとこと','talk',1],
+  ['📖','みんなの図鑑','みんなで ひとつの 図鑑を つくる','wiki',1],
+  ['🗂','作品の棚','テーマごとに 作品を あつめる','shelf',1],
+  ['❓','しつもん','こまったら きいてみる','qa',1],
+  ['🗳','とうひょう','みんなで きめる','poll',1]
 ];
 
 var PAGE_RULES = {
+  wiki: ['図鑑の きまり',
+         'だれでも 直せます。だから まちがえても だいじょうぶ。'
+         + 'ほかの人が 書いた ものを けすときは、りゆうを 書いて ください。'],
+  shelf:['棚の きまり',
+         'テーマに あう 作品を 入れて ください。'
+         + '自分の 作品だけを 入れつづける のは やめましょう。'],
+  qa:   ['しつもんの きまり',
+         'こまって いることを くわしく 書くと、こたえが つきやすい です。'
+         + 'わからない ことを きくのは、はずかしい ことでは ありません。'],
+  poll: ['とうひょうの きまり',
+         'ひとり 1回 だけです。あとから 変えられません。'
+         + '人を きずつける しつもんは つくらない。'],
+  talk: ['つぶやきの きまり',
+         '本名・住所・学校の くわしい 場所は 書かないで ください。'
+         + '人が いやがる ことは 書かない。けんかに なりそうな ときは 手を とめる。'],
   apps:  ['見るときの きまり',
           'いいと おもったら ♡ を おしてあげて ください。'
           + 'まねしたい ときは「コピーして つくる」を つかうと、'
@@ -1767,6 +1799,478 @@ function comingSoon(page, title){
 }
 
 
+
+
+function prevTall(){
+  var f = $('preview');
+  f.classList.toggle('tall');
+  f.scrollIntoView({block:'start', behavior:'smooth'});
+}
+
+
+/* ============ 📖 みんなの図鑑 ============ */
+async function loadWiki(){
+  var d = await J('/api/mp/wiki');
+  var el = $('wikiBody');
+  if (!d.ok){ el.innerHTML = '<div class="empty">' + K(d.error) + '</div>'; return; }
+  el.innerHTML = '<div class="row">'
+    + '<input class="inp" id="wkQ" placeholder="さがす" style="flex:1;min-width:140px"'
+    + ' onkeydown="if(event.key===\'Enter\')loadWiki()">'
+    + '<button class="btn" onclick="newWiki()">＋ 新しく 書く</button></div>'
+    + (d.cats.length ? '<div class="row">' + d.cats.map(function(c){
+        return '<button class="btn gh sm" onclick="$(\'wkQ\').value=\'\';loadWiki()">'
+          + K(c.name) + ' <span style="opacity:.6">' + c.n + '</span></button>';
+      }).join('') + '</div>' : '')
+    + (d.pages.length
+        ? '<div class="grid">' + d.pages.map(function(p){
+            return '<div class="app" onclick="viewWiki(\'' + K(p.slug) + '\')">'
+              + '<div class="t">' + K(p.title) + '</div>'
+              + '<div class="s">' + K(p.category || '') + '</div>'
+              + '<div class="m"><span>' + K(p.updated_by || '') + '</span>'
+              + '<span>👁 ' + (p.views||0) + '</span>'
+              + '<span>' + K(String(p.updated_at||'').slice(5,10)) + '</span></div></div>';
+          }).join('') + '</div>'
+        : '<div class="empty">まだ ページが ありません。<br>'
+          + 'さいしょの 1ページを 書いてみませんか。</div>');
+}
+
+async function viewWiki(slug){
+  var d = await J('/api/mp/wiki/' + slug);
+  var el = $('wikiBody');
+  if (!d.ok){
+    el.innerHTML = '<div class="empty">まだ ありません<br>'
+      + '<button class="btn" style="margin-top:12px" onclick="editWiki(\''
+      + K(slug) + '\')">この なまえで 書く</button></div>';
+    return;
+  }
+  var p = d.page;
+  el.innerHTML = '<button class="btn gh sm" onclick="loadWiki()">← いちらん</button>'
+    + '<h2 style="margin-top:12px">' + K(p.title) + '</h2>'
+    + '<p class="lead">' + (p.category ? K(p.category) + ' · ' : '')
+    + 'さいごに 直した人: ' + K(p.updated_by||'') + ' · ' + K(p.updated_at) + '</p>'
+    + '<div class="card" style="white-space:pre-wrap;line-height:1.9;font-size:13.5px">'
+    + K(p.body || '（なにも 書かれて いません）') + '</div>'
+    + '<div class="row"><button class="btn" onclick="editWiki(\'' + K(slug) + '\')">'
+    + '✏️ 直す</button>'
+    + '<button class="btn gh" onclick="wikiHist(\'' + K(slug) + '\')">履歴</button></div>'
+    + '<div id="wkHist"></div>';
+  window.WIKI_CUR = p;
+}
+
+function editWiki(slug){
+  var p = (window.WIKI_CUR && window.WIKI_CUR.slug === slug) ? window.WIKI_CUR : {};
+  $('wikiBody').innerHTML =
+      '<button class="btn gh sm" onclick="loadWiki()">← やめる</button>'
+    + '<div class="row" style="margin-top:12px">'
+    + '<input class="inp" id="wkTitle" placeholder="だいめい" value="'
+    + K(p.title||'') + '" style="flex:1;min-width:150px">'
+    + '<input class="inp" id="wkCat" placeholder="なかま（むし / はな）" value="'
+    + K(p.category||'') + '" style="max-width:170px"></div>'
+    + '<textarea class="ta" id="wkBody" style="min-height:300px;line-height:1.8"'
+    + ' placeholder="ここに 書きます">' + K(p.body||'') + '</textarea>'
+    + '<div class="row" style="margin-top:10px">'
+    + '<input class="inp" id="wkNote" placeholder="なにを 直したか（任意）" '
+    + 'style="flex:1;min-width:140px">'
+    + '<button class="btn" onclick="saveWiki(\'' + K(slug) + '\')">ほぞん</button>'
+    + '<span id="wkMsg" style="font-size:12.5px"></span></div>';
+}
+
+async function newWiki(){
+  var t = prompt('なにに ついて 書きますか？\n\n例: カブトムシ');
+  if (!t) return;
+  var slug = prompt('URLの 名前（小文字の えいすうじ）\n\n例: kabutomushi');
+  if (!slug) return;
+  window.WIKI_CUR = {slug: slug.toLowerCase(), title: t, body: '', category: ''};
+  editWiki(slug.toLowerCase());
+}
+
+async function saveWiki(slug, confirmed){
+  var d = await P('/api/mp/wiki/' + slug, {
+    title: $('wkTitle').value, body: $('wkBody').value,
+    category: $('wkCat').value, note: $('wkNote').value, confirmed: confirmed});
+  if (!d.ok){
+    $('wkMsg').style.color = '#c0453b'; $('wkMsg').textContent = d.error;
+    if (d.need_confirm && confirm(d.error + '\n\nそれでも ほぞんしますか？'))
+      saveWiki(slug, true);
+    return;
+  }
+  viewWiki(slug);
+}
+
+async function wikiHist(slug){
+  var d = await J('/api/mp/wiki/' + slug);
+  $('wkHist').innerHTML = '<div class="sec">直した きろく</div>'
+    + (d.revs.length ? d.revs.map(function(r){
+        return '<div class="card" style="display:flex;align-items:center;gap:10px">'
+          + '<div style="flex:1"><b style="font-size:12.5px">' + K(r.at) + '</b>'
+          + '<div style="font-size:11.5px;color:var(--muted)">' + K(r.by||'')
+          + (r.note ? ' · ' + K(r.note) : '') + '</div></div>'
+          + '<button class="btn gh sm" onclick="wikiBack(\'' + K(slug) + '\','
+          + r.id + ')">もどす</button></div>';
+      }).join('') : '<div class="empty">まだ ありません</div>');
+}
+async function wikiBack(slug, rev){
+  if (!confirm('この ときの じょうたいに もどしますか？')) return;
+  await P('/api/mp/wiki/' + slug + '/restore/' + rev);
+  viewWiki(slug);
+}
+
+/* ============ 🗂 作品の棚 ============ */
+async function loadShelf(){
+  var d = await J('/api/mp/shelves');
+  var el = $('shelfBody');
+  if (!d.ok){ el.innerHTML = '<div class="empty">' + K(d.error) + '</div>'; return; }
+  el.innerHTML = '<div class="row">'
+    + '<button class="btn" onclick="newShelf()">＋ 棚を つくる</button></div>'
+    + (d.shelves.length
+        ? '<div class="grid">' + d.shelves.map(function(x){
+            return '<div class="app" onclick="viewShelf(' + x.id + ')">'
+              + '<div class="t">🗂 ' + K(x.title) + '</div>'
+              + '<div class="s">' + K(x.summary||'') + '</div>'
+              + '<div class="m"><span>' + K(x.owner_name||x.owner) + '</span>'
+              + '<span>' + x.apps + ' 作品</span>'
+              + (x.open_add ? '<span class="tag">だれでも 入れられる</span>' : '')
+              + '</div></div>';
+          }).join('') + '</div>'
+        : '<div class="empty">まだ 棚が ありません</div>');
+}
+
+async function viewShelf(sid){
+  var d = await J('/api/mp/shelf/' + sid);
+  var el = $('shelfBody');
+  if (!d.ok){ el.innerHTML = '<div class="empty">' + K(d.error) + '</div>'; return; }
+  var s2 = d.shelf;
+  el.innerHTML = '<button class="btn gh sm" onclick="loadShelf()">← いちらん</button>'
+    + '<h2 style="margin-top:12px">🗂 ' + K(s2.title) + '</h2>'
+    + '<p class="lead">' + K(s2.summary||'') + ' · '
+    + K(s2.owner_name||s2.owner) + ' さんの 棚</p>'
+    + ((d.is_owner || s2.open_add)
+        ? '<div class="row"><select class="sel" id="shApp" style="flex:1;min-width:150px">'
+          + (d.my_apps.length
+              ? d.my_apps.map(function(a){
+                  return '<option value="'+a.id+'">'+K(a.title)+'</option>'; }).join('')
+              : '<option value="">公開ずみの 作品が ありません</option>')
+          + '</select><button class="btn" onclick="shelfAdd(' + sid + ')">'
+          + '入れる</button></div>'
+        : '')
+    + (d.apps.length
+        ? '<div class="grid">' + d.apps.map(function(a){
+            return appCard(a, false); }).join('') + '</div>'
+        : '<div class="empty">まだ 作品が ありません</div>');
+}
+
+async function newShelf(){
+  var t = prompt('棚の 名前\n\n例: ゲーム あつめ');
+  if (!t) return;
+  var d = await P('/api/mp/shelf', {title:t, summary: prompt('せつめい（任意）')||''});
+  if (!d.ok){ alert(d.error); return; }
+  viewShelf(d.id);
+}
+async function shelfAdd(sid){
+  var a = $('shApp').value;
+  if (!a){ alert('先に 作品を 公開して ください'); return; }
+  var d = await P('/api/mp/shelf/' + sid + '/add', {app_id: parseInt(a)});
+  if (!d.ok){ alert(d.error); return; }
+  viewShelf(sid);
+}
+
+/* ============ ❓ しつもん ============ */
+async function loadQa(f){
+  var d = await J('/api/mp/qa?filter=' + (f || 'all'));
+  var el = $('qaBody');
+  if (!d.ok){ el.innerHTML = '<div class="empty">' + K(d.error) + '</div>'; return; }
+  el.innerHTML = '<div class="row">'
+    + '<button class="btn gh sm" onclick="loadQa(\'all\')">ぜんぶ</button>'
+    + '<button class="btn gh sm" onclick="loadQa(\'open\')">こたえ まち</button>'
+    + '<button class="btn gh sm" onclick="loadQa(\'solved\')">かいけつ ずみ</button>'
+    + '<span class="sp" style="flex:1"></span>'
+    + '<button class="btn" onclick="newQa()">＋ しつもんする</button></div>'
+    + (d.questions.length
+        ? d.questions.map(function(q){
+            return '<div class="card" style="cursor:pointer" onclick="viewQa('+q.id+')">'
+              + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+              + (q.solved ? '<span class="tag d1">かいけつ</span>'
+                          : '<span class="tag d2">こたえ まち</span>')
+              + '<b style="font-size:13.5px">' + K(q.title) + '</b></div>'
+              + '<div class="m" style="font-size:11.5px;color:var(--muted);margin-top:5px">'
+              + K(q.nickname||q.member_id) + ' · 💬' + q.answers + ' · 👁' + q.views
+              + ' · ' + K(String(q.created_at).slice(5,16)) + '</div></div>';
+          }).join('')
+        : '<div class="empty">まだ しつもんが ありません</div>');
+}
+
+async function viewQa(qid){
+  var d = await J('/api/mp/qa/' + qid);
+  var el = $('qaBody');
+  if (!d.ok){ el.innerHTML = '<div class="empty">' + K(d.error) + '</div>'; return; }
+  var q = d.question;
+  var mine = ME && ME.member_id === q.member_id;
+  el.innerHTML = '<button class="btn gh sm" onclick="loadQa()">← いちらん</button>'
+    + '<h2 style="margin-top:12px">' + (q.solved ? '✅ ' : '❓ ') + K(q.title) + '</h2>'
+    + '<p class="lead">' + K(q.nickname||q.member_id) + ' · ' + K(q.created_at) + '</p>'
+    + (q.body ? '<div class="card" style="white-space:pre-wrap;line-height:1.8">'
+        + K(q.body) + '</div>' : '')
+    + '<div class="sec">こたえ（' + d.answers.length + '）</div>'
+    + (d.answers.length ? d.answers.map(function(a){
+        var best = (q.best_id === a.id);
+        return '<div class="card" style="' + (best ? 'border-color:#16a34a;'
+          + 'background:#f0fdf4' : '') + '">'
+          + (best ? '<div style="color:#15803d;font-weight:700;font-size:12px;'
+              + 'margin-bottom:4px">⭐ いちばん たすかった こたえ</div>' : '')
+          + '<b style="font-size:12.5px">' + K(a.nickname||a.member_id) + '</b>'
+          + '<span style="font-size:11px;color:var(--muted);margin-left:7px">'
+          + K(a.created_at) + '</span>'
+          + '<div style="white-space:pre-wrap;line-height:1.8;font-size:13px;'
+          + 'margin-top:5px">' + K(a.body) + '</div>'
+          + ((mine && !q.solved)
+              ? '<div class="row" style="margin:8px 0 0">'
+                + '<button class="btn sm" onclick="qaBest(' + qid + ',' + a.id + ')">'
+                + '⭐ これが たすかった</button></div>' : '')
+          + '</div>';
+      }).join('') : '<div class="empty">まだ こたえが ありません</div>')
+    + '<div class="com-form" style="margin-top:14px">'
+    + '<textarea id="qaAns" placeholder="こたえて あげましょう"></textarea>'
+    + '<div class="row" style="margin:8px 0 0">'
+    + '<button class="com-btn" onclick="sendQa(' + qid + ')">こたえる</button>'
+    + '<span id="qaMsg" style="font-size:12px"></span></div></div>';
+}
+
+async function newQa(){
+  var t = prompt('なにを 聞きますか？\n\n例: for の つかいかたが わかりません');
+  if (!t) return;
+  var b = prompt('くわしく 書くと、こたえが つきやすい です（任意）') || '';
+  var d = await P('/api/mp/qa', {title:t, body:b});
+  if (!d.ok){ alert(d.error); return; }
+  viewQa(d.id);
+}
+async function sendQa(qid){
+  var t = $('qaAns').value.trim();
+  if (!t) return;
+  var d = await P('/api/mp/qa/' + qid + '/answer', {body:t});
+  if (!d.ok){ $('qaMsg').style.color='#c0453b'; $('qaMsg').textContent=d.error; return; }
+  viewQa(qid);
+}
+async function qaBest(qid, aid){
+  await P('/api/mp/qa/' + qid + '/best/' + aid);
+  viewQa(qid);
+}
+
+/* ============ 🗳 とうひょう ============ */
+async function loadPoll(){
+  var d = await J('/api/mp/polls');
+  var el = $('pollBody');
+  if (!d.ok){ el.innerHTML = '<div class="empty">' + K(d.error) + '</div>'; return; }
+  el.innerHTML = '<div class="row">'
+    + '<button class="btn" onclick="newPoll()">＋ とうひょうを つくる</button></div>'
+    + (d.polls.length ? d.polls.map(function(p){
+        return '<div class="card" style="cursor:pointer" onclick="viewPoll('+p.id+')">'
+          + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+          + (p.active ? '<span class="tag d1">うけつけ中</span>'
+                      : '<span class="tag draft">おわり</span>')
+          + (p.mine ? '<span class="tag">こたえ ずみ</span>' : '')
+          + '<b style="font-size:13.5px">' + K(p.title) + '</b></div>'
+          + '<div style="font-size:11.5px;color:var(--muted);margin-top:5px">'
+          + K(p.owner_name||p.owner) + ' · ' + p.answers + '人が こたえた</div></div>';
+      }).join('') : '<div class="empty">まだ とうひょうが ありません</div>');
+}
+
+async function viewPoll(pid){
+  var d = await J('/api/mp/poll/' + pid);
+  var el = $('pollBody');
+  if (!d.ok){ el.innerHTML = '<div class="empty">' + K(d.error) + '</div>'; return; }
+  var p = d.poll;
+  var body = '<button class="btn gh sm" onclick="loadPoll()">← いちらん</button>'
+    + '<h2 style="margin-top:12px">🗳 ' + K(p.title) + '</h2>'
+    + '<p class="lead">' + K(p.summary||'') + ' · ' + d.total + '人が こたえました</p>';
+
+  if (d.answered || !p.active){
+    // けっかを 見せる
+    body += p.qs.map(function(q, i){
+      var t = d.tally[i] || {};
+      var mx = Math.max.apply(null, Object.keys(t).map(function(k){ return t[k]; })
+                 .concat([1]));
+      return '<div class="card"><b style="font-size:13px">' + K(q.q) + '</b>'
+        + (q.choices||[]).map(function(ch){
+            var n = t[ch] || 0;
+            return '<div style="margin-top:8px"><div style="display:flex;'
+              + 'justify-content:space-between;font-size:12.5px">'
+              + '<span>' + K(ch) + '</span><b>' + n + '</b></div>'
+              + '<div style="height:8px;background:#e8eef1;border-radius:99px;'
+              + 'margin-top:3px"><div style="height:100%;width:'
+              + Math.round(n/mx*100) + '%;background:#22d3ee;border-radius:99px">'
+              + '</div></div></div>';
+          }).join('')
+        + (q.type === 'text' ? '<div style="font-size:12px;color:var(--muted);'
+            + 'margin-top:6px">じゆうに 書く しつもんです</div>' : '')
+        + '</div>';
+    }).join('');
+    if (d.answered) body += '<div class="note">こたえて くれて ありがとう。'
+      + 'こたえは あとから 変えられません。</div>';
+  } else {
+    // こたえる
+    body += p.qs.map(function(q, i){
+      return '<div class="card"><b style="font-size:13px">' + K(q.q) + '</b>'
+        + '<div style="margin-top:8px">'
+        + (q.type === 'text'
+            ? '<input class="inp" data-q="' + i + '" placeholder="こたえ">'
+            : (q.choices||[]).map(function(ch){
+                return '<label style="display:flex;align-items:center;gap:8px;'
+                  + 'padding:6px 0;cursor:pointer;font-size:13px">'
+                  + '<input type="' + (q.type==='many'?'checkbox':'radio') + '" '
+                  + 'name="pq' + i + '" data-q="' + i + '" value="' + K(ch) + '">'
+                  + K(ch) + '</label>';
+              }).join(''))
+        + '</div></div>';
+    }).join('')
+    + '<div class="row"><button class="btn" onclick="sendPoll(' + pid + ')">'
+    + 'こたえる</button><span style="font-size:11.5px;color:var(--muted)">'
+    + 'ひとり 1回だけ。あとから 変えられません</span>'
+    + '<span id="plMsg" style="font-size:12px"></span></div>';
+  }
+  if (d.is_owner) body += '<div class="row" style="margin-top:12px">'
+    + '<button class="btn gh sm" onclick="closePoll(' + pid + ','
+    + (p.active?0:1) + ')">' + (p.active ? 'うけつけを とめる' : 'また うけつける')
+    + '</button></div>';
+  el.innerHTML = body;
+}
+
+async function sendPoll(pid){
+  var ans = {};
+  document.querySelectorAll('#pollBody [data-q]').forEach(function(el){
+    var i = el.getAttribute('data-q');
+    if (el.type === 'checkbox'){
+      if (el.checked){ ans[i] = ans[i] || []; ans[i].push(el.value); }
+    } else if (el.type === 'radio'){
+      if (el.checked) ans[i] = el.value;
+    } else {
+      if (el.value.trim()) ans[i] = el.value.trim();
+    }
+  });
+  var d = await P('/api/mp/poll/' + pid + '/answer', {ans: ans});
+  if (!d.ok){ $('plMsg').style.color='#c0453b'; $('plMsg').textContent=d.error; return; }
+  viewPoll(pid);
+}
+
+async function newPoll(){
+  var t = prompt('なにを きめますか？\n\n例: つぎの お題は？');
+  if (!t) return;
+  var q = prompt('しつもん\n\n例: どれが いいですか？');
+  if (!q) return;
+  var ch = prompt('えらぶ もの（コンマで くぎる）\n\n例: ゲーム,絵,計算');
+  if (!ch) return;
+  var d = await P('/api/mp/poll', {title:t, qs:[{
+    q:q, type:'one', choices: ch.split(',').map(function(x){ return x.trim(); })}]});
+  if (!d.ok){ alert(d.error); return; }
+  viewPoll(d.id);
+}
+async function closePoll(pid, open){
+  await P('/api/mp/poll/' + pid + '/close', {open: !!open});
+  viewPoll(pid);
+}
+
+/* ============ 💬 つぶやき ============ */
+var TALK_MODE = 'all';
+
+async function loadTalk(mode){
+  TALK_MODE = mode || 'all';
+  var q = TALK_MODE === 'group' ? '?group=' + (window.TALK_GID || '')
+        : (TALK_MODE === 'follow' ? '?following=1' : '');
+  var d = await J('/api/mp/posts' + q);
+  var el = $('talkBody');
+  if (!d.ok){ el.innerHTML = '<div class="empty">' + K(d.error) + '</div>'; return; }
+
+  var gs = '<div class="row" style="margin-bottom:12px">'
+    + '<button class="btn ' + (TALK_MODE==='all'?'':'gh') + ' sm" '
+    + 'onclick="loadTalk(\'all\')">ぜんぶ</button>'
+    + '<button class="btn ' + (TALK_MODE==='follow'?'':'gh') + ' sm" '
+    + 'onclick="loadTalk(\'follow\')">フォロー中</button>'
+    + (d.groups||[]).map(function(g){
+        return '<button class="btn ' + (window.TALK_GID==g.id?'':'gh') + ' sm" '
+          + 'onclick="window.TALK_GID=' + g.id + ';loadTalk(\'group\')">'
+          + K(g.name) + ' <span style="opacity:.6">' + g.members + '</span></button>';
+      }).join('')
+    + '<button class="btn gh sm" onclick="newGroup()">＋ グループ</button></div>';
+
+  var form = '<div class="com-form" style="background:#f0f9ff;border-color:#bae6fd">'
+    + '<textarea id="tkBody" maxlength="300" placeholder="いまの きもちを ひとこと…"'
+    + ' style="border-color:#bae6fd"></textarea>'
+    + '<div class="row" style="margin:8px 0 0">'
+    + '<button class="btn cy" onclick="sendTalk()">つぶやく</button>'
+    + '<span style="font-size:11.5px;color:#0369a1">'
+    + (TALK_MODE==='group' ? 'この グループに 出します' : 'みんなに 見えます') + '</span>'
+    + '<span class="sp" style="flex:1"></span>'
+    + '<span id="tkMsg" style="font-size:12px"></span></div></div>';
+
+  el.innerHTML = gs + form + (d.posts.length
+    ? d.posts.map(postCard).join('')
+    : '<div class="empty">まだ つぶやきが ありません。さいしょに どうぞ。</div>');
+}
+
+function postCard(p){
+  var mine = ME && ME.member_id === p.member_id;
+  return '<div class="card" id="pst' + p.id + '">'
+    + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+    + '<b style="font-size:13px;cursor:pointer" onclick="viewAuthor(\''
+    + K(p.member_id) + '\')">' + K(p.nickname || p.member_id) + '</b>'
+    + (p.group_name ? '<span class="tag">' + K(p.group_name) + '</span>' : '')
+    + '<span style="font-size:11px;color:var(--muted);margin-left:auto">'
+    + K(p.created_at) + '</span></div>'
+    + '<div style="font-size:13.5px;line-height:1.8;white-space:pre-wrap;margin:6px 0">'
+    + K(p.body) + '</div>'
+    + '<div class="row" style="margin:0;gap:6px">'
+    + '<button class="btn gh sm" onclick="likeTalk(' + p.id + ')">'
+    + (p.liked ? '♥' : '♡') + ' ' + (p.likes||0) + '</button>'
+    + '<button class="btn gh sm" onclick="showReplies(' + p.id + ')">💬 '
+    + (p.replies||0) + '</button>'
+    + (mine ? '<button class="btn gh sm" onclick="hideTalk(' + p.id + ')">けす</button>' : '')
+    + '</div><div id="rep' + p.id + '"></div></div>';
+}
+
+async function sendTalk(){
+  var t = $('tkBody').value.trim();
+  if (!t) return;
+  var b = {body:t};
+  if (TALK_MODE === 'group' && window.TALK_GID) b.group_id = window.TALK_GID;
+  var d = await P('/api/mp/post', b);
+  if (!d.ok){ $('tkMsg').style.color='#c0453b'; $('tkMsg').textContent=d.error; return; }
+  loadTalk(TALK_MODE);
+}
+async function likeTalk(id){ await P('/api/mp/post/'+id+'/like'); loadTalk(TALK_MODE); }
+async function hideTalk(id){
+  if (!confirm('この つぶやきを けしますか？')) return;
+  await P('/api/mp/post/'+id+'/hide'); loadTalk(TALK_MODE);
+}
+async function showReplies(id){
+  var el = $('rep'+id);
+  if (el.innerHTML){ el.innerHTML = ''; return; }
+  var d = await J('/api/mp/post/'+id+'/replies');
+  el.innerHTML = '<div style="border-left:2px solid #e2e8f0;padding-left:11px;'
+    + 'margin-top:9px">'
+    + (d.replies||[]).map(function(r){
+        return '<div style="margin-bottom:7px"><b style="font-size:12px">'
+          + K(r.nickname||r.member_id) + '</b>'
+          + '<span style="font-size:11px;color:var(--muted);margin-left:6px">'
+          + K(r.created_at) + '</span>'
+          + '<div style="font-size:12.5px;white-space:pre-wrap">'+K(r.body)+'</div></div>';
+      }).join('')
+    + '<div class="row" style="margin:6px 0 0">'
+    + '<input class="inp" id="rp'+id+'" placeholder="かえす…" style="flex:1">'
+    + '<button class="btn cy sm" onclick="sendReply('+id+')">おくる</button></div></div>';
+}
+async function sendReply(id){
+  var t = $('rp'+id).value.trim();
+  if (!t) return;
+  var d = await P('/api/mp/post', {body:t, reply_to:id});
+  if (!d.ok){ alert(d.error); return; }
+  $('rep'+id).innerHTML = ''; showReplies(id);
+}
+async function newGroup(){
+  var n = prompt('グループの 名前');
+  if (!n) return;
+  var d = await P('/api/mp/group', {name:n});
+  if (!d.ok){ alert(d.error); return; }
+  window.TALK_GID = d.id; loadTalk('group');
+}
 
 /* ============ 大きく うごかす ============ */
 async function bigRun(){
@@ -1875,16 +2379,11 @@ var CATS = [
       ['apps','📦 みんなの作品',1],
       ['mine','📁 自分の作品',1],
       ['favs','☆ お気に入り',1]]],
-  ['talk', '💬 つぶやき', 0, [
-      ['talk','ぜんぶ',0], ['talkg','グループ',0], ['talkf','フォロー中',0]]],
-  ['wiki', '📖 みんなの図鑑', 0, [
-      ['wiki','さがす',0], ['wikinew','新しく 書く',0]]],
-  ['shelf','🗂 作品の棚', 0, [
-      ['shelf','棚を さがす',0], ['shelfnew','棚を つくる',0]]],
-  ['qa',   '❓ しつもん', 0, [
-      ['qa','しつもんを 見る',0], ['qanew','しつもんする',0]]],
-  ['poll', '🗳 とうひょう', 0, [
-      ['poll','とうひょうする',0], ['pollnew','つくる',0]]]
+  ['talk', '💬 つぶやき', 1, [['talk','💬 つぶやき',1]]],
+  ['wiki', '📖 みんなの図鑑', 1, [['wiki','📖 図鑑',1]]],
+  ['shelf','🗂 作品の棚', 1, [['shelf','🗂 棚',1]]],
+  ['qa',   '❓ しつもん', 1, [['qa','❓ しつもん',1]]],
+  ['poll', '🗳 とうひょう', 1, [['poll','🗳 とうひょう',1]]]
 ];
 
 var CURCAT = 'prog';
@@ -2453,7 +2952,11 @@ async function runFiles(files, db, outEl, frameEl){
     frameEl.srcdoc = '<style>body{font-family:sans-serif;padding:12px}</style>'
       + head + eh.content + tail;
     outWrite(outEl, '画面に表示しました（' + eh.path + '）', 'ok');
-  } else { frameEl.style.display = 'none'; }
+    if (frameEl.id === 'preview' && $('prevBar')) $('prevBar').style.display = 'flex';
+  } else {
+    frameEl.style.display = 'none';
+    if (frameEl.id === 'preview' && $('prevBar')) $('prevBar').style.display = 'none';
+  }
 
   if (db && (db.schema || db.seed))
     await runSql((db.schema||'') + '\n' + (db.seed||''), outEl);
