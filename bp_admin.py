@@ -1770,3 +1770,53 @@ def api_mp_page_toggle(slug):
     c.commit(); c.close()
     audit('mp_page_' + ('on' if d.get('active') else 'off'), slug, d.get('why') or '')
     return jsonify(ok=True)
+
+
+# ---------- 会員への おしらせ（管理側） ----------
+@bp.route('/api/admin/mp/anns', methods=['GET'])
+def api_mp_anns():
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    c = _db()
+    rows = [dict(r) for r in c.execute("""
+        SELECT a.*, (SELECT COUNT(*) FROM mp_ann_read r WHERE r.ann_id=a.id) AS reads
+        FROM mp_ann a ORDER BY a.id DESC LIMIT 50""").fetchall()]
+    total = c.execute("SELECT COUNT(*) AS n FROM mp_member "
+                      "WHERE status='active'").fetchone()
+    c.close()
+    return jsonify(ok=True, anns=rows, members=(total['n'] if total else 0))
+
+
+@bp.route('/api/admin/mp/ann', methods=['POST'])
+def api_mp_ann_new():
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    d = request.get_json(silent=True) or {}
+    t = (d.get('title') or '').strip()
+    if not t:
+        return jsonify(ok=False, error='だいめいを 入れてください'), 400
+    c = _db()
+    c.execute("""INSERT INTO mp_ann(title,body,level,pinned,starts_at,ends_at,created_by)
+                 VALUES(?,?,?,?,?,?,?)""",
+              (t[:120], (d.get('body') or '')[:3000], d.get('level') or 'info',
+               1 if d.get('pinned') else 0, d.get('starts_at') or None,
+               d.get('ends_at') or None, session.get('staff_id')))
+    c.commit(); c.close()
+    audit('mp_ann_new', t[:40])
+    return jsonify(ok=True)
+
+
+@bp.route('/api/admin/mp/ann/<int:aid>', methods=['POST'])
+def api_mp_ann_edit(aid):
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    d = request.get_json(silent=True) or {}
+    c = _db()
+    if 'active' in d:
+        c.execute('UPDATE mp_ann SET active=? WHERE id=?',
+                  (1 if d['active'] else 0, aid))
+    if 'pinned' in d:
+        c.execute('UPDATE mp_ann SET pinned=? WHERE id=?',
+                  (1 if d['pinned'] else 0, aid))
+    c.commit(); c.close()
+    return jsonify(ok=True)

@@ -2132,3 +2132,42 @@ def page_public(slug):
         title=(p['title'] or p['app_title']), favicon=(p['favicon'] or '🎈'),
         app_id=p['app_id'], slug=slug, has_html=(1 if has_html else 0),
         files_json=safe, tables_json=tabs)
+
+
+# ====================================================================
+# 運営から 会員への おしらせ
+# ====================================================================
+
+@bp.route('/api/mp/anns')
+def mp_anns():
+    u = me()
+    if not u:
+        return jsonify(ok=False), 401
+    c = _db()
+    rows = [dict(r) for r in c.execute("""
+        SELECT a.*, (SELECT COUNT(*) FROM mp_ann_read r
+                     WHERE r.ann_id=a.id AND r.member_id=?) AS is_read
+        FROM mp_ann a WHERE a.active=1
+        AND (a.starts_at IS NULL OR a.starts_at <= datetime('now','localtime'))
+        AND (a.ends_at IS NULL OR a.ends_at >= datetime('now','localtime'))
+        ORDER BY a.pinned DESC, a.id DESC LIMIT 20""",
+        (u['member_id'],)).fetchall()]
+    c.close()
+    unread = len([r for r in rows if not r['is_read']])
+    return jsonify(ok=True, anns=rows, unread=unread)
+
+
+@bp.route('/api/mp/ann/<int:aid>/read', methods=['POST'])
+def mp_ann_read(aid):
+    u = me()
+    if not u:
+        return jsonify(ok=False), 401
+    c = _db()
+    try:
+        c.execute('INSERT OR IGNORE INTO mp_ann_read(ann_id,member_id) VALUES(?,?)',
+                  (aid, u['member_id']))
+        c.commit()
+    except Exception:
+        pass
+    c.close()
+    return jsonify(ok=True)

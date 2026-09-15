@@ -63,6 +63,9 @@
     <button class="mtab" data-p="member">👥 会員</button>
     <button class="mtab" data-p="app">📦 作品</button>
     <button class="mtab" data-p="report">🚩 通報</button>
+    <button class="mtab" data-p="ann">📢 おしらせ</button>
+    <button class="mtab" data-p="ann">📢 おしらせ</button>
+    <button class="mtab" data-p="ann">📢 おしらせ</button>
     <button class="mtab" data-p="invite">🎟 招待コード</button>
   </div>
 
@@ -83,6 +86,96 @@
   </div>
 
   <div class="mpane" id="m-report"><div id="repList"></div></div>
+
+  <div class="mpane" id="m-ann">
+    <div class="mnote">
+      会員の ホームに 出ます。ひとりずつの 通知（いいねなど）とは べつです。
+    </div>
+    <div class="mform">
+      <h4>＋ おしらせを 出す</h4>
+      <div class="mrow">
+        <input class="minp" id="anTitle" placeholder="だいめい" style="flex:1;min-width:170px">
+        <select class="msel" id="anLevel">
+          <option value="info">おしらせ</option>
+          <option value="event">イベント</option>
+          <option value="warn">ちゅうい</option>
+          <option value="maint">メンテナンス</option>
+        </select>
+        <label style="font-size:12px;display:flex;align-items:center;gap:5px">
+          <input type="checkbox" id="anPin"> いちばん上に とめる</label>
+      </div>
+      <textarea class="minp" id="anBody" placeholder="なかみ"
+        style="width:100%;min-height:80px;resize:vertical;margin-bottom:9px"></textarea>
+      <div class="mrow">
+        <input class="minp" id="anStart" type="datetime-local" style="max-width:195px">
+        <span style="font-size:12px;color:#7a8794">-</span>
+        <input class="minp" id="anEnd" type="datetime-local" style="max-width:195px">
+        <button class="mbtn" onclick="mkAnn()">出す</button>
+        <span id="anMsg" style="font-size:12.5px"></span>
+      </div>
+    </div>
+    <div id="annList"></div>
+  </div>
+
+  <div class="mpane" id="m-ann">
+    <div class="mnote">
+      会員の ホームに 出ます。ひとりずつの 通知（いいねなど）とは べつです。
+    </div>
+    <div class="mform">
+      <h4>＋ おしらせを 出す</h4>
+      <div class="mrow">
+        <input class="minp" id="anTitle" placeholder="だいめい" style="flex:1;min-width:170px">
+        <select class="msel" id="anLevel">
+          <option value="info">おしらせ</option>
+          <option value="event">イベント</option>
+          <option value="warn">ちゅうい</option>
+          <option value="maint">メンテナンス</option>
+        </select>
+        <label style="font-size:12px;display:flex;align-items:center;gap:5px">
+          <input type="checkbox" id="anPin"> いちばん上に とめる</label>
+      </div>
+      <textarea class="minp" id="anBody" placeholder="なかみ"
+        style="width:100%;min-height:80px;resize:vertical;margin-bottom:9px"></textarea>
+      <div class="mrow">
+        <input class="minp" id="anStart" type="datetime-local" style="max-width:195px">
+        <span style="font-size:12px;color:#7a8794">-</span>
+        <input class="minp" id="anEnd" type="datetime-local" style="max-width:195px">
+        <button class="mbtn" onclick="mkAnn()">出す</button>
+        <span id="anMsg" style="font-size:12.5px"></span>
+      </div>
+    </div>
+    <div id="annList"></div>
+  </div>
+
+  <div class="mpane" id="m-ann">
+    <div class="mnote">
+      会員の ホームに 出ます。ひとりずつの 通知（いいねなど）とは べつです。
+    </div>
+    <div class="mform">
+      <h4>＋ おしらせを 出す</h4>
+      <div class="mrow">
+        <input class="minp" id="anTitle" placeholder="だいめい" style="flex:1;min-width:170px">
+        <select class="msel" id="anLevel">
+          <option value="info">おしらせ</option>
+          <option value="event">イベント</option>
+          <option value="warn">ちゅうい</option>
+          <option value="maint">メンテナンス</option>
+        </select>
+        <label style="font-size:12px;display:flex;align-items:center;gap:5px">
+          <input type="checkbox" id="anPin"> いちばん上に とめる</label>
+      </div>
+      <textarea class="minp" id="anBody" placeholder="なかみ"
+        style="width:100%;min-height:80px;resize:vertical;margin-bottom:9px"></textarea>
+      <div class="mrow">
+        <input class="minp" id="anStart" type="datetime-local" style="max-width:195px">
+        <span style="font-size:12px;color:#7a8794">-</span>
+        <input class="minp" id="anEnd" type="datetime-local" style="max-width:195px">
+        <button class="mbtn" onclick="mkAnn()">出す</button>
+        <span id="anMsg" style="font-size:12.5px"></span>
+      </div>
+    </div>
+    <div id="annList"></div>
+  </div>
 
   <div class="mpane" id="m-invite">
     <div class="mnote">
@@ -136,7 +229,7 @@ async function load(){
     + card(s.files, 'ファイル') + card(s.comments, 'コメント')
     + card(s.data, 'みんなの データ')
     + card(s.reports, '未対応の通報', s.reports > 0);
-  drawMembers(); drawApps(); drawReports(); drawInvites();
+  drawMembers(); drawApps(); drawReports(); drawInvites(); loadAnns2(); loadAnns2(); loadAnns2();
 }
 function card(n, l, warn){
   return '<div class="mcard' + (warn ? ' warn' : '') + '">'
@@ -230,6 +323,149 @@ function drawInvites(){
         + (i.active?0:1)+')">'+(i.active?'止める':'もどす')+'</button></td></tr>';
     }));
 }
+var ANN_LV = {info:'おしらせ', event:'イベント',
+              warn:'ちゅうい', maint:'メンテナンス'};
+
+async function loadAnns2(){
+  var d = await J('/api/admin/mp/anns');
+  var el = document.getElementById('annList');
+  if (!d.ok){ el.innerHTML = '<div class="mempty">'+K(d.error)+'</div>'; return; }
+  el.innerHTML = tbl(['だいめい','しゅるい','よんだ人','きかん','状態',''],
+    d.anns.map(function(a){
+      return '<tr><td><b>'+K(a.title)+'</b>'
+        + (a.pinned ? ' <span class="tg staff">とめてる</span>' : '')
+        + '<div class="mono">'+K(String(a.body||'').slice(0,50))+'</div></td>'
+        + '<td>'+K(ANN_LV[a.level]||a.level)+'</td>'
+        + '<td>'+(a.reads||0)+' / '+d.members+'</td>'
+        + '<td class="mono">'+K(a.starts_at||'-')+'<br>'+K(a.ends_at||'-')+'</td>'
+        + '<td><span class="tg '+(a.active?'active':'closed')+'">'
+        + (a.active?'出てる':'止めた')+'</span></td>'
+        + '<td><button class="mbtn gh" onclick="togAnn('+a.id+',\'active\','
+        + (a.active?0:1)+')">'+(a.active?'止める':'もどす')+'</button> '
+        + '<button class="mbtn gh" onclick="togAnn('+a.id+',\'pinned\','
+        + (a.pinned?0:1)+')">'+(a.pinned?'とめを はずす':'上に とめる')+'</button>'
+        + '</td></tr>';
+    }));
+}
+
+window.mkAnn = async function(){
+  var t = document.getElementById('anTitle').value.trim();
+  var m = document.getElementById('anMsg');
+  if (t === ''){ m.style.color='#c0453b'; m.textContent='だいめいを 入れてください'; return; }
+  var r = await P('/api/admin/mp/ann', {
+    title:t, body:document.getElementById('anBody').value,
+    level:document.getElementById('anLevel').value,
+    pinned:document.getElementById('anPin').checked,
+    starts_at:document.getElementById('anStart').value.replace('T',' '),
+    ends_at:document.getElementById('anEnd').value.replace('T',' ')});
+  if (r.ok !== true){ m.style.color='#c0453b'; m.textContent=r.error; return; }
+  m.style.color='#0e7490'; m.textContent='出しました';
+  document.getElementById('anTitle').value='';
+  document.getElementById('anBody').value='';
+  loadAnns2();
+};
+window.togAnn = async function(id, key, v){
+  var b = {}; b[key] = (v ? true : false);
+  await P('/api/admin/mp/ann/' + id, b);
+  loadAnns2();
+};
+
+var ANN_LV = {info:'おしらせ', event:'イベント',
+              warn:'ちゅうい', maint:'メンテナンス'};
+
+async function loadAnns2(){
+  var d = await J('/api/admin/mp/anns');
+  var el = document.getElementById('annList');
+  if (!d.ok){ el.innerHTML = '<div class="mempty">'+K(d.error)+'</div>'; return; }
+  el.innerHTML = tbl(['だいめい','しゅるい','よんだ人','きかん','状態',''],
+    d.anns.map(function(a){
+      return '<tr><td><b>'+K(a.title)+'</b>'
+        + (a.pinned ? ' <span class="tg staff">とめてる</span>' : '')
+        + '<div class="mono">'+K(String(a.body||'').slice(0,50))+'</div></td>'
+        + '<td>'+K(ANN_LV[a.level]||a.level)+'</td>'
+        + '<td>'+(a.reads||0)+' / '+d.members+'</td>'
+        + '<td class="mono">'+K(a.starts_at||'-')+'<br>'+K(a.ends_at||'-')+'</td>'
+        + '<td><span class="tg '+(a.active?'active':'closed')+'">'
+        + (a.active?'出てる':'止めた')+'</span></td>'
+        + '<td><button class="mbtn gh" onclick="togAnn('+a.id+',\'active\','
+        + (a.active?0:1)+')">'+(a.active?'止める':'もどす')+'</button> '
+        + '<button class="mbtn gh" onclick="togAnn('+a.id+',\'pinned\','
+        + (a.pinned?0:1)+')">'+(a.pinned?'とめを はずす':'上に とめる')+'</button>'
+        + '</td></tr>';
+    }));
+}
+
+window.mkAnn = async function(){
+  var t = document.getElementById('anTitle').value.trim();
+  var m = document.getElementById('anMsg');
+  if (t === ''){ m.style.color='#c0453b'; m.textContent='だいめいを 入れてください'; return; }
+  var r = await P('/api/admin/mp/ann', {
+    title:t, body:document.getElementById('anBody').value,
+    level:document.getElementById('anLevel').value,
+    pinned:document.getElementById('anPin').checked,
+    starts_at:document.getElementById('anStart').value.replace('T',' '),
+    ends_at:document.getElementById('anEnd').value.replace('T',' ')});
+  if (r.ok !== true){ m.style.color='#c0453b'; m.textContent=r.error; return; }
+  m.style.color='#0e7490'; m.textContent='出しました';
+  document.getElementById('anTitle').value='';
+  document.getElementById('anBody').value='';
+  loadAnns2();
+};
+window.togAnn = async function(id, key, v){
+  var b = {}; b[key] = (v ? true : false);
+  await P('/api/admin/mp/ann/' + id, b);
+  loadAnns2();
+};
+
+var ANN_LV = {info:'おしらせ', event:'イベント',
+              warn:'ちゅうい', maint:'メンテナンス'};
+
+async function loadAnns2(){
+  var d = await J('/api/admin/mp/anns');
+  var el = document.getElementById('annList');
+  if (d.ok !== true){ el.innerHTML = '<div class="mempty">'+K(d.error)+'</div>'; return; }
+  el.innerHTML = tbl(['だいめい','しゅるい','よんだ人','きかん','状態',''],
+    d.anns.map(function(a){
+      return '<tr><td><b>'+K(a.title)+'</b>'
+        + (a.pinned ? ' <span class="tg staff">とめてる</span>' : '')
+        + '<div class="mono">'+K(String(a.body||'').slice(0,50))+'</div></td>'
+        + '<td>'+K(ANN_LV[a.level]||a.level)+'</td>'
+        + '<td>'+(a.reads||0)+' / '+d.members+'</td>'
+        + '<td class="mono">'+K(a.starts_at||'-')+'<br>'+K(a.ends_at||'-')+'</td>'
+        + '<td><span class="tg '+(a.active?'active':'closed')+'">'
+        + (a.active?'出てる':'止めた')+'</span></td>'
+        + '<td><button class="mbtn gh" onclick="togAnn('+a.id+',\'active\','
+        + (a.active?0:1)+')">'+(a.active?'止める':'もどす')+'</button> '
+        + '<button class="mbtn gh" onclick="togAnn('+a.id+',\'pinned\','
+        + (a.pinned?0:1)+')">'+(a.pinned?'はずす':'上に とめる')+'</button>'
+        + '</td></tr>';
+    }));
+}
+
+window.mkAnn = async function(){
+  var t = document.getElementById('anTitle').value.trim();
+  var m = document.getElementById('anMsg');
+  if (t === ''){ m.style.color='#c0453b'; m.textContent='だいめいを 入れてください'; return; }
+  var r = await P('/api/admin/mp/ann', {
+    title:t, body:document.getElementById('anBody').value,
+    level:document.getElementById('anLevel').value,
+    pinned:document.getElementById('anPin').checked,
+    starts_at:document.getElementById('anStart').value.replace('T',' '),
+    ends_at:document.getElementById('anEnd').value.replace('T',' ')});
+  if (r.ok !== true){ m.style.color='#c0453b'; m.textContent=r.error; return; }
+  m.style.color='#0e7490'; m.textContent='出しました';
+  document.getElementById('anTitle').value='';
+  document.getElementById('anBody').value='';
+  loadAnns2();
+};
+
+window.togAnn = async function(id, key, v){
+  var b = {};
+  b[key] = (v ? true : false);
+  await P('/api/admin/mp/ann/' + id, b);
+  loadAnns2();
+};
+
 window.mkInvite2 = async function(){
   var r = await P('/api/admin/mp/invite', {
     code: document.getElementById('ivCode2').value,

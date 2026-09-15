@@ -324,6 +324,22 @@ body.furi .lead{font-size:13.5px}
 .blk-lg.on{background:#0a1628;color:#fff;border-color:#0a1628;font-weight:600}
 .blk.lv3{margin-left:78px}
 .blk-palette{max-height:560px}
+
+.ann{border-radius:11px;padding:13px 16px;margin-bottom:10px;
+  display:flex;align-items:flex-start;gap:11px;font-size:13px;line-height:1.75}
+.ann.info{background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a}
+.ann.event{background:#fdf4ff;border:1px solid #f0abfc;color:#86198f}
+.ann.warn{background:#fffbeb;border:1px solid #fde68a;color:#78350f}
+.ann.maint{background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
+.ann .ic{font-size:18px;line-height:1.3;flex:none}
+.ann .t{font-weight:700;font-size:13.5px;margin-bottom:3px}
+.ann .b{white-space:pre-wrap;font-size:12.5px;opacity:.9}
+.ann .when{font-size:11px;opacity:.6;margin-top:4px}
+.ann .x{cursor:pointer;opacity:.5;font-size:16px;padding:0 2px;flex:none}
+.ann .x:hover{opacity:1}
+.ann.unread{box-shadow:0 0 0 2px rgba(34,211,238,.35)}
+.ann-pin{font-size:10px;background:rgba(0,0,0,.08);padding:1px 7px;
+  border-radius:99px;margin-left:6px}
 </style></head><body>
 
 <div class="hd">
@@ -353,6 +369,7 @@ body.furi .lead{font-size:13.5px}
         <div class="stat"><b id="stPeople">0</b><span>つくった人</span></div>
       </div>
     </div>
+    <div id="annBox"></div>
     <div class="menu-grid" id="homeMenu"></div>
   </div>
 
@@ -674,7 +691,7 @@ function go(p){
             login:'nvLogin', favs:'nvFavs', block:'nvBlock',
             notices:'nvNotice'}[p];
   if (nv && $(nv)) $(nv).classList.add('on');
-  if (p==='home'){ drawHomeMenu(); loadStats(); }
+  if (p==='home'){ drawHomeMenu(); loadStats(); loadAnns(); }
   if (p==='apps'){ drawRule('apps'); loadApps(); }
   if (p==='talk'){ drawRule('talk'); loadTalk('all'); return; }
   if (p==='wiki'){ drawRule('wiki'); loadWiki(); return; }
@@ -2532,6 +2549,32 @@ async function closePoll(pid, open){
   viewPoll(pid);
 }
 
+
+/* ============ 運営からの おしらせ ============ */
+async function loadAnns(){
+  var el = $('annBox');
+  if (!el || !ME) return;
+  var d = await J('/api/mp/anns');
+  if (!d.ok || !d.anns.length){ el.innerHTML = ''; return; }
+  var IC = {info:'📢', event:'🎉', warn:'⚠️', maint:'🔧'};
+  el.innerHTML = d.anns.map(function(a){
+    return '<div class="ann ' + K(a.level) + (a.is_read ? '' : ' unread')
+      + '" id="ann' + a.id + '">'
+      + '<span class="ic">' + (IC[a.level]||'📢') + '</span>'
+      + '<div style="flex:1;min-width:0">'
+      + '<div class="t">' + K(a.title)
+      + (a.pinned ? '<span class="ann-pin">たいせつ</span>' : '') + '</div>'
+      + (a.body ? '<div class="b">' + K(a.body) + '</div>' : '')
+      + '<div class="when">' + K(String(a.created_at).slice(0,16)) + '</div></div>'
+      + '<span class="x" onclick="readAnn(' + a.id + ')" title="よんだ">✕</span></div>';
+  }).join('');
+}
+async function readAnn(id){
+  await P('/api/mp/ann/' + id + '/read');
+  var el = $('ann' + id);
+  if (el){ el.style.transition='.2s'; el.style.opacity='0';
+           setTimeout(function(){ el.remove(); }, 200); }
+}
 /* ============ 💬 つぶやき ============ */
 var TALK_MODE = 'all';
 
