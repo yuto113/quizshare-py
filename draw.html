@@ -1,0 +1,605 @@
+<!-- おえかき。member.html の <div class="wrap"> の中に足す -->
+<div class="pane" id="p-draw">
+  <h1>🎨 おえかき</h1>
+  <div class="rulebox" id="rb-draw"></div>
+  <div id="drawBody"></div>
+</div>
+
+<style>
+/* ---- キャンバスを つくる画面 ---- */
+.dnew{background:#f7f9fa;border:1px solid var(--line);border-radius:12px;
+  padding:18px;margin-bottom:18px}
+.dnew h4{font-size:13.5px;margin:0 0 12px}
+.dmode{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.dmode-card{flex:1;min-width:150px;background:#fff;border:2px solid var(--line);
+  border-radius:11px;padding:14px;cursor:pointer;text-align:center;transition:.14s}
+.dmode-card:hover{border-color:var(--cy2)}
+.dmode-card.on{border-color:var(--cy2);background:#f0fdff}
+.dmode-card .ic{font-size:26px}
+.dmode-card .t{font-weight:700;font-size:13px;margin-top:5px}
+.dmode-card .d{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.55}
+
+.dshapes{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.dshape{background:#fff;border:2px solid var(--line);border-radius:10px;
+  padding:10px 16px;cursor:pointer;font-size:12.5px;transition:.14s;
+  display:flex;flex-direction:column;align-items:center;gap:5px}
+.dshape:hover{border-color:var(--cy2)}
+.dshape.on{border-color:var(--cy2);background:#f0fdff;font-weight:600}
+.dshape svg{display:block}
+
+.dsizes{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.dsize{background:#fff;border:1px solid var(--line);border-radius:8px;
+  padding:6px 13px;cursor:pointer;font-size:12px}
+.dsize:hover{border-color:var(--cy2)}
+.dsize.on{background:#0a1628;color:#fff;border-color:#0a1628}
+
+/* ---- えを かく画面 ---- */
+.dwrap{display:flex;gap:14px;align-items:flex-start}
+.dtools{width:196px;flex:none;background:#f7f9fa;border:1px solid var(--line);
+  border-radius:12px;padding:13px;max-height:600px;overflow-y:auto}
+.dstage{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;
+  background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;
+  overflow:auto}
+#dCanvas{image-rendering:pixelated;cursor:crosshair;
+  box-shadow:0 2px 12px rgba(10,22,40,.1);touch-action:none;
+  background-image:linear-gradient(45deg,#eef2f4 25%,transparent 25%),
+    linear-gradient(-45deg,#eef2f4 25%,transparent 25%),
+    linear-gradient(45deg,transparent 75%,#eef2f4 75%),
+    linear-gradient(-45deg,transparent 75%,#eef2f4 75%);
+  background-size:16px 16px;
+  background-position:0 0,0 8px,8px -8px,-8px 0}
+
+.dsec{font-size:10.5px;color:var(--muted);font-weight:700;margin:12px 0 6px;
+  letter-spacing:.05em}
+.dsec:first-child{margin-top:0}
+.dtool{display:flex;gap:5px;flex-wrap:wrap}
+.dtool button{flex:1;min-width:52px;background:#fff;border:1px solid var(--line);
+  border-radius:8px;padding:8px 4px;font-size:15px;cursor:pointer;font-family:inherit}
+.dtool button:hover{border-color:var(--cy2)}
+.dtool button.on{background:#0a1628;color:#fff;border-color:#0a1628}
+
+.dpal{display:grid;grid-template-columns:repeat(8,1fr);gap:4px}
+.dpal div{aspect-ratio:1;border-radius:5px;cursor:pointer;border:2px solid transparent;
+  transition:.1s}
+.dpal div:hover{transform:scale(1.12)}
+.dpal div.on{border-color:#0a1628;transform:scale(1.12)}
+
+.dnow{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.dnow .sw{width:40px;height:40px;border-radius:9px;border:2px solid var(--line);
+  flex:none}
+.dnow input[type=color]{width:38px;height:38px;border:none;background:none;
+  cursor:pointer;padding:0}
+
+.drgb label{display:flex;align-items:center;gap:7px;font-size:11px;
+  color:var(--muted);margin-bottom:5px}
+.drgb label span{width:14px;font-weight:700}
+.drgb input[type=range]{flex:1;height:5px}
+.drgb label b{width:30px;text-align:right;font-family:ui-monospace,monospace;
+  font-size:11px;color:var(--navy)}
+
+.dsize2{display:flex;align-items:center;gap:8px;font-size:12px}
+.dsize2 input{flex:1}
+
+.dgal{display:grid;grid-template-columns:repeat(auto-fill,minmax(138px,1fr));gap:11px}
+.dcard{background:#fff;border:1px solid var(--line);border-radius:11px;
+  overflow:hidden;cursor:pointer;transition:.14s}
+.dcard:hover{border-color:var(--cy2);transform:translateY(-2px);
+  box-shadow:0 4px 14px rgba(10,22,40,.08)}
+.dcard img{width:100%;aspect-ratio:1;object-fit:contain;display:block;
+  image-rendering:pixelated;background:#fafcfd}
+.dcard .info{padding:8px 10px}
+.dcard .t{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.dcard .m{font-size:11px;color:var(--muted);margin-top:2px;display:flex;
+  gap:7px;flex-wrap:wrap}
+
+@media(max-width:700px){
+  .dwrap{flex-direction:column}
+  .dtools{width:100%;max-height:none}
+  .dpal{grid-template-columns:repeat(12,1fr)}
+}
+</style>
+
+<script>
+/* ============ 🎨 おえかき ============ */
+var DRAW = null;   // {id,mode,shape,w,h,px:[],title,public}
+var D_TOOL = 'pen';
+var D_COLOR = '#0a1628';
+var D_SIZE = 3;
+var D_HIST = [];
+var D_CTX = null, D_CELL = 16;
+
+var D_PAL = ['#000000','#ffffff','#e74c3c','#e67e22','#f1c40f','#2ecc71',
+             '#1abc9c','#3498db','#9b59b6','#e84393','#795548','#95a5a6',
+             '#0a1628','#f5f5f5','#c0392b','#d35400','#f39c12','#27ae60',
+             '#16a085','#2980b9','#8e44ad','#c2185b','#5d4037','#607d8b'];
+
+/* ---- さいしょの がめん ---- */
+function loadDraw(){
+  drawGallery();
+}
+
+async function drawGallery(){
+  var d = await J('/api/mp/draws');
+  var mine = await J('/api/mp/draws?mine=1');
+  var el = $('drawBody');
+  el.innerHTML =
+      '<div class="dnew" id="dNew">'
+    + '<h4>あたらしく かく</h4>'
+    + '<div class="dmode">'
+    + '<div class="dmode-card on" id="dmDot" onclick="pickMode(\'dot\')">'
+    + '<div class="ic">🟦</div><div class="t">ドット</div>'
+    + '<div class="d">マスを ぬって かく<br>ドット絵に</div></div>'
+    + '<div class="dmode-card" id="dmSm" onclick="pickMode(\'smooth\')">'
+    + '<div class="ic">🖌</div><div class="t">なめらか</div>'
+    + '<div class="d">ペンで じゆうに かく</div></div>'
+    + '</div>'
+    + '<div id="dotOpts">'
+    + '<div class="dsec">マスの かたち</div>'
+    + '<div class="dshapes">'
+    + shapeBtn('square','しかく') + shapeBtn('circle','まる')
+    + shapeBtn('triangle','さんかく')
+    + '</div>'
+    + '<div class="dsec">おおきさ（たて × よこ）</div>'
+    + '<div class="dsizes">'
+    + [8,16,24,32,48,64].map(function(n){
+        return '<button class="dsize' + (n===32?' on':'') + '" '
+          + 'onclick="pickSize(' + n + ')">' + n + '×' + n + '</button>';
+      }).join('')
+    + '<input class="inp" id="dW" type="number" value="32" min="4" max="128" '
+    + 'style="width:68px" oninput="pickSize(0)">'
+    + '<span style="font-size:12px;color:var(--muted)">×</span>'
+    + '<input class="inp" id="dH" type="number" value="32" min="4" max="128" '
+    + 'style="width:68px" oninput="pickSize(0)">'
+    + '</div></div>'
+    + '<div class="row" style="margin-top:6px">'
+    + '<input class="inp" id="dTitle" placeholder="だいめい" style="flex:1;min-width:140px">'
+    + '<button class="btn cy" onclick="startDraw()">はじめる</button></div>'
+    + '</div>'
+
+    + '<div class="sec" style="font-size:12.5px;font-weight:700;margin:22px 0 9px;'
+    + 'padding-bottom:6px;border-bottom:1px solid var(--line)">'
+    + 'じぶんの え（' + (mine.used||0) + ' / ' + (mine.limit||30) + '）</div>'
+    + (mine.ok && mine.draws.length
+        ? '<div class="dgal">' + mine.draws.map(function(x){
+            return dCard(x, true); }).join('') + '</div>'
+        : '<div class="empty">まだ ありません</div>')
+
+    + '<div class="sec" style="font-size:12.5px;font-weight:700;margin:22px 0 9px;'
+    + 'padding-bottom:6px;border-bottom:1px solid var(--line)">みんなの え</div>'
+    + (d.ok && d.draws.length
+        ? '<div class="dgal">' + d.draws.map(function(x){
+            return dCard(x, false); }).join('') + '</div>'
+        : '<div class="empty">まだ ありません</div>');
+  D_NEWMODE = 'dot'; D_NEWSHAPE = 'square';
+}
+
+function shapeBtn(k, lbl){
+  var svg = {
+    square: '<rect x="2" y="2" width="20" height="20" rx="2" fill="#0a1628"/>',
+    circle: '<circle cx="12" cy="12" r="10" fill="#0a1628"/>',
+    triangle: '<polygon points="12,2 22,21 2,21" fill="#0a1628"/>'
+  }[k];
+  return '<div class="dshape' + (k==='square'?' on':'') + '" id="ds_' + k + '" '
+    + 'onclick="pickShape(\'' + k + '\')">'
+    + '<svg width="24" height="24" viewBox="0 0 24 24">' + svg + '</svg>'
+    + lbl + '</div>';
+}
+
+var D_NEWMODE = 'dot', D_NEWSHAPE = 'square';
+function pickMode(m){
+  D_NEWMODE = m;
+  $('dmDot').classList.toggle('on', m==='dot');
+  $('dmSm').classList.toggle('on', m==='smooth');
+  $('dotOpts').style.display = (m==='dot') ? '' : 'none';
+  if (m === 'smooth'){ $('dW').value = 400; $('dH').value = 300; }
+  else { $('dW').value = 32; $('dH').value = 32; }
+}
+function pickShape(k){
+  D_NEWSHAPE = k;
+  ['square','circle','triangle'].forEach(function(x){
+    $('ds_'+x).classList.toggle('on', x===k); });
+}
+function pickSize(n){
+  document.querySelectorAll('.dsize').forEach(function(b){
+    b.classList.toggle('on', n>0 && b.textContent === n+'×'+n); });
+  if (n > 0){ $('dW').value = n; $('dH').value = n; }
+}
+
+function dCard(x, mine){
+  return '<div class="dcard" onclick="openDraw(' + x.id + ')">'
+    + (x.thumb ? '<img src="' + x.thumb + '">' : '<div style="aspect-ratio:1"></div>')
+    + '<div class="info"><div class="t">' + K(x.title||'むだい') + '</div>'
+    + '<div class="m">' + (mine ? '' : '<span>' + K(x.nickname||x.member_id) + '</span>')
+    + '<span>♡' + (x.likes||0) + '</span>'
+    + (mine && x.public ? '<span class="tag">公開中</span>' : '')
+    + '</div></div></div>';
+}
+
+/* ---- かく がめん ---- */
+function startDraw(){
+  var w = parseInt($('dW').value) || 32;
+  var h = parseInt($('dH').value) || 32;
+  if (D_NEWMODE === 'dot'){
+    w = Math.max(4, Math.min(128, w)); h = Math.max(4, Math.min(128, h));
+  } else {
+    w = Math.max(100, Math.min(800, w)); h = Math.max(100, Math.min(600, h));
+  }
+  DRAW = {id:null, mode:D_NEWMODE, shape:D_NEWSHAPE, w:w, h:h,
+          title:($('dTitle').value.trim() || 'むだい'), public:0,
+          px: (D_NEWMODE==='dot') ? new Array(w*h).fill('') : null};
+  D_HIST = [];
+  showCanvas();
+}
+
+async function openDraw(id){
+  var d = await J('/api/mp/draw/' + id);
+  if (!d.ok){ alert(d.error); return; }
+  var x = d.draw;
+  if (!d.is_mine){
+    // ほかの人の えは 見るだけ
+    $('drawBody').innerHTML =
+        '<button class="btn gh sm" onclick="loadDraw()">← もどる</button>'
+      + '<h2 style="margin-top:12px">' + K(x.title||'むだい') + '</h2>'
+      + '<p class="lead">' + K(x.nickname||x.member_id) + ' · ♡' + x.likes + '</p>'
+      + '<div style="text-align:center;background:#fff;border:1px solid var(--line);'
+      + 'border-radius:12px;padding:20px">'
+      + '<img src="' + K(x.thumb||'') + '" style="max-width:100%;'
+      + 'image-rendering:pixelated"></div>'
+      + '<div class="row" style="margin-top:12px">'
+      + '<button class="btn gh" onclick="likeDraw(' + id + ')">♡ いいね</button>'
+      + '</div>';
+    return;
+  }
+  DRAW = {id:x.id, mode:x.mode, shape:x.shape, w:x.w, h:x.h,
+          title:x.title, public:x.public,
+          px: (x.mode==='dot') ? JSON.parse(x.data) : null,
+          png: (x.mode==='smooth') ? x.data : null};
+  D_HIST = [];
+  showCanvas();
+}
+
+function showCanvas(){
+  var dot = (DRAW.mode === 'dot');
+  D_CELL = dot ? Math.max(6, Math.min(22, Math.floor(560 / DRAW.w))) : 1;
+  var cw = dot ? DRAW.w * D_CELL : DRAW.w;
+  var ch = dot ? DRAW.h * D_CELL : DRAW.h;
+
+  $('drawBody').innerHTML =
+      '<div class="row">'
+    + '<button class="btn gh sm" onclick="askLeave()">← もどる</button>'
+    + '<input class="inp" id="dTitle2" value="' + K(DRAW.title) + '" '
+    + 'style="flex:1;min-width:130px">'
+    + '<label style="font-size:12px;display:flex;align-items:center;gap:6px">'
+    + '<input type="checkbox" id="dPub"' + (DRAW.public?' checked':'')
+    + '> みんなに 見せる</label>'
+    + '<button class="btn" onclick="saveDraw()">ほぞん</button>'
+    + '<span id="dMsg" style="font-size:12px"></span></div>'
+
+    + '<div class="dwrap">'
+    + '<div class="dtools">'
+    + '<div class="dsec">どうぐ</div><div class="dtool" id="dTools">'
+    + tBtn('pen','✏️','ペン') + tBtn('eraser','🧽','けしゴム')
+    + tBtn('fill','🪣','ぬりつぶし') + tBtn('pick','💧','スポイト')
+    + (dot ? '' : tBtn('line','📏','せん'))
+    + '</div>'
+
+    + (dot ? '' :
+       '<div class="dsec">ふとさ</div><div class="dsize2">'
+       + '<input type="range" id="dPen" min="1" max="40" value="' + D_SIZE + '" '
+       + 'oninput="D_SIZE=+this.value;$(\'dPenN\').textContent=this.value">'
+       + '<b id="dPenN" style="font-size:12px">' + D_SIZE + '</b></div>')
+
+    + '<div class="dsec">いろ</div>'
+    + '<div class="dnow">'
+    + '<div class="sw" id="dSw" style="background:' + D_COLOR + '"></div>'
+    + '<input type="color" id="dPick" value="' + D_COLOR + '" '
+    + 'oninput="setColor(this.value)">'
+    + '<span style="font-size:11px;color:var(--muted)">えらぶ</span></div>'
+    + '<div class="drgb">'
+    + rgbRow('R') + rgbRow('G') + rgbRow('B')
+    + '</div>'
+    + '<div class="dsec">パレット</div>'
+    + '<div class="dpal" id="dPal">' + D_PAL.map(function(c){
+        return '<div style="background:' + c + '" onclick="setColor(\'' + c + '\')">'
+          + '</div>'; }).join('') + '</div>'
+
+    + '<div class="dsec">そのた</div>'
+    + '<div class="dtool">'
+    + '<button onclick="undoDraw()" title="もどす">↶</button>'
+    + '<button onclick="clearDraw()" title="ぜんぶ けす">🗑</button>'
+    + '<button onclick="downloadDraw()" title="ほぞん">⬇</button>'
+    + (DRAW.id ? '<button onclick="delDraw()" title="この えを けす">✕</button>' : '')
+    + '</div></div>'
+
+    + '<div class="dstage">'
+    + '<canvas id="dCanvas" width="' + cw + '" height="' + ch + '"></canvas>'
+    + '<div style="font-size:11px;color:var(--muted);margin-top:9px">'
+    + DRAW.w + ' × ' + DRAW.h + (dot ? '（' + shapeName(DRAW.shape) + '）' : '')
+    + '</div></div></div>';
+
+  var cv = $('dCanvas');
+  D_CTX = cv.getContext('2d');
+  if (dot) redrawDots();
+  else {
+    D_CTX.fillStyle = '#ffffff';
+    D_CTX.fillRect(0, 0, cw, ch);
+    if (DRAW.png){
+      var im = new Image();
+      im.onload = function(){ D_CTX.drawImage(im, 0, 0); };
+      im.src = DRAW.png;
+    }
+  }
+  bindCanvas(cv, dot);
+  setTool(D_TOOL); setColor(D_COLOR);
+}
+
+function shapeName(s){
+  return {square:'しかく', circle:'まる', triangle:'さんかく'}[s] || s;
+}
+function tBtn(k, ic, t){
+  return '<button id="dt_' + k + '" onclick="setTool(\'' + k + '\')" title="' + t
+    + '">' + ic + '</button>';
+}
+function rgbRow(c){
+  return '<label><span>' + c + '</span>'
+    + '<input type="range" id="dr' + c + '" min="0" max="255" value="0" '
+    + 'oninput="fromRGB()"><b id="dn' + c + '">0</b></label>';
+}
+
+function setTool(t){
+  D_TOOL = t;
+  document.querySelectorAll('#dTools button').forEach(function(b){
+    b.classList.toggle('on', b.id === 'dt_' + t); });
+}
+
+function setColor(c){
+  D_COLOR = c;
+  if ($('dSw')) $('dSw').style.background = c;
+  if ($('dPick')) $('dPick').value = c;
+  var r = parseInt(c.substr(1,2),16), g = parseInt(c.substr(3,2),16),
+      b = parseInt(c.substr(5,2),16);
+  ['R','G','B'].forEach(function(k, i){
+    var v = [r,g,b][i];
+    if ($('dr'+k)) $('dr'+k).value = v;
+    if ($('dn'+k)) $('dn'+k).textContent = v;
+  });
+  document.querySelectorAll('#dPal div').forEach(function(d){
+    d.classList.toggle('on', d.style.background === hexToRgb(c)); });
+}
+function hexToRgb(h){
+  var r = parseInt(h.substr(1,2),16), g = parseInt(h.substr(3,2),16),
+      b = parseInt(h.substr(5,2),16);
+  return 'rgb(' + r + ', ' + g + ', ' + b + ')';
+}
+function fromRGB(){
+  var v = ['R','G','B'].map(function(k){
+    var x = +$('dr'+k).value;
+    $('dn'+k).textContent = x;
+    return ('0' + x.toString(16)).slice(-2);
+  });
+  setColor('#' + v.join(''));
+}
+
+/* ---- ドット ---- */
+function redrawDots(){
+  var c = D_CTX, w = DRAW.w, h = DRAW.h, s = D_CELL;
+  c.clearRect(0, 0, w*s, h*s);
+  for (var y = 0; y < h; y++){
+    for (var x = 0; x < w; x++){
+      var col = DRAW.px[y*w + x];
+      if (!col) continue;
+      c.fillStyle = col;
+      cellPath(c, x, y, s);
+      c.fill();
+    }
+  }
+  // うすい 線
+  c.strokeStyle = 'rgba(10,22,40,.08)';
+  c.lineWidth = 1;
+  for (var i = 0; i <= w; i++){
+    c.beginPath(); c.moveTo(i*s, 0); c.lineTo(i*s, h*s); c.stroke();
+  }
+  for (var j = 0; j <= h; j++){
+    c.beginPath(); c.moveTo(0, j*s); c.lineTo(w*s, j*s); c.stroke();
+  }
+}
+
+function cellPath(c, x, y, s){
+  c.beginPath();
+  if (DRAW.shape === 'circle'){
+    c.arc(x*s + s/2, y*s + s/2, s/2, 0, Math.PI*2);
+  } else if (DRAW.shape === 'triangle'){
+    var up = ((x + y) % 2 === 0);
+    if (up) { c.moveTo(x*s + s/2, y*s); c.lineTo(x*s + s, y*s + s);
+              c.lineTo(x*s, y*s + s); }
+    else    { c.moveTo(x*s, y*s); c.lineTo(x*s + s, y*s);
+              c.lineTo(x*s + s/2, y*s + s); }
+  } else {
+    c.rect(x*s, y*s, s, s);
+  }
+  c.closePath();
+}
+
+function setDot(x, y){
+  if (x < 0 || y < 0 || x >= DRAW.w || y >= DRAW.h) return;
+  var i = y*DRAW.w + x;
+  var v = (D_TOOL === 'eraser') ? '' : D_COLOR;
+  if (DRAW.px[i] === v) return;
+  DRAW.px[i] = v;
+  redrawDots();
+}
+
+function fillDot(x, y){
+  var w = DRAW.w, h = DRAW.h;
+  var from = DRAW.px[y*w + x], to = D_COLOR;
+  if (from === to) return;
+  var st = [[x,y]];
+  while (st.length){
+    var p = st.pop(), px = p[0], py = p[1];
+    if (px < 0 || py < 0 || px >= w || py >= h) continue;
+    var i = py*w + px;
+    if (DRAW.px[i] !== from) continue;
+    DRAW.px[i] = to;
+    st.push([px+1,py],[px-1,py],[px,py+1],[px,py-1]);
+  }
+  redrawDots();
+}
+
+/* ---- なめらか ---- */
+var D_DRAWING = false, D_LAST = null;
+
+function bindCanvas(cv, dot){
+  var pos = function(e){
+    var r = cv.getBoundingClientRect();
+    var t = (e.touches && e.touches[0]) || e;
+    return {x: (t.clientX - r.left) * (cv.width / r.width),
+            y: (t.clientY - r.top) * (cv.height / r.height)};
+  };
+  var down = function(e){
+    e.preventDefault();
+    pushHist();
+    D_DRAWING = true;
+    var p = pos(e);
+    if (dot){
+      var cx = Math.floor(p.x / D_CELL), cy = Math.floor(p.y / D_CELL);
+      if (D_TOOL === 'fill') fillDot(cx, cy);
+      else if (D_TOOL === 'pick'){
+        var c = DRAW.px[cy*DRAW.w + cx];
+        if (c) setColor(c);
+        setTool('pen');
+      }
+      else setDot(cx, cy);
+    } else {
+      if (D_TOOL === 'pick'){
+        var d = D_CTX.getImageData(Math.floor(p.x), Math.floor(p.y), 1, 1).data;
+        setColor('#' + [d[0],d[1],d[2]].map(function(v){
+          return ('0'+v.toString(16)).slice(-2); }).join(''));
+        setTool('pen'); D_DRAWING = false; return;
+      }
+      if (D_TOOL === 'fill'){ fillSmooth(Math.floor(p.x), Math.floor(p.y)); 
+        D_DRAWING = false; return; }
+      D_LAST = p; strokeTo(p, p);
+    }
+  };
+  var move = function(e){
+    if (!D_DRAWING) return;
+    e.preventDefault();
+    var p = pos(e);
+    if (dot){
+      if (D_TOOL === 'pen' || D_TOOL === 'eraser')
+        setDot(Math.floor(p.x / D_CELL), Math.floor(p.y / D_CELL));
+    } else {
+      if (D_TOOL === 'pen' || D_TOOL === 'eraser'){ strokeTo(D_LAST, p); D_LAST = p; }
+    }
+  };
+  var up = function(){ D_DRAWING = false; D_LAST = null; };
+
+  cv.onmousedown = down; cv.onmousemove = move;
+  window.addEventListener('mouseup', up);
+  cv.addEventListener('touchstart', down, {passive:false});
+  cv.addEventListener('touchmove', move, {passive:false});
+  cv.addEventListener('touchend', up);
+}
+
+function strokeTo(a, b){
+  var c = D_CTX;
+  c.strokeStyle = (D_TOOL === 'eraser') ? '#ffffff' : D_COLOR;
+  c.lineWidth = D_SIZE;
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
+}
+
+function fillSmooth(x, y){
+  // かんたんな ぬりつぶし（ぜんたいを ぬる）
+  if (!confirm('ぜんぶ ぬりつぶしますか？')) return;
+  D_CTX.fillStyle = D_COLOR;
+  D_CTX.fillRect(0, 0, DRAW.w, DRAW.h);
+}
+
+/* ---- そのた ---- */
+function pushHist(){
+  if (DRAW.mode === 'dot') D_HIST.push(DRAW.px.slice());
+  else D_HIST.push($('dCanvas').toDataURL());
+  if (D_HIST.length > 25) D_HIST.shift();
+}
+function undoDraw(){
+  if (!D_HIST.length) return;
+  var h = D_HIST.pop();
+  if (DRAW.mode === 'dot'){ DRAW.px = h; redrawDots(); }
+  else {
+    var im = new Image();
+    im.onload = function(){
+      D_CTX.fillStyle = '#fff';
+      D_CTX.fillRect(0,0,DRAW.w,DRAW.h);
+      D_CTX.drawImage(im, 0, 0);
+    };
+    im.src = h;
+  }
+}
+function clearDraw(){
+  if (!confirm('ぜんぶ けしますか？')) return;
+  pushHist();
+  if (DRAW.mode === 'dot'){ DRAW.px = new Array(DRAW.w*DRAW.h).fill(''); redrawDots(); }
+  else { D_CTX.fillStyle = '#fff'; D_CTX.fillRect(0,0,DRAW.w,DRAW.h); }
+}
+function downloadDraw(){
+  var a = document.createElement('a');
+  a.download = (DRAW.title || 'e') + '.png';
+  a.href = $('dCanvas').toDataURL();
+  a.click();
+}
+function askLeave(){
+  if (confirm('もどりますか？ ほぞんして いない ものは きえます')) loadDraw();
+}
+
+async function saveDraw(){
+  var m = $('dMsg');
+  DRAW.title = $('dTitle2').value.trim() || 'むだい';
+  DRAW.public = $('dPub').checked ? 1 : 0;
+  var data = (DRAW.mode === 'dot') ? JSON.stringify(DRAW.px)
+                                   : $('dCanvas').toDataURL('image/png');
+  var thumb = makeThumb();
+  var r = await P('/api/mp/draw', {
+    id: DRAW.id, title: DRAW.title, mode: DRAW.mode, shape: DRAW.shape,
+    w: DRAW.w, h: DRAW.h, data: data, thumb: thumb, public: DRAW.public});
+  if (r.ok !== true){ m.style.color='#c0453b'; m.textContent = r.error; return; }
+  DRAW.id = r.id;
+  m.style.color='#0e7490'; m.textContent = 'ほぞんしました';
+}
+
+function makeThumb(){
+  var s = document.createElement('canvas');
+  var n = 160;
+  var rw = DRAW.w, rh = DRAW.h;
+  var sc = Math.min(n/rw, n/rh);
+  s.width = Math.round(rw*sc); s.height = Math.round(rh*sc);
+  var c = s.getContext('2d');
+  c.imageSmoothingEnabled = (DRAW.mode !== 'dot');
+  c.fillStyle = '#fff'; c.fillRect(0,0,s.width,s.height);
+  if (DRAW.mode === 'dot'){
+    var cs = s.width / rw;
+    for (var y = 0; y < rh; y++){
+      for (var x = 0; x < rw; x++){
+        var col = DRAW.px[y*rw + x];
+        if (!col) continue;
+        c.fillStyle = col;
+        c.fillRect(x*cs, y*cs, cs+0.5, cs+0.5);
+      }
+    }
+  } else {
+    c.drawImage($('dCanvas'), 0, 0, s.width, s.height);
+  }
+  return s.toDataURL('image/png');
+}
+
+async function delDraw(){
+  if (!DRAW.id || !confirm('この えを けしますか？')) return;
+  await P('/api/mp/draw/' + DRAW.id + '/delete');
+  loadDraw();
+}
+async function likeDraw(id){
+  await P('/api/mp/draw/' + id + '/like');
+  openDraw(id);
+}
+</script>

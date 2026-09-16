@@ -2171,3 +2171,140 @@ def mp_ann_read(aid):
         pass
     c.close()
     return jsonify(ok=True)
+
+
+# ====================================================================
+# おえかき
+# ====================================================================
+DRAW_LIMIT = 30          # ひとり 何まいまで
+DRAW_MAX = 300000        # 1まいの おおきさ（約300KB）
+
+
+@bp.route('/api/mp/draws')
+def mp_draws():
+    u = me()
+    if not u:
+        return jsonify(ok=False, error='会員だけが 見られます'), 401
+    mine = request.args.get('mine')
+    c = _db()
+    if mine:
+        rows = [dict(r) for r in c.execute("""
+            SELECT d.id,d.title,d.mode,d.shape,d.w,d.h,d.thumb,d.public,
+                   d.likes,d.created_at, m.nickname
+            FROM mp_draw d LEFT JOIN mp_member m ON m.member_id=d.member_id
+            WHERE d.member_id=? AND d.hidden=0 ORDER BY d.id DESC""",
+            (u['member_id'],)).fetchall()]
+    else:
+        rows = [dict(r) for r in c.execute("""
+            SELECT d.id,d.title,d.mode,d.shape,d.w,d.h,d.thumb,d.public,
+                   d.likes,d.member_id,d.created_at, m.nickname,
+                   (SELECT COUNT(*) FROM mp_draw_like l
+                    WHERE l.draw_id=d.id AND l.member_id=?) AS liked
+            FROM mp_draw d LEFT JOIN mp_member m ON m.member_id=d.member_id
+            WHERE d.public=1 AND d.hidden=0 ORDER BY d.id DESC LIMIT 60""",
+            (u['member_id'],)).fetchall()]
+    n = c.execute('SELECT COUNT(*) AS n FROM mp_draw WHERE member_id=? AND hidden=0',
+                  (u['member_id'],)).fetchone()
+    c.close()
+    return jsonify(ok=True, draws=rows, used=(n['n'] if n else 0), limit=DRAW_LIMIT)
+
+
+@bp.route('/api/mp/draw/<int:did>')
+def mp_draw_get(did):
+    u = me()
+    if not u:
+        return jsonify(ok=False), 401
+    c = _db()
+    r = c.execute("""SELECT d.*, m.nickname FROM mp_draw d
+                     LEFT JOIN mp_member m ON m.member_id=d.member_id
+                     WHERE d.id=? AND d.hidden=0""", (did,)).fetchone()
+    c.close()
+    if not r:
+        return jsonify(ok=False, error='見つかりません'), 404
+    if not r['public'] and r['member_id'] != u['member_id']:
+        return jsonify(ok=False, error='見られません'), 403
+    return jsonify(ok=True, draw=dict(r),
+                   is_mine=(r['member_id'] == u['member_id']))
+
+
+@bp.route('/api/mp/draw', methods=['POST'])
+def mp_draw_save():
+    u = me()
+    if not u:
+        return jsonify(ok=False, error='ログインしてください'), 401
+    d = request.get_json(silent=True) or {}
+    data = d.get('data') or ''
+    if not data:
+        return jsonify(ok=False, error='なにも かかれて いません'), 400
+    if len(data) > DRAW_MAX:
+        return jsonify(ok=False, error='おおきすぎます。'
+                       'もうすこし ちいさい キャンバスで どうぞ'), 400
+    did = d.get('id')
+    c = _db()
+    if not did:
+        n = c.execute('SELECT COUNT(*) AS n FROM mp_draw WHERE member_id=? AND hidden=0',
+                      (u['member_id'],)).fetchone()
+        if n and n['n'] >= DRAW_LIMIT:
+            c.close()
+            return jsonify(ok=False, over_limit=True,
+                error=f'えは {DRAW_LIMIT}まいまでです。'
+                      'いらない ものを けすと また かけます'), 409
+        cur = c.execute("""INSERT INTO mp_draw(member_id,title,mode,shape,w,h,
+                           data,thumb,public) VALUES(?,?,?,?,?,?,?,?,?)""",
+                        (u['member_id'], (d.get('title') or 'むだい')[:60],
+                         d.get('mode') or 'dot', d.get('shape') or 'square',
+                         int(d.get('w') or 32), int(d.get('h') or 32),
+                         data, (d.get('thumb') or '')[:DRAW_MAX],
+                         1 if d.get('public') else 0))
+        did = cur.lastrowid
+    else:
+        own = c.execute('SELECT member_id FROM mp_draw WHERE id=?', (did,)).fetchone()
+        if not own or own['member_id'] != u['member_id']:
+            c.close(); return jsonify(ok=False, error='自分の えでは ありません'), 403
+        c.execute("""UPDATE mp_draw SET title=?,data=?,thumb=?,public=?,
+                     updated_at=datetime('now','localtime') WHERE id=?""",
+                  ((d.get('title') or 'むだい')[:60], data,
+                   (d.get('thumb') or '')[:DRAW_MAX],
+                   1 if d.get('public') else 0, did))
+    c.commit(); c.close()
+    return jsonify(ok=True, id=did)
+
+
+@bp.route('/api/mp/draw/<int:did>/delete', methods=['POST'])
+def mp_draw_del(did):
+    u = me()
+    if not u:
+        return jsonify(ok=False), 401
+    c = _db()
+    own = c.execute('SELECT member_id FROM mp_draw WHERE id=?', (did,)).fetchone()
+    if not own or own['member_id'] != u['member_id']:
+        c.close(); return jsonify(ok=False, error='自分の えでは ありません'), 403
+    c.execute('DELETE FROM mp_draw WHERE id=?', (did,))
+    c.execute('DELETE FROM mp_draw_like WHERE draw_id=?', (did,))
+    c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+@bp.route('/api/mp/draw/<int:did>/like', methods=['POST'])
+def mp_draw_like(did):
+    u = me()
+    if not u:
+        return jsonify(ok=False), 401
+    c = _db()
+    hit = c.execute('SELECT 1 FROM mp_draw_like WHERE draw_id=? AND member_id=?',
+                    (did, u['member_id'])).fetchone()
+    if hit:
+        c.execute('DELETE FROM mp_draw_like WHERE draw_id=? AND member_id=?',
+                  (did, u['member_id']))
+        c.execute('UPDATE mp_draw SET likes=MAX(0,likes-1) WHERE id=?', (did,))
+        liked = False
+    else:
+        c.execute('INSERT INTO mp_draw_like(draw_id,member_id) VALUES(?,?)',
+                  (did, u['member_id']))
+        c.execute('UPDATE mp_draw SET likes=likes+1 WHERE id=?', (did,))
+        liked = True
+    own = c.execute('SELECT member_id FROM mp_draw WHERE id=?', (did,)).fetchone()
+    c.commit(); c.close()
+    if liked and own:
+        notify(own['member_id'], 'like', None, u['member_id'], 'えに いいねが つきました')
+    return jsonify(ok=True, liked=liked)
