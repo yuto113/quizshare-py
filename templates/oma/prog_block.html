@@ -1,0 +1,113 @@
+{% extends "oma/_base.html" %}
+{% block title %}ブロックで つくる — Omame PJ{% endblock %}
+
+{% block subnav %}
+<div class="sub">
+  <a href="/oma_pj/prog_block" {% if view=='list' %}class="on"{% endif %}>つくる</a>
+  <a href="#" onclick="goMine();return false">じぶんの</a>
+  <a href="/oma_pj/prog_code">コードで つくる →</a>
+</div>
+{% endblock %}
+
+{% block style %}
+.blk-wrap{display:flex;gap:12px;align-items:flex-start}
+.blk-palette{width:190px;flex:none;background:#fff;border:1px solid var(--line2);
+  border-radius:12px;padding:11px;max-height:560px;overflow-y:auto}
+.blk-lgs{display:flex;gap:3px;margin-bottom:10px;flex-wrap:wrap}
+.blk-lg{flex:1;min-width:62px;background:var(--paper);border:1px solid var(--line2);
+  border-radius:8px;padding:6px 4px;font-size:11px;cursor:pointer;
+  font-family:inherit;color:var(--muted)}
+.blk-lg:hover{border-color:var(--main)}
+.blk-lg.on{background:var(--dark);color:#fff;border-color:var(--dark);font-weight:600}
+.blk-cat{font-size:10.5px;color:var(--muted);font-weight:700;margin:11px 0 5px;
+  letter-spacing:.05em}
+.blk-cat:first-of-type{margin-top:0}
+.blk-item{background:var(--paper);border:1px solid var(--line2);border-radius:8px;
+  padding:8px 10px;font-size:12.5px;margin-bottom:5px;cursor:pointer;
+  transition:.12s;user-select:none}
+.blk-item:hover{border-color:var(--main);background:var(--line);
+  transform:translateX(2px)}
+
+.blk-main{flex:1;min-width:0}
+.blk-list{min-height:250px;background:#fff;border:1px solid var(--line2);
+  border-radius:12px;padding:12px}
+.blk{background:#f7fee7;border:1px solid var(--line);border-left:4px solid var(--main);
+  border-radius:8px;padding:9px 11px;margin-bottom:7px;display:flex;
+  align-items:center;gap:7px;flex-wrap:wrap}
+.blk.lv1{margin-left:26px} .blk.lv2{margin-left:52px} .blk.lv3{margin-left:78px}
+.blk.kw-for{background:#fef6e7;border-color:#f5d9a0;border-left-color:#d97706}
+.blk.kw-if{background:#f4f0fd;border-color:#ddd2f7;border-left-color:#7c3aed}
+.blk.kw-com{background:#f0fdf4;border-color:#bbf7d0;border-left-color:#16a34a}
+.blk .lbl{font-size:12.5px;font-weight:600;white-space:nowrap}
+.blk input{padding:5px 9px;border:1px solid var(--line2);border-radius:6px;
+  font-size:12.5px;font-family:inherit;min-width:70px}
+.blk input.wide{flex:1;min-width:120px}
+.blk .sp{flex:1}
+.blk .x{cursor:pointer;color:#9aa885;font-size:15px;padding:0 3px}
+.blk .x:hover{color:#dc2626}
+.blk .mv{cursor:pointer;color:#9aa885;font-size:13px;padding:0 2px}
+.blk .mv:hover{color:var(--main)}
+.blk-code{background:var(--dark);color:#d9f99d;border-radius:10px;padding:13px;
+  font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;
+  line-height:1.65;overflow-x:auto;min-height:70px;margin:0;white-space:pre}
+.blk-empty{color:#9aa885;font-size:12.5px;text-align:center;padding:44px 0}
+@media(max-width:700px){
+  .blk-wrap{flex-direction:column}
+  .blk-palette{width:100%;max-height:170px}
+}
+{% endblock %}
+
+{% block body %}
+<h1>🧩 ブロックで つくる</h1>
+<p class="lead">ブロックを ならべると、コードに なります。
+  できたら「コードに する」を おして、つづきを 書いて みて ください。</p>
+
+<div class="blk-wrap">
+  <div class="blk-palette"></div>
+  <div class="blk-main">
+    <div id="blkList" class="blk-list"></div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn mn" onclick="blkRun()">▶ うごかす</button>
+      <button class="btn" onclick="blkToCode()">📝 コードに する</button>
+      <button class="btn gh" onclick="blkClear()">ぜんぶ けす</button>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin:10px 0 4px">
+      できる コード</div>
+    <pre id="blkCode" class="blk-code"></pre>
+    <iframe id="blkFrame" sandbox="allow-scripts allow-modals"
+      style="width:100%;height:320px;border:1px solid var(--line2);
+      border-radius:10px;background:#fff;margin-top:10px;display:none"></iframe>
+    <div class="out" id="blkOut">ここに けっかが 出ます</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script src="/static/oma_blocks.js"></script>
+<script>
+function goMine(){
+  if (ME) location.href = '/oma_pj/prog_block/me/every_watch';
+}
+
+/* ブロックから コードに して、コードの ページへ わたす */
+function blkToCode(){
+  blkCode();
+  var o = window.BLK_OUT || {};
+  if (!o.py && !o.html && !o.js && !o.sql){
+    toast('まだ ブロックが ありません', 'error'); return;
+  }
+  try {
+    sessionStorage.setItem('oma_blk', JSON.stringify(o));
+  } catch(e){}
+  location.href = '/oma_pj/prog_code/' + ME.owner_id + '/make?from=block';
+}
+
+loadMe().then(function(m){
+  if (!m) return;
+  drawPalette();
+  drawBlk();
+});
+</script>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+{% endblock %}

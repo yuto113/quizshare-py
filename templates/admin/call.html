@@ -64,6 +64,17 @@
   cursor:pointer;font-family:inherit;font-weight:600}
 
 .cempty{padding:30px 0;text-align:center;color:#9aa8b2;font-size:12.5px}
+
+.rem-wrap{position:relative;display:inline-block;width:100%}
+.off-mark{
+  position:absolute; display:none; align-items:center; justify-content:center;
+  background:rgba(10,22,40,.82); color:#fff; border-radius:50%;
+  width:52px; height:52px; font-size:26px; pointer-events:none;
+}
+.off-cam{top:50%; left:50%; transform:translate(-50%,-50%);
+  width:76px; height:76px; font-size:38px}
+.off-mic{right:12px; bottom:12px; width:40px; height:40px; font-size:20px;
+  background:rgba(220,38,38,.9)}
 </style>
 
 <div class="cw">
@@ -94,7 +105,7 @@
 <!-- 通話中 -->
 <div class="cstage" id="cStage">
   <div class="cvideos">
-    <video id="vRemote" autoplay playsinline></video>
+    <div class="rem-wrap"><video id="vRemote" autoplay playsinline></video><div class="off-mark off-cam" id="remOffCam">📷</div><div class="off-mark off-mic" id="remOffMic">🔇</div></div>
     <video id="vLocal" autoplay playsinline muted></video>
     <div class="cwho" id="cWho">—</div>
     <div class="ctime" id="cTime">接続中…</div>
@@ -108,9 +119,128 @@
 
 <script>
 (function(){
+
+/* ---- 相手の カメラ・マイクの ようす ---- */
+function watchRemote(stream){
+  if (!stream) return;
+  var vid = stream.getVideoTracks()[0];
+  var aud = stream.getAudioTracks()[0];
+
+  function upd(){
+    var noCam = !vid || vid.muted || !vid.enabled
+                || vid.readyState === 'ended';
+    var noMic = !aud || aud.muted || !aud.enabled
+                || aud.readyState === 'ended';
+    var c = document.getElementById('remOffCam');
+    var m = document.getElementById('remOffMic');
+    if (c) c.style.display = noCam ? 'flex' : 'none';
+    if (m) m.style.display = noMic ? 'flex' : 'none';
+  }
+
+  [vid, aud].forEach(function(t){
+    if (!t) return;
+    t.onmute = upd; t.onunmute = upd; t.onended = upd;
+  });
+  upd();
+  if (window._remTimer) clearInterval(window._remTimer);
+  window._remTimer = setInterval(upd, 1500);
+}
+
+
+/* ---- つながり ぐあいを 画面に 出す ---- */
+function connMsg(t, cls){
+  var el = document.getElementById('connState');
+  if (!el){
+    el = document.createElement('div');
+    el.id = 'connState';
+    el.style.cssText = 'position:fixed;left:50%;bottom:18px;'
+      + 'transform:translateX(-50%);padding:9px 18px;border-radius:99px;'
+      + 'font-size:13px;z-index:200;font-family:inherit;'
+      + 'box-shadow:0 4px 16px rgba(0,0,0,.25)';
+    document.body.appendChild(el);
+  }
+  var C = {wait:['#1f2937','#e5e7eb'], ok:['#065f46','#d1fae5'],
+           ng:['#7f1d1d','#fee2e2']};
+  var c = C[cls] || C.wait;
+  el.style.background = c[0];
+  el.style.color = c[1];
+  el.textContent = t;
+  el.style.display = '';
+}
+
+function watchConn(pc){
+  var seen = {relay:false, srflx:false, host:false};
+
+  pc.onicecandidate = function(e){
+    if (!e.candidate) return;
+    var t = e.candidate.type || '';
+    if (t) seen[t] = true;
+  };
+
+  pc.oniceconnectionstatechange = function(){
+    var st = pc.iceConnectionState;
+    if (st === 'checking') connMsg('つないで います…', 'wait');
+    else if (st === 'connected' || st === 'completed'){
+      connMsg('つながりました', 'ok');
+      setTimeout(function(){
+        var el = document.getElementById('connState');
+        if (el) el.style.display = 'none';
+      }, 2500);
+      showRoute(pc);
+    }
+    else if (st === 'failed'){
+      connMsg('つながりません でした（ネットが きびしいようです）', 'ng');
+      showRoute(pc);
+    }
+    else if (st === 'disconnected') connMsg('とぎれました', 'ng');
+  };
+}
+
+async function showRoute(pc){
+  try {
+    var st = await pc.getStats();
+    var pair = null, cands = {};
+    st.forEach(function(r){
+      if (r.type === 'local-candidate' || r.type === 'remote-candidate')
+        cands[r.id] = r;
+      if (r.type === 'candidate-pair' && (r.nominated || r.state === 'succeeded'))
+        pair = r;
+    });
+    var info = '';
+    if (pair){
+      var L = cands[pair.localCandidateId] || {};
+      var R = cands[pair.remoteCandidateId] || {};
+      var N = {host:'おなじ ネット', srflx:'STUN', prflx:'STUN', relay:'TURN（中継）'};
+      info = 'けいろ: ' + (N[L.candidateType]||L.candidateType||'?')
+           + ' ↔ ' + (N[R.candidateType]||R.candidateType||'?');
+    } else {
+      info = 'けいろが 見つかりません';
+    }
+    var el = document.getElementById('connInfo');
+    if (!el){
+      el = document.createElement('div');
+      el.id = 'connInfo';
+      el.style.cssText = 'position:fixed;left:50%;bottom:58px;'
+        + 'transform:translateX(-50%);padding:6px 14px;border-radius:8px;'
+        + 'font-size:11.5px;background:rgba(10,22,40,.85);color:#cfe3ea;'
+        + 'z-index:199';
+      document.body.appendChild(el);
+    }
+    el.textContent = info;
+    setTimeout(function(){ if (el) el.style.display='none'; }, 8000);
+  } catch(e){}
+}
 var ICE = {iceServers:[
   {urls:'stun:stun.l.google.com:19302'},
-  {urls:'stun:stun1.l.google.com:19302'}
+  {urls:'stun:stun1.l.google.com:19302'},
+  // TURN（中継）。おたがいの ネットが きびしいと、
+  // STUN だけでは つながらない。ここを 通して つなぐ。
+  {urls:'turn:openrelay.metered.ca:80',
+   username:'openrelayproject', credential:'openrelayproject'},
+  {urls:'turn:openrelay.metered.ca:443',
+   username:'openrelayproject', credential:'openrelayproject'},
+  {urls:'turn:openrelay.metered.ca:443?transport=tcp',
+   username:'openrelayproject', credential:'openrelayproject'}
 ]};
 
 var pc = null, local = null, callId = null, role = null;
@@ -167,9 +297,27 @@ function drawList(people){
 }
 
 /* ---------- 定期通信。着信の検知もここ ---------- */
+var _ticking = false, _pingFail = 0;
+
 async function tick(){
-  var d = await P('/api/admin/call/ping');
-  if (!d.ok) return;
+  if (_ticking) return;          // まえの が おわって いない
+  _ticking = true;
+  var d;
+  try {
+    d = await P('/api/admin/call/ping');
+  } catch (e) {
+    _pingFail++;
+    _ticking = false;
+    // 3かい つづけて しっぱいしたら、つうわを おわりに する
+    if (_pingFail >= 3 && (typeof callId !== 'undefined') && callId){
+      connMsg('つうしんが とぎれました', 'ng');
+      try { callHangup(); } catch (e2) {}
+    }
+    return;
+  }
+  _ticking = false;
+  _pingFail = 0;
+  if (!d || !d.ok) return;
   if (!pc) drawList(d.people || []);
 
   // 着信
@@ -226,7 +374,7 @@ window.callAccept = async function(){
   await pc.setLocalDescription(ans);
   await P('/api/admin/call/answer', {call_id:callId, answer:ans});
   ringing = null; startedAt = Date.now();
-  iceLoop();
+  iceLoop(); bump();
 };
 
 window.callDecline = async function(){
@@ -238,6 +386,7 @@ window.callDecline = async function(){
 window.callHangup = async function(){
   if (callId) await P('/api/admin/call/end', {call_id:callId});
   cleanup();
+  bump();
 };
 
 /* ---------- WebRTC ---------- */
@@ -254,9 +403,12 @@ async function getMedia(){
 
 function newPeer(){
   var p = new RTCPeerConnection(ICE);
+  window.pc = p;
+  watchConn(p);
   local.getTracks().forEach(function(t){ p.addTrack(t, local); });
   p.ontrack = function(e){
     document.getElementById('vRemote').srcObject = e.streams[0];
+    watchRemote(e.streams[0]);
     if (!startedAt) startedAt = Date.now();
   };
   p.onicecandidate = function(e){
@@ -290,12 +442,22 @@ function iceLoop(){
   }, 1500);
 }
 
+function bump(){          // すぐ 見に行く
+  if (tickTimer) clearTimeout(tickTimer);
+  tickTimer = setTimeout(tickLoop, 100);
+}
+
 function cleanup(){
   clearInterval(iceTimer);
   if (pc){ try{ pc.close(); }catch(e){} pc = null; }
   if (local){ local.getTracks().forEach(function(t){ t.stop(); }); local = null; }
   document.getElementById('cStage').classList.remove('on');
   document.getElementById('vRemote').srcObject = null;
+  if (window._remTimer) clearInterval(window._remTimer);
+  var _c = document.getElementById('remOffCam');
+  var _m = document.getElementById('remOffMic');
+  if (_c) _c.style.display = 'none';
+  if (_m) _m.style.display = 'none';
   document.getElementById('vLocal').srcObject = null;
   callId = null; role = null; iceSince = 0; startedAt = 0;
 }
@@ -320,7 +482,29 @@ window.addEventListener('beforeunload', function(){
     new Blob([JSON.stringify({call_id:callId})], {type:'application/json'}));
 });
 
-tick();
-tickTimer = setInterval(tick, 2500);
+/* つうわ中は はやく、まっている ときは ゆっくり 見に行く。
+   はやく しすぎると サーバーが しんどいので、ひつような ときだけ。 */
+function tickWait(){
+  if (typeof callId !== 'undefined' && callId) return 700;    // つうわ中
+  if (typeof ringing !== 'undefined' && ringing) return 700;  // 呼ばれて いる
+  if (document.hidden) return 8000;   // タブを 見て いない
+  return 5000;                        // まって いる
+}
+
+async function tickLoop(){
+  await tick();
+  if (tickTimer) clearTimeout(tickTimer);
+  tickTimer = setTimeout(tickLoop, tickWait());
+}
+
+tickLoop();
+
+// タブに もどって きたら すぐ 見に行く
+document.addEventListener('visibilitychange', function(){
+  if (!document.hidden){
+    if (tickTimer) clearTimeout(tickTimer);
+    tickLoop();
+  }
+});
 })();
 </script>

@@ -1,0 +1,106 @@
+{% extends "oma/_base.html" %}
+{% block title %}たな — Omame PJ{% endblock %}
+
+{% block subnav %}
+<div class="sub">
+  <a href="/oma_pj/shelf" {% if view=='list' %}class="on"{% endif %}>たなを さがす</a>
+  <a href="#" onclick="newShelf();return false">＋ たなを つくる</a>
+</div>
+{% endblock %}
+
+{% block style %}
+.sh{background:#fff;border:1px solid var(--line2);border-radius:12px;
+  padding:16px 18px;cursor:pointer;transition:.14s}
+.sh:hover{border-color:var(--main);transform:translateY(-2px)}
+.sh .t{font-size:15px;font-weight:700}
+.sh .d{font-size:12.5px;color:var(--muted);margin-top:4px;line-height:1.7}
+.sh .m{font-size:11.5px;color:var(--muted);margin-top:9px;display:flex;
+  gap:9px;flex-wrap:wrap;align-items:center}
+.app{background:#fff;border:1px solid var(--line2);border-radius:12px;
+  padding:15px 17px;cursor:pointer;transition:.14s}
+.app:hover{border-color:var(--main)}
+.app .t{font-size:14px;font-weight:700}
+.app .m{font-size:11.5px;color:var(--muted);margin-top:7px;display:flex;gap:9px}
+{% endblock %}
+
+{% block body %}
+<div id="body"><div class="empty">よみこみ中…</div></div>
+{% endblock %}
+
+{% block script %}
+<script>
+var VIEW = {{ view | tojson }};
+var COL_ID = {{ (col_id or none) | tojson }};
+
+async function showList(){
+  var d = await J('/api/mp/shelves');
+  var el = $('body');
+  if (!d.ok){ el.innerHTML = '<div class="empty">' + K(d.error) + '</div>'; return; }
+  el.innerHTML = '<h1>🗂 たな</h1>'
+    + '<p class="lead">テーマごとに 作品を あつめる ばしょです。</p>'
+    + '<div class="rulebox"><b>たなの きまり</b>'
+    + 'テーマに あう 作品を 入れて ください。'
+    + 'じぶんの 作品だけを 入れつづける のは やめましょう。</div>'
+    + '<div class="row"><button class="btn mn" onclick="newShelf()">'
+    + '＋ たなを つくる</button></div>'
+    + '<div class="grid">'
+    + (d.shelves.length ? d.shelves.map(function(x){
+        return '<div class="sh" onclick="showOne(' + x.id + ')">'
+          + '<div class="t">🗂 ' + K(x.title) + '</div>'
+          + '<div class="d">' + K(x.summary || '') + '</div>'
+          + '<div class="m"><span>' + K(x.owner_name || x.owner) + '</span>'
+          + '<span>' + x.apps + ' こ</span>'
+          + (x.open_add ? '<span class="tag">だれでも 入れられる</span>' : '')
+          + '</div></div>';
+      }).join('') : '<div class="empty">まだ たなが ありません</div>')
+    + '</div>';
+}
+
+async function showOne(sid){
+  var d = await J('/api/mp/shelf/' + sid);
+  var el = $('body');
+  if (!d.ok){ el.innerHTML = '<div class="empty">' + K(d.error) + '</div>'; return; }
+  var s = d.shelf;
+  el.innerHTML = '<button class="btn gh sm" onclick="showList()">← いちらん</button>'
+    + '<h1 style="margin-top:12px">🗂 ' + K(s.title) + '</h1>'
+    + '<p class="lead">' + K(s.summary || '') + ' · '
+    + K(s.owner_name || s.owner) + ' さんの たな</p>'
+    + ((d.is_owner || s.open_add)
+        ? '<div class="row"><select class="sel" id="shApp" '
+          + 'style="flex:1;min-width:150px">'
+          + (d.my_apps.length ? d.my_apps.map(function(a){
+              return '<option value="' + a.id + '">' + K(a.title) + '</option>';
+            }).join('') : '<option value="">公開ずみの 作品が ありません</option>')
+          + '</select><button class="btn mn" onclick="addTo(' + sid + ')">'
+          + '入れる</button></div>'
+        : '')
+    + '<div class="grid">'
+    + (d.apps.length ? d.apps.map(function(a){
+        return '<div class="app" onclick="goCol(\'' + K(a.owner_id || '')
+          + '\',\'' + K(a.col_id || a.id) + '\',\'prog_code\')">'
+          + '<div class="t">' + K(a.title) + '</div>'
+          + '<div class="m"><span>' + K(a.nickname || '') + '</span>'
+          + '<span>♡' + (a.likes || 0) + '</span></div></div>';
+      }).join('') : '<div class="empty">まだ 作品が ありません</div>')
+    + '</div>';
+}
+
+async function newShelf(){
+  var t = prompt('たなの 名前\n\n例: ゲーム あつめ');
+  if (!t) return;
+  var s = prompt('せつめい（にんい）') || '';
+  var d = await P('/api/mp/shelf', {title:t, summary:s});
+  if (d.ok !== true){ toast(d.error, 'error'); return; }
+  showOne(d.id);
+}
+async function addTo(sid){
+  var a = $('shApp').value;
+  if (!a){ toast('さきに 作品を 公開して ください', 'error'); return; }
+  var d = await P('/api/mp/shelf/' + sid + '/add', {app_id: parseInt(a)});
+  if (d.ok !== true){ toast(d.error, 'error'); return; }
+  showOne(sid);
+}
+
+loadMe().then(function(m){ if (m) showList(); });
+</script>
+{% endblock %}

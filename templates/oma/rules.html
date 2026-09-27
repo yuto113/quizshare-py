@@ -1,0 +1,74 @@
+{% extends "oma/_base.html" %}
+{% block title %}きまり — Omame PJ{% endblock %}
+
+{% block style %}
+.rule{background:#fff;border:1px solid var(--line2);border-radius:12px;
+  padding:16px 19px;margin-bottom:11px;display:flex;gap:14px;
+  align-items:flex-start}
+.rule .n{width:30px;height:30px;background:var(--main);color:#fff;
+  border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:13px;flex:none}
+.rule .t{font-weight:700;font-size:14px;margin-bottom:4px}
+.rule .b{font-size:13px;color:var(--muted);line-height:1.85}
+.agree{background:linear-gradient(135deg,var(--dark),var(--dark2));color:#fff;
+  border-radius:14px;padding:22px 24px;margin-top:22px;text-align:center}
+.agree p{font-size:13.5px;color:#c8e6a0;margin-bottom:14px;line-height:1.9}
+.agree .btn{background:var(--acc);color:#04220f;font-weight:800;padding:12px 30px;
+  font-size:14.5px}
+.agree .btn:hover{background:#3dfa7d}
+.done{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;
+  padding:16px 20px;text-align:center;font-size:13.5px;color:#14532d;
+  margin-top:22px}
+{% endblock %}
+
+{% block body %}
+<h1>📜 みんなで まもる きまり</h1>
+<p class="lead">むずかしく ありません。6つ だけです。</p>
+
+{% if first %}
+<div class="note">
+  <b>ようこそ！</b>
+  さいしょに、この きまりを 読んで ください。
+  読んだら いちばん 下の ボタンを おすと、作品を 公開できる ように なります。
+</div>
+{% endif %}
+
+<div id="ruleList"></div>
+
+<div id="agreeBox"></div>
+{% endblock %}
+
+{% block script %}
+<script>
+async function loadRules(){
+  var d = await J('/api/mp/rules');
+  if (!d.ok){
+    $('ruleList').innerHTML = '<div class="empty">' + K(d.error) + '</div>';
+    return;
+  }
+  $('ruleList').innerHTML = d.rules.map(function(r, i){
+    return '<div class="rule"><div class="n">' + (i + 1) + '</div>'
+      + '<div><div class="t">' + K(r.title) + '</div>'
+      + '<div class="b">' + K(r.body) + '</div></div></div>';
+  }).join('');
+
+  $('agreeBox').innerHTML = !ME
+    ? '<div class="note">会員に なると 同意 できます</div>'
+    : (d.agreed
+        ? '<div class="done">✓ 同意ずみ です。ありがとう。</div>'
+        : '<div class="agree"><p>この きまりを まもって、'
+          + 'みんなが あんしんして つかえる ばしょに しましょう。</p>'
+          + '<button class="btn" onclick="doAgree()">読みました</button></div>');
+}
+
+async function doAgree(){
+  var d = await P('/api/mp/agree');
+  if (d.ok !== true){ toast(d.error || 'しっぱい しました', 'error'); return; }
+  toast('ありがとう。これで 公開 できます');
+  loadRules();
+  setTimeout(function(){ location.href = '/oma_pj/home'; }, 1400);
+}
+
+loadMe().then(loadRules);
+</script>
+{% endblock %}

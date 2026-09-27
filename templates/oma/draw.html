@@ -1,0 +1,119 @@
+{% extends "oma/_base.html" %}
+{% block title %}おえかき — Omame PJ{% endblock %}
+
+{% block subnav %}
+<div class="sub">
+  <a href="/oma_pj/draw" {% if view=='list' %}class="on"{% endif %}>みんなの え</a>
+  <a href="#" onclick="goMine();return false">じぶんの え</a>
+  <a href="#" onclick="goMake();return false">＋ かく</a>
+</div>
+{% endblock %}
+
+{% block style %}
+.dnew{background:#fff;border:1px solid var(--line2);border-radius:13px;
+  padding:18px;margin-bottom:18px}
+.dnew h4{font-size:13.5px;margin:0 0 12px}
+.dmode{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.dmode-card{flex:1;min-width:150px;background:var(--paper);
+  border:2px solid var(--line2);border-radius:11px;padding:14px;cursor:pointer;
+  text-align:center;transition:.14s}
+.dmode-card:hover{border-color:var(--main)}
+.dmode-card.on{border-color:var(--main);background:var(--line)}
+.dmode-card .ic{font-size:26px}
+.dmode-card .t{font-weight:700;font-size:13px;margin-top:5px}
+.dmode-card .d{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.55}
+.dshapes{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.dshape{background:var(--paper);border:2px solid var(--line2);border-radius:10px;
+  padding:10px 16px;cursor:pointer;font-size:12.5px;transition:.14s;
+  display:flex;flex-direction:column;align-items:center;gap:5px}
+.dshape:hover{border-color:var(--main)}
+.dshape.on{border-color:var(--main);background:var(--line);font-weight:600}
+.dsizes{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.dsize{background:var(--paper);border:1px solid var(--line2);border-radius:8px;
+  padding:6px 13px;cursor:pointer;font-size:12px}
+.dsize:hover{border-color:var(--main)}
+.dsize.on{background:var(--dark);color:#fff;border-color:var(--dark)}
+
+.dwrap{display:flex;gap:14px;align-items:flex-start}
+.dtools{width:196px;flex:none;background:#fff;border:1px solid var(--line2);
+  border-radius:12px;padding:13px;max-height:600px;overflow-y:auto}
+.dstage{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;
+  background:#fff;border:1px solid var(--line2);border-radius:12px;padding:16px;
+  overflow:auto}
+#dCanvas{image-rendering:pixelated;cursor:crosshair;touch-action:none;
+  box-shadow:0 2px 12px rgba(26,46,5,.1);
+  background-image:linear-gradient(45deg,#eef2e4 25%,transparent 25%),
+    linear-gradient(-45deg,#eef2e4 25%,transparent 25%),
+    linear-gradient(45deg,transparent 75%,#eef2e4 75%),
+    linear-gradient(-45deg,transparent 75%,#eef2e4 75%);
+  background-size:16px 16px;background-position:0 0,0 8px,8px -8px,-8px 0}
+.dsec{font-size:10.5px;color:var(--muted);font-weight:700;margin:12px 0 6px;
+  letter-spacing:.05em}
+.dsec:first-child{margin-top:0}
+.dtool{display:flex;gap:5px;flex-wrap:wrap}
+.dtool button{flex:1;min-width:52px;background:var(--paper);
+  border:1px solid var(--line2);border-radius:8px;padding:8px 4px;font-size:15px;
+  cursor:pointer;font-family:inherit}
+.dtool button:hover{border-color:var(--main)}
+.dtool button.on{background:var(--dark);color:#fff;border-color:var(--dark)}
+.dpal{display:grid;grid-template-columns:repeat(8,1fr);gap:4px}
+.dpal div{aspect-ratio:1;border-radius:5px;cursor:pointer;
+  border:2px solid transparent;transition:.1s}
+.dpal div:hover{transform:scale(1.12)}
+.dpal div.on{border-color:var(--dark);transform:scale(1.12)}
+.dnow{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.dnow .sw{width:40px;height:40px;border-radius:9px;border:2px solid var(--line2);
+  flex:none}
+.dnow input[type=color]{width:38px;height:38px;border:none;background:none;
+  cursor:pointer;padding:0}
+.drgb label{display:flex;align-items:center;gap:7px;font-size:11px;
+  color:var(--muted);margin-bottom:5px}
+.drgb label span{width:14px;font-weight:700}
+.drgb input[type=range]{flex:1;height:5px}
+.drgb label b{width:30px;text-align:right;
+  font-family:ui-monospace,monospace;font-size:11px;color:var(--text)}
+.dsize2{display:flex;align-items:center;gap:8px;font-size:12px}
+.dsize2 input{flex:1}
+
+.dgal{display:grid;grid-template-columns:repeat(auto-fill,minmax(138px,1fr));
+  gap:11px}
+.dcard{background:#fff;border:1px solid var(--line2);border-radius:11px;
+  overflow:hidden;cursor:pointer;transition:.14s}
+.dcard:hover{border-color:var(--main);transform:translateY(-2px)}
+.dcard img{width:100%;aspect-ratio:1;object-fit:contain;display:block;
+  image-rendering:pixelated;background:var(--paper)}
+.dcard .info{padding:8px 10px}
+.dcard .t{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.dcard .m{font-size:11px;color:var(--muted);margin-top:2px;display:flex;gap:7px}
+@media(max-width:700px){
+  .dwrap{flex-direction:column} .dtools{width:100%;max-height:none}
+  .dpal{grid-template-columns:repeat(12,1fr)}
+}
+{% endblock %}
+
+{% block body %}
+<div id="body"><div class="empty">よみこみ中…</div></div>
+{% endblock %}
+
+{% block script %}
+<script src="/static/oma_draw.js"></script>
+<script>
+var VIEW = {{ view | tojson }};
+var OWNER_ID = {{ (owner_id or none) | tojson }};
+var COL_ID = {{ (col_id or none) | tojson }};
+var IS_MINE = {{ 'true' if is_mine else 'false' }};
+
+function goMine(){
+  if (ME) location.href = '/oma_pj/draw/me/every_watch';
+}
+
+loadMe().then(function(m){
+  if (!m) return;
+  if (VIEW === 'watch') showDrawWatch();
+  else if (VIEW === 'make') showDrawMake();
+  else if (VIEW === 'every_watch') showDrawList(OWNER_ID);
+  else showDrawList(null);
+});
+</script>
+{% endblock %}

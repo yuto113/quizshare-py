@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ja"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Omame PJ{% endblock %}</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🫘</text></svg>">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --dark:#1a2e05;      /* こい つち */
+  --dark2:#2d4a0a;
+  --main:#65a30d;      /* きみどり（まめ・わかば） */
+  --main2:#4d7c0f;
+  --acc:#05f75f;       /* ひかる みどり */
+  --paper:#f7fee7;     /* うすい きみどり */
+  --line:#d9f99d;
+  --line2:#e2e8d0;
+  --text:#1a2e05;
+  --muted:#6b7a52;
+}
+body{font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;
+  background:var(--paper);color:var(--text);line-height:1.7}
+body.furi{font-size:16.5px;line-height:1.9}
+
+/* ---- うえの バー ---- */
+.hd{background:var(--dark);color:#fff;padding:12px 20px;display:flex;
+  align-items:center;gap:12px;position:sticky;top:0;z-index:50}
+.logo{font-size:16px;font-weight:800;letter-spacing:.07em;cursor:pointer;
+  display:flex;align-items:center;gap:7px}
+.logo em{font-style:normal;color:var(--acc)}
+.logo .bean{font-size:19px}
+.hd .sp{flex:1}
+.hd .who{font-size:12px;color:#a8c47a;white-space:nowrap}
+.hd button{background:none;border:none;color:#c8e6a0;font-size:12.5px;
+  cursor:pointer;padding:6px 10px;border-radius:7px;font-family:inherit}
+.hd button:hover{background:rgba(255,255,255,.1);color:#fff}
+.badge{background:#dc2626;color:#fff;border-radius:99px;padding:1px 6px;
+  font-size:10px;margin-left:3px}
+
+.cat{background:var(--dark2);padding:0 18px;display:flex;gap:1px;
+  overflow-x:auto;position:sticky;top:45px;z-index:49;scrollbar-width:none}
+.cat::-webkit-scrollbar{display:none}
+.cat a{background:none;border:none;color:#b8d48a;font-size:13px;
+  padding:11px 16px;text-decoration:none;white-space:nowrap;
+  border-bottom:2px solid transparent;transition:.12s}
+.cat a:hover{color:#fff;background:rgba(255,255,255,.07)}
+.cat a.on{color:#fff;border-bottom-color:var(--acc);font-weight:700}
+
+.sub{background:#fff;border-bottom:1px solid var(--line2);padding:0 18px;
+  display:flex;gap:2px;overflow-x:auto;position:sticky;top:87px;z-index:48;
+  scrollbar-width:none;min-height:40px;align-items:center}
+.sub::-webkit-scrollbar{display:none}
+.sub a{color:var(--muted);font-size:12.5px;padding:9px 14px;
+  text-decoration:none;border-radius:8px;white-space:nowrap;transition:.12s}
+.sub a:hover{background:var(--paper);color:var(--text)}
+.sub a.on{background:var(--line);color:var(--main2);font-weight:600}
+
+.wrap{max-width:1040px;margin:0 auto;padding:24px 20px 80px}
+h1{font-size:23px;margin-bottom:8px}
+h2{font-size:16px;margin:26px 0 11px;padding-bottom:7px;
+  border-bottom:1px solid var(--line2)}
+.lead{font-size:13px;color:var(--muted);margin-bottom:18px}
+
+/* ---- ぶひん ---- */
+.btn{background:var(--dark);color:#fff;border:none;padding:9px 18px;
+  border-radius:9px;font-size:13px;cursor:pointer;font-family:inherit}
+.btn:hover{background:var(--dark2)}
+.btn:disabled{background:#c5cdb5;cursor:not-allowed}
+.btn.mn{background:var(--main)}.btn.mn:hover{background:var(--main2)}
+.btn.gh{background:none;border:1px solid var(--line2);color:var(--text)}
+.btn.gh:hover{background:#eef4e0}
+.btn.sm{padding:5px 12px;font-size:11.5px}
+.btn.ng{background:#dc2626;color:#fff}
+
+.inp,.sel,.ta{padding:9px 12px;border:1px solid var(--line2);border-radius:9px;
+  font-size:13px;font-family:inherit;width:100%;background:#fff}
+.inp:focus,.sel:focus,.ta:focus{outline:none;border-color:var(--main)}
+.ta{resize:vertical}
+.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+label.lb{font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px}
+
+.card{background:#fff;border:1px solid var(--line2);border-radius:11px;
+  padding:15px 17px;margin-bottom:11px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.tag{display:inline-block;font-size:10.5px;padding:2px 8px;border-radius:99px;
+  background:var(--line);color:var(--main2);margin-right:4px}
+.tag.d1{background:#dcfce7;color:#166534}
+.tag.d2{background:#fef3c7;color:#92400e}
+.tag.d3{background:#fee2e2;color:#991b1b}
+.tag.draft{background:#e5e7eb;color:#4b5563}
+
+.hero{background:linear-gradient(135deg,var(--dark),var(--dark2));color:#fff;
+  border-radius:15px;padding:32px 30px;margin-bottom:24px}
+.hero h1{font-size:25px;margin-bottom:10px}
+.hero p{font-size:14px;color:#c8e6a0;line-height:1.9;margin-bottom:20px}
+.hero .stats{display:flex;gap:32px;flex-wrap:wrap}
+.hero .stat b{display:block;font-size:31px;color:var(--acc);line-height:1.1}
+.hero .stat span{font-size:12px;color:#9ab873}
+
+.rulebox{background:#fefce8;border:1px solid #fde68a;border-radius:10px;
+  padding:11px 14px;font-size:12px;color:#713f12;line-height:1.8;margin-bottom:16px}
+.rulebox b{display:block;margin-bottom:3px;font-size:12.5px}
+.note{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;
+  padding:12px 15px;font-size:12px;color:#14532d;margin-bottom:16px;line-height:1.8}
+.warn{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;
+  padding:12px 15px;font-size:12.5px;color:#78350f;margin-bottom:16px}
+.err{background:#fef2f2;border:1px solid #fecaca;border-radius:10px;
+  padding:12px 15px;font-size:12.5px;color:#991b1b;margin-bottom:16px}
+.empty{padding:40px 0;text-align:center;color:#9aa885;font-size:13px}
+
+.modal{position:fixed;inset:0;background:rgba(26,46,5,.6);z-index:100;
+  display:none;align-items:center;justify-content:center;padding:20px}
+.modal.on{display:flex}
+.mbox{background:#fff;border-radius:14px;padding:24px;max-width:520px;
+  width:100%;max-height:86vh;overflow:auto}
+
+#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
+  background:var(--dark);color:#fff;border-radius:10px;padding:10px 20px;
+  font-size:13px;opacity:0;transition:.24s;pointer-events:none;z-index:120}
+#toast.on{opacity:1;bottom:32px}
+
+.out{background:var(--dark);color:#d9f99d;
+  font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;
+  padding:13px;border-radius:10px;min-height:110px;max-height:340px;
+  overflow:auto;white-space:pre-wrap;word-break:break-all;margin-top:11px}
+.out .e{color:#fca5a5}
+.out .ok{color:#86efac}
+
+@media(max-width:600px){
+  .hd{padding:10px 14px}
+  .cat{padding:0 10px;top:41px}
+  .cat a{padding:10px 13px;font-size:12.5px}
+  .sub{padding:0 10px;top:80px}
+  .sub a{padding:8px 11px;font-size:12px}
+  .wrap{padding:16px 13px 70px}
+  .hero{padding:24px 20px}
+  .hero h1{font-size:20px}
+  h1{font-size:20px}
+}
+{% block style %}{% endblock %}
+</style></head><body>
+
+<div class="hd">
+  <span class="logo" onclick="location.href='/oma_pj/home'">
+    <span class="bean">🫘</span>Omame<em>PJ</em></span>
+  <span class="sp"></span>
+  <span class="who" id="whoami"></span>
+  <button onclick="location.href='/oma_pj/notices'" title="おしらせ">🔔<span
+    id="nvBadge"></span></button>
+  <button onclick="location.href='/oma_pj/me'" title="せってい">⚙</button>
+  <button onclick="omaLogout()">ログアウト</button>
+</div>
+
+<div class="cat">
+  <a href="/oma_pj/home" {% if page=='home' %}class="on"{% endif %}>🏠 ホーム</a>
+  <a href="/oma_pj/prog_code" {% if page=='prog_code' %}class="on"{% endif %}>⌨️ コード</a>
+  <a href="/oma_pj/prog_block" {% if page=='prog_block' %}class="on"{% endif %}>🧩 ブロック</a>
+  <a href="/oma_pj/draw" {% if page=='draw' %}class="on"{% endif %}>🎨 おえかき</a>
+  <a href="/oma_pj/talk" {% if page=='talk' %}class="on"{% endif %}>💬 つぶやき</a>
+  <a href="/oma_pj/wiki" {% if page=='wiki' %}class="on"{% endif %}>📖 図鑑</a>
+  <a href="/oma_pj/shelf" {% if page=='shelf' %}class="on"{% endif %}>🗂 たな</a>
+  <a href="/oma_pj/qa" {% if page=='qa' %}class="on"{% endif %}>❓ しつもん</a>
+  <a href="/oma_pj/poll" {% if page=='poll' %}class="on"{% endif %}>🗳 とうひょう</a>
+  <a href="/oma_pj/rules" {% if page=='rules' %}class="on"{% endif %}>📜 きまり</a>
+</div>
+
+{% block subnav %}{% endblock %}
+
+<div class="wrap">
+{% block body %}{% endblock %}
+</div>
+
+<div class="modal" id="modal"><div class="mbox" id="modalBody"></div></div>
+<div id="toast"></div>
+
+<script>
+/* ============ みんなで つかう しくみ ============ */
+var ME = null;
+var OWNER = {{ (owner_id or none) | tojson }};
+var PROJ = {{ page | tojson }};
+
+function $(i){ return document.getElementById(i); }
+function K(s){ var d = document.createElement('div');
+  d.textContent = (s == null ? '' : s); return d.innerHTML; }
+
+async function J(u, o){
+  var r = await fetch(u, o);
+  return await r.json().catch(function(){
+    return {ok:false, error:'こたえを よめません'}; });
+}
+function P(u, b){
+  return J(u, {method:'POST', headers:{'Content-Type':'application/json'},
+               body:JSON.stringify(b || {})});
+}
+
+function toast(m, kind){
+  var t = $('toast');
+  if (!t) { alert(m); return; }
+  t.textContent = m;
+  t.style.background = (kind === 'error') ? '#991b1b' : '#1a2e05';
+  t.classList.add('on');
+  setTimeout(function(){ t.classList.remove('on'); }, 2400);
+}
+
+function closeModal(){ $('modal').classList.remove('on'); }
+function openModal(html){
+  $('modalBody').innerHTML = html;
+  $('modal').classList.add('on');
+}
+
+/* ---- じぶんの こと ---- */
+async function loadMe(){
+  var d = await J('/api/mp/me');
+  if (!d.logged_in){ location.href = '/oma_pj'; return null; }
+  ME = d;
+  if ($('whoami')) $('whoami').textContent = d.nickname || '';
+  document.body.classList.toggle('furi', !!d.furigana);
+  checkNotices();
+  return d;
+}
+
+async function checkNotices(){
+  var d = await J('/api/mp/notices');
+  var b = $('nvBadge');
+  if (!b) return;
+  if (d.ok && d.unread > 0){
+    b.textContent = d.unread;
+    b.className = 'badge';
+  } else {
+    b.textContent = ''; b.className = '';
+  }
+}
+
+async function omaLogout(){
+  await P('/api/mp/logout');
+  location.href = '/oma_pj';
+}
+
+/* ---- じかんの 出しかた ---- */
+function ago(s){
+  if (!s) return '';
+  var t = new Date(String(s).replace(' ', 'T'));
+  var d = (Date.now() - t.getTime()) / 1000;
+  if (d < 60) return 'いま';
+  if (d < 3600) return Math.floor(d / 60) + '分';
+  if (d < 86400) return Math.floor(d / 3600) + '時間';
+  if (d < 604800) return Math.floor(d / 86400) + '日';
+  return (t.getMonth() + 1) + '月' + t.getDate() + '日';
+}
+
+/* ---- アイコン ---- */
+function avHtml(m, small){
+  var kind = (m.avatar_kind || 'letter');
+  var col = m.color || pickColor(m.owner_id || m.member_id || 'x');
+  var cls = 'av' + (small ? ' sm' : '');
+  if (kind === 'img' && m.avatar)
+    return '<div class="' + cls + '"><img src="' + K(m.avatar) + '"></div>';
+  if (kind === 'emoji' && m.avatar)
+    return '<div class="' + cls + '" style="background:' + col + '">'
+      + K(m.avatar) + '</div>';
+  var ch = (m.nickname || m.member_id || '?').charAt(0);
+  return '<div class="' + cls + '" style="background:' + col + '">'
+    + K(ch) + '</div>';
+}
+function pickColor(seed){
+  var C = ['#65a30d','#16a34a','#0891b2','#7c3aed','#db2777',
+           '#ea580c','#059669','#0284c7','#9333ea','#c2410c'];
+  var n = 0;
+  for (var i = 0; i < String(seed).length; i++) n += String(seed).charCodeAt(i);
+  return C[n % C.length];
+}
+
+/* ---- その人の ページへ ---- */
+function goOwner(oid, proj){
+  location.href = '/oma_pj/' + (proj || PROJ) + '/' + oid + '/every_watch';
+}
+function goCol(oid, cid, proj){
+  location.href = '/oma_pj/' + (proj || PROJ) + '/' + oid + '/watch/' + cid;
+}
+function goMake(proj){
+  if (!ME) return;
+  location.href = '/oma_pj/' + (proj || PROJ) + '/me/make';
+}
+
+loadMe();
+</script>
+<style>
+.av{width:42px;height:42px;border-radius:50%;flex:none;display:flex;
+  align-items:center;justify-content:center;font-weight:700;color:#fff;
+  font-size:17px;overflow:hidden}
+.av img{width:100%;height:100%;object-fit:cover}
+.av.sm{width:30px;height:30px;font-size:13px}
+</style>
+{% block script %}{% endblock %}
+</body></html>

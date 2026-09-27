@@ -186,6 +186,10 @@ def mp_me():
                    nickname=m['nickname'], tier=t, limit=LIMITS[t],
                    published=published_count(m['member_id']),
                    grade=m.get('grade'), school=m.get('school'),
+                   owner_id=m.get('owner_id'),
+                   avatar=m.get('avatar'),
+                   avatar_kind=m.get('avatar_kind'),
+                   color=m.get('color'),
                    furigana=bool(m.get('furigana')),
                    show_grade=bool(m.get('show_grade')),
                    is_staff=bool(m.get('is_staff')),
@@ -548,7 +552,6 @@ def mp_report():
     return jsonify(ok=True)
 
 
-@bp.route('/member')
 def page_member():
     return render_template('member.html')
 
@@ -904,24 +907,17 @@ def mp_tables_save(aid):
     return jsonify(ok=True, count=len(clean))
 
 
-@bp.route('/member/program/<author>/<int:aid>')
 def page_program(author, aid):
     """作品ごとのURL。
        /member/program/{作った人のID}/{作品の番号}"""
     return render_template('member.html', open_app=aid, open_author=author)
 
 
-@bp.route('/member/u/<author>')
 def page_author(author):
     """作った人のページ"""
     return render_template('member.html', open_author=author, open_profile=1)
 
 
-@bp.route('/member/mine')
-@bp.route('/member/rules')
-@bp.route('/member/login')
-@bp.route('/member/edit')
-@bp.route('/member/edit/<int:aid>')
 def page_member_sub(aid=None):
     """会員ページの各画面。中身は同じHTMLで、開く場所だけ変える。"""
     return render_template('member.html', open_edit=aid)
@@ -1008,9 +1004,6 @@ def mp_author(author):
         'forked': (forked['n'] if forked else 0)}, apps=apps)
 
 
-@bp.route('/member/favs')
-@bp.route('/member/notices')
-@bp.route('/member/u/<author>')
 def page_member_sub2(author=None):
     return render_template('member.html', open_author2=author)
 
@@ -1335,19 +1328,39 @@ def mp_posts():
         return jsonify(ok=False, error='会員だけが 見られます'), 401
     gid = request.args.get('group')
     who = request.args.get('who')
+    tag = request.args.get('tag')
     following = request.args.get('following')
 
-    sql = """SELECT p.*, m.nickname, g.name AS group_name,
+    sql = """SELECT p.*, m.nickname, m.avatar, m.avatar_kind, m.color, m.grade,
+                    m.show_grade, g.name AS group_name,
                     (SELECT COUNT(*) FROM mp_post r WHERE r.reply_to = p.id
                      AND r.hidden = 0) AS replies,
                     (SELECT COUNT(*) FROM mp_post_like l WHERE l.post_id = p.id
-                     AND l.member_id = ?) AS liked
+                     AND l.member_id = ?) AS liked,
+                    (SELECT COUNT(*) FROM mp_post r WHERE r.repost_of = p.id
+                     AND r.member_id = ? AND r.hidden = 0) AS reposted,
+                    q.body AS q_body, q.member_id AS q_member,
+                    qm.nickname AS q_nick, qm.avatar AS q_avatar,
+                    qm.avatar_kind AS q_avatar_kind, qm.color AS q_color,
+                    q.created_at AS q_at,
+                    r0.body AS r_body, r0.member_id AS r_member,
+                    rm.nickname AS r_nick, rm.avatar AS r_avatar,
+                    rm.avatar_kind AS r_avatar_kind, rm.color AS r_color,
+                    r0.created_at AS r_at, r0.likes AS r_likes,
+                    r0.id AS r_id
              FROM mp_post p
              LEFT JOIN mp_member m ON m.member_id = p.member_id
              LEFT JOIN mp_group g ON g.id = p.group_id
+             LEFT JOIN mp_post q ON q.id = p.quote_of
+             LEFT JOIN mp_member qm ON qm.member_id = q.member_id
+             LEFT JOIN mp_post r0 ON r0.id = p.repost_of
+             LEFT JOIN mp_member rm ON rm.member_id = r0.member_id
              WHERE p.hidden = 0 AND p.reply_to IS NULL """
-    args = [u['member_id']]
-    if gid:
+    args = [u['member_id'], u['member_id']]
+    if tag:
+        sql += "AND p.id IN (SELECT post_id FROM mp_tag WHERE tag = ?) "
+        args.append(tag.lower())
+    elif gid:
         sql += 'AND p.group_id = ? '; args.append(gid)
     elif who:
         sql += 'AND p.member_id = ? '; args.append(who)
@@ -1357,7 +1370,11 @@ def mp_posts():
         args += [u['member_id'], u['member_id']]
     else:
         sql += 'AND p.group_id IS NULL '
-    sql += 'ORDER BY p.id DESC LIMIT 60'
+
+    before = request.args.get('before')
+    if before:
+        sql += 'AND p.id < ? '; args.append(before)
+    sql += 'ORDER BY p.id DESC LIMIT 25'
 
     c = _db()
     rows = [dict(r) for r in c.execute(sql, args).fetchall()]
@@ -1368,8 +1385,14 @@ def mp_posts():
                 WHERE gm.group_id = g.id AND gm.member_id = ?) AS joined
         FROM mp_group g ORDER BY g.id DESC LIMIT 30""",
         (u['member_id'],)).fetchall()]
+    tags = [dict(r) for r in c.execute("""
+        SELECT tag, COUNT(*) AS n FROM mp_tag
+        WHERE created_at > datetime('now','localtime','-7 days')
+        GROUP BY tag ORDER BY n DESC LIMIT 12""").fetchall()]
     c.close()
-    return jsonify(ok=True, posts=rows, groups=groups)
+    more = (len(rows) == 25)
+    return jsonify(ok=True, posts=rows, groups=groups, tags=tags, more=more)
+
 
 
 @bp.route('/api/mp/post/<int:pid>/replies')
@@ -1394,21 +1417,76 @@ def mp_post_new():
         return jsonify(ok=False, error='はやすぎます。すこし 待ってください'), 429
     d = request.get_json(silent=True) or {}
     body = (d.get('body') or '').strip()
-    if not body:
+    repost = d.get('repost_of')
+
+    # 再投稿だけ（じぶんの ことばなし）は 本文が なくてよい
+    if not body and not repost:
         return jsonify(ok=False, error='なにか 書いてください'), 400
     if len(body) > POST_MAX:
-        return jsonify(ok=False, error=f'{POST_MAX}文字までです'), 400
-    ng = check_content(body)
-    if ng:
-        return jsonify(ok=False,
-            error='個人情報かも しれないものが あります: ' + '、'.join(ng)), 400
+        return jsonify(ok=False, error=str(POST_MAX) + '文字までです'), 400
+    if body:
+        ng = check_content(body)
+        if ng:
+            return jsonify(ok=False,
+                error='個人情報かも しれないものが あります: ' + '、'.join(ng)), 400
+
     c = _db()
-    c.execute("""INSERT INTO mp_post(member_id,body,group_id,reply_to,app_id)
-                 VALUES(?,?,?,?,?)""",
-              (u['member_id'], body, d.get('group_id') or None,
-               d.get('reply_to') or None, d.get('app_id') or None))
+
+    # おなじ つぶやきを 2回 再投稿しない
+    if repost:
+        hit = c.execute("""SELECT id FROM mp_post WHERE repost_of=? AND member_id=?
+                           AND hidden=0 AND (body IS NULL OR body='')""",
+                        (repost, u['member_id'])).fetchone()
+        if hit and not body:
+            c.execute('DELETE FROM mp_post WHERE id=?', (hit['id'],))
+            c.execute('UPDATE mp_post SET reposts=MAX(0,reposts-1) WHERE id=?',
+                      (repost,))
+            c.commit(); c.close()
+            return jsonify(ok=True, undone=True)
+
+    cur = c.execute("""INSERT INTO mp_post(member_id,body,group_id,reply_to,app_id,
+                       quote_of,repost_of,draw_id)
+                       VALUES(?,?,?,?,?,?,?,?)""",
+                    (u['member_id'], body, d.get('group_id') or None,
+                     d.get('reply_to') or None, d.get('app_id') or None,
+                     d.get('quote_of') or None, repost or None,
+                     d.get('draw_id') or None))
+    pid = cur.lastrowid
+
+    # ハッシュタグを ひろう
+    tags = set(_re2.findall(r'[#＃]([0-9A-Za-z_ぁ-んァ-ヶ一-龠ー]{1,20})', body))
+    for t in list(tags)[:5]:
+        try:
+            c.execute('INSERT OR IGNORE INTO mp_tag(tag,post_id) VALUES(?,?)',
+                      (t.lower(), pid))
+        except Exception:
+            pass
+    if tags:
+        c.execute('UPDATE mp_post SET tags=? WHERE id=?',
+                  (','.join(list(tags)[:5]), pid))
+
+    # かず を ふやす・しらせる
+    if repost:
+        c.execute('UPDATE mp_post SET reposts=reposts+1 WHERE id=?', (repost,))
+        own = c.execute('SELECT member_id FROM mp_post WHERE id=?', (repost,)).fetchone()
+    elif d.get('quote_of'):
+        own = c.execute('SELECT member_id FROM mp_post WHERE id=?',
+                        (d.get('quote_of'),)).fetchone()
+    elif d.get('reply_to'):
+        own = c.execute('SELECT member_id FROM mp_post WHERE id=?',
+                        (d.get('reply_to'),)).fetchone()
+    else:
+        own = None
     c.commit(); c.close()
-    return jsonify(ok=True)
+
+    if own:
+        kind = 'fork' if repost else 'comment'
+        msg = ('あなたの つぶやきが ひろめられました' if repost
+               else ('ひきようされました' if d.get('quote_of')
+                     else 'かえしが つきました'))
+        notify(own['member_id'], kind, None, u['member_id'], msg)
+    return jsonify(ok=True, id=pid)
+
 
 
 @bp.route('/api/mp/post/<int:pid>/like', methods=['POST'])
@@ -2308,3 +2386,53 @@ def mp_draw_like(did):
     if liked and own:
         notify(own['member_id'], 'like', None, u['member_id'], 'えに いいねが つきました')
     return jsonify(ok=True, liked=liked)
+
+
+@bp.route('/api/mp/avatar', methods=['POST'])
+def mp_avatar():
+    """アイコンを きめる。画像 / 絵文字 / 文字。"""
+    u = me()
+    if not u:
+        return jsonify(ok=False), 401
+    d = request.get_json(silent=True) or {}
+    kind = d.get('kind') or 'letter'
+    av = d.get('avatar') or ''
+    if kind == 'img':
+        if not av.startswith('data:image/'):
+            return jsonify(ok=False, error='がぞうでは ありません'), 400
+        if len(av) > 120000:     # 約120KB
+            return jsonify(ok=False, error='がぞうが おおきすぎます'), 400
+    elif kind == 'emoji':
+        av = av[:8]
+    else:
+        kind = 'letter'; av = ''
+    c = _db()
+    c.execute('UPDATE mp_member SET avatar=?, avatar_kind=?, color=? WHERE member_id=?',
+              (av, kind, (d.get('color') or '')[:9], u['member_id']))
+    c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+@bp.route('/api/mp/post/<int:pid>')
+def mp_post_one(pid):
+    """1つの つぶやきと、その かえしを ぜんぶ。"""
+    u = me()
+    if not u:
+        return jsonify(ok=False), 401
+    c = _db()
+    p = c.execute("""SELECT p.*, m.nickname, m.avatar, m.avatar_kind, m.color,
+                     (SELECT COUNT(*) FROM mp_post_like l WHERE l.post_id=p.id
+                      AND l.member_id=?) AS liked
+                     FROM mp_post p LEFT JOIN mp_member m ON m.member_id=p.member_id
+                     WHERE p.id=? AND p.hidden=0""", (u['member_id'], pid)).fetchone()
+    if not p:
+        c.close(); return jsonify(ok=False, error='見つかりません'), 404
+    reps = [dict(r) for r in c.execute("""
+        SELECT p.*, m.nickname, m.avatar, m.avatar_kind, m.color,
+               (SELECT COUNT(*) FROM mp_post_like l WHERE l.post_id=p.id
+                AND l.member_id=?) AS liked
+        FROM mp_post p LEFT JOIN mp_member m ON m.member_id=p.member_id
+        WHERE p.reply_to=? AND p.hidden=0 ORDER BY p.id""",
+        (u['member_id'], pid)).fetchall()]
+    c.close()
+    return jsonify(ok=True, post=dict(p), replies=reps)

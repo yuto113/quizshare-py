@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ja"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Omame PJ — おまめ育成プロジェクト</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🫘</text></svg>">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --dark:#1a2e05; --dark2:#2d4a0a; --main:#65a30d; --main2:#4d7c0f;
+  --acc:#05f75f; --paper:#f7fee7; --line:#d9f99d; --line2:#e2e8d0;
+  --text:#1a2e05; --muted:#6b7a52;
+}
+body{font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;
+  background:var(--paper);color:var(--text);line-height:1.8}
+
+.top{background:var(--dark);color:#fff;padding:13px 22px;display:flex;
+  align-items:center;gap:12px}
+.logo{font-size:17px;font-weight:800;letter-spacing:.07em;
+  display:flex;align-items:center;gap:8px}
+.logo em{font-style:normal;color:var(--acc)}
+.top .sp{flex:1}
+.top a{color:#c8e6a0;text-decoration:none;font-size:13px;padding:7px 14px;
+  border-radius:8px}
+.top a:hover{background:rgba(255,255,255,.1);color:#fff}
+.top a.go{background:var(--acc);color:#04220f;font-weight:700}
+.top a.go:hover{background:#3dfa7d}
+
+.hero{background:linear-gradient(140deg,var(--dark) 0%,var(--dark2) 60%,#3d5f10 100%);
+  color:#fff;padding:70px 24px 66px;text-align:center;position:relative;
+  overflow:hidden}
+.hero::before{content:'🫘';position:absolute;font-size:340px;opacity:.05;
+  right:-40px;top:-40px;transform:rotate(-14deg)}
+.hero h1{font-size:38px;line-height:1.35;margin-bottom:16px;letter-spacing:-.01em}
+.hero h1 em{font-style:normal;color:var(--acc)}
+.hero p{font-size:15.5px;color:#c8e6a0;max-width:620px;margin:0 auto 28px;
+  line-height:2}
+.hero .btns{display:flex;gap:11px;justify-content:center;flex-wrap:wrap}
+.big{background:var(--acc);color:#04220f;border:none;padding:14px 34px;
+  border-radius:12px;font-size:16px;font-weight:800;cursor:pointer;
+  text-decoration:none;display:inline-block;font-family:inherit;transition:.15s}
+.big:hover{background:#3dfa7d;transform:translateY(-2px)}
+.big.gh{background:none;border:2px solid rgba(255,255,255,.3);color:#fff;
+  font-weight:600}
+.big.gh:hover{background:rgba(255,255,255,.1);transform:translateY(-2px)}
+
+.wrap{max-width:980px;margin:0 auto;padding:54px 22px 70px}
+h2{font-size:23px;text-align:center;margin-bottom:10px}
+.sub{font-size:14px;color:var(--muted);text-align:center;margin-bottom:34px}
+
+.feats{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));
+  gap:14px;margin-bottom:60px}
+.feat{background:#fff;border:1px solid var(--line2);border-radius:15px;
+  padding:24px 20px;text-align:center;transition:.16s}
+.feat:hover{border-color:var(--main);transform:translateY(-3px);
+  box-shadow:0 7px 20px rgba(26,46,5,.08)}
+.feat .ic{font-size:36px;line-height:1}
+.feat .t{font-weight:700;font-size:15px;margin-top:10px}
+.feat .d{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.75}
+
+.wish{background:#fff;border:1px solid var(--line2);border-radius:16px;
+  padding:34px 30px;margin-bottom:56px}
+.wish h3{font-size:19px;margin-bottom:20px;text-align:center}
+.wish ol{list-style:none;counter-reset:w}
+.wish li{counter-increment:w;padding:13px 0 13px 50px;position:relative;
+  font-size:14.5px;border-bottom:1px solid var(--line2)}
+.wish li:last-child{border-bottom:none}
+.wish li::before{content:counter(w);position:absolute;left:0;top:13px;
+  width:32px;height:32px;background:var(--main);color:#fff;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-weight:800;
+  font-size:14px}
+
+.steps{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));
+  gap:14px;margin-bottom:56px}
+.step{text-align:center;padding:20px 14px}
+.step .n{width:44px;height:44px;background:var(--line);color:var(--main2);
+  border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:19px;font-weight:800;margin:0 auto 12px}
+.step .t{font-weight:700;font-size:14px}
+.step .d{font-size:12.5px;color:var(--muted);margin-top:5px;line-height:1.7}
+
+.safe{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;
+  padding:24px 26px;margin-bottom:50px}
+.safe h3{font-size:16px;margin-bottom:12px;color:#14532d}
+.safe ul{list-style:none;font-size:13px;color:#166534;line-height:2.1}
+.safe li::before{content:'✓ ';color:var(--main);font-weight:800}
+
+.cta{text-align:center;padding:44px 24px;background:var(--dark);
+  border-radius:16px;color:#fff}
+.cta h3{font-size:22px;margin-bottom:10px}
+.cta p{font-size:14px;color:#c8e6a0;margin-bottom:22px}
+
+footer{background:var(--dark);color:#8fae63;text-align:center;
+  padding:26px 20px;font-size:12px;line-height:2}
+footer a{color:#c8e6a0;text-decoration:none}
+footer a:hover{text-decoration:underline}
+
+@media(max-width:600px){
+  .hero{padding:48px 18px 44px}
+  .hero h1{font-size:27px}
+  .hero p{font-size:14px}
+  .wrap{padding:38px 16px 50px}
+  h2{font-size:19px}
+  .wish{padding:24px 20px}
+}
+</style></head><body>
+
+<div class="top">
+  <span class="logo">🫘 Omame<em>PJ</em></span>
+  <span class="sp"></span>
+  <a href="/oma_pj/rules">きまり</a>
+  <a href="/oma_pj/login" class="go">はじめる</a>
+</div>
+
+<div class="hero">
+  <h1>プログラミングは、<br><em>大人だけの ものじゃない。</em></h1>
+  <p>ちいさな まめが、そだって めを だすように。<br>
+     つくりたい きもちを、かたちに する ばしょです。</p>
+  <div class="btns">
+    <a href="/oma_pj/login" class="big">はじめる</a>
+    <a href="#what" class="big gh">どんな ところ？</a>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <h2 id="what">なにが できるの？</h2>
+  <p class="sub">つくる。見せる。話す。しらべる。ぜんぶ ここで。</p>
+  <div class="feats">
+    <div class="feat"><div class="ic">🧩</div><div class="t">ブロックで つくる</div>
+      <div class="d">ならべる だけで プログラムに なります。はじめての 人へ</div></div>
+    <div class="feat"><div class="ic">⌨️</div><div class="t">コードで つくる</div>
+      <div class="d">Python・HTML・JavaScript・SQL を つかって 自由に</div></div>
+    <div class="feat"><div class="ic">🎨</div><div class="t">おえかき</div>
+      <div class="d">ドット絵も、じゆうに かく えも</div></div>
+    <div class="feat"><div class="ic">💬</div><div class="t">つぶやき</div>
+      <div class="d">できた こと、こまった ことを ひとこと</div></div>
+    <div class="feat"><div class="ic">📖</div><div class="t">みんなの図鑑</div>
+      <div class="d">みんなで ひとつの 図鑑を つくる</div></div>
+    <div class="feat"><div class="ic">❓</div><div class="t">しつもん</div>
+      <div class="d">わからない ことを きく。こたえる</div></div>
+  </div>
+
+  <div class="wish">
+    <h3>この ばしょを つくった わけ</h3>
+    <ol>
+      <li>たくさんの 人に プログラミングに きょうみを もって ほしい</li>
+      <li>小学生でも きょうみを もって ほしい</li>
+      <li>「プログラミングは 大人が するもの」という あたりまえを やぶりたい</li>
+    </ol>
+  </div>
+
+  <h2>はじめかた</h2>
+  <p class="sub">むずかしい ことは ありません。3つの ステップです。</p>
+  <div class="steps">
+    <div class="step"><div class="n">1</div><div class="t">会員に なる</div>
+      <div class="d">ニックネームと パスワードだけ。本名は いりません</div></div>
+    <div class="step"><div class="n">2</div><div class="t">見本から はじめる</div>
+      <div class="d">白紙は こわい。見本を えらんで 書きかえる ところから</div></div>
+    <div class="step"><div class="n">3</div><div class="t">見せてみる</div>
+      <div class="d">できた ものを 公開。じぶんだけの URLも つくれます</div></div>
+  </div>
+
+  <div class="safe">
+    <h3>🛡 あんぜんの ために</h3>
+    <ul>
+      <li>本名・住所・電話番号は 書かない ルールです</li>
+      <li>書いた ものは 自動で しらべて、あぶない ものは 止めます</li>
+      <li>プログラムは ブラウザの 中だけで うごきます</li>
+      <li>こまった ときは 通報できます。運営が 見ています</li>
+      <li>けした ものは あとから もどせます</li>
+    </ul>
+  </div>
+
+  <div class="cta">
+    <h3>さあ、はじめよう</h3>
+    <p>いま <b id="nApps">—</b> この 作品が、<b id="nPeople">—</b> 人の 手で できています。</p>
+    <a href="/oma_pj/login" class="big">会員に なる</a>
+  </div>
+</div>
+
+<footer>
+  🫘 Omame PJ — おまめ育成プロジェクト<br>
+  <a href="/oma_pj/rules">きまり</a> ·
+  <a href="/oma_pj/login">ログイン</a><br>
+  <span style="opacity:.6">Omame Group</span>
+</footer>
+
+<script>
+(async function(){
+  try {
+    var r = await fetch('/api/mp/stats_public');
+    var d = await r.json();
+    if (d && d.ok){
+      document.getElementById('nApps').textContent = d.apps;
+      document.getElementById('nPeople').textContent = d.people;
+    }
+  } catch(e){}
+})();
+</script>
+</body></html>

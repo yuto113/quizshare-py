@@ -1,0 +1,139 @@
+{% extends "oma/_base.html" %}
+{% block title %}とうひょう — Omame PJ{% endblock %}
+
+{% block subnav %}
+<div class="sub">
+  <a href="/oma_pj/poll" {% if view=='list' %}class="on"{% endif %}>とうひょう する</a>
+  <a href="#" onclick="newPoll();return false">＋ つくる</a>
+</div>
+{% endblock %}
+
+{% block style %}
+.pl{background:#fff;border:1px solid var(--line2);border-radius:12px;
+  padding:15px 17px;margin-bottom:10px;cursor:pointer;transition:.14s}
+.pl:hover{border-color:var(--main)}
+.pl .t{font-size:14.5px;font-weight:700;margin-top:4px}
+.pl .m{font-size:11.5px;color:var(--muted);margin-top:6px;display:flex;gap:9px}
+.bar{height:9px;background:var(--line2);border-radius:99px;margin-top:4px;
+  overflow:hidden}
+.bar i{display:block;height:100%;background:var(--main);border-radius:99px}
+.opt{display:flex;align-items:center;gap:10px;padding:9px 0;cursor:pointer;
+  font-size:13.5px}
+{% endblock %}
+
+{% block body %}
+<div id="body"><div class="empty">よみこみ中…</div></div>
+{% endblock %}
+
+{% block script %}
+<script>
+async function loadPolls(){
+  var d = await J('/api/mp/polls');
+  var el = $('body');
+  if (!d.ok){ el.innerHTML = '<div class="empty">' + K(d.error) + '</div>'; return; }
+  el.innerHTML = '<h1>🗳 とうひょう</h1>'
+    + '<p class="lead">みんなで きめる ところです。</p>'
+    + '<div class="rulebox"><b>とうひょうの きまり</b>'
+    + 'ひとり 1回 だけです。あとから 変えられません。'
+    + '人を きずつける しつもんは つくらない。</div>'
+    + '<div class="row"><button class="btn mn" onclick="newPoll()">'
+    + '＋ とうひょうを つくる</button></div>'
+    + (d.polls.length ? d.polls.map(function(p){
+        return '<div class="pl" onclick="showPoll(' + p.id + ')">'
+          + (p.active ? '<span class="tag d1">うけつけ中</span>'
+                      : '<span class="tag draft">おわり</span>')
+          + (p.mine ? '<span class="tag">こたえ ずみ</span>' : '')
+          + '<div class="t">' + K(p.title) + '</div>'
+          + '<div class="m"><span>' + K(p.owner_name || p.owner) + '</span>'
+          + '<span>' + p.answers + '人が こたえた</span></div></div>';
+      }).join('') : '<div class="empty">まだ とうひょうが ありません</div>');
+}
+
+async function showPoll(pid){
+  var d = await J('/api/mp/poll/' + pid);
+  var el = $('body');
+  if (!d.ok){ el.innerHTML = '<div class="empty">' + K(d.error) + '</div>'; return; }
+  var p = d.poll;
+  var h = '<button class="btn gh sm" onclick="loadPolls()">← いちらん</button>'
+    + '<h1 style="margin-top:12px">🗳 ' + K(p.title) + '</h1>'
+    + '<p class="lead">' + K(p.summary || '') + ' · '
+    + d.total + '人が こたえました</p>';
+
+  if (d.answered || !p.active){
+    h += p.qs.map(function(q, i){
+      var t = d.tally[i] || {};
+      var mx = 1;
+      Object.keys(t).forEach(function(k){ if (t[k] > mx) mx = t[k]; });
+      return '<div class="card"><b style="font-size:13.5px">' + K(q.q) + '</b>'
+        + (q.choices || []).map(function(ch){
+            var n = t[ch] || 0;
+            return '<div style="margin-top:9px">'
+              + '<div style="display:flex;justify-content:space-between;'
+              + 'font-size:12.5px"><span>' + K(ch) + '</span><b>' + n + '</b></div>'
+              + '<div class="bar"><i style="width:'
+              + Math.round(n / mx * 100) + '%"></i></div></div>';
+          }).join('') + '</div>';
+    }).join('');
+    if (d.answered) h += '<div class="note">こたえて くれて ありがとう。'
+      + 'こたえは あとから 変えられません。</div>';
+  } else {
+    h += p.qs.map(function(q, i){
+      return '<div class="card"><b style="font-size:13.5px">' + K(q.q) + '</b>'
+        + '<div style="margin-top:8px">'
+        + (q.type === 'text'
+            ? '<input class="inp" data-q="' + i + '" placeholder="こたえ">'
+            : (q.choices || []).map(function(ch){
+                return '<label class="opt"><input type="'
+                  + (q.type === 'many' ? 'checkbox' : 'radio') + '" name="pq' + i
+                  + '" data-q="' + i + '" value="' + K(ch) + '">' + K(ch) + '</label>';
+              }).join(''))
+        + '</div></div>';
+    }).join('')
+    + '<div class="row"><button class="btn mn" onclick="sendPoll(' + pid + ')">'
+    + 'こたえる</button><span style="font-size:11.5px;color:var(--muted)">'
+    + 'ひとり 1回だけ。あとから 変えられません</span>'
+    + '<span id="plMsg" style="font-size:12px"></span></div>';
+  }
+  if (d.is_owner) h += '<div class="row" style="margin-top:12px">'
+    + '<button class="btn gh sm" onclick="closePoll(' + pid + ','
+    + (p.active ? 0 : 1) + ')">'
+    + (p.active ? 'うけつけを とめる' : 'また うけつける') + '</button></div>';
+  el.innerHTML = h;
+}
+
+async function sendPoll(pid){
+  var ans = {};
+  document.querySelectorAll('#body [data-q]').forEach(function(el){
+    var i = el.getAttribute('data-q');
+    if (el.type === 'checkbox'){
+      if (el.checked){ ans[i] = ans[i] || []; ans[i].push(el.value); }
+    } else if (el.type === 'radio'){
+      if (el.checked) ans[i] = el.value;
+    } else if (el.value.trim()) ans[i] = el.value.trim();
+  });
+  var d = await P('/api/mp/poll/' + pid + '/answer', {ans: ans});
+  if (d.ok !== true){
+    $('plMsg').style.color = '#c0453b'; $('plMsg').textContent = d.error; return; }
+  showPoll(pid);
+}
+
+async function newPoll(){
+  var t = prompt('なにを きめますか？\n\n例: つぎの お題は？');
+  if (!t) return;
+  var q = prompt('しつもん\n\n例: どれが いいですか？');
+  if (!q) return;
+  var ch = prompt('えらぶ もの（コンマで くぎる）\n\n例: ゲーム,絵,計算');
+  if (!ch) return;
+  var d = await P('/api/mp/poll', {title:t, qs:[{
+    q:q, type:'one', choices: ch.split(',').map(function(x){ return x.trim(); })}]});
+  if (d.ok !== true){ toast(d.error, 'error'); return; }
+  showPoll(d.id);
+}
+async function closePoll(pid, open){
+  await P('/api/mp/poll/' + pid + '/close', {open: !!open});
+  showPoll(pid);
+}
+
+loadMe().then(function(m){ if (m) loadPolls(); });
+</script>
+{% endblock %}

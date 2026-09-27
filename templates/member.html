@@ -433,6 +433,76 @@ body.furi .lead{font-size:13.5px}
   .dtools{width:100%;max-height:none}
   .dpal{grid-template-columns:repeat(12,1fr)}
 }
+
+/* ---- つぶやき（X風） ---- */
+.tl{max-width:600px;margin:0 auto}
+.tk{background:#fff;border:1px solid var(--line);border-radius:0;
+  padding:13px 15px;display:flex;gap:11px;border-bottom:none}
+.tk:first-of-type{border-radius:12px 12px 0 0}
+.tk:last-of-type{border-radius:0 0 12px 12px;border-bottom:1px solid var(--line)}
+.tk:hover{background:#fafcfd}
+.av{width:42px;height:42px;border-radius:50%;flex:none;display:flex;
+  align-items:center;justify-content:center;font-weight:700;color:#fff;
+  font-size:17px;overflow:hidden;cursor:pointer;user-select:none}
+.av img{width:100%;height:100%;object-fit:cover}
+.av.sm{width:30px;height:30px;font-size:13px}
+.tk-main{flex:1;min-width:0}
+.tk-hd{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px}
+.tk-hd b{cursor:pointer}
+.tk-hd b:hover{text-decoration:underline}
+.tk-hd .id{color:var(--muted);font-size:12px}
+.tk-hd .when{color:var(--muted);font-size:12px;margin-left:auto}
+.tk-body{font-size:14px;line-height:1.7;white-space:pre-wrap;word-break:break-word;
+  margin:4px 0 8px}
+.tk-body a{color:var(--cy2);text-decoration:none}
+.tk-body a:hover{text-decoration:underline}
+.tk-acts{display:flex;gap:4px;max-width:340px}
+.tk-act{flex:1;background:none;border:none;color:var(--muted);font-size:12.5px;
+  cursor:pointer;padding:5px 8px;border-radius:99px;display:flex;
+  align-items:center;gap:5px;font-family:inherit;transition:.12s}
+.tk-act:hover{background:#eef4f6;color:var(--navy)}
+.tk-act.on{color:#e0245e}
+.tk-act.rp.on{color:#16a34a}
+.tk-quote{border:1px solid var(--line);border-radius:11px;padding:10px 12px;
+  margin:6px 0 4px;font-size:13px;cursor:pointer;background:#fafcfd}
+.tk-quote:hover{background:#f0f4f6}
+.tk-quote .qh{display:flex;align-items:center;gap:6px;font-size:12px;
+  margin-bottom:3px}
+.tk-quote .qb{line-height:1.6;white-space:pre-wrap;color:#334155}
+.tk-rp{font-size:11.5px;color:var(--muted);margin-bottom:4px;
+  display:flex;align-items:center;gap:5px}
+.tk-tag{color:var(--cy2);cursor:pointer}
+.tk-tag:hover{text-decoration:underline}
+
+.tk-form{background:#fff;border:1px solid var(--line);border-radius:12px;
+  padding:13px 15px;margin-bottom:14px;display:flex;gap:11px}
+.tk-form textarea{flex:1;border:none;outline:none;font-size:15px;
+  font-family:inherit;resize:none;min-height:54px;line-height:1.65}
+.tk-form .bt{display:flex;align-items:center;gap:10px;margin-top:6px}
+.tk-cnt{font-size:12px;color:var(--muted);margin-left:auto}
+.tk-cnt.over{color:#dc2626;font-weight:700}
+
+.tk-tabs{display:flex;gap:3px;margin-bottom:12px;overflow-x:auto;
+  scrollbar-width:none;padding-bottom:2px}
+.tk-tabs::-webkit-scrollbar{display:none}
+.tk-tabs button{background:#fff;border:1px solid var(--line);border-radius:99px;
+  padding:6px 14px;font-size:12.5px;cursor:pointer;font-family:inherit;
+  white-space:nowrap;color:var(--muted)}
+.tk-tabs button:hover{border-color:var(--cy2)}
+.tk-tabs button.on{background:#0a1628;color:#fff;border-color:#0a1628;font-weight:600}
+.tk-more{width:100%;background:#fff;border:1px solid var(--line);border-radius:12px;
+  padding:12px;font-size:13px;cursor:pointer;margin-top:12px;font-family:inherit;
+  color:var(--cy2)}
+.tk-more:hover{background:#f0fdff}
+
+@media(max-width:600px){
+  .tk{padding:11px 12px;gap:9px}
+  .av{width:38px;height:38px;font-size:15px}
+  .tk-body{font-size:14.5px}
+  .tk-acts{max-width:none}
+  .tk-form{padding:11px 12px}
+  .tl{max-width:none}
+}
 </style></head><body>
 
 <div class="hd">
@@ -3183,108 +3253,238 @@ async function likeDraw(id){
   openDraw(id);
 }
 
-/* ============ 💬 つぶやき ============ */
-var TALK_MODE = 'all';
+/* ============ 💬 つぶやき（X風） ============ */
+var TK_MODE = 'all', TK_GID = null, TK_TAG = null, TK_LAST = null;
 
-async function loadTalk(mode){
-  TALK_MODE = mode || 'all';
-  var q = TALK_MODE === 'group' ? '?group=' + (window.TALK_GID || '')
-        : (TALK_MODE === 'follow' ? '?following=1' : '');
+function avHtml(m, small){
+  var kind = m.avatar_kind || 'letter';
+  var col = m.color || pickColor(m.member_id || m.nickname || 'x');
+  var cls = 'av' + (small ? ' sm' : '');
+  var on = 'onclick="viewAuthor(\'' + K(m.member_id||'') + '\');event.stopPropagation()"';
+  if (kind === 'img' && m.avatar)
+    return '<div class="' + cls + '" ' + on + '><img src="' + K(m.avatar) + '"></div>';
+  if (kind === 'emoji' && m.avatar)
+    return '<div class="' + cls + '" ' + on + ' style="background:' + col
+      + '">' + K(m.avatar) + '</div>';
+  var ch = (m.nickname || m.member_id || '?').charAt(0);
+  return '<div class="' + cls + '" ' + on + ' style="background:' + col + '">'
+    + K(ch) + '</div>';
+}
+
+function pickColor(seed){
+  var C = ['#0891b2','#7c3aed','#db2777','#16a34a','#ea580c','#0284c7',
+           '#9333ea','#c2410c','#059669','#dc2626'];
+  var n = 0;
+  for (var i = 0; i < String(seed).length; i++) n += String(seed).charCodeAt(i);
+  return C[n % C.length];
+}
+
+function ago(s){
+  if (!s) return '';
+  var t = new Date(String(s).replace(' ', 'T'));
+  var d = (Date.now() - t.getTime()) / 1000;
+  if (d < 60) return 'いま';
+  if (d < 3600) return Math.floor(d/60) + '分';
+  if (d < 86400) return Math.floor(d/3600) + '時間';
+  if (d < 604800) return Math.floor(d/86400) + '日';
+  return (t.getMonth()+1) + '月' + t.getDate() + '日';
+}
+
+function linkify(t){
+  var out = K(t);
+  out = out.replace(/[#＃]([0-9A-Za-z_ぁ-んァ-ヶ一-龠ー]{1,20})/g,
+    function(m0, g1){
+      return '<span class="tk-tag" onclick="pickTag(\'' + g1 + '\')">#' + g1 + '</span>';
+    });
+  out = out.replace(/(https?:\/\/[^\s<]+)/g,
+    '<a href="$1" target="_blank" rel="noopener">$1</a>');
+  return out;
+}
+
+async function loadTalk(mode, gid, more){
+  if (!more){ TK_MODE = mode || 'all'; TK_GID = gid || null; TK_LAST = null;
+              if (mode !== 'tag') TK_TAG = null; }
+  var q = '?';
+  if (TK_MODE === 'group' && TK_GID) q += 'group=' + TK_GID;
+  else if (TK_MODE === 'follow') q += 'following=1';
+  else if (TK_MODE === 'tag' && TK_TAG) q += 'tag=' + encodeURIComponent(TK_TAG);
+  if (more && TK_LAST) q += '&before=' + TK_LAST;
+
   var d = await J('/api/mp/posts' + q);
   var el = $('talkBody');
   if (!d.ok){ el.innerHTML = '<div class="empty">' + K(d.error) + '</div>'; return; }
+  if (d.posts.length) TK_LAST = d.posts[d.posts.length - 1].id;
 
-  var gs = '<div class="row" style="margin-bottom:12px">'
-    + '<button class="btn ' + (TALK_MODE==='all'?'':'gh') + ' sm" '
-    + 'onclick="loadTalk(\'all\')">ぜんぶ</button>'
-    + '<button class="btn ' + (TALK_MODE==='follow'?'':'gh') + ' sm" '
+  if (more){
+    var box = $('tkList');
+    if (box) box.insertAdjacentHTML('beforeend', d.posts.map(tkCard).join(''));
+    var b = $('tkMore');
+    if (b) b.style.display = d.more ? '' : 'none';
+    return;
+  }
+
+  var tabs = '<div class="tk-tabs">'
+    + '<button class="' + (TK_MODE==='all'?'on':'') + '" onclick="loadTalk(\'all\')">'
+    + 'ぜんぶ</button>'
+    + '<button class="' + (TK_MODE==='follow'?'on':'') + '" '
     + 'onclick="loadTalk(\'follow\')">フォロー中</button>'
     + (d.groups||[]).map(function(g){
-        return '<button class="btn ' + (window.TALK_GID==g.id?'':'gh') + ' sm" '
-          + 'onclick="window.TALK_GID=' + g.id + ';loadTalk(\'group\')">'
-          + K(g.name) + ' <span style="opacity:.6">' + g.members + '</span></button>';
+        return '<button class="' + (TK_MODE==='group'&&TK_GID==g.id?'on':'') + '" '
+          + 'onclick="loadTalk(\'group\',' + g.id + ')">' + K(g.name)
+          + ' <span style="opacity:.55">' + g.members + '</span></button>';
       }).join('')
-    + '<button class="btn gh sm" onclick="newGroup()">＋ グループ</button></div>';
+    + '<button onclick="newGroup()">＋ グループ</button></div>'
+    + (TK_TAG ? '<div class="row" style="margin-bottom:10px">'
+        + '<b style="font-size:14px">#' + K(TK_TAG) + '</b>'
+        + '<button class="btn gh sm" onclick="loadTalk(\'all\')">やめる</button></div>'
+        : '')
+    + ((d.tags||[]).length && !TK_TAG
+        ? '<div class="row" style="margin-bottom:11px;gap:5px">'
+          + '<span style="font-size:11.5px;color:var(--muted)">よく つかわれて '
+          + 'いる ことば:</span>'
+          + d.tags.map(function(t){
+              return '<span class="tk-tag" style="font-size:12.5px" '
+                + 'onclick="pickTag(\'' + K(t.tag) + '\')">#' + K(t.tag) + '</span>';
+            }).join('') + '</div>'
+        : '');
 
-  var form = '<div class="com-form" style="background:#f0f9ff;border-color:#bae6fd">'
-    + '<textarea id="tkBody" maxlength="300" placeholder="いまの きもちを ひとこと…"'
-    + ' style="border-color:#bae6fd"></textarea>'
-    + '<div class="row" style="margin:8px 0 0">'
-    + '<button class="btn cy" onclick="sendTalk()">つぶやく</button>'
-    + '<span style="font-size:11.5px;color:#0369a1">'
-    + (TALK_MODE==='group' ? 'この グループに 出します' : 'みんなに 見えます') + '</span>'
-    + '<span class="sp" style="flex:1"></span>'
-    + '<span id="tkMsg" style="font-size:12px"></span></div></div>';
+  var form = ME ? '<div class="tk-form">' + avHtml(ME)
+    + '<div style="flex:1;min-width:0">'
+    + '<textarea id="tkBody" maxlength="320" '
+    + 'placeholder="いまの きもちを ひとこと…" oninput="tkCount(this)"></textarea>'
+    + '<div class="bt">'
+    + '<button class="btn cy sm" onclick="sendTalk()">つぶやく</button>'
+    + '<span style="font-size:11.5px;color:var(--muted)">'
+    + (TK_MODE==='group' ? 'この グループに' : 'みんなに 見えます') + '</span>'
+    + '<span class="tk-cnt" id="tkCnt">300</span></div>'
+    + '<div id="tkMsg" style="font-size:12px"></div></div></div>' : '';
 
-  el.innerHTML = gs + form + (d.posts.length
-    ? d.posts.map(postCard).join('')
-    : '<div class="empty">まだ つぶやきが ありません。さいしょに どうぞ。</div>');
+  el.innerHTML = '<div class="tl">' + tabs + form + '<div id="tkList">'
+    + (d.posts.length ? d.posts.map(tkCard).join('')
+       : '<div class="empty">まだ つぶやきが ありません。さいしょに どうぞ。</div>')
+    + '</div>'
+    + '<button class="tk-more" id="tkMore" onclick="loadTalk(null,null,1)" '
+    + 'style="' + (d.more ? '' : 'display:none') + '">もっと 見る</button></div>';
 }
 
-function postCard(p){
-  var mine = ME && ME.member_id === p.member_id;
-  return '<div class="card" id="pst' + p.id + '">'
-    + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
-    + '<b style="font-size:13px;cursor:pointer" onclick="viewAuthor(\''
-    + K(p.member_id) + '\')">' + K(p.nickname || p.member_id) + '</b>'
+function tkCard(p){
+  var rp = p.repost_of && p.r_id;
+  var src = rp ? {member_id:p.r_member, nickname:p.r_nick, avatar:p.r_avatar,
+                  avatar_kind:p.r_avatar_kind, color:p.r_color} : p;
+  var body = (rp && !p.body) ? p.r_body : p.body;
+  var at = (rp && !p.body) ? p.r_at : p.created_at;
+  var showId = (rp && !p.body) ? p.r_id : p.id;
+
+  return '<div class="tk" id="tk' + p.id + '">' + avHtml(src)
+    + '<div class="tk-main">'
+    + (rp ? '<div class="tk-rp">🔁 ' + K(p.nickname||p.member_id)
+        + ' さんが ひろめました</div>' : '')
+    + '<div class="tk-hd"><b onclick="viewAuthor(\'' + K(src.member_id) + '\')">'
+    + K(src.nickname || src.member_id) + '</b>'
+    + '<span class="id">@' + K(src.member_id) + '</span>'
     + (p.group_name ? '<span class="tag">' + K(p.group_name) + '</span>' : '')
-    + '<span style="font-size:11px;color:var(--muted);margin-left:auto">'
-    + K(p.created_at) + '</span></div>'
-    + '<div style="font-size:13.5px;line-height:1.8;white-space:pre-wrap;margin:6px 0">'
-    + K(p.body) + '</div>'
-    + '<div class="row" style="margin:0;gap:6px">'
-    + '<button class="btn gh sm" onclick="likeTalk(' + p.id + ')">'
-    + (p.liked ? '♥' : '♡') + ' ' + (p.likes||0) + '</button>'
-    + '<button class="btn gh sm" onclick="showReplies(' + p.id + ')">💬 '
-    + (p.replies||0) + '</button>'
-    + (mine ? '<button class="btn gh sm" onclick="hideTalk(' + p.id + ')">けす</button>' : '')
-    + '</div><div id="rep' + p.id + '"></div></div>';
+    + '<span class="when">' + ago(at) + '</span></div>'
+    + '<div class="tk-body">' + linkify(body || '') + '</div>'
+    + (p.quote_of && p.q_body
+        ? '<div class="tk-quote" onclick="openThread(' + p.quote_of + ')">'
+          + '<div class="qh">' + avHtml({member_id:p.q_member, nickname:p.q_nick,
+              avatar:p.q_avatar, avatar_kind:p.q_avatar_kind, color:p.q_color}, true)
+          + '<b>' + K(p.q_nick||p.q_member) + '</b>'
+          + '<span style="color:var(--muted)">' + ago(p.q_at) + '</span></div>'
+          + '<div class="qb">' + K(String(p.q_body).slice(0,140)) + '</div></div>'
+        : '')
+    + '<div class="tk-acts">'
+    + '<button class="tk-act" onclick="openThread(' + showId + ')">💬 '
+    + (p.replies||'') + '</button>'
+    + '<button class="tk-act rp' + (p.reposted?' on':'') + '" '
+    + 'onclick="repost(' + showId + ')">🔁 ' + (p.reposts||'') + '</button>'
+    + '<button class="tk-act' + (p.liked?' on':'') + '" '
+    + 'onclick="likeTalk(' + showId + ')">' + (p.liked?'♥':'♡') + ' '
+    + (p.likes||'') + '</button>'
+    + '<button class="tk-act" onclick="quotePost(' + showId + ')">✍️</button>'
+    + (ME && ME.member_id === p.member_id
+        ? '<button class="tk-act" onclick="hideTalk(' + p.id + ')">🗑</button>' : '')
+    + '</div></div></div>';
+}
+
+function tkCount(t){
+  var n = 300 - t.value.length;
+  var el = $('tkCnt');
+  if (el){ el.textContent = n; el.classList.toggle('over', n < 0); }
 }
 
 async function sendTalk(){
   var t = $('tkBody').value.trim();
-  if (!t) return;
+  if (!t || t.length > 300) return;
   var b = {body:t};
-  if (TALK_MODE === 'group' && window.TALK_GID) b.group_id = window.TALK_GID;
+  if (TK_MODE === 'group' && TK_GID) b.group_id = TK_GID;
+  if (window.TK_QUOTE) b.quote_of = window.TK_QUOTE;
   var d = await P('/api/mp/post', b);
-  if (!d.ok){ $('tkMsg').style.color='#c0453b'; $('tkMsg').textContent=d.error; return; }
-  loadTalk(TALK_MODE);
+  if (d.ok !== true){
+    var m = $('tkMsg'); m.style.color='#c0453b'; m.textContent = d.error; return; }
+  window.TK_QUOTE = null;
+  loadTalk(TK_MODE, TK_GID);
 }
-async function likeTalk(id){ await P('/api/mp/post/'+id+'/like'); loadTalk(TALK_MODE); }
+
+async function likeTalk(id){
+  var d = await P('/api/mp/post/' + id + '/like');
+  if (d.ok === true) loadTalk(TK_MODE, TK_GID);
+}
+
+async function repost(id){
+  var d = await P('/api/mp/post', {repost_of:id});
+  if (d.ok !== true){ alert(d.error); return; }
+  loadTalk(TK_MODE, TK_GID);
+}
+
+function quotePost(id){
+  window.TK_QUOTE = id;
+  var t = $('tkBody');
+  if (t){ t.focus(); t.placeholder = 'この つぶやきに ひとこと…'; }
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
 async function hideTalk(id){
   if (!confirm('この つぶやきを けしますか？')) return;
-  await P('/api/mp/post/'+id+'/hide'); loadTalk(TALK_MODE);
+  await P('/api/mp/post/' + id + '/hide');
+  loadTalk(TK_MODE, TK_GID);
 }
-async function showReplies(id){
-  var el = $('rep'+id);
-  if (el.innerHTML){ el.innerHTML = ''; return; }
-  var d = await J('/api/mp/post/'+id+'/replies');
-  el.innerHTML = '<div style="border-left:2px solid #e2e8f0;padding-left:11px;'
-    + 'margin-top:9px">'
-    + (d.replies||[]).map(function(r){
-        return '<div style="margin-bottom:7px"><b style="font-size:12px">'
-          + K(r.nickname||r.member_id) + '</b>'
-          + '<span style="font-size:11px;color:var(--muted);margin-left:6px">'
-          + K(r.created_at) + '</span>'
-          + '<div style="font-size:12.5px;white-space:pre-wrap">'+K(r.body)+'</div></div>';
-      }).join('')
-    + '<div class="row" style="margin:6px 0 0">'
-    + '<input class="inp" id="rp'+id+'" placeholder="かえす…" style="flex:1">'
-    + '<button class="btn cy sm" onclick="sendReply('+id+')">おくる</button></div></div>';
+
+function pickTag(t){ TK_TAG = t; loadTalk('tag'); }
+
+async function openThread(id){
+  var d = await J('/api/mp/post/' + id);
+  if (d.ok !== true){ alert(d.error); return; }
+  var p = d.post;
+  $('talkBody').innerHTML = '<div class="tl">'
+    + '<button class="btn gh sm" onclick="loadTalk(TK_MODE,TK_GID)" '
+    + 'style="margin-bottom:12px">← もどる</button>'
+    + tkCard(p)
+    + (ME ? '<div class="tk-form" style="margin-top:12px">' + avHtml(ME)
+        + '<div style="flex:1;min-width:0">'
+        + '<textarea id="tkRep" maxlength="320" placeholder="かえす…"></textarea>'
+        + '<div class="bt"><button class="btn cy sm" onclick="sendReply(' + id + ')">'
+        + 'かえす</button></div></div></div>' : '')
+    + '<div style="margin-top:12px">'
+    + (d.replies.length ? d.replies.map(tkCard).join('')
+       : '<div class="empty">まだ かえしが ありません</div>')
+    + '</div></div>';
 }
+
 async function sendReply(id){
-  var t = $('rp'+id).value.trim();
+  var t = $('tkRep').value.trim();
   if (!t) return;
   var d = await P('/api/mp/post', {body:t, reply_to:id});
-  if (!d.ok){ alert(d.error); return; }
-  $('rep'+id).innerHTML = ''; showReplies(id);
+  if (d.ok !== true){ alert(d.error); return; }
+  openThread(id);
 }
+
 async function newGroup(){
   var n = prompt('グループの 名前');
   if (!n) return;
   var d = await P('/api/mp/group', {name:n});
-  if (!d.ok){ alert(d.error); return; }
-  window.TALK_GID = d.id; loadTalk('group');
+  if (d.ok !== true){ alert(d.error); return; }
+  loadTalk('group', d.id);
 }
 
 /* ============ 大きく うごかす ============ */

@@ -1,0 +1,92 @@
+{% extends "oma/_base.html" %}
+{% block title %}つぶやき — Omame PJ{% endblock %}
+
+{% block subnav %}
+<div class="sub">
+  <a href="#" onclick="loadTalk('all');return false" id="sb_all" class="on">ぜんぶ</a>
+  <a href="#" onclick="loadTalk('follow');return false" id="sb_fo">フォロー中</a>
+  <a href="#" onclick="goMine();return false">じぶんの</a>
+  <a href="#" onclick="newGroup();return false">＋ グループ</a>
+</div>
+{% endblock %}
+
+{% block style %}
+.tl{max-width:600px;margin:0 auto}
+.tk{background:#fff;border:1px solid var(--line2);padding:13px 15px;
+  display:flex;gap:11px;border-bottom:none}
+.tk:first-of-type{border-radius:12px 12px 0 0}
+.tk:last-of-type{border-radius:0 0 12px 12px;border-bottom:1px solid var(--line2)}
+.tk:hover{background:#fdfef8}
+.tk-main{flex:1;min-width:0}
+.tk-hd{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px}
+.tk-hd b{cursor:pointer}
+.tk-hd b:hover{text-decoration:underline}
+.tk-hd .id{color:var(--muted);font-size:12px}
+.tk-hd .when{color:var(--muted);font-size:12px;margin-left:auto}
+.tk-body{font-size:14px;line-height:1.7;white-space:pre-wrap;word-break:break-word;
+  margin:4px 0 8px}
+.tk-body a{color:var(--main2);text-decoration:none}
+.tk-acts{display:flex;gap:4px;max-width:340px}
+.tk-act{flex:1;background:none;border:none;color:var(--muted);font-size:12.5px;
+  cursor:pointer;padding:5px 8px;border-radius:99px;display:flex;
+  align-items:center;gap:5px;font-family:inherit;transition:.12s}
+.tk-act:hover{background:var(--paper);color:var(--text)}
+.tk-act.on{color:#e0245e}
+.tk-act.rp.on{color:var(--main)}
+.tk-quote{border:1px solid var(--line2);border-radius:11px;padding:10px 12px;
+  margin:6px 0 4px;font-size:13px;cursor:pointer;background:var(--paper)}
+.tk-quote:hover{background:var(--line)}
+.tk-quote .qh{display:flex;align-items:center;gap:6px;font-size:12px;
+  margin-bottom:3px}
+.tk-rp{font-size:11.5px;color:var(--muted);margin-bottom:4px}
+.tk-tag{color:var(--main2);cursor:pointer}
+.tk-tag:hover{text-decoration:underline}
+.tk-form{background:#fff;border:1px solid var(--line2);border-radius:12px;
+  padding:13px 15px;margin-bottom:14px;display:flex;gap:11px}
+.tk-form textarea{flex:1;border:none;outline:none;font-size:15px;
+  font-family:inherit;resize:none;min-height:54px;line-height:1.65}
+.tk-form .bt{display:flex;align-items:center;gap:10px;margin-top:6px}
+.tk-cnt{font-size:12px;color:var(--muted);margin-left:auto}
+.tk-cnt.over{color:#dc2626;font-weight:700}
+.tk-tabs{display:flex;gap:3px;margin-bottom:12px;overflow-x:auto;
+  scrollbar-width:none;padding-bottom:2px}
+.tk-tabs::-webkit-scrollbar{display:none}
+.tk-tabs button{background:#fff;border:1px solid var(--line2);border-radius:99px;
+  padding:6px 14px;font-size:12.5px;cursor:pointer;font-family:inherit;
+  white-space:nowrap;color:var(--muted)}
+.tk-tabs button:hover{border-color:var(--main)}
+.tk-tabs button.on{background:var(--dark);color:#fff;border-color:var(--dark);
+  font-weight:600}
+.tk-more{width:100%;background:#fff;border:1px solid var(--line2);
+  border-radius:12px;padding:12px;font-size:13px;cursor:pointer;margin-top:12px;
+  font-family:inherit;color:var(--main2)}
+.tk-more:hover{background:var(--paper)}
+@media(max-width:600px){
+  .tk{padding:11px 12px;gap:9px} .tk-acts{max-width:none} .tl{max-width:none}
+}
+{% endblock %}
+
+{% block body %}
+<div class="rulebox"><b>つぶやきの きまり</b>
+  本名・住所・学校の くわしい ばしょは 書かないで ください。
+  人が いやがる ことは 書かない。けんかに なりそうな ときは 手を とめる。</div>
+<div id="talkBody"><div class="empty">よみこみ中…</div></div>
+{% endblock %}
+
+{% block script %}
+<script src="/static/oma_talk.js"></script>
+<script>
+var OWNER_ID = {{ (owner_id or none) | tojson }};
+var VIEW = {{ view | tojson }};
+
+function goMine(){
+  if (ME) location.href = '/oma_pj/talk/me/every_watch';
+}
+
+loadMe().then(function(m){
+  if (!m) return;
+  if (VIEW === 'every_watch') loadTalk('who', OWNER_ID);
+  else loadTalk('all');
+});
+</script>
+{% endblock %}

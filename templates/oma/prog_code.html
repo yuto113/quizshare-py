@@ -1,0 +1,748 @@
+{% extends "oma/_base.html" %}
+{% block title %}コードで つくる — Omame PJ{% endblock %}
+
+{% block subnav %}
+<div class="sub">
+  <a href="/oma_pj/prog_code" {% if view=='list' %}class="on"{% endif %}>みんなの</a>
+  <a href="#" onclick="goMine();return false">じぶんの</a>
+  <a href="#" onclick="goMake();return false">＋ つくる</a>
+  <a href="/oma_pj/prog_code/search" {% if view=='search' %}class="on"{% endif %}>さがす</a>
+</div>
+{% endblock %}
+
+{% block style %}
+.app{background:#fff;border:1px solid var(--line2);border-radius:12px;
+  padding:15px 17px;cursor:pointer;transition:.14s}
+.app:hover{border-color:var(--main);transform:translateY(-2px);
+  box-shadow:0 5px 15px rgba(26,46,5,.07)}
+.app .t{font-size:14.5px;font-weight:700;margin-bottom:3px}
+.app .s{font-size:12.5px;color:var(--muted);line-height:1.7;min-height:2.6em}
+.app .m{display:flex;gap:9px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);
+  margin-top:9px;align-items:center}
+.app .m b{cursor:pointer;text-decoration:underline;font-weight:400}
+
+.ide{display:flex;gap:12px;align-items:flex-start;margin-top:12px}
+.side{width:186px;flex:none;background:#fff;border:1px solid var(--line2);
+  border-radius:11px;padding:11px;max-height:520px;overflow-y:auto}
+.side-hd{display:flex;align-items:center;justify-content:space-between;
+  font-size:10.5px;color:var(--muted);font-weight:700;margin-bottom:6px}
+.side-note{font-size:11px;color:var(--muted);padding:3px 5px}
+.fitem{padding:6px 9px;border-radius:7px;font-size:12px;cursor:pointer;
+  font-family:ui-monospace,Menlo,Consolas,monospace;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:5px}
+.fitem:hover{background:var(--paper)}
+.fitem.on{background:var(--line);color:var(--main2);font-weight:600}
+.fitem .ent{font-size:9px;background:var(--main);color:#fff;padding:0 5px;
+  border-radius:99px;margin-left:auto}
+
+.edit{flex:1;min-width:0;display:flex;flex-direction:column}
+.ed-hd{display:flex;align-items:center;gap:7px;background:var(--dark);
+  color:#d9f99d;padding:7px 12px;border-radius:10px 10px 0 0;font-size:12px;
+  font-family:ui-monospace,Menlo,Consolas,monospace}
+.ed-hd .sp{flex:1}
+.ed-hd .btn{padding:3px 10px;font-size:11px;background:none;
+  border:1px solid #3f6212;color:#d9f99d}
+.ed-hd .btn:hover{background:#2d4a0a}
+.code2{width:100%;min-height:380px;padding:12px;border:1px solid var(--line2);
+  border-top:none;border-radius:0 0 10px 10px;
+  font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;
+  line-height:1.6;resize:vertical;background:#fff}
+.code2:focus{outline:none}
+#preview{width:100%;height:340px;border:1px solid var(--line2);
+  border-radius:0 0 10px 10px;background:#fff;display:none}
+#prevBar{display:none;align-items:center;gap:7px;margin-top:11px;
+  padding:6px 11px;background:var(--dark);color:#d9f99d;
+  border-radius:10px 10px 0 0;font-size:12px}
+#prevBar .btn{padding:3px 10px;font-size:11px;background:none;
+  border:1px solid #3f6212;color:#d9f99d}
+
+.owner-hd{background:linear-gradient(135deg,var(--dark),var(--dark2));
+  color:#fff;border-radius:14px;padding:22px 24px;margin-bottom:20px;
+  display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.owner-hd .nm{font-size:20px;font-weight:700}
+.owner-hd .sub2{font-size:12.5px;color:#c8e6a0;margin-top:3px}
+.owner-hd .st{display:flex;gap:22px;margin-left:auto;flex-wrap:wrap}
+.owner-hd .st div{text-align:center}
+.owner-hd .st b{display:block;font-size:21px;color:var(--acc)}
+.owner-hd .st span{font-size:11px;color:#9ab873}
+
+@media(max-width:700px){ .ide{flex-direction:column} .side{width:100%} }
+{% endblock %}
+
+{% block body %}
+<div id="body"><div class="empty">よみこみ中…</div></div>
+{% endblock %}
+
+{% block script %}
+<script>
+var VIEW = {{ view | tojson }};
+var OWNER_ID = {{ (owner_id or none) | tojson }};
+var COL_ID = {{ (col_id or none) | tojson }};
+var IS_MINE = {{ 'true' if is_mine else 'false' }};
+
+var APP = {id:null, col_id:null};
+var FILES = [], CUR = 0, DB = {name:'app.db', schema:'', seed:''};
+var PYO = null, SQLJS = null;
+
+function goMine(){
+  if (ME) location.href = '/oma_pj/prog_code/me/every_watch';
+}
+
+/* ============ 一覧 ============ */
+async function showList(who, q){
+  var u = '/api/mp/proj/prog_code/list?';
+  if (who) u += 'who=' + who;
+  if (q) u += '&q=' + encodeURIComponent(q);
+  var d = await J(u);
+  var el = $('body');
+  if (!d.ok){ el.innerHTML = '<div class="empty">' + K(d.error) + '</div>'; return; }
+
+  var head = '';
+  if (d.owner){
+    var o = d.owner;
+    head = '<div class="owner-hd">' + avHtml(o)
+      + '<div><div class="nm">' + K(o.nickname) + '</div>'
+      + '<div class="sub2">' + (o.grade ? K(o.grade) + ' · ' : '')
+      + 'はじめて ' + o.days + '日目</div></div>'
+      + '<div class="st"><div><b>' + d.items.length + '</b><span>作品</span></div>'
+      + '</div></div>'
+      + (IS_MINE ? '<div class="row"><button class="btn mn" '
+          + 'onclick="goMake()">＋ あたらしく つくる</button></div>' : '');
+  } else {
+    head = '<h1>⌨️ コードで つくる</h1>'
+      + '<p class="lead">Python・HTML・CSS・JavaScript・SQL が つかえます。'
+      + 'ぜんぶ ブラウザの 中で うごきます。</p>'
+      + '<div class="rulebox"><b>見るときの きまり</b>'
+      + 'いいと おもったら ♡ を おして あげて ください。'
+      + 'まねしたい ときは「コピーして つくる」を つかうと、'
+      + 'つくった人の 名前が のこります。</div>'
+      + '<div class="row"><input class="inp" id="q" placeholder="さがす" '
+      + 'style="flex:1;min-width:150px" value="' + K(q || '')
+      + '" onkeydown="if(event.key===\'Enter\')doSearch()">'
+      + '<button class="btn gh" onclick="doSearch()">さがす</button>'
+      + '<button class="btn mn" onclick="goMake()">＋ つくる</button></div>';
+  }
+
+  el.innerHTML = head + '<div class="grid">'
+    + (d.items.length ? d.items.map(card).join('')
+       : '<div class="empty">まだ ありません</div>') + '</div>';
+}
+
+function card(a){
+  var D = ['', 'かんたん', 'ふつう', 'むずかしい'][a.difficulty || 1];
+  return '<div class="app" onclick="goCol(\'' + K(a.owner_id) + '\',\''
+    + K(a.col_id || a.id) + '\',\'prog_code\')">'
+    + '<div class="t">' + K(a.title) + '</div>'
+    + '<div class="s">' + K(a.summary || '') + '</div>'
+    + '<div class="m">'
+    + '<b onclick="goOwner(\'' + K(a.owner_id) + '\',\'prog_code\');'
+    + 'event.stopPropagation()">' + K(a.nickname || '') + '</b>'
+    + '<span class="tag d' + (a.difficulty || 1) + '">' + D + '</span>'
+    + '<span>♡' + (a.likes || 0) + '</span>'
+    + '<span>👁' + (a.views || 0) + '</span>'
+    + (a.status !== 'published' ? '<span class="tag draft">下書き</span>' : '')
+    + '</div></div>';
+}
+
+function doSearch(){
+  var q = $('q').value.trim();
+  location.href = '/oma_pj/prog_code/search?q=' + encodeURIComponent(q);
+}
+
+/* ============ 見る ============ */
+async function showWatch(){
+  var d = await J('/api/mp/col/prog_code/' + OWNER_ID + '/' + COL_ID);
+  var el = $('body');
+  if (!d.ok){ el.innerHTML = '<div class="empty">' + K(d.error) + '</div>'; return; }
+  var a = d.item;
+  window.VIEW_FILES = d.files || [];
+  window.VIEW_DB = d.db || null;
+
+  el.innerHTML =
+      '<button class="btn gh sm" onclick="history.back()">← もどる</button>'
+    + '<h1 style="margin-top:12px">' + K(a.title) + '</h1>'
+    + '<p class="lead"><b style="cursor:pointer" onclick="goOwner(\''
+    + K(OWNER_ID) + '\',\'prog_code\')">' + K(a.nickname) + '</b>'
+    + ' · ♡' + a.likes + ' · 👁' + a.views + '</p>'
+    + (a.summary ? '<div class="card">' + K(a.summary) + '</div>' : '')
+    + '<div class="row">'
+    + '<button class="btn mn" onclick="runView()">▶ うごかす</button>'
+    + '<button class="btn gh" onclick="likeCol()">♡ いいね</button>'
+    + '<button class="btn gh" onclick="forkCol()">コピーして つくる</button>'
+    + (IS_MINE ? '<button class="btn gh" onclick="location.href=\''
+        + '/oma_pj/prog_code/' + OWNER_ID + '/make/' + COL_ID
+        + '\'">✏️ なおす</button>' : '')
+    + '<button class="btn gh sm" onclick="copyLink()">🔗 リンク</button></div>'
+    + '<div id="prevBar"><span>けっか</span><span style="flex:1"></span>'
+    + '<button class="btn" onclick="bigRun()">⛶ 大きく</button></div>'
+    + '<iframe id="preview" sandbox="allow-scripts allow-modals"></iframe>'
+    + '<div class="out" id="out">「うごかす」を おして ください</div>'
+    + '<h2>ファイル</h2>'
+    + (d.files || []).map(function(f){
+        return '<div class="card"><b style="font-family:ui-monospace,monospace;'
+          + 'font-size:12px;color:var(--muted)">' + K(f.path)
+          + (f.is_entry ? ' <span class="tag">最初に うごく</span>' : '')
+          + '</b><pre style="font-family:ui-monospace,monospace;font-size:12.5px;'
+          + 'white-space:pre-wrap;margin-top:7px;overflow-x:auto">'
+          + K(f.content) + '</pre></div>';
+      }).join('');
+}
+
+function runView(){
+  runFiles(window.VIEW_FILES, window.VIEW_DB, $('out'), $('preview'));
+}
+async function likeCol(){
+  var d = await P('/api/mp/col/prog_code/' + COL_ID + '/like');
+  if (d.ok === true) showWatch();
+}
+async function forkCol(){
+  var d = await P('/api/mp/col/prog_code/' + COL_ID + '/fork');
+  if (d.ok !== true){ toast(d.error, 'error'); return; }
+  location.href = '/oma_pj/prog_code/me/make/' + d.col_id;
+}
+function copyLink(){
+  var u = location.origin + '/oma_pj/prog_code/' + OWNER_ID + '/watch/' + COL_ID;
+  if (navigator.clipboard) navigator.clipboard.writeText(u)
+    .then(function(){ toast('コピー しました'); });
+  else prompt('リンク', u);
+}
+
+/* ============ つくる ============ */
+async function showMake(){
+  $('body').innerHTML =
+      '<div class="row">'
+    + '<input class="inp" id="eTitle" placeholder="だいめい" '
+    + 'style="flex:1;min-width:160px">'
+    + '<select class="sel" id="eDiff" style="max-width:130px">'
+    + '<option value="1">かんたん</option><option value="2">ふつう</option>'
+    + '<option value="3">むずかしい</option></select></div>'
+    + '<div class="row"><input class="inp" id="eSummary" '
+    + 'placeholder="どんな ものか ひとこと" style="flex:1;min-width:180px">'
+    + '<input class="inp" id="eTags" placeholder="タグ（コンマ）" '
+    + 'style="max-width:180px"></div>'
+    + '<div class="ide">'
+    + '<div class="side"><div class="side-hd"><span>ファイル</span>'
+    + '<button class="btn gh sm" onclick="addFile()">＋</button></div>'
+    + '<div id="tree"></div></div>'
+    + '<div class="edit">'
+    + '<div class="ed-hd"><span id="edPath">main.py</span>'
+    + '<span class="sp"></span>'
+    + '<button class="btn" id="btnEntry" onclick="setEntry()">▶ 最初に</button>'
+    + '<button class="btn" onclick="renameFile()">名前</button>'
+    + '<button class="btn" onclick="removeFile()">けす</button></div>'
+    + '<textarea class="code2" id="eCode" spellcheck="false"></textarea>'
+    + '</div></div>'
+    + '<div class="row" style="margin-top:11px">'
+    + '<button class="btn mn" onclick="runCode()">▶ うごかす</button>'
+    + '<button class="btn" onclick="saveApp(0)">下書きで ほぞん</button>'
+    + '<button class="btn" onclick="saveApp(1)">公開する</button>'
+    + '<span id="eMsg" style="font-size:12.5px"></span></div>'
+    + '<div id="prevBar"><span>けっか</span><span style="flex:1"></span>'
+    + '<button class="btn" onclick="bigRun()">⛶ 大きく</button></div>'
+    + '<iframe id="preview" sandbox="allow-scripts allow-modals"></iframe>'
+    + '<div class="out" id="out">ここに けっかが 出ます</div>';
+
+  if (COL_ID){
+    var d = await J('/api/mp/col/prog_code/' + OWNER_ID + '/' + COL_ID);
+    if (d.ok){
+      APP = {id: d.item.id, col_id: COL_ID};
+      FILES = d.files || [];
+      DB = d.db || {name:'app.db', schema:'', seed:''};
+      $('eTitle').value = d.item.title || '';
+      $('eSummary').value = d.item.summary || '';
+      $('eTags').value = d.item.tags || '';
+      $('eDiff').value = String(d.item.difficulty || 1);
+    }
+  }
+  if (!FILES.length)
+    FILES = [{path:'main.py', content:'print("こんにちは")\n',
+              kind:'py', is_entry:1}];
+  CUR = 0;
+  pick(0, true);
+}
+
+function kindOf(p){
+  var e = p.split('.').pop().toLowerCase();
+  return {py:'py', html:'html', htm:'html', css:'css', js:'js',
+          sql:'sql'}[e] || 'txt';
+}
+function icon(p){
+  return {py:'🐍', html:'📄', css:'🎨', js:'⚡', sql:'🗄'}[kindOf(p)] || '📃';
+}
+
+function tree(){
+  $('tree').innerHTML = FILES.map(function(f, i){
+    return '<div class="fitem' + (i === CUR ? ' on' : '') + '" '
+      + 'onclick="pick(' + i + ')">' + icon(f.path) + ' ' + K(f.path)
+      + (f.is_entry ? '<span class="ent">最初</span>' : '') + '</div>';
+  }).join('');
+}
+
+function pick(i, keep){
+  if (!keep && FILES[CUR]) FILES[CUR].content = $('eCode').value;
+  CUR = i;
+  $('eCode').value = FILES[i].content || '';
+  $('edPath').textContent = FILES[i].path;
+  tree();
+  var b = $('btnEntry'), f = FILES[i];
+  if (b){
+    var can = (f.kind === 'py' || f.kind === 'html');
+    b.style.display = can ? '' : 'none';
+    b.textContent = f.is_entry ? '▶ 最初に うごく' : '▶ 最初に する';
+  }
+}
+
+function addFile(){
+  var p = prompt('ファイルの 名前\n\n例: utils.py / index.html / lib/calc.py');
+  if (!p) return;
+  p = p.trim();
+  if (p.indexOf('.') < 0) p += '.txt';
+  if (!/^[A-Za-z0-9_\-.\/]{1,60}$/.test(p) || p.indexOf('..') >= 0){
+    toast('つかえない 名前です', 'error'); return; }
+  if (FILES.some(function(x){ return x.path === p; })){
+    toast('おなじ 名前が あります', 'error'); return; }
+  if (FILES[CUR]) FILES[CUR].content = $('eCode').value;
+  FILES.push({path:p, content:'', kind:kindOf(p), is_entry:0});
+  pick(FILES.length - 1);
+}
+
+function renameFile(){
+  var p = prompt('あたらしい 名前', FILES[CUR].path);
+  if (!p) return;
+  FILES[CUR].path = p.trim();
+  FILES[CUR].kind = kindOf(p);
+  $('edPath').textContent = p;
+  tree();
+}
+
+function removeFile(){
+  if (FILES.length <= 1){ toast('さいごの 1つは けせません', 'error'); return; }
+  if (!confirm(FILES[CUR].path + ' を けしますか？')) return;
+  FILES.splice(CUR, 1);
+  CUR = 0; pick(0, true);
+}
+
+function setEntry(){
+  var f = FILES[CUR];
+  FILES.forEach(function(x){ if (x.kind === f.kind) x.is_entry = 0; });
+  f.is_entry = 1;
+  tree(); pick(CUR, true);
+}
+
+async function saveApp(pub){
+  if (FILES[CUR]) FILES[CUR].content = $('eCode').value;
+  var m = $('eMsg');
+  var t = $('eTitle').value.trim();
+  if (!t){ m.style.color = '#c0453b'; m.textContent = 'だいめいを 入れて ください';
+    return; }
+  var d = await P('/api/mp/col/prog_code/save', {
+    col_id: APP.col_id, title: t, summary: $('eSummary').value,
+    tags: $('eTags').value, difficulty: $('eDiff').value,
+    publish: !!pub, files: FILES, db: DB});
+  if (d.ok !== true){ m.style.color = '#c0453b'; m.textContent = d.error; return; }
+  APP.col_id = d.col_id;
+  m.style.color = 'var(--main2)';
+  m.textContent = pub ? '公開 しました' : 'ほぞん しました';
+  if (!COL_ID)
+    history.replaceState({}, '',
+      '/oma_pj/prog_code/me/make/' + d.col_id);
+}
+
+async function runCode(){
+  if (FILES[CUR]) FILES[CUR].content = $('eCode').value;
+  await runFiles(FILES, DB, $('out'), $('preview'));
+}
+
+
+/* ============ Python から 画面を さわる ============ */
+{% raw %}
+var GAMEN_PY = [
+'"""がめん ─ Flask みたいに HTML と Python を つなぐ。',
+'',
+'つかいかた（main.py）:',
+'    import gamen',
+'',
+'    @gamen.route("/")',
+'    def home():',
+'        return gamen.hyouji("index.html", namae="ゆうと", ten=100)',
+'',
+'    @gamen.route("/next")',
+'    def next_page():',
+'        return gamen.hyouji("page2.html")',
+'',
+'    gamen.run()',
+'',
+'index.html には こう 書く:',
+'    <h1>こんにちは、{{ namae }}</h1>',
+'    <p>てんすう: {{ ten }}</p>',
+'    <a href="/next">つぎへ</a>',
+'"""',
+'import js as _js',
+'import json as _json',
+'',
+'_routes = {}',
+'_now = "/"',
+'',
+'',
+'def route(path):',
+'    """@gamen.route("/") で ページを つくる"""',
+'    def deco(fn):',
+'        _routes[path] = fn',
+'        return fn',
+'    return deco',
+'',
+'',
+'def hyouji(html_file, **atai):',
+'    """HTML を よんで、{{ }} の ところに あたいを 入れる"""',
+'    try:',
+'        with open(html_file, encoding="utf-8") as f:',
+'            t = f.read()',
+'    except FileNotFoundError:',
+'        return "<p style=color:red>" + html_file + " が ありません</p>"',
+'    return _umeru(t, atai)',
+'',
+'',
+'def _umeru(t, atai):',
+'    """{{ なまえ }} を あたいに かえる。',
+'       {% for x in list %} … {% endfor %} も つかえる。',
+'       {% if jouken %} … {% endif %} も。"""',
+'    import re as _re',
+'',
+'    # くりかえし',
+'    def _for(m):',
+'        var, lst, body = m.group(1), m.group(2), m.group(3)',
+'        items = atai.get(lst, [])',
+'        out = []',
+'        for it in items:',
+'            sub = dict(atai)',
+'            sub[var] = it',
+'            out.append(_umeru(body, sub))',
+'        return "".join(out)',
+'    t = _re.sub(r"\{%\s*for\s+(\w+)\s+in\s+(\w+)\s*%\}(.*?)\{%\s*endfor\s*%\}",',
+'                _for, t, flags=_re.S)',
+'',
+'    # もし',
+'    def _if(m):',
+'        key, body = m.group(1), m.group(2)',
+'        return body if atai.get(key) else ""',
+'    t = _re.sub(r"\{%\s*if\s+(\w+)\s*%\}(.*?)\{%\s*endif\s*%\}",',
+'                _if, t, flags=_re.S)',
+'',
+'    # あたいを 入れる',
+'    def _var(m):',
+'        k = m.group(1).strip()',
+'        # もの.なまえ の かたちにも 対応',
+'        if "." in k:',
+'            a, b = k.split(".", 1)',
+'            o = atai.get(a)',
+'            if isinstance(o, dict):',
+'                return str(o.get(b, ""))',
+'            return str(getattr(o, b, ""))',
+'        v = atai.get(k, "")',
+'        return str(v)',
+'    t = _re.sub(r"\{\{\s*([\w.]+)\s*\}\}", _var, t)',
+'    return t',
+'',
+'',
+'def request_arg(name, default=""):',
+'    """入力らんや リンクの ?name=… を よむ"""',
+'    v = _js.gamenArg(str(name))',
+'    return v if v else default',
+'',
+'',
+'def modoru(path="/"):',
+'    """べつの ページへ うつる"""',
+'    ikou(path)',
+'',
+'',
+'def ikou(path):',
+'    global _now',
+'    _now = path',
+'    fn = _routes.get(path)',
+'    if not fn:',
+'        _js.gamenShow("<p style=color:red>" + path + " は ありません</p>")',
+'        return',
+'    html = fn()',
+'    _js.gamenShow(html if html else "")',
+'',
+'',
+'def run(start="/"):',
+'    """さいしょの ページを 出す"""',
+'    _js.gamenReady()',
+'    ikou(start)',
+'',
+'',
+'# ---- かんたんな 書き出しも のこして おく ----',
+'def kaku(*args):',
+'    t = " ".join(str(a) for a in args)',
+'    _js.gamenAppend("<div>" + t + "</div>")',
+'',
+'',
+'def yomu(name):',
+'    return _js.gamenRead(str(name))',
+''].join(String.fromCharCode(10));
+{% endraw %}
+
+/* Python から よばれる 入り口 */
+function setupGamen(frameEl, files){
+  if (!frameEl) return;
+  window.GAMEN_ARGS = {};
+
+  var css = (files || []).filter(function(f){ return f.kind === 'css'; })
+    .map(function(f){ return f.content; }).join('\n');
+  var js = (files || []).filter(function(f){ return f.kind === 'js'; })
+    .map(function(f){ return f.content; }).join('\n');
+
+  window.gamenReady = function(){
+    frameEl.srcdoc = '<!DOCTYPE html><html><head><meta charset="utf-8">'
+      + '<style>body{font-family:"Hiragino Sans","Noto Sans JP",sans-serif;'
+      + 'padding:16px;line-height:1.85;font-size:14px;margin:0;color:#1a2e05}'
+      + 'button,input[type=submit]{font-size:14px;padding:8px 18px;'
+      + 'margin:4px 6px 4px 0;border:none;border-radius:8px;background:#65a30d;'
+      + 'color:#fff;cursor:pointer;font-family:inherit}'
+      + 'button:hover{background:#4d7c0f}'
+      + 'input,select,textarea{font-size:14px;padding:7px 11px;'
+      + 'border:1px solid #d9f99d;border-radius:7px;margin:4px 6px 4px 0;'
+      + 'font-family:inherit}'
+      + 'a{color:#4d7c0f}'
+      + 'table{border-collapse:collapse;margin:8px 0}'
+      + 'th,td{border:1px solid #d9f99d;padding:6px 12px;text-align:left}'
+      + 'th{background:#f7fee7}'
+      + 'h1{font-size:21px;margin:10px 0}h2{font-size:17px;margin:9px 0}'
+      + '</style>' + (css ? '<style>' + css + '</style>' : '')
+      + '</head><body><div id="g"></div>'
+      + '<scr' + 'ipt>' + (js || '') + '</scr' + 'ipt>'
+      + '<scr' + 'ipt>'
+      // リンクを おしたら 親に しらせる（ページを うつる）
+      + 'document.addEventListener("click", function(e){'
+      + '  var a = e.target.closest("a");'
+      + '  if (a && a.getAttribute("href")){'
+      + '    var h = a.getAttribute("href");'
+      + '    if (h.charAt(0) === "/" || h.charAt(0) === "?"){'
+      + '      e.preventDefault();'
+      + '      var vals = {};'
+      + '      document.querySelectorAll("input,select,textarea")'
+      + '        .forEach(function(x){ if (x.name||x.id) vals[x.name||x.id]=x.value; });'
+      + '      parent.postMessage({omaGo:h, vals:vals}, "*");'
+      + '    }'
+      + '  }'
+      + '  var b = e.target.closest("[data-go]");'
+      + '  if (b){'
+      + '    var vals2 = {};'
+      + '    document.querySelectorAll("input,select,textarea")'
+      + '      .forEach(function(x){ if (x.name||x.id) vals2[x.name||x.id]=x.value; });'
+      + '    parent.postMessage({omaGo:b.getAttribute("data-go"), vals:vals2}, "*");'
+      + '  }'
+      + '}); </scr' + 'ipt></body></html>';
+    frameEl.style.display = 'block';
+    if ($('prevBar')) $('prevBar').style.display = 'flex';
+  };
+
+  window.gamenShow = function(html){
+    var doc = frameEl.contentDocument;
+    if (!doc) return;
+    var g = doc.getElementById('g');
+    if (g) g.innerHTML = html;
+    frameEl.style.display = 'block';
+  };
+
+  window.gamenAppend = function(html){
+    var doc = frameEl.contentDocument;
+    if (!doc) return;
+    var g = doc.getElementById('g');
+    if (g) g.insertAdjacentHTML('beforeend', html);
+    frameEl.style.display = 'block';
+  };
+
+  window.gamenRead = function(name){
+    return (window.GAMEN_ARGS && window.GAMEN_ARGS[name]) || '';
+  };
+
+  window.gamenArg = function(name){
+    return (window.GAMEN_ARGS && window.GAMEN_ARGS[name]) || '';
+  };
+
+  // iframe から「ページを うつって」と 来たら Python を よぶ
+  if (window._omaMsg) window.removeEventListener('message', window._omaMsg);
+  window._omaMsg = async function(e){
+    var d = e.data;
+    if (!d || !d.omaGo || !PYO) return;
+    var path = d.omaGo, q = {};
+    if (path.indexOf('?') >= 0){
+      var parts = path.split('?');
+      path = parts[0] || '/';
+      parts[1].split('&').forEach(function(kv){
+        var p = kv.split('=');
+        q[decodeURIComponent(p[0])] = decodeURIComponent(p[1] || '');
+      });
+    }
+    window.GAMEN_ARGS = Object.assign({}, d.vals || {}, q);
+    try {
+      PYO.globals.set('_oma_path', path);
+      await PYO.runPythonAsync('import gamen' + String.fromCharCode(10)
+        + 'gamen.ikou(_oma_path)' + String.fromCharCode(10));
+    } catch(err){
+      var o = $('out');
+      if (o) outWrite(o, String(err).split(String.fromCharCode(10))
+        .slice(-3).join(String.fromCharCode(10)), 'e');
+    }
+  };
+  window.addEventListener('message', window._omaMsg);
+}
+
+/* ============ うごかす（ブラウザの 中だけ） ============ */
+function outWrite(el, s, cls){
+  var d = document.createElement('div');
+  if (cls) d.className = cls;
+  d.textContent = s;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+}
+
+async function runFiles(files, db, outEl, frameEl){
+  outEl.innerHTML = '';
+  var find = function(k){
+    return (files || []).filter(function(f){ return f.kind === k; }); };
+  var htmls = find('html'), csss = find('css'), jss = find('js'), pys = find('py');
+
+  if (htmls.length){
+    // iframe の 中では localStorage が つかえない（あんぜんの ため）。
+    // かわりに、おなじ かたちの ものを 入れて おく。とじると きえる。
+    var shim = '<scr' + 'ipt>(function(){'
+      + 'try{ window.localStorage.getItem("_t"); return; }catch(e){}'
+      + 'var m={};'
+      + 'var fake={'
+      + 'getItem:function(k){return (k in m)?m[k]:null;},'
+      + 'setItem:function(k,v){m[k]=String(v);},'
+      + 'removeItem:function(k){delete m[k];},'
+      + 'clear:function(){m={};},'
+      + 'key:function(i){return Object.keys(m)[i]||null;},'
+      + 'length:0};'
+      + 'try{'
+      + 'Object.defineProperty(window,"localStorage",'
+      + '{value:fake,configurable:true});'
+      + 'Object.defineProperty(window,"sessionStorage",'
+      + '{value:fake,configurable:true});'
+      + '}catch(e){}'
+      + '})();</scr' + 'ipt>';
+    var head = shim + csss.map(function(f){
+      return '<style>' + f.content + '</style>'; }).join('');
+    // JavaScript は 名前じゅんに 読む。
+    // ただし main.js / script.js は さいごに する（ほかを つかう ため）。
+    var jsSorted = jss.slice().sort(function(a, b){
+      var last = ['main.js','script.js','app.js'];
+      var ai = last.indexOf(a.path), bi = last.indexOf(b.path);
+      if (ai >= 0 && bi < 0) return 1;
+      if (bi >= 0 && ai < 0) return -1;
+      return a.path.localeCompare(b.path);
+    });
+    var tail = jsSorted.map(function(f){
+      return '<scr' + 'ipt>try{' + f.content + '}catch(e){'
+        + 'document.body.innerHTML+="<pre style=color:red>['
+        + f.path.split(String.fromCharCode(39)).join('') + '] "+e+"</pre>"}'
+        + '</scr' + 'ipt>'; }).join('');
+    var eh = htmls.filter(function(f){ return f.is_entry; })[0] || htmls[0];
+    var body = eh.content;
+    var low = body.replace(/^\s+/, '').slice(0, 20).toLowerCase();
+    if (low.indexOf('<!doctype') === 0 || low.indexOf('<html') === 0){
+      if (head) body = body.replace('</head>', head + '</head>');
+      if (tail) body = body.replace('</body>', tail + '</body>');
+      frameEl.srcdoc = body;
+    } else {
+      frameEl.srcdoc = '<style>body{font-family:sans-serif;padding:12px}</style>'
+        + head + body + tail;
+    }
+    frameEl.style.display = 'block';
+    if ($('prevBar')) $('prevBar').style.display = 'flex';
+    outWrite(outEl, '画面に 出しました（' + eh.path + '）', 'ok');
+  } else {
+    frameEl.style.display = 'none';
+    if ($('prevBar')) $('prevBar').style.display = 'none';
+  }
+
+  if (db && (db.schema || db.seed)){
+    try {
+      if (!SQLJS) SQLJS = await initSqlJs({locateFile: function(f){
+        return 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/' + f; }});
+      var sdb = new SQLJS.Database();
+      sdb.exec((db.schema || '') + '\n' + (db.seed || ''));
+      sdb.close();
+      outWrite(outEl, 'データベースを つくりました', 'ok');
+    } catch(e){ outWrite(outEl, String(e), 'e'); }
+  }
+
+  if (pys.length){
+    try {
+      if (!PYO){
+        outWrite(outEl, 'Python を よういして います…');
+        PYO = await loadPyodide();
+      }
+      PYO.setStdout({batched: function(s){ outWrite(outEl, s); }});
+      PYO.setStderr({batched: function(s){ outWrite(outEl, s, 'e'); }});
+      PYO.setStdin({stdin: function(){
+        var v = window.prompt('入力して ください');
+        return (v === null ? '' : v) + String.fromCharCode(10); }});
+      try { PYO.FS.mkdir('/work'); } catch(e){}
+      files.forEach(function(f){
+        var ps = f.path.split('/'), dir = '/work';
+        for (var i = 0; i < ps.length - 1; i++){
+          dir += '/' + ps[i];
+          try { PYO.FS.mkdir(dir); } catch(e){}
+        }
+        try { PYO.FS.writeFile('/work/' + f.path, f.content); } catch(e){}
+      });
+      await PYO.runPythonAsync('import sys, os' + String.fromCharCode(10)
+        + 'os.chdir("/work")' + String.fromCharCode(10)
+        + 'if "/work" not in sys.path: sys.path.insert(0, "/work")'
+        + String.fromCharCode(10));
+      // Python から 画面を さわれる ように する
+      setupGamen(frameEl, files);
+      PYO.FS.writeFile('/work/gamen.py', GAMEN_PY);
+      var ep = pys.filter(function(f){ return f.is_entry; })[0] || pys[0];
+      await PYO.runPythonAsync(ep.content);
+    } catch(e){
+      outWrite(outEl, String(e).split(String.fromCharCode(10)).slice(-4)
+        .join(String.fromCharCode(10)), 'e');
+      var h = errHint(String(e));
+      if (h) outWrite(outEl, '💡 ' + h);
+    }
+  }
+}
+
+function errHint(e){
+  var H = [
+    ['SyntaxError', '書き方が ちがうみたい。かっこの 閉じわすれや コロン（:）を 見て みて。'],
+    ['IndentationError', '行の あたまの スペースが そろって いません。'],
+    ['NameError', 'その 名前は まだ ありません。つづりを 見て みて。'],
+    ['ZeroDivisionError', '0 で わる ことは できません。'],
+    ['IndexError', 'ならびの ばんごうが おおきすぎます。0 から はじまります。'],
+    ['KeyError', 'その 名前の データは まだ 入って いません。'],
+    ['TypeError', 'もじ と かず が まざって いるかも。str() や int() で そろえて。'],
+    ['ValueError', 'かずに できない もじを、かずに しようと して います。'],
+    ['ModuleNotFoundError', 'その ぶひんは ここでは つかえません。'],
+    ['AttributeError', 'その ものに、その はたらきは ありません。'],
+    ['RecursionError', 'じぶんを よびつづけて います。とまる ところを つくって。']
+  ];
+  for (var i = 0; i < H.length; i++)
+    if (e.indexOf(H[i][0]) >= 0) return H[i][1];
+  return null;
+}
+
+function bigRun(){
+  var f = $('preview');
+  if (f.requestFullscreen) f.requestFullscreen();
+}
+
+/* ============ はじまり ============ */
+loadMe().then(function(m){
+  if (!m) return;
+  if (VIEW === 'watch') showWatch();
+  else if (VIEW === 'make') showMake();
+  else if (VIEW === 'every_watch') showList(OWNER_ID);
+  else if (VIEW === 'search') showList(null, {{ (q or '') | tojson }});
+  else showList();
+});
+</script>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+{% endblock %}

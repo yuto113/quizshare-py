@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ja"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ログイン — Omame PJ</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🫘</text></svg>">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --dark:#1a2e05; --dark2:#2d4a0a; --main:#65a30d; --main2:#4d7c0f;
+  --acc:#05f75f; --paper:#f7fee7; --line:#d9f99d; --line2:#e2e8d0;
+  --text:#1a2e05; --muted:#6b7a52;
+}
+body{font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;
+  background:var(--paper);color:var(--text);line-height:1.7;min-height:100vh}
+
+.top{background:var(--dark);color:#fff;padding:13px 22px;display:flex;
+  align-items:center;gap:12px}
+.logo{font-size:16px;font-weight:800;letter-spacing:.07em;cursor:pointer;
+  display:flex;align-items:center;gap:8px}
+.logo em{font-style:normal;color:var(--acc)}
+
+.wrap{max-width:520px;margin:0 auto;padding:36px 20px 70px}
+h1{font-size:24px;margin-bottom:8px;text-align:center}
+.lead{font-size:13px;color:var(--muted);text-align:center;margin-bottom:26px}
+
+/* ---- えらぶ ---- */
+.pick{display:grid;gap:11px;margin-bottom:8px}
+.pcard{background:#fff;border:2px solid var(--line2);border-radius:14px;
+  padding:19px 20px;cursor:pointer;transition:.15s;display:flex;
+  align-items:center;gap:15px}
+.pcard:hover{border-color:var(--main);transform:translateY(-2px);
+  box-shadow:0 5px 16px rgba(26,46,5,.08)}
+.pcard .ic{font-size:30px;line-height:1;flex:none}
+.pcard .t{font-weight:700;font-size:15px}
+.pcard .d{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.7}
+.pcard .go{margin-left:auto;color:var(--main);font-size:19px;flex:none}
+
+.pane{display:none}
+.pane.on{display:block}
+
+.card{background:#fff;border:1px solid var(--line2);border-radius:14px;
+  padding:22px 22px 20px;margin-bottom:14px}
+.card h2{font-size:16px;margin-bottom:5px}
+.card .cd{font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.75}
+
+.inp{padding:10px 13px;border:1px solid var(--line2);border-radius:9px;
+  font-size:14px;font-family:inherit;width:100%;background:#fff}
+.inp:focus{outline:none;border-color:var(--main)}
+label.lb{font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px}
+.row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px}
+.row>div{flex:1;min-width:140px}
+
+.btn{background:var(--dark);color:#fff;border:none;padding:11px 24px;
+  border-radius:10px;font-size:14px;cursor:pointer;font-family:inherit;
+  font-weight:600}
+.btn:hover{background:var(--dark2)}
+.btn.mn{background:var(--main)}.btn.mn:hover{background:var(--main2)}
+.btn.gh{background:none;border:1px solid var(--line2);color:var(--text);
+  font-weight:400;font-size:12.5px;padding:7px 15px}
+.btn.gh:hover{background:var(--paper)}
+.btn:disabled{background:#c5cdb5;cursor:not-allowed}
+
+.msg{font-size:12.5px;margin-top:9px;min-height:19px}
+.msg.ng{color:#c0453b}
+.msg.ok{color:var(--main2)}
+
+.note{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;
+  padding:12px 15px;font-size:12px;color:#14532d;margin-bottom:18px;
+  line-height:1.85}
+.note b{display:block;margin-bottom:3px}
+.warn{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;
+  padding:12px 15px;font-size:12px;color:#78350f;margin-bottom:18px;
+  line-height:1.85}
+
+.back{font-size:12.5px;color:var(--main2);cursor:pointer;display:inline-block;
+  margin-bottom:14px}
+.back:hover{text-decoration:underline}
+
+@media(max-width:600px){
+  .wrap{padding:24px 15px 60px}
+  h1{font-size:20px}
+}
+</style></head><body>
+
+<div class="top">
+  <span class="logo" onclick="location.href='/oma_pj'">🫘 Omame<em>PJ</em></span>
+</div>
+
+<div class="wrap">
+
+  <!-- えらぶ -->
+  <div class="pane on" id="p-pick">
+    <h1>ようこそ</h1>
+    <p class="lead">どれか えらんで ください。</p>
+    <div class="pick">
+      <div class="pcard" onclick="show('mirai')">
+        <span class="ic">🔄</span>
+        <div><div class="t">MIRAI POWER 会員の 人</div>
+          <div class="d">まえの IDと パスワードで 入れます。<br>
+            そのまま Omame PJ に うつります</div></div>
+        <span class="go">→</span>
+      </div>
+      <div class="pcard" onclick="show('login')">
+        <span class="ic">🫘</span>
+        <div><div class="t">Omame PJ 会員の 人</div>
+          <div class="d">いつもの IDと パスワードで</div></div>
+        <span class="go">→</span>
+      </div>
+      <div class="pcard" onclick="show('reg')">
+        <span class="ic">✨</span>
+        <div><div class="t">はじめての 人</div>
+          <div class="d">会員に なる。ニックネームだけで だいじょうぶ</div></div>
+        <span class="go">→</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MIRAI POWER から うつる -->
+  <div class="pane" id="p-mirai">
+    <span class="back" onclick="show('pick')">← もどる</span>
+    <h1>MIRAI POWER から うつる</h1>
+    <div class="note">
+      <b>だいじょうぶ、なくなりません。</b>
+      いままでの 作品・いいね・おえかき は ぜんぶ そのまま のこります。
+      名前が かわる だけです。
+    </div>
+    <div class="card">
+      <div class="row">
+        <div><label class="lb">ID</label>
+          <input class="inp" id="mId" placeholder="まえと おなじ ID"></div>
+        <div><label class="lb">パスワード</label>
+          <input class="inp" id="mPw" type="password"
+            onkeydown="if(event.key==='Enter')doMirai()"></div>
+      </div>
+      <button class="btn mn" onclick="doMirai()">うつる</button>
+      <div class="msg" id="mMsg"></div>
+    </div>
+  </div>
+
+  <!-- ふつうに ログイン -->
+  <div class="pane" id="p-login">
+    <span class="back" onclick="show('pick')">← もどる</span>
+    <h1>ログイン</h1>
+    <div class="card">
+      <div class="row">
+        <div><label class="lb">ID</label>
+          <input class="inp" id="lId"></div>
+        <div><label class="lb">パスワード</label>
+          <input class="inp" id="lPw" type="password"
+            onkeydown="if(event.key==='Enter')doLogin()"></div>
+      </div>
+      <button class="btn" onclick="doLogin()">ログイン</button>
+      <div class="msg" id="lMsg"></div>
+    </div>
+  </div>
+
+  <!-- あたらしく つくる -->
+  <div class="pane" id="p-reg">
+    <span class="back" onclick="show('pick')">← もどる</span>
+    <h1>会員に なる</h1>
+    <div class="warn">
+      本名・住所・電話番号は 書かないで ください。<br>
+      ニックネームで だいじょうぶです。
+    </div>
+    <div class="card">
+      <div class="row">
+        <div><label class="lb">ID（はんかく えいすうじ）</label>
+          <input class="inp" id="rId" placeholder="omame_taro"></div>
+        <div><label class="lb">ニックネーム</label>
+          <input class="inp" id="rNick" placeholder="おまめ"></div>
+      </div>
+      <div class="row">
+        <div><label class="lb">パスワード（6文字いじょう）</label>
+          <input class="inp" id="rPw" type="password"></div>
+        <div><label class="lb">学年（にんい）</label>
+          <input class="inp" id="rGrade" placeholder="小5 / 中1"></div>
+      </div>
+      <div class="row">
+        <div><label class="lb">しょうたいコード（あれば）</label>
+          <input class="inp" id="rInv" placeholder="OM-XXXX"></div>
+      </div>
+      <button class="btn mn" onclick="doReg()">会員に なる</button>
+      <div class="msg" id="rMsg"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function $(i){ return document.getElementById(i); }
+async function J(u,o){ var r=await fetch(u,o);
+  return await r.json().catch(function(){ return {ok:false,error:'こたえを よめません'}; }); }
+function P(u,b){ return J(u,{method:'POST',headers:{'Content-Type':'application/json'},
+                             body:JSON.stringify(b||{})}); }
+
+function show(p){
+  document.querySelectorAll('.pane').forEach(function(x){
+    x.classList.toggle('on', x.id === 'p-' + p); });
+  window.scrollTo(0,0);
+}
+
+function say(id, t, ok){
+  var m = $(id);
+  m.textContent = t;
+  m.className = 'msg ' + (ok ? 'ok' : 'ng');
+}
+
+async function doLogin(){
+  var d = await P('/api/mp/login', {
+    member_id: $('lId').value.trim(), password: $('lPw').value});
+  if (d.ok !== true){ say('lMsg', d.error); return; }
+  location.href = '/oma_pj/home';
+}
+
+async function doMirai(){
+  var d = await P('/api/mp/migrate', {
+    member_id: $('mId').value.trim(), password: $('mPw').value});
+  if (d.ok !== true){ say('mMsg', d.error); return; }
+  say('mMsg', 'うつりました。ようこそ Omame PJ へ', true);
+  setTimeout(function(){ location.href = '/oma_pj/home'; }, 900);
+}
+
+async function doReg(){
+  var d = await P('/api/mp/register', {
+    member_id: $('rId').value.trim(), nickname: $('rNick').value.trim(),
+    password: $('rPw').value, grade: $('rGrade').value.trim(),
+    invite: $('rInv').value.trim()});
+  if (d.ok !== true){ say('rMsg', d.error); return; }
+  say('rMsg', '会員に なりました。公開できる 作品は ' + d.limit + ' こです', true);
+  setTimeout(function(){ location.href = '/oma_pj/rules?first=1'; }, 1100);
+}
+
+/* もう 入って いたら ホームへ */
+(async function(){
+  var d = await J('/api/mp/me');
+  if (d.logged_in) location.href = '/oma_pj/home';
+})();
+</script>
+</body></html>

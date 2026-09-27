@@ -1,0 +1,118 @@
+{% extends "oma/_base.html" %}
+{% block title %}しつもん — Omame PJ{% endblock %}
+
+{% block subnav %}
+<div class="sub">
+  <a href="#" onclick="loadQa('all');return false" class="on">ぜんぶ</a>
+  <a href="#" onclick="loadQa('open');return false">こたえ まち</a>
+  <a href="#" onclick="loadQa('solved');return false">かいけつ ずみ</a>
+  <a href="#" onclick="newQa();return false">＋ しつもん する</a>
+</div>
+{% endblock %}
+
+{% block style %}
+.q{background:#fff;border:1px solid var(--line2);border-radius:12px;
+  padding:15px 17px;margin-bottom:10px;cursor:pointer;transition:.14s}
+.q:hover{border-color:var(--main)}
+.q .t{font-size:14px;font-weight:700;margin-top:4px}
+.q .m{font-size:11.5px;color:var(--muted);margin-top:6px;display:flex;gap:9px;
+  flex-wrap:wrap}
+.ans{background:#fff;border:1px solid var(--line2);border-radius:12px;
+  padding:15px 17px;margin-bottom:10px}
+.ans.best{border-color:var(--main);background:#f0fdf4}
+.ans .who{font-size:12.5px;font-weight:700}
+.ans .b{font-size:13.5px;line-height:1.85;white-space:pre-wrap;margin-top:6px}
+.aform{background:#fff;border:1px solid var(--line2);border-radius:12px;
+  padding:14px 16px;margin-top:14px}
+.aform textarea{width:100%;min-height:80px;border:1px solid var(--line2);
+  border-radius:9px;padding:10px;font-family:inherit;font-size:13.5px;
+  resize:vertical}
+{% endblock %}
+
+{% block body %}
+<div id="body"><div class="empty">よみこみ中…</div></div>
+{% endblock %}
+
+{% block script %}
+<script>
+async function loadQa(f){
+  var d = await J('/api/mp/qa?filter=' + (f || 'all'));
+  var el = $('body');
+  if (!d.ok){ el.innerHTML = '<div class="empty">' + K(d.error) + '</div>'; return; }
+  el.innerHTML = '<h1>❓ しつもん</h1>'
+    + '<p class="lead">わからない ことを きく のは、はずかしい ことでは ありません。</p>'
+    + '<div class="rulebox"><b>しつもんの きまり</b>'
+    + 'こまって いる ことを くわしく 書くと、こたえが つきやすい です。'
+    + 'こたえて もらったら お礼を いいましょう。</div>'
+    + '<div class="row"><button class="btn mn" onclick="newQa()">'
+    + '＋ しつもん する</button></div>'
+    + (d.questions.length ? d.questions.map(function(q){
+        return '<div class="q" onclick="showQa(' + q.id + ')">'
+          + (q.solved ? '<span class="tag d1">かいけつ</span>'
+                      : '<span class="tag d2">こたえ まち</span>')
+          + '<div class="t">' + K(q.title) + '</div>'
+          + '<div class="m"><span>' + K(q.nickname || q.member_id) + '</span>'
+          + '<span>💬' + q.answers + '</span><span>👁' + q.views + '</span>'
+          + '<span>' + ago(q.created_at) + '</span></div></div>';
+      }).join('') : '<div class="empty">まだ しつもんが ありません</div>');
+}
+
+async function showQa(qid){
+  var d = await J('/api/mp/qa/' + qid);
+  var el = $('body');
+  if (!d.ok){ el.innerHTML = '<div class="empty">' + K(d.error) + '</div>'; return; }
+  var q = d.question;
+  var mine = ME && ME.member_id === q.member_id;
+  el.innerHTML = '<button class="btn gh sm" onclick="loadQa()">← いちらん</button>'
+    + '<h1 style="margin-top:12px">' + (q.solved ? '✅ ' : '❓ ') + K(q.title) + '</h1>'
+    + '<p class="lead">' + K(q.nickname || q.member_id) + ' · '
+    + ago(q.created_at) + '</p>'
+    + (q.body ? '<div class="card" style="white-space:pre-wrap;line-height:1.85">'
+        + K(q.body) + '</div>' : '')
+    + '<h2>こたえ（' + d.answers.length + '）</h2>'
+    + (d.answers.length ? d.answers.map(function(a){
+        var best = (q.best_id === a.id);
+        return '<div class="ans' + (best ? ' best' : '') + '">'
+          + (best ? '<div style="color:var(--main2);font-weight:700;font-size:12px;'
+              + 'margin-bottom:4px">⭐ いちばん たすかった こたえ</div>' : '')
+          + '<div class="who">' + K(a.nickname || a.member_id)
+          + ' <span style="font-weight:400;color:var(--muted);font-size:11px">'
+          + ago(a.created_at) + '</span></div>'
+          + '<div class="b">' + K(a.body) + '</div>'
+          + ((mine && !q.solved)
+              ? '<div class="row" style="margin:9px 0 0">'
+                + '<button class="btn mn sm" onclick="best(' + qid + ',' + a.id
+                + ')">⭐ これが たすかった</button></div>' : '')
+          + '</div>';
+      }).join('') : '<div class="empty">まだ こたえが ありません</div>')
+    + '<div class="aform"><textarea id="qaAns" '
+    + 'placeholder="こたえて あげましょう"></textarea>'
+    + '<div class="row" style="margin:9px 0 0">'
+    + '<button class="btn mn" onclick="sendAns(' + qid + ')">こたえる</button>'
+    + '<span id="qaMsg" style="font-size:12.5px"></span></div></div>';
+}
+
+async function newQa(){
+  var t = prompt('なにを ききますか？\n\n例: for の つかいかたが わかりません');
+  if (!t) return;
+  var b = prompt('くわしく 書くと、こたえが つきやすい です（にんい）') || '';
+  var d = await P('/api/mp/qa', {title:t, body:b});
+  if (d.ok !== true){ toast(d.error, 'error'); return; }
+  showQa(d.id);
+}
+async function sendAns(qid){
+  var t = $('qaAns').value.trim();
+  if (!t) return;
+  var d = await P('/api/mp/qa/' + qid + '/answer', {body:t});
+  if (d.ok !== true){
+    $('qaMsg').style.color = '#c0453b'; $('qaMsg').textContent = d.error; return; }
+  showQa(qid);
+}
+async function best(qid, aid){
+  await P('/api/mp/qa/' + qid + '/best/' + aid);
+  showQa(qid);
+}
+
+loadMe().then(function(m){ if (m) loadQa('all'); });
+</script>
+{% endblock %}

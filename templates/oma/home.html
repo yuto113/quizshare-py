@@ -1,0 +1,130 @@
+{% extends "oma/_base.html" %}
+{% block title %}ホーム — Omame PJ{% endblock %}
+
+{% block style %}
+.menu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));
+  gap:13px}
+.menu-card{background:#fff;border:1px solid var(--line2);border-radius:14px;
+  padding:22px 16px 20px;cursor:pointer;transition:.15s;text-align:center;
+  display:flex;flex-direction:column;align-items:center;min-height:156px;
+  text-decoration:none;color:inherit}
+.menu-card:hover{border-color:var(--main);transform:translateY(-3px);
+  box-shadow:0 6px 18px rgba(26,46,5,.09)}
+.menu-card .ic{font-size:34px;line-height:1;margin-bottom:10px}
+.menu-card .t{font-size:14.5px;font-weight:700;margin:0 0 6px}
+.menu-card .d{font-size:12px;line-height:1.65;color:var(--muted);max-width:15em}
+.menu-card .n{font-size:11px;color:var(--main2);margin-top:7px;font-weight:600}
+
+.ann{border-radius:11px;padding:13px 16px;margin-bottom:10px;
+  display:flex;align-items:flex-start;gap:11px;font-size:13px;line-height:1.75}
+.ann.info{background:#f0fdf4;border:1px solid #bbf7d0;color:#14532d}
+.ann.event{background:#fdf4ff;border:1px solid #f0abfc;color:#86198f}
+.ann.warn{background:#fffbeb;border:1px solid #fde68a;color:#78350f}
+.ann.maint{background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
+.ann .ic{font-size:18px;flex:none}
+.ann .t{font-weight:700;font-size:13.5px;margin-bottom:3px}
+.ann .b{white-space:pre-wrap;font-size:12.5px;opacity:.9}
+.ann .x{cursor:pointer;opacity:.5;font-size:16px;flex:none}
+.ann .x:hover{opacity:1}
+
+.recent{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
+  gap:11px}
+.rc{background:#fff;border:1px solid var(--line2);border-radius:11px;
+  padding:12px 14px;cursor:pointer;transition:.14s}
+.rc:hover{border-color:var(--main)}
+.rc .t{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.rc .m{font-size:11px;color:var(--muted);margin-top:3px}
+{% endblock %}
+
+{% block body %}
+<div class="hero">
+  <h1>つくった ものを、見せあう ばしょ</h1>
+  <p>ちいさな まめが、そだって めを だすように。<br>
+     つくりたい きもちを、かたちに する ばしょです。</p>
+  <div class="stats">
+    <div class="stat"><b id="stApps">—</b><span>作品</span></div>
+    <div class="stat"><b id="stPeople">—</b><span>つくった人</span></div>
+    <div class="stat"><b id="stMine">—</b><span>じぶんの 作品</span></div>
+  </div>
+</div>
+
+<div id="annBox"></div>
+
+<h2 style="margin-top:0;border:none;padding:0">なにを しますか？</h2>
+<div class="menu-grid" id="menu"></div>
+
+<h2>さいきん できた もの</h2>
+<div class="recent" id="recent"><div class="empty">よみこみ中…</div></div>
+{% endblock %}
+
+{% block script %}
+<script>
+var PROJS = [
+  ['prog_block','🧩','ブロックで つくる','ならべる だけ。はじめての 人へ'],
+  ['prog_code', '⌨️','コードで つくる','Python や HTML で 自由に'],
+  ['draw',      '🎨','おえかき','ドット絵も、じゆうに かく えも'],
+  ['talk',      '💬','つぶやき','いまの きもちを ひとこと'],
+  ['wiki',      '📖','みんなの図鑑','みんなで ひとつの 図鑑を つくる'],
+  ['shelf',     '🗂','たな','テーマごとに 作品を あつめる'],
+  ['qa',        '❓','しつもん','こまったら きいてみる'],
+  ['poll',      '🗳','とうひょう','みんなで きめる']
+];
+
+function drawMenu(counts){
+  $('menu').innerHTML = PROJS.map(function(p){
+    var n = (counts && counts[p[0]]) ? counts[p[0]] : 0;
+    return '<a class="menu-card" href="/oma_pj/' + p[0] + '">'
+      + '<div class="ic">' + p[1] + '</div>'
+      + '<div class="t">' + K(p[2]) + '</div>'
+      + '<div class="d">' + K(p[3]) + '</div>'
+      + (n ? '<div class="n">' + n + ' こ</div>' : '') + '</a>';
+  }).join('');
+}
+
+async function loadHome(){
+  drawMenu(null);
+
+  var d = await J('/api/mp/home');
+  if (d.ok){
+    $('stApps').textContent = d.apps;
+    $('stPeople').textContent = d.people;
+    $('stMine').textContent = d.mine;
+    drawMenu(d.counts);
+    $('recent').innerHTML = (d.recent || []).length
+      ? d.recent.map(function(x){
+          return '<div class="rc" onclick="goCol(\'' + K(x.owner_id) + '\',\''
+            + K(x.col_id) + '\',\'' + K(x.proj) + '\')">'
+            + '<div class="t">' + K(x.title) + '</div>'
+            + '<div class="m">' + K(x.nickname || '') + ' · ' + ago(x.created_at)
+            + '</div></div>';
+        }).join('')
+      : '<div class="empty">まだ ありません</div>';
+  }
+  loadAnns();
+}
+
+async function loadAnns(){
+  var d = await J('/api/mp/anns');
+  var el = $('annBox');
+  if (!d.ok || !d.anns.length){ el.innerHTML = ''; return; }
+  var IC = {info:'📢', event:'🎉', warn:'⚠️', maint:'🔧'};
+  el.innerHTML = d.anns.filter(function(a){ return !a.is_read; }).map(function(a){
+    return '<div class="ann ' + K(a.level) + '" id="ann' + a.id + '">'
+      + '<span class="ic">' + (IC[a.level] || '📢') + '</span>'
+      + '<div style="flex:1;min-width:0">'
+      + '<div class="t">' + K(a.title) + '</div>'
+      + (a.body ? '<div class="b">' + K(a.body) + '</div>' : '') + '</div>'
+      + '<span class="x" onclick="readAnn(' + a.id + ')">✕</span></div>';
+  }).join('');
+}
+
+async function readAnn(id){
+  await P('/api/mp/ann/' + id + '/read');
+  var el = $('ann' + id);
+  if (el){ el.style.opacity = '0'; setTimeout(function(){ el.remove(); }, 200); }
+}
+
+loadMe().then(function(m){ if (m) loadHome(); });
+</script>
+{% endblock %}

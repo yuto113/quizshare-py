@@ -1,0 +1,86 @@
+{% extends "oma/_base.html" %}
+{% block title %}おしらせ — Omame PJ{% endblock %}
+
+{% block style %}
+.nt{background:#fff;border:1px solid var(--line2);border-radius:11px;
+  padding:13px 16px;margin-bottom:9px;display:flex;align-items:flex-start;
+  gap:12px}
+.nt.unread{border-left:4px solid var(--main);background:#fbfef5}
+.nt .ic{font-size:19px;flex:none;line-height:1.4}
+.nt .t{font-size:13.5px;font-weight:600}
+.nt .b{font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.75}
+.nt .w{font-size:11px;color:#9aa885;margin-left:auto;white-space:nowrap}
+.ann{border-radius:11px;padding:14px 17px;margin-bottom:10px;
+  display:flex;align-items:flex-start;gap:12px;font-size:13px;line-height:1.8}
+.ann.info{background:#f0fdf4;border:1px solid #bbf7d0;color:#14532d}
+.ann.event{background:#fdf4ff;border:1px solid #f0abfc;color:#86198f}
+.ann.warn{background:#fffbeb;border:1px solid #fde68a;color:#78350f}
+.ann.maint{background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
+.ann .t{font-weight:700;font-size:13.5px;margin-bottom:3px}
+.ann .b{white-space:pre-wrap;font-size:12.5px;opacity:.9}
+.ann .w{font-size:11px;opacity:.6;margin-top:5px}
+{% endblock %}
+
+{% block body %}
+<h1>🔔 おしらせ</h1>
+<p class="lead">じぶんに とどいた ものと、運営からの おしらせ です。</p>
+
+<h2 style="margin-top:0;border:none;padding:0">運営から</h2>
+<div id="annList"><div class="empty">よみこみ中…</div></div>
+
+<h2>じぶんに とどいた もの</h2>
+<div id="noticeList"><div class="empty">よみこみ中…</div></div>
+{% endblock %}
+
+{% block script %}
+<script>
+var LBL = {
+  like:    ['♡', 'いいねが つきました'],
+  fork:    ['🔁', 'ひろめられました'],
+  comment: ['💬', 'コメントが つきました'],
+  featured:['⭐', '注目の 作品に えらばれました']
+};
+
+async function loadAll(){
+  var a = await J('/api/mp/anns');
+  var IC = {info:'📢', event:'🎉', warn:'⚠️', maint:'🔧'};
+  $('annList').innerHTML = (a.ok && a.anns.length)
+    ? a.anns.map(function(x){
+        return '<div class="ann ' + K(x.level) + '">'
+          + '<span style="font-size:19px">' + (IC[x.level] || '📢') + '</span>'
+          + '<div style="flex:1;min-width:0">'
+          + '<div class="t">' + K(x.title) + '</div>'
+          + (x.body ? '<div class="b">' + K(x.body) + '</div>' : '')
+          + '<div class="w">' + K(String(x.created_at).slice(0, 16)) + '</div>'
+          + '</div></div>';
+      }).join('')
+    : '<div class="empty">まだ ありません</div>';
+
+  var d = await J('/api/mp/notices');
+  $('noticeList').innerHTML = (d.ok && d.notices.length)
+    ? d.notices.map(function(n){
+        var L = LBL[n.kind] || ['🔔', n.kind];
+        return '<div class="nt' + (n.is_read ? '' : ' unread') + '">'
+          + '<span class="ic">' + L[0] + '</span>'
+          + '<div style="flex:1;min-width:0">'
+          + '<div class="t">' + K(L[1]) + '</div>'
+          + (n.title ? '<div class="b">' + K(n.title) + '</div>' : '')
+          + (n.actor_name
+              ? '<div class="b">' + K(n.actor_name) + ' さん</div>' : '')
+          + '</div><span class="w">' + ago(n.created_at) + '</span></div>';
+      }).join('')
+    : '<div class="empty">まだ ありません</div>';
+
+  // 見たので 読んだ ことに する
+  await P('/api/mp/notices/read');
+  var b = $('nvBadge');
+  if (b){ b.textContent = ''; b.className = ''; }
+  // 運営の おしらせも 読んだ ことに
+  if (a.ok) for (var i = 0; i < a.anns.length; i++){
+    if (!a.anns[i].is_read) P('/api/mp/ann/' + a.anns[i].id + '/read');
+  }
+}
+
+loadMe().then(function(m){ if (m) loadAll(); });
+</script>
+{% endblock %}

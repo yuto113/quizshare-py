@@ -1,0 +1,186 @@
+{% extends "oma/_base.html" %}
+{% block title %}みんなの図鑑 — Omame PJ{% endblock %}
+
+{% block subnav %}
+<div class="sub">
+  <a href="/oma_pj/wiki" {% if view=='list' %}class="on"{% endif %}>さがす</a>
+  <a href="#" onclick="newWiki();return false">＋ 新しく 書く</a>
+  <a href="#" onclick="goMine();return false">じぶんが 書いた もの</a>
+</div>
+{% endblock %}
+
+{% block style %}
+.wk{background:#fff;border:1px solid var(--line2);border-radius:12px;
+  padding:15px 17px;cursor:pointer;transition:.14s}
+.wk:hover{border-color:var(--main);transform:translateY(-2px)}
+.wk .t{font-size:14.5px;font-weight:700}
+.wk .m{font-size:11.5px;color:var(--muted);margin-top:6px;display:flex;
+  gap:9px;flex-wrap:wrap}
+.wbody{background:#fff;border:1px solid var(--line2);border-radius:12px;
+  padding:20px 22px;white-space:pre-wrap;line-height:1.95;font-size:14px}
+.rev{background:#fff;border:1px solid var(--line2);border-radius:10px;
+  padding:11px 14px;margin-bottom:8px;display:flex;align-items:center;gap:11px}
+.rev .t{font-size:12.5px;font-weight:600}
+.rev .m{font-size:11px;color:var(--muted)}
+{% endblock %}
+
+{% block body %}
+<div id="body"><div class="empty">よみこみ中…</div></div>
+{% endblock %}
+
+{% block script %}
+<script>
+var VIEW = {{ view | tojson }};
+var OWNER_ID = {{ (owner_id or none) | tojson }};
+var CUR_SLUG = null;
+
+function goMine(){
+  if (ME) location.href = '/oma_pj/wiki/me/every_watch';
+}
+
+async function showList(){
+  var d = await J('/api/mp/wiki');
+  var el = $('body');
+  if (!d.ok){ el.innerHTML = '<div class="empty">' + K(d.error) + '</div>'; return; }
+  el.innerHTML = '<h1>📖 みんなの図鑑</h1>'
+    + '<p class="lead">だれでも 書けて、だれでも 直せます。'
+    + 'まちがえても だいじょうぶ。あとから もどせます。</p>'
+    + '<div class="rulebox"><b>図鑑の きまり</b>'
+    + 'ほかの人が 書いた ものを けす ときは、りゆうを 書いて ください。'
+    + 'よそから コピーして きた 文は はりつけない。</div>'
+    + '<div class="row"><input class="inp" id="wq" placeholder="さがす" '
+    + 'style="flex:1;min-width:150px" onkeydown="if(event.key===\'Enter\')doSearch()">'
+    + '<button class="btn gh" onclick="doSearch()">さがす</button>'
+    + '<button class="btn mn" onclick="newWiki()">＋ 新しく 書く</button></div>'
+    + ((d.cats || []).length
+        ? '<div class="row">' + d.cats.map(function(c){
+            return '<button class="btn gh sm" onclick="byCat(\'' + K(c.name)
+              + '\')">' + K(c.name) + ' ' + c.n + '</button>'; }).join('')
+          + '</div>'
+        : '')
+    + '<div class="grid">'
+    + (d.pages.length ? d.pages.map(function(p){
+        return '<div class="wk" onclick="showOne(\'' + K(p.slug) + '\')">'
+          + '<div class="t">' + K(p.title) + '</div>'
+          + '<div class="m"><span>' + K(p.category || '') + '</span>'
+          + '<span>👁' + (p.views || 0) + '</span>'
+          + '<span>' + ago(p.updated_at) + '</span></div></div>';
+      }).join('')
+      : '<div class="empty">まだ ページが ありません。<br>'
+        + 'さいしょの 1ページを 書いて みませんか。</div>')
+    + '</div>';
+}
+
+async function doSearch(){
+  var q = $('wq').value.trim();
+  var d = await J('/api/mp/wiki?q=' + encodeURIComponent(q));
+  if (!d.ok) return;
+  var g = document.querySelector('.grid');
+  g.innerHTML = d.pages.length ? d.pages.map(function(p){
+    return '<div class="wk" onclick="showOne(\'' + K(p.slug) + '\')">'
+      + '<div class="t">' + K(p.title) + '</div>'
+      + '<div class="m"><span>' + K(p.category || '') + '</span>'
+      + '<span>' + ago(p.updated_at) + '</span></div></div>';
+  }).join('') : '<div class="empty">見つかりません でした</div>';
+}
+async function byCat(c){
+  var d = await J('/api/mp/wiki?cat=' + encodeURIComponent(c));
+  if (!d.ok) return;
+  document.querySelector('.grid').innerHTML = d.pages.map(function(p){
+    return '<div class="wk" onclick="showOne(\'' + K(p.slug) + '\')">'
+      + '<div class="t">' + K(p.title) + '</div>'
+      + '<div class="m"><span>' + ago(p.updated_at) + '</span></div></div>';
+  }).join('');
+}
+
+async function showOne(slug){
+  CUR_SLUG = slug;
+  var d = await J('/api/mp/wiki/' + slug);
+  var el = $('body');
+  if (!d.ok){
+    el.innerHTML = '<button class="btn gh sm" onclick="showList()">← いちらん</button>'
+      + '<div class="empty">まだ ありません<br>'
+      + '<button class="btn mn" style="margin-top:12px" onclick="editWiki(\''
+      + K(slug) + '\')">この 名前で 書く</button></div>';
+    return;
+  }
+  var p = d.page;
+  window.WIKI_CUR = p;
+  el.innerHTML = '<button class="btn gh sm" onclick="showList()">← いちらん</button>'
+    + '<h1 style="margin-top:12px">' + K(p.title) + '</h1>'
+    + '<p class="lead">' + (p.category ? K(p.category) + ' · ' : '')
+    + 'さいごに 直した人: ' + K(p.updated_by || '') + ' · ' + ago(p.updated_at)
+    + ' · 👁' + p.views + '</p>'
+    + '<div class="wbody">' + K(p.body || '（まだ なにも 書かれて いません）')
+    + '</div>'
+    + '<div class="row" style="margin-top:12px">'
+    + '<button class="btn mn" onclick="editWiki(\'' + K(slug) + '\')">✏️ 直す</button>'
+    + '<button class="btn gh" onclick="showHist(\'' + K(slug) + '\')">'
+    + '直した きろく</button></div>'
+    + '<div id="hist"></div>';
+}
+
+function editWiki(slug){
+  var p = (window.WIKI_CUR && window.WIKI_CUR.slug === slug)
+    ? window.WIKI_CUR : {slug:slug, title:'', body:'', category:''};
+  $('body').innerHTML =
+      '<button class="btn gh sm" onclick="showOne(\'' + K(slug) + '\')">'
+    + '← やめる</button>'
+    + '<div class="row" style="margin-top:12px">'
+    + '<input class="inp" id="wkTitle" placeholder="だいめい" value="'
+    + K(p.title || '') + '" style="flex:1;min-width:150px">'
+    + '<input class="inp" id="wkCat" placeholder="なかま（むし / はな）" value="'
+    + K(p.category || '') + '" style="max-width:180px"></div>'
+    + '<textarea class="ta" id="wkBody" style="min-height:320px;line-height:1.85" '
+    + 'placeholder="ここに 書きます">' + K(p.body || '') + '</textarea>'
+    + '<div class="row" style="margin-top:10px">'
+    + '<input class="inp" id="wkNote" placeholder="なにを 直したか（にんい）" '
+    + 'style="flex:1;min-width:150px">'
+    + '<button class="btn mn" onclick="saveWiki(\'' + K(slug) + '\')">ほぞん</button>'
+    + '<span id="wkMsg" style="font-size:12.5px"></span></div>';
+}
+
+async function newWiki(){
+  var t = prompt('なにに ついて 書きますか？\n\n例: カブトムシ');
+  if (!t) return;
+  var slug = prompt('URLの 名前（小文字の えいすうじ）\n\n例: kabutomushi');
+  if (!slug) return;
+  window.WIKI_CUR = {slug: slug.toLowerCase(), title: t, body: '', category: ''};
+  editWiki(slug.toLowerCase());
+}
+
+async function saveWiki(slug, confirmed){
+  var m = $('wkMsg');
+  var d = await P('/api/mp/wiki/' + slug, {
+    title: $('wkTitle').value, body: $('wkBody').value,
+    category: $('wkCat').value, note: $('wkNote').value, confirmed: confirmed});
+  if (d.ok !== true){
+    m.style.color = '#c0453b'; m.textContent = d.error;
+    if (d.need_confirm && confirm(d.error + '\n\nそれでも ほぞん しますか？'))
+      saveWiki(slug, true);
+    return;
+  }
+  showOne(slug);
+}
+
+async function showHist(slug){
+  var d = await J('/api/mp/wiki/' + slug);
+  $('hist').innerHTML = '<h2>直した きろく</h2>'
+    + ((d.revs || []).length ? d.revs.map(function(r){
+        return '<div class="rev"><div style="flex:1">'
+          + '<div class="t">' + K(r.at) + '</div>'
+          + '<div class="m">' + K(r.by || '')
+          + (r.note ? ' · ' + K(r.note) : '') + '</div></div>'
+          + '<button class="btn gh sm" onclick="backTo(\'' + K(slug) + '\','
+          + r.id + ')">もどす</button></div>';
+      }).join('') : '<div class="empty">まだ ありません</div>');
+}
+async function backTo(slug, rev){
+  if (!confirm('この ときの じょうたいに もどしますか？')) return;
+  await P('/api/mp/wiki/' + slug + '/restore/' + rev);
+  showOne(slug);
+}
+
+loadMe().then(function(m){ if (m) showList(); });
+</script>
+{% endblock %}

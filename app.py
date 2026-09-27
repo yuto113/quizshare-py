@@ -1576,6 +1576,10 @@ def page_homepage():
 from bp_member import bp as _bp_member
 app.register_blueprint(_bp_member)
 
+# Omame PJ（あたらしい URL）
+from bp_oma import bp_oma as _bp_oma
+app.register_blueprint(_bp_oma)
+
 from bp_admin import bp as _bp_admin
 app.register_blueprint(_bp_admin)
 

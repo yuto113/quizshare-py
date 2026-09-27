@@ -1,0 +1,254 @@
+{% extends "oma/_base.html" %}
+{% block title %}せってい — Omame PJ{% endblock %}
+
+{% block style %}
+.avbox{display:flex;align-items:center;gap:18px;margin-bottom:20px;
+  flex-wrap:wrap}
+.avbig{width:88px;height:88px;border-radius:50%;flex:none;display:flex;
+  align-items:center;justify-content:center;font-weight:800;color:#fff;
+  font-size:36px;overflow:hidden}
+.avbig img{width:100%;height:100%;object-fit:cover}
+.avpick{display:flex;gap:7px;flex-wrap:wrap}
+.avtab{background:#fff;border:2px solid var(--line2);border-radius:9px;
+  padding:7px 14px;font-size:12.5px;cursor:pointer;font-family:inherit}
+.avtab:hover{border-color:var(--main)}
+.avtab.on{background:var(--dark);color:#fff;border-color:var(--dark)}
+.emos{display:grid;grid-template-columns:repeat(auto-fill,minmax(42px,1fr));
+  gap:6px;margin-top:10px}
+.emos div{aspect-ratio:1;display:flex;align-items:center;justify-content:center;
+  font-size:22px;background:#fff;border:1px solid var(--line2);border-radius:9px;
+  cursor:pointer}
+.emos div:hover{border-color:var(--main);transform:scale(1.08)}
+.emos div.on{border-color:var(--main);background:var(--line)}
+.cols{display:grid;grid-template-columns:repeat(auto-fill,minmax(38px,1fr));
+  gap:6px;margin-top:10px}
+.cols div{aspect-ratio:1;border-radius:9px;cursor:pointer;
+  border:3px solid transparent}
+.cols div:hover{transform:scale(1.1)}
+.cols div.on{border-color:var(--dark)}
+.oid{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;
+  background:var(--paper);border:1px solid var(--line2);border-radius:8px;
+  padding:8px 13px;display:inline-block}
+{% endblock %}
+
+{% block body %}
+<h1>⚙ じぶんの せってい</h1>
+<p class="lead">本名は 書かないで ください。</p>
+
+<div class="card">
+  <h2 style="margin:0 0 14px;border:none;padding:0">アイコン</h2>
+  <div class="avbox">
+    <div class="avbig" id="avPrev"></div>
+    <div style="flex:1;min-width:200px">
+      <div class="avpick">
+        <button class="avtab on" id="at_letter" onclick="avTab('letter')">
+          文字</button>
+        <button class="avtab" id="at_emoji" onclick="avTab('emoji')">絵文字</button>
+        <button class="avtab" id="at_img" onclick="avTab('img')">画像</button>
+        <button class="avtab" id="at_draw" onclick="avTab('draw')">
+          じぶんの え</button>
+      </div>
+      <div id="avBody" style="margin-top:12px"></div>
+    </div>
+  </div>
+  <div class="row" style="margin:0">
+    <button class="btn mn" onclick="saveAvatar()">アイコンを ほぞん</button>
+    <span id="avMsg" style="font-size:12.5px"></span>
+  </div>
+</div>
+
+<div class="card">
+  <h2 style="margin:0 0 14px;border:none;padding:0">なまえと 学年</h2>
+  <div class="row">
+    <div style="flex:1;min-width:150px">
+      <label class="lb">ニックネーム</label>
+      <input class="inp" id="pfNick" maxlength="20"></div>
+    <div style="flex:1;min-width:110px">
+      <label class="lb">学年</label>
+      <input class="inp" id="pfGrade" placeholder="小5 / 中1"></div>
+  </div>
+  <label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer;
+    font-size:13px;margin:12px 0">
+    <input type="checkbox" id="pfShowGrade" style="margin-top:4px">
+    <span><b>学年を みんなに 見せる</b>
+      <div style="font-size:11.5px;color:var(--muted);line-height:1.75">
+        「小4が つくった」と 出ます。プログラミングは 大人だけの ものじゃない、と
+        見せられます。いやなら オフの ままで だいじょうぶです。</div></span></label>
+  <label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer;
+    font-size:13px;margin-bottom:14px">
+    <input type="checkbox" id="pfFuri" style="margin-top:4px">
+    <span><b>文字を 大きく する</b>
+      <div style="font-size:11.5px;color:var(--muted)">読みやすく なります</div>
+    </span></label>
+  <div class="row" style="margin:0">
+    <button class="btn" onclick="saveProfile()">ほぞん</button>
+    <span id="pfMsg" style="font-size:12.5px"></span>
+  </div>
+</div>
+
+<div class="card">
+  <h2 style="margin:0 0 10px;border:none;padding:0">じぶんの ばしょ</h2>
+  <p style="font-size:12.5px;color:var(--muted);margin-bottom:10px">
+    この ID が、じぶんの ページの URL に なります。
+    ともだちに おしえると、公開した ものを 見て もらえます。</p>
+  <div class="oid" id="myOid">—</div>
+  <div class="row" style="margin-top:11px">
+    <button class="btn gh sm" onclick="copyOid()">リンクを コピー</button>
+    <button class="btn gh sm" onclick="goOwner(ME.owner_id,'prog_code')">
+      じぶんの ページを 見る</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+var AV = {kind:'letter', avatar:'', color:''};
+var EMOS = ['🫘','🌱','🌻','🐱','🐶','🐼','🦊','🐸','🐧','🦉','🐢','🦋',
+            '🍎','🍊','🍇','🍓','🍰','🍜','⚽','🎮','🎨','🎵','🚀','⭐',
+            '🌈','☀️','🌙','❄️','🔥','💧','🌸','🍀'];
+var COLS = ['#65a30d','#16a34a','#059669','#0891b2','#0284c7','#7c3aed',
+            '#9333ea','#db2777','#dc2626','#ea580c','#d97706','#4d7c0f'];
+
+function drawAv(){
+  var el = $('avPrev');
+  var col = AV.color || pickColor(ME ? ME.owner_id : 'x');
+  if (AV.kind === 'img' && AV.avatar){
+    el.style.background = '';
+    el.innerHTML = '<img src="' + K(AV.avatar) + '">';
+  } else if (AV.kind === 'emoji' && AV.avatar){
+    el.style.background = col;
+    el.textContent = AV.avatar;
+  } else {
+    el.style.background = col;
+    el.textContent = (ME && ME.nickname ? ME.nickname.charAt(0) : '?');
+  }
+}
+
+function avTab(k){
+  AV.kind = k;
+  ['letter','emoji','img','draw'].forEach(function(x){
+    $('at_' + x).classList.toggle('on', x === k); });
+  var b = $('avBody');
+  if (k === 'letter' || k === 'emoji'){
+    b.innerHTML = '<div style="font-size:11.5px;color:var(--muted)">いろ</div>'
+      + '<div class="cols">' + COLS.map(function(c){
+          return '<div style="background:' + c + '" onclick="setCol(\'' + c
+            + '\')" class="' + (AV.color === c ? 'on' : '') + '"></div>';
+        }).join('') + '</div>'
+      + (k === 'emoji'
+          ? '<div style="font-size:11.5px;color:var(--muted);margin-top:12px">'
+            + 'えらぶ</div><div class="emos">' + EMOS.map(function(e){
+                return '<div onclick="setEmo(\'' + e + '\')" class="'
+                  + (AV.avatar === e ? 'on' : '') + '">' + e + '</div>';
+              }).join('') + '</div>'
+          : '');
+  } else if (k === 'img'){
+    b.innerHTML = '<input type="file" accept="image/*" id="avFile" '
+      + 'onchange="pickImg(this)" style="font-size:12.5px">'
+      + '<div style="font-size:11.5px;color:var(--muted);margin-top:7px;'
+      + 'line-height:1.75">じぶんの かおの 写真は やめましょう。'
+      + '小さく して ほぞんします。</div>';
+  } else {
+    b.innerHTML = '<div style="font-size:12.5px;color:var(--muted)">'
+      + 'よみこみ中…</div>';
+    loadMyDraws();
+  }
+  drawAv();
+}
+
+function setCol(c){ AV.color = c; avTab(AV.kind); }
+function setEmo(e){ AV.avatar = e; avTab('emoji'); }
+
+function pickImg(inp){
+  var f = inp.files[0];
+  if (!f) return;
+  var r = new FileReader();
+  r.onload = function(){
+    var im = new Image();
+    im.onload = function(){
+      // 128x128 に 小さく する
+      var cv = document.createElement('canvas');
+      cv.width = cv.height = 128;
+      var g = cv.getContext('2d');
+      var s = Math.min(im.width, im.height);
+      g.drawImage(im, (im.width - s) / 2, (im.height - s) / 2, s, s,
+                  0, 0, 128, 128);
+      AV.avatar = cv.toDataURL('image/jpeg', 0.82);
+      AV.kind = 'img';
+      drawAv();
+    };
+    im.src = r.result;
+  };
+  r.readAsDataURL(f);
+}
+
+async function loadMyDraws(){
+  var d = await J('/api/mp/draws?mine=1');
+  var b = $('avBody');
+  if (!d.ok || !d.draws.length){
+    b.innerHTML = '<div style="font-size:12.5px;color:var(--muted)">'
+      + 'まだ えが ありません。<a href="/oma_pj/draw" '
+      + 'style="color:var(--main2)">おえかき</a> で かいて みて ください。</div>';
+    return;
+  }
+  b.innerHTML = '<div class="emos" style="grid-template-columns:'
+    + 'repeat(auto-fill,minmax(56px,1fr))">'
+    + d.draws.filter(function(x){ return x.thumb; }).map(function(x){
+        return '<div onclick="useDraw(\'' + x.id + '\')" style="padding:0;'
+          + 'overflow:hidden"><img src="' + K(x.thumb) + '" '
+          + 'style="width:100%;height:100%;object-fit:contain"></div>';
+      }).join('') + '</div>';
+}
+
+async function useDraw(id){
+  var d = await J('/api/mp/draw/' + id);
+  if (d.ok !== true) return;
+  AV.kind = 'img';
+  AV.avatar = d.draw.thumb;
+  drawAv();
+}
+
+async function saveAvatar(){
+  var m = $('avMsg');
+  var d = await P('/api/mp/avatar',
+    {kind: AV.kind, avatar: AV.avatar, color: AV.color});
+  if (d.ok !== true){ m.style.color = '#c0453b'; m.textContent = d.error; return; }
+  m.style.color = 'var(--main2)'; m.textContent = 'ほぞん しました';
+  loadMe();
+}
+
+async function saveProfile(){
+  var m = $('pfMsg');
+  var nick = $('pfNick').value.trim();
+  if (!nick){ m.style.color = '#c0453b';
+    m.textContent = 'ニックネームを 入れて ください'; return; }
+  var d = await P('/api/mp/profile', {
+    nickname: nick, grade: $('pfGrade').value.trim(),
+    show_grade: $('pfShowGrade').checked, furigana: $('pfFuri').checked});
+  if (d.ok !== true){ m.style.color = '#c0453b'; m.textContent = d.error; return; }
+  m.style.color = 'var(--main2)'; m.textContent = 'ほぞん しました';
+  loadMe();
+}
+
+function copyOid(){
+  var url = location.origin + '/oma_pj/prog_code/me/every_watch';
+  if (navigator.clipboard)
+    navigator.clipboard.writeText(url).then(function(){
+      toast('コピー しました'); });
+  else prompt('この リンクを コピー して ください', url);
+}
+
+loadMe().then(function(m){
+  if (!m) return;
+  $('pfNick').value = m.nickname || '';
+  $('pfGrade').value = m.grade || '';
+  $('pfShowGrade').checked = !!m.show_grade;
+  $('pfFuri').checked = !!m.furigana;
+  $('myOid').textContent = '/oma_pj/<プロジェクト>/' + (m.owner_id || '') ;
+  AV.kind = m.avatar_kind || 'letter';
+  AV.avatar = m.avatar || '';
+  AV.color = m.color || '';
+  avTab(AV.kind);
+});
+</script>
+{% endblock %}
