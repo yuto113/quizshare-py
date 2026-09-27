@@ -172,7 +172,9 @@ async function showWatch(){
     + (IS_MINE ? '<button class="btn gh" onclick="location.href=\''
         + '/oma_pj/prog_code/' + OWNER_ID + '/make/' + COL_ID
         + '\'">✏️ なおす</button>' : '')
-    + '<button class="btn gh sm" onclick="copyLink()">🔗 リンク</button></div>'
+    + '<button class="btn gh sm" onclick="copyLink()">🔗 リンク</button>'
+    + (IS_MINE ? '<button class="btn gh sm" onclick="openPages()">'
+        + '🌐 ページ</button>' : '') + '</div>'
     + '<div id="prevBar"><span>けっか</span><span style="flex:1"></span>'
     + '<button class="btn" onclick="bigRun()">⛶ 大きく</button></div>'
     + '<iframe id="preview" sandbox="allow-scripts allow-modals"></iframe>'
@@ -241,6 +243,8 @@ async function showMake(){
     + '</div></div>'
     + '<div class="row" style="margin-top:11px">'
     + '<button class="btn mn" onclick="runCode()">▶ うごかす</button>'
+    + (IS_EX ? '' : '<button class="btn gh" onclick="openPages()">'
+        + '🌐 ページ</button>')
     + (IS_EX
         ? '<button class="btn mn" onclick="saveApp(0)">'
           + '💾 のこす（会員に なる）</button>'
@@ -608,6 +612,91 @@ function setupGamen(frameEl, files){
   window.addEventListener('message', window._omaMsg);
 }
 
+
+
+/* ============ 公開ページ ============ */
+async function openPages(){
+  var d = await J('/api/mp/pages');
+  if (d.ok !== true){ toast(d.error, 'error'); return; }
+  openModal(
+      '<h1 style="font-size:18px;margin-bottom:4px">🌐 公開ページ</h1>'
+    + '<p style="font-size:12.5px;color:var(--muted);line-height:1.8;'
+    + 'margin-bottom:14px">じぶんの URL で、作品だけを 見せられます。'
+    + '会員じゃ ない 人にも 見せられます（家族や 友だちに どうぞ）。</p>'
+    + '<div class="note" style="margin-bottom:14px">つくれるのは '
+    + d.used + ' / ' + (d.limit >= 100000000 ? 'むせいげん' : d.limit)
+    + ' こ です</div>'
+    + '<div class="card" style="background:var(--paper)">'
+    + '<b style="font-size:12.5px">＋ あたらしい ページ</b>'
+    + '<div class="row" style="margin-top:9px">'
+    + '<span style="font-size:12px;color:var(--muted)">/oma_pj/page/</span>'
+    + '<input class="inp" id="pgSlug" placeholder="mygame" '
+    + 'style="flex:1;min-width:110px">'
+    + '<input class="inp" id="pgIcon" placeholder="🎮" maxlength="4" '
+    + 'style="max-width:62px"></div>'
+    + '<div class="row">'
+    + '<select class="sel" id="pgApp" style="flex:1;min-width:130px">'
+    + (d.my_apps.length
+        ? d.my_apps.map(function(a){
+            return '<option value="' + a.id + '">' + K(a.title) + '</option>';
+          }).join('')
+        : '<option value="">公開ずみの 作品が ありません</option>')
+    + '</select>'
+    + '<input class="inp" id="pgTitle" placeholder="タブに 出す 名前（にんい）" '
+    + 'style="flex:1;min-width:130px"></div>'
+    + '<div class="row" style="margin:0">'
+    + '<button class="btn mn" onclick="savePage()">つくる</button>'
+    + '<span id="pgMsg" style="font-size:12.5px"></span></div></div>'
+    + (d.pages.length
+        ? '<div style="font-size:11px;color:var(--muted);font-weight:700;'
+          + 'margin:16px 0 7px">つくった ページ</div>'
+          + d.pages.map(function(p){
+              return '<div class="card" style="display:flex;align-items:center;'
+                + 'gap:10px">'
+                + '<span style="font-size:22px">' + K(p.favicon || '🎈') + '</span>'
+                + '<div style="flex:1;min-width:0">'
+                + '<a href="/oma_pj/page/' + K(p.slug) + '" target="_blank" '
+                + 'style="color:var(--main2);font-weight:600;font-size:13px">'
+                + '/oma_pj/page/' + K(p.slug) + '</a>'
+                + '<div style="font-size:11.5px;color:var(--muted)">'
+                + K(p.app_title) + ' · 👁' + p.views + '</div></div>'
+                + '<button class="btn gh sm" onclick="copyPage(\'' + K(p.slug)
+                + '\')">リンク</button>'
+                + '<button class="btn gh sm" onclick="delPage(\'' + K(p.slug)
+                + '\')">けす</button></div>';
+            }).join('')
+        : '')
+    + '<div class="row" style="margin-top:14px">'
+    + '<button class="btn gh" onclick="closeModal()">とじる</button></div>');
+}
+
+async function savePage(){
+  var m = $('pgMsg');
+  var slug = $('pgSlug').value.trim().toLowerCase();
+  var app = $('pgApp').value;
+  if (!slug){ m.style.color = '#c0453b';
+    m.textContent = 'URLの 名前を 入れて ください'; return; }
+  if (!app){ m.style.color = '#c0453b';
+    m.textContent = 'さきに 作品を 公開して ください'; return; }
+  var d = await P('/api/mp/page', {slug: slug, app_id: parseInt(app),
+    title: $('pgTitle').value, favicon: $('pgIcon').value});
+  if (d.ok !== true){ m.style.color = '#c0453b'; m.textContent = d.error; return; }
+  openPages();
+}
+
+function copyPage(slug){
+  var url = location.origin + '/oma_pj/page/' + slug;
+  if (navigator.clipboard)
+    navigator.clipboard.writeText(url).then(function(){
+      toast('コピー しました'); });
+  else prompt('この リンクを コピーして ください', url);
+}
+
+async function delPage(slug){
+  if (!confirm('/oma_pj/page/' + slug + ' を けしますか？')) return;
+  await fetch('/api/mp/page/' + slug, {method:'DELETE'});
+  openPages();
+}
 
 /* ============ 体験版 ============ */
 function keepWork(){
