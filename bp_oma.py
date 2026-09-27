@@ -137,8 +137,10 @@ def oma_home():
 
 @bp_oma.route('/oma_pj/rules')
 def oma_rules():
+    """きまりは だれでも 見られる。"""
     return render_template('oma/rules.html', page='rules',
-                           first=request.args.get('first'))
+                           first=request.args.get('first'),
+                           guest=(not _me()))
 
 
 @bp_oma.route('/oma_pj/me')
@@ -165,6 +167,18 @@ def oma_page(slug):
 
 
 # ---- プロジェクトごと ----
+@bp_oma.route('/oma_pj/<proj>/ex')
+def oma_ex(proj):
+    """体験版。ログインなしで さわれる。ほぞんは できない。"""
+    if proj not in ('prog_code', 'prog_block'):
+        abort(404)
+    # もう 入って いる 人には /ex は いらない
+    if _me():
+        return redirect('/oma_pj/%s/me/make' % proj)
+    return render_template('oma/' + proj + '.html', page=proj,
+                           proj=proj, view='make', ex=True)
+
+
 @bp_oma.route('/oma_pj/<proj>')
 def oma_proj(proj):
     if proj not in PROJS:

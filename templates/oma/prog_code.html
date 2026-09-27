@@ -37,12 +37,12 @@
 
 .edit{flex:1;min-width:0;display:flex;flex-direction:column}
 .ed-hd{display:flex;align-items:center;gap:7px;background:var(--dark);
-  color:#d9f99d;padding:7px 12px;border-radius:10px 10px 0 0;font-size:12px;
+  color:#bbf7d0;padding:7px 12px;border-radius:10px 10px 0 0;font-size:12px;
   font-family:ui-monospace,Menlo,Consolas,monospace}
 .ed-hd .sp{flex:1}
 .ed-hd .btn{padding:3px 10px;font-size:11px;background:none;
-  border:1px solid #3f6212;color:#d9f99d}
-.ed-hd .btn:hover{background:#2d4a0a}
+  border:1px solid #15803d;color:#bbf7d0}
+.ed-hd .btn:hover{background:#064e3b}
 .code2{width:100%;min-height:380px;padding:12px;border:1px solid var(--line2);
   border-top:none;border-radius:0 0 10px 10px;
   font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;
@@ -51,20 +51,20 @@
 #preview{width:100%;height:340px;border:1px solid var(--line2);
   border-radius:0 0 10px 10px;background:#fff;display:none}
 #prevBar{display:none;align-items:center;gap:7px;margin-top:11px;
-  padding:6px 11px;background:var(--dark);color:#d9f99d;
+  padding:6px 11px;background:var(--dark);color:#bbf7d0;
   border-radius:10px 10px 0 0;font-size:12px}
 #prevBar .btn{padding:3px 10px;font-size:11px;background:none;
-  border:1px solid #3f6212;color:#d9f99d}
+  border:1px solid #15803d;color:#bbf7d0}
 
 .owner-hd{background:linear-gradient(135deg,var(--dark),var(--dark2));
   color:#fff;border-radius:14px;padding:22px 24px;margin-bottom:20px;
   display:flex;align-items:center;gap:18px;flex-wrap:wrap}
 .owner-hd .nm{font-size:20px;font-weight:700}
-.owner-hd .sub2{font-size:12.5px;color:#c8e6a0;margin-top:3px}
+.owner-hd .sub2{font-size:12.5px;color:#a7f3d0;margin-top:3px}
 .owner-hd .st{display:flex;gap:22px;margin-left:auto;flex-wrap:wrap}
 .owner-hd .st div{text-align:center}
 .owner-hd .st b{display:block;font-size:21px;color:var(--acc)}
-.owner-hd .st span{font-size:11px;color:#9ab873}
+.owner-hd .st span{font-size:11px;color:#7fbf9a}
 
 @media(max-width:700px){ .ide{flex-direction:column} .side{width:100%} }
 {% endblock %}
@@ -210,6 +210,13 @@ function copyLink(){
 /* ============ つくる ============ */
 async function showMake(){
   $('body').innerHTML =
+      (IS_EX
+        ? '<div class="note" style="background:#dcfce7;border-color:#22c55e">'
+          + '<b>🫘 体験版です</b>'
+          + 'ログインしないで プログラミングを ためせます。'
+          + 'できた ものを のこしたい ときは、下の「のこす」を おして ください。'
+          + 'ページを とじると きえます。</div>'
+        : '') +
       '<div class="row">'
     + '<input class="inp" id="eTitle" placeholder="だいめい" '
     + 'style="flex:1;min-width:160px">'
@@ -234,8 +241,11 @@ async function showMake(){
     + '</div></div>'
     + '<div class="row" style="margin-top:11px">'
     + '<button class="btn mn" onclick="runCode()">▶ うごかす</button>'
-    + '<button class="btn" onclick="saveApp(0)">下書きで ほぞん</button>'
-    + '<button class="btn" onclick="saveApp(1)">公開する</button>'
+    + (IS_EX
+        ? '<button class="btn mn" onclick="saveApp(0)">'
+          + '💾 のこす（会員に なる）</button>'
+        : '<button class="btn" onclick="saveApp(0)">下書きで ほぞん</button>'
+          + '<button class="btn" onclick="saveApp(1)">公開する</button>')
     + '<span id="eMsg" style="font-size:12.5px"></span></div>'
     + '<div id="prevBar"><span>けっか</span><span style="flex:1"></span>'
     + '<button class="btn" onclick="bigRun()">⛶ 大きく</button></div>'
@@ -254,6 +264,7 @@ async function showMake(){
       $('eDiff').value = String(d.item.difficulty || 1);
     }
   }
+  if (restoreWork()) return;
   if (!FILES.length)
     FILES = [{path:'main.py', content:'print("こんにちは")\n',
               kind:'py', is_entry:1}];
@@ -333,6 +344,13 @@ async function saveApp(pub){
   if (FILES[CUR]) FILES[CUR].content = $('eCode').value;
   var m = $('eMsg');
   var t = $('eTitle').value.trim();
+
+  // 体験版。つくった ものを あずかって、ログインへ さそう。
+  if (IS_EX){
+    keepWork();
+    askJoin();
+    return;
+  }
   if (!t){ m.style.color = '#c0453b'; m.textContent = 'だいめいを 入れて ください';
     return; }
   var d = await P('/api/mp/col/prog_code/save', {
@@ -496,18 +514,18 @@ function setupGamen(frameEl, files){
   window.gamenReady = function(){
     frameEl.srcdoc = '<!DOCTYPE html><html><head><meta charset="utf-8">'
       + '<style>body{font-family:"Hiragino Sans","Noto Sans JP",sans-serif;'
-      + 'padding:16px;line-height:1.85;font-size:14px;margin:0;color:#1a2e05}'
+      + 'padding:16px;line-height:1.85;font-size:14px;margin:0;color:#052e16}'
       + 'button,input[type=submit]{font-size:14px;padding:8px 18px;'
-      + 'margin:4px 6px 4px 0;border:none;border-radius:8px;background:#65a30d;'
+      + 'margin:4px 6px 4px 0;border:none;border-radius:8px;background:#22c55e;'
       + 'color:#fff;cursor:pointer;font-family:inherit}'
-      + 'button:hover{background:#4d7c0f}'
+      + 'button:hover{background:#16a34a}'
       + 'input,select,textarea{font-size:14px;padding:7px 11px;'
-      + 'border:1px solid #d9f99d;border-radius:7px;margin:4px 6px 4px 0;'
+      + 'border:1px solid #bbf7d0;border-radius:7px;margin:4px 6px 4px 0;'
       + 'font-family:inherit}'
-      + 'a{color:#4d7c0f}'
+      + 'a{color:#16a34a}'
       + 'table{border-collapse:collapse;margin:8px 0}'
-      + 'th,td{border:1px solid #d9f99d;padding:6px 12px;text-align:left}'
-      + 'th{background:#f7fee7}'
+      + 'th,td{border:1px solid #bbf7d0;padding:6px 12px;text-align:left}'
+      + 'th{background:#f0fdf4}'
       + 'h1{font-size:21px;margin:10px 0}h2{font-size:17px;margin:9px 0}'
       + '</style>' + (css ? '<style>' + css + '</style>' : '')
       + '</head><body><div id="g"></div>'
@@ -590,6 +608,82 @@ function setupGamen(frameEl, files){
   window.addEventListener('message', window._omaMsg);
 }
 
+
+/* ============ 体験版 ============ */
+function keepWork(){
+  try {
+    sessionStorage.setItem('oma_ex_work', JSON.stringify({
+      proj: PROJ,
+      title: $('eTitle') ? $('eTitle').value : '',
+      summary: $('eSummary') ? $('eSummary').value : '',
+      tags: $('eTags') ? $('eTags').value : '',
+      difficulty: $('eDiff') ? $('eDiff').value : '1',
+      files: FILES, db: DB, at: Date.now()
+    }));
+  } catch(e){}
+}
+
+function takeWork(){
+  try {
+    var raw = sessionStorage.getItem('oma_ex_work');
+    if (!raw) return null;
+    var w = JSON.parse(raw);
+    sessionStorage.removeItem('oma_ex_work');
+    // 1時間 いじょう 前の ものは すてる
+    if (!w.at || Date.now() - w.at > 3600000) return null;
+    return w;
+  } catch(e){ return null; }
+}
+
+function askJoin(){
+  openModal(
+      '<div style="text-align:center;padding:6px 0 2px">'
+    + '<div style="font-size:42px">🫘</div>'
+    + '<h1 style="font-size:19px;margin:10px 0 6px">'
+    + 'つくった ものを のこしますか？</h1>'
+    + '<p style="font-size:13px;color:var(--muted);line-height:1.9;'
+    + 'margin-bottom:18px">'
+    + '会員に なると、いま つくった ものを その まま ほぞん できます。<br>'
+    + 'ニックネームと パスワードだけ。本名は いりません。<br>'
+    + '<b style="color:var(--main2)">いま かいた コードは あずかって います。</b>'
+    + '</p>'
+    + '<div style="display:grid;gap:9px">'
+    + '<button class="btn mn" style="padding:12px" '
+    + 'onclick="goJoin(\'reg\')">✨ 会員に なる（はじめての人）</button>'
+    + '<button class="btn" style="padding:12px" '
+    + 'onclick="goJoin(\'login\')">ログイン する</button>'
+    + '<button class="btn gh" onclick="closeModal()">'
+    + 'あとで（つづきを かく）</button></div>'
+    + '<p style="font-size:11.5px;color:var(--muted);margin-top:14px;'
+    + 'line-height:1.75">ページを とじると、つくった ものは きえます。</p>'
+    + '</div>');
+}
+
+function goJoin(which){
+  location.href = '/oma_pj/login?back=' + encodeURIComponent(PROJ)
+    + (which === 'reg' ? '&new=1' : '');
+}
+
+/* ログインした あと、あずけた ものを もどす */
+function restoreWork(){
+  if (IS_EX) return false;
+  var w = takeWork();
+  if (!w || w.proj !== PROJ) return false;
+  FILES = w.files || [];
+  DB = w.db || {name:'app.db', schema:'', seed:''};
+  if ($('eTitle')) $('eTitle').value = w.title || '';
+  if ($('eSummary')) $('eSummary').value = w.summary || '';
+  if ($('eTags')) $('eTags').value = w.tags || '';
+  if ($('eDiff')) $('eDiff').value = w.difficulty || '1';
+  CUR = 0;
+  pick(0, true);
+  if ($('eMsg')){
+    $('eMsg').style.color = 'var(--main2)';
+    $('eMsg').textContent = '体験版で つくった ものを もどしました。'
+      + 'ほぞん できます';
+  }
+  return true;
+}
 /* ============ うごかす（ブラウザの 中だけ） ============ */
 function outWrite(el, s, cls){
   var d = document.createElement('div');

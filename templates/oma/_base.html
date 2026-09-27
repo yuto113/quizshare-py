@@ -7,16 +7,16 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --dark:#1a2e05;      /* こい つち */
-  --dark2:#2d4a0a;
-  --main:#65a30d;      /* きみどり（まめ・わかば） */
-  --main2:#4d7c0f;
+  --dark:#052e16;      /* こい つち */
+  --dark2:#064e3b;
+  --main:#22c55e;      /* きみどり（まめ・わかば） */
+  --main2:#16a34a;
   --acc:#05f75f;       /* ひかる みどり */
-  --paper:#f7fee7;     /* うすい きみどり */
-  --line:#d9f99d;
-  --line2:#e2e8d0;
-  --text:#1a2e05;
-  --muted:#6b7a52;
+  --paper:#f0fdf4;     /* うすい きみどり */
+  --line:#bbf7d0;
+  --line2:#dcead9;
+  --text:#052e16;
+  --muted:#5a7a63;
 }
 body{font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;
   background:var(--paper);color:var(--text);line-height:1.7}
@@ -30,8 +30,8 @@ body.furi{font-size:16.5px;line-height:1.9}
 .logo em{font-style:normal;color:var(--acc)}
 .logo .bean{font-size:19px}
 .hd .sp{flex:1}
-.hd .who{font-size:12px;color:#a8c47a;white-space:nowrap}
-.hd button{background:none;border:none;color:#c8e6a0;font-size:12.5px;
+.hd .who{font-size:12px;color:#86c9a4;white-space:nowrap}
+.hd button{background:none;border:none;color:#a7f3d0;font-size:12.5px;
   cursor:pointer;padding:6px 10px;border-radius:7px;font-family:inherit}
 .hd button:hover{background:rgba(255,255,255,.1);color:#fff}
 .badge{background:#dc2626;color:#fff;border-radius:99px;padding:1px 6px;
@@ -40,7 +40,7 @@ body.furi{font-size:16.5px;line-height:1.9}
 .cat{background:var(--dark2);padding:0 18px;display:flex;gap:1px;
   overflow-x:auto;position:sticky;top:45px;z-index:49;scrollbar-width:none}
 .cat::-webkit-scrollbar{display:none}
-.cat a{background:none;border:none;color:#b8d48a;font-size:13px;
+.cat a{background:none;border:none;color:#8fd4ae;font-size:13px;
   padding:11px 16px;text-decoration:none;white-space:nowrap;
   border-bottom:2px solid transparent;transition:.12s}
 .cat a:hover{color:#fff;background:rgba(255,255,255,.07)}
@@ -68,7 +68,7 @@ h2{font-size:16px;margin:26px 0 11px;padding-bottom:7px;
 .btn:disabled{background:#c5cdb5;cursor:not-allowed}
 .btn.mn{background:var(--main)}.btn.mn:hover{background:var(--main2)}
 .btn.gh{background:none;border:1px solid var(--line2);color:var(--text)}
-.btn.gh:hover{background:#eef4e0}
+.btn.gh:hover{background:#e4f6ec}
 .btn.sm{padding:5px 12px;font-size:11.5px}
 .btn.ng{background:#dc2626;color:#fff}
 
@@ -92,10 +92,10 @@ label.lb{font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px}
 .hero{background:linear-gradient(135deg,var(--dark),var(--dark2));color:#fff;
   border-radius:15px;padding:32px 30px;margin-bottom:24px}
 .hero h1{font-size:25px;margin-bottom:10px}
-.hero p{font-size:14px;color:#c8e6a0;line-height:1.9;margin-bottom:20px}
+.hero p{font-size:14px;color:#a7f3d0;line-height:1.9;margin-bottom:20px}
 .hero .stats{display:flex;gap:32px;flex-wrap:wrap}
 .hero .stat b{display:block;font-size:31px;color:var(--acc);line-height:1.1}
-.hero .stat span{font-size:12px;color:#9ab873}
+.hero .stat span{font-size:12px;color:#7fbf9a}
 
 .rulebox{background:#fefce8;border:1px solid #fde68a;border-radius:10px;
   padding:11px 14px;font-size:12px;color:#713f12;line-height:1.8;margin-bottom:16px}
@@ -106,7 +106,7 @@ label.lb{font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px}
   padding:12px 15px;font-size:12.5px;color:#78350f;margin-bottom:16px}
 .err{background:#fef2f2;border:1px solid #fecaca;border-radius:10px;
   padding:12px 15px;font-size:12.5px;color:#991b1b;margin-bottom:16px}
-.empty{padding:40px 0;text-align:center;color:#9aa885;font-size:13px}
+.empty{padding:40px 0;text-align:center;color:#93b3a1;font-size:13px}
 
 .modal{position:fixed;inset:0;background:rgba(26,46,5,.6);z-index:100;
   display:none;align-items:center;justify-content:center;padding:20px}
@@ -119,7 +119,7 @@ label.lb{font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px}
   font-size:13px;opacity:0;transition:.24s;pointer-events:none;z-index:120}
 #toast.on{opacity:1;bottom:32px}
 
-.out{background:var(--dark);color:#d9f99d;
+.out{background:var(--dark);color:#bbf7d0;
   font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;
   padding:13px;border-radius:10px;min-height:110px;max-height:340px;
   overflow:auto;white-space:pre-wrap;word-break:break-all;margin-top:11px}
@@ -145,13 +145,30 @@ label.lb{font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px}
     <span class="bean">🫘</span>Omame<em>PJ</em></span>
   <span class="sp"></span>
   <span class="who" id="whoami"></span>
+  {% if ex %}
+  <span style="font-size:11.5px;background:#05f75f;color:#042f1a;
+    padding:3px 11px;border-radius:99px;font-weight:700">体験版</span>
+  <button onclick="location.href='/oma_pj/login'"
+    style="background:var(--acc);color:#042f1a;font-weight:700">
+    会員に なる</button>
+  {% else %}
   <button onclick="location.href='/oma_pj/notices'" title="おしらせ">🔔<span
     id="nvBadge"></span></button>
   <button onclick="location.href='/oma_pj/me'" title="せってい">⚙</button>
   <button onclick="omaLogout()">ログアウト</button>
+  {% endif %}
 </div>
 
 <div class="cat">
+  {% if ex %}
+  <a href="/oma_pj/prog_code/ex" {% if page=='prog_code' %}class="on"{% endif %}>
+    ⌨️ コード</a>
+  <a href="/oma_pj/prog_block/ex" {% if page=='prog_block' %}class="on"{% endif %}>
+    🧩 ブロック</a>
+  <a href="/oma_pj/rules" {% if page=='rules' %}class="on"{% endif %}>📜 きまり</a>
+  <a href="/oma_pj/login">✨ 会員に なる</a>
+</div>
+{% else %}
   <a href="/oma_pj/home" {% if page=='home' %}class="on"{% endif %}>🏠 ホーム</a>
   <a href="/oma_pj/prog_code" {% if page=='prog_code' %}class="on"{% endif %}>⌨️ コード</a>
   <a href="/oma_pj/prog_block" {% if page=='prog_block' %}class="on"{% endif %}>🧩 ブロック</a>
@@ -163,8 +180,9 @@ label.lb{font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px}
   <a href="/oma_pj/poll" {% if page=='poll' %}class="on"{% endif %}>🗳 とうひょう</a>
   <a href="/oma_pj/rules" {% if page=='rules' %}class="on"{% endif %}>📜 きまり</a>
 </div>
+{% endif %}
 
-{% block subnav %}{% endblock %}
+{% if not ex %}{% block subnav %}{% endblock %}{% endif %}
 
 <div class="wrap">
 {% block body %}{% endblock %}
@@ -178,6 +196,7 @@ label.lb{font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px}
 var ME = null;
 var OWNER = {{ (owner_id or none) | tojson }};
 var PROJ = {{ page | tojson }};
+var IS_EX = {{ 'true' if ex else 'false' }};
 
 function $(i){ return document.getElementById(i); }
 function K(s){ var d = document.createElement('div');
@@ -197,7 +216,7 @@ function toast(m, kind){
   var t = $('toast');
   if (!t) { alert(m); return; }
   t.textContent = m;
-  t.style.background = (kind === 'error') ? '#991b1b' : '#1a2e05';
+  t.style.background = (kind === 'error') ? '#991b1b' : '#052e16';
   t.classList.add('on');
   setTimeout(function(){ t.classList.remove('on'); }, 2400);
 }
@@ -211,7 +230,16 @@ function openModal(html){
 /* ---- じぶんの こと ---- */
 async function loadMe(){
   var d = await J('/api/mp/me');
-  if (!d.logged_in){ location.href = '/oma_pj'; return null; }
+  if (!d.logged_in){
+    if (IS_EX) return null;        // 体験版は ログインなしで よい
+    location.href = '/oma_pj';
+    return null;
+  }
+  // ログインして いるのに /ex なら、ふつうの ページへ
+  if (IS_EX){
+    location.href = location.pathname.replace(/\/ex$/, '/me/make');
+    return null;
+  }
   ME = d;
   if ($('whoami')) $('whoami').textContent = d.nickname || '';
   document.body.classList.toggle('furi', !!d.furigana);
@@ -263,7 +291,7 @@ function avHtml(m, small){
     + K(ch) + '</div>';
 }
 function pickColor(seed){
-  var C = ['#65a30d','#16a34a','#0891b2','#7c3aed','#db2777',
+  var C = ['#22c55e','#16a34a','#0891b2','#7c3aed','#db2777',
            '#ea580c','#059669','#0284c7','#9333ea','#c2410c'];
   var n = 0;
   for (var i = 0; i < String(seed).length; i++) n += String(seed).charCodeAt(i);

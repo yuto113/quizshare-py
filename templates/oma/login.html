@@ -7,9 +7,9 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --dark:#1a2e05; --dark2:#2d4a0a; --main:#65a30d; --main2:#4d7c0f;
-  --acc:#05f75f; --paper:#f7fee7; --line:#d9f99d; --line2:#e2e8d0;
-  --text:#1a2e05; --muted:#6b7a52;
+  --dark:#052e16; --dark2:#064e3b; --main:#22c55e; --main2:#16a34a;
+  --acc:#05f75f; --paper:#f0fdf4; --line:#bbf7d0; --line2:#dcead9;
+  --text:#052e16; --muted:#5a7a63;
 }
 body{font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;
   background:var(--paper);color:var(--text);line-height:1.7;min-height:100vh}
@@ -194,6 +194,12 @@ async function J(u,o){ var r=await fetch(u,o);
 function P(u,b){ return J(u,{method:'POST',headers:{'Content-Type':'application/json'},
                              body:JSON.stringify(b||{})}); }
 
+function backTo(){
+  var m = /[?&]back=([a-z_]+)/.exec(location.search);
+  if (m) return '/oma_pj/' + m[1] + '/me/make';
+  return '/oma_pj/home';
+}
+
 function show(p){
   document.querySelectorAll('.pane').forEach(function(x){
     x.classList.toggle('on', x.id === 'p-' + p); });
@@ -210,7 +216,7 @@ async function doLogin(){
   var d = await P('/api/mp/login', {
     member_id: $('lId').value.trim(), password: $('lPw').value});
   if (d.ok !== true){ say('lMsg', d.error); return; }
-  location.href = '/oma_pj/home';
+  location.href = backTo();
 }
 
 async function doMirai(){
@@ -218,7 +224,7 @@ async function doMirai(){
     member_id: $('mId').value.trim(), password: $('mPw').value});
   if (d.ok !== true){ say('mMsg', d.error); return; }
   say('mMsg', 'うつりました。ようこそ Omame PJ へ', true);
-  setTimeout(function(){ location.href = '/oma_pj/home'; }, 900);
+  setTimeout(function(){ location.href = backTo(); }, 900);
 }
 
 async function doReg(){
@@ -228,8 +234,17 @@ async function doReg(){
     invite: $('rInv').value.trim()});
   if (d.ok !== true){ say('rMsg', d.error); return; }
   say('rMsg', '会員に なりました。公開できる 作品は ' + d.limit + ' こです', true);
-  setTimeout(function(){ location.href = '/oma_pj/rules?first=1'; }, 1100);
+  setTimeout(function(){
+    var b = backTo();
+    location.href = (b === '/oma_pj/home')
+      ? '/oma_pj/rules?first=1' : b;
+  }, 1100);
 }
+
+/* URL で えらばれて いたら その 画面を 出す */
+(function(){
+  if (/[?&]new=1/.test(location.search)) show('reg');
+})();
 
 /* もう 入って いたら ホームへ */
 (async function(){
