@@ -1534,8 +1534,6 @@ window.addEventListener('popstate', function(){
 });
 
 // URL で作品が指定されていれば、それを開く
-var OPEN_APP = {% if open_app %}{{ open_app }}{% else %}null{% endif %};
-var OPEN_EDIT = {% if open_edit %}{{ open_edit }}{% else %}null{% endif %};
 
 drawCat();
 refreshMe().then(function(){
@@ -1547,3 +1545,22 @@ refreshMe().then(function(){
     if (p) go(p);
   }
 });
+
+
+/* ============ Omame PJ 用の 入り口 ============ */
+function showDrawList(who){
+  window.DRAW_WHO = who || null;
+  drawGallery();
+}
+function showDrawMake(){
+  drawGallery();       // まず えらぶ 画面を 出す
+}
+function showDrawWatch(){
+  if (typeof COL_ID !== 'undefined' && COL_ID) openDrawByCol(COL_ID);
+  else drawGallery();
+}
+async function openDrawByCol(cid){
+  var d = await J('/api/mp/col/draw/' + (OWNER_ID || 'me') + '/' + cid);
+  if (d.ok !== true){ toast(d.error, 'error'); return; }
+  openDraw(d.item.id);
+}
