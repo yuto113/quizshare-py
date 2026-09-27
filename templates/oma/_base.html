@@ -138,6 +138,12 @@ label.lb{font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px}
   h1{font-size:20px}
 }
 {% block style %}{% endblock %}
+
+.ptbox{background:linear-gradient(135deg,#4a9d6e,#3d8460);color:#fff;
+  padding:4px 13px;border-radius:99px;font-size:12px;font-weight:700;
+  cursor:pointer;white-space:nowrap;transition:.14s}
+.ptbox:hover{filter:brightness(1.12)}
+.ptbox b{font-size:13.5px;color:#5fd99a}
 </style></head><body>
 
 <div class="hd">
@@ -145,6 +151,10 @@ label.lb{font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px}
     <span class="bean">🫘</span>Omame<em>PJ</em></span>
   <span class="sp"></span>
   <span class="who" id="whoami"></span>
+  {% if not ex %}
+  <span class="ptbox" id="ptBox" onclick="location.href='/oma_pt'"
+    title="Omame Point">🫘 <b id="ptNum">—</b> PT</span>
+  {% endif %}
   {% if ex %}
   <span style="font-size:11.5px;background:#5fd99a;color:#042f1a;
     padding:3px 11px;border-radius:99px;font-weight:700">体験版</span>
@@ -242,6 +252,7 @@ async function loadMe(){
   }
   ME = d;
   if ($('whoami')) $('whoami').textContent = d.nickname || '';
+  if ($('ptNum')) $('ptNum').textContent = (d.pt != null ? d.pt : 0);
   document.body.classList.toggle('furi', !!d.furigana);
   checkNotices();
   return d;

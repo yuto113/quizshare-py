@@ -174,6 +174,12 @@ def _install(bp_oma, PROJS, _db, _me, owner_to_member, member_to_owner,
                        (db.get('seed') or '')[:20000]))
 
         c.commit(); c.close()
+        if pub:
+            try:
+                import oma_pt
+                oma_pt.add_pt(u['member_id'], 'publish', ref_id=col_id)
+            except Exception:
+                pass
         return jsonify(ok=True, col_id=col_id,
                        owner_id=member_to_owner(u['member_id']))
 
@@ -207,6 +213,13 @@ def _install(bp_oma, PROJS, _db, _me, owner_to_member, member_to_owner,
             if liked:
                 from bp_member import notify
                 notify(owner, 'like', r['id'], u['member_id'], 'いいねが つきました')
+                try:
+                    import oma_pt
+                    oma_pt.add_pt(owner, 'like_got',
+                                  ref_id='%s-%s' % (col_id, u['member_id']),
+                                  by=u['member_id'])
+                except Exception:
+                    pass
             return jsonify(ok=True, liked=liked)
         c.close()
         return jsonify(ok=False, error='まだ'), 501
@@ -253,4 +266,9 @@ def _install(bp_oma, PROJS, _db, _me, owner_to_member, member_to_owner,
         from bp_member import notify
         notify(owner, 'fork', r['id'], u['member_id'],
                'あなたの 作品が コピーされました')
+        try:
+            import oma_pt
+            oma_pt.add_pt(owner, 'fork_got', ref_id=nid, by=u['member_id'])
+        except Exception:
+            pass
         return jsonify(ok=True, col_id=nid)

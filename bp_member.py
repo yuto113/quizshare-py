@@ -186,6 +186,7 @@ def mp_me():
                    nickname=m['nickname'], tier=t, limit=LIMITS[t],
                    published=published_count(m['member_id']),
                    grade=m.get('grade'), school=m.get('school'),
+                   pt=(oma_pt.get_pt(m['member_id'])['pt'] if oma_pt else 0),
                    owner_id=m.get('owner_id'),
                    avatar=m.get('avatar'),
                    avatar_kind=m.get('avatar_kind'),
@@ -434,6 +435,10 @@ def mp_app_like(aid):
     c.commit(); c.close()
     if liked and own:
         notify(own['member_id'], 'like', aid, u['member_id'], 'いいねがつきました')
+        if oma_pt:
+            oma_pt.add_pt(own['member_id'], 'like_got',
+                          ref_id='%s-%s' % (aid, u['member_id']),
+                          by=u['member_id'])
     return jsonify(ok=True, liked=liked)
 
 
@@ -461,12 +466,19 @@ def mp_app_fork(aid):
     owner = r['member_id']
     c.commit(); c.close()
     notify(owner, 'fork', aid, u['member_id'], 'あなたの作品がコピーされました')
+    if oma_pt:
+        oma_pt.add_pt(owner, 'fork_got', ref_id=nid, by=u['member_id'])
     return jsonify(ok=True, id=nid)
 
 
 # ====================================================================
 # 決まりごと
 # ====================================================================
+try:
+    import oma_pt
+except Exception:
+    oma_pt = None
+
 RULES_VERSION = '2.0'
 
 RULES = [
@@ -1700,6 +1712,9 @@ def mp_wiki_save(slug):
                          (d.get('tags') or '')[:120], u['member_id'], u['member_id']))
         wid = cur.lastrowid
     c.commit(); c.close()
+    if oma_pt:
+        oma_pt.add_pt(u['member_id'], 'wiki_new' if not old else 'wiki_edit',
+                      ref_id='w%s-%s' % (wid, 'n' if not old else _today_key()))
     return jsonify(ok=True, id=wid)
 
 
@@ -1815,6 +1830,8 @@ def mp_qa_answer(qid):
     if q:
         notify(q['member_id'], 'comment', None, u['member_id'],
                'しつもんに こたえが つきました')
+    if oma_pt:
+        oma_pt.add_pt(u['member_id'], 'answer', ref_id='q%s' % qid)
     return jsonify(ok=True)
 
 
@@ -1835,6 +1852,9 @@ def mp_qa_best(qid, aid):
     if a:
         notify(a['member_id'], 'comment', None, u['member_id'],
                'あなたの こたえが えらばれました')
+        if oma_pt:
+            oma_pt.add_pt(a['member_id'], 'best', ref_id='a%s' % aid,
+                          by=u['member_id'])
     return jsonify(ok=True)
 
 
@@ -2368,6 +2388,8 @@ def mp_draw_save():
                    (d.get('thumb') or '')[:DRAW_MAX],
                    1 if d.get('public') else 0, did))
     c.commit(); c.close()
+    if oma_pt and d.get('public'):
+        oma_pt.add_pt(u['member_id'], 'draw_pub', ref_id='d%s' % did)
     return jsonify(ok=True, id=did)
 
 
@@ -2408,6 +2430,10 @@ def mp_draw_like(did):
     c.commit(); c.close()
     if liked and own:
         notify(own['member_id'], 'like', None, u['member_id'], 'えに いいねが つきました')
+        if oma_pt:
+            oma_pt.add_pt(own['member_id'], 'like_got',
+                          ref_id='d%s-%s' % (did, u['member_id']),
+                          by=u['member_id'])
     return jsonify(ok=True, liked=liked)
 
 
@@ -2459,3 +2485,46 @@ def mp_post_one(pid):
         (u['member_id'], pid)).fetchall()]
     c.close()
     return jsonify(ok=True, post=dict(p), replies=reps)
+
+
+# ====================================================================
+# OmamePT の API
+# ====================================================================
+
+@bp.route('/api/pt')
+def api_pt():
+    """いま いくつ か と、これまでの きろく"""
+    u = me()
+    if not u:
+        return jsonify(ok=False), 401
+    if not oma_pt:
+        return jsonify(ok=False, error='まだ つかえません'), 503
+    got = oma_pt.daily_login(u['member_id'])      # 今日 はじめてなら たす
+    now = oma_pt.get_pt(u['member_id'])
+    c = _db()
+    logs = [dict(r) for r in c.execute("""
+        SELECT amount, reason, detail, created_at FROM oma_pt_log
+        WHERE member_id=? ORDER BY id DESC LIMIT 60""",
+        (u['member_id'],)).fetchall()]
+    day = c.execute("SELECT earned FROM oma_pt_day WHERE member_id=? AND day=?",
+                    (u['member_id'], oma_pt._today())).fetchone()
+    c.close()
+    return jsonify(ok=True, pt=now['pt'], total=now['total'],
+                   today=(day['earned'] if day else 0),
+                   day_max=oma_pt.DAY_MAX, logs=logs,
+                   bonus=got, earn=oma_pt.EARN)
+
+
+@bp.route('/api/pt/rank')
+def api_pt_rank():
+    """みんなの ならび"""
+    if not me():
+        return jsonify(ok=False), 401
+    c = _db()
+    rows = [dict(r) for r in c.execute("""
+        SELECT p.member_id, p.pt, p.total, m.nickname, m.owner_id,
+               m.avatar, m.avatar_kind, m.color
+        FROM oma_pt p LEFT JOIN mp_member m ON m.member_id = p.member_id
+        WHERE m.status='active' ORDER BY p.total DESC LIMIT 30""").fetchall()]
+    c.close()
+    return jsonify(ok=True, rank=rows)

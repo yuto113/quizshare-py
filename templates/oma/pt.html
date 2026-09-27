@@ -1,0 +1,137 @@
+{% extends "oma/_base.html" %}
+{% block title %}Omame Point — Omame PJ{% endblock %}
+
+{% block style %}
+.ptbig{background:linear-gradient(140deg,#1c2e24,#2a4437);color:#fff;
+  border-radius:16px;padding:32px 30px;margin-bottom:22px;text-align:center}
+.ptbig .n{font-size:52px;font-weight:800;color:#5fd99a;line-height:1.1}
+.ptbig .u{font-size:15px;color:#a7f3d0;margin-left:6px;font-weight:600}
+.ptbig .sub{font-size:12.5px;color:#86c9a4;margin-top:8px}
+.ptbig .bar{height:8px;background:rgba(255,255,255,.14);border-radius:99px;
+  margin:18px auto 7px;max-width:320px;overflow:hidden}
+.ptbig .bar i{display:block;height:100%;background:#5fd99a;border-radius:99px;
+  transition:.4s}
+
+.earn{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
+  gap:9px}
+.earn div{background:#fff;border:1px solid var(--line2);border-radius:10px;
+  padding:11px 13px;font-size:12.5px;display:flex;align-items:center;gap:8px}
+.earn b{margin-left:auto;color:var(--main2);font-size:14px}
+
+.log{background:#fff;border:1px solid var(--line2);border-radius:10px;
+  padding:11px 14px;margin-bottom:7px;display:flex;align-items:center;gap:11px}
+.log .a{font-weight:800;font-size:15px;white-space:nowrap}
+.log .a.p{color:var(--main2)}
+.log .a.m{color:#c0453b}
+.log .t{font-size:13px;flex:1;min-width:0}
+.log .w{font-size:11px;color:var(--muted);white-space:nowrap}
+
+.rk{background:#fff;border:1px solid var(--line2);border-radius:10px;
+  padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:12px}
+.rk .no{width:28px;text-align:center;font-weight:800;font-size:15px;
+  color:var(--muted)}
+.rk .no.g1{color:#d4a017;font-size:18px}
+.rk .no.g2{color:#94a3b8;font-size:17px}
+.rk .no.g3{color:#c08552;font-size:16px}
+.rk .nm{flex:1;min-width:0;font-size:13.5px;font-weight:600}
+.rk .pt{font-weight:800;color:var(--main2);font-size:14px}
+.rk.me{border-color:var(--main);background:#f6faf7}
+{% endblock %}
+
+{% block body %}
+<h1>🫘 Omame Point</h1>
+<p class="lead">つくったり、こたえたり すると たまります。
+  ゲームや アイテムと こうかん できます。</p>
+
+<div class="ptbig">
+  <div><span class="n" id="ptNow">—</span><span class="u">PT</span></div>
+  <div class="sub">これまで ためた ぜんぶ： <b id="ptTotal">—</b> PT</div>
+  <div class="bar"><i id="ptBar" style="width:0%"></i></div>
+  <div class="sub">今日 ためた ぶん： <b id="ptToday">0</b> / <span id="ptMax">50</span>
+    <span id="ptCap"></span></div>
+</div>
+
+<h2>どうすると たまるか</h2>
+<div class="earn" id="earnList"></div>
+
+<h2>きろく</h2>
+<div id="logList"><div class="empty">よみこみ中…</div></div>
+
+<h2>みんなの ならび</h2>
+<div id="rankList"><div class="empty">よみこみ中…</div></div>
+{% endblock %}
+
+{% block script %}
+<script>
+var ICON = {
+  publish:'📦', like_got:'♡', fork_got:'🔁', answer:'💬', best:'⭐',
+  wiki_new:'📖', wiki_edit:'✏️', draw_pub:'🎨', login:'☀️', login7:'🔥',
+  prize:'🏆', join:'🎖', admin:'⚙',
+  buy:'🛒', item:'🎁', test:'🔧'
+};
+
+async function loadPt(){
+  var d = await J('/api/pt');
+  if (d.ok !== true){
+    $('logList').innerHTML = '<div class="empty">' + K(d.error) + '</div>';
+    return;
+  }
+  $('ptNow').textContent = d.pt;
+  $('ptTotal').textContent = d.total;
+  $('ptToday').textContent = d.today;
+  $('ptMax').textContent = d.day_max;
+  $('ptBar').style.width = Math.min(100, d.today / d.day_max * 100) + '%';
+  $('ptCap').textContent = (d.today >= d.day_max)
+    ? ' — 今日は いっぱいです' : '';
+  if ($('ptNum')) $('ptNum').textContent = d.pt;
+
+  if (d.bonus === 'week') toast('7日 つづけて 来ました！ +10 PT');
+  else if (d.bonus === 'day') toast('今日も 来ました +1 PT');
+
+  var E = d.earn || {};
+  $('earnList').innerHTML = Object.keys(E).map(function(k){
+    return '<div><span>' + (ICON[k] || '🫘') + '</span>'
+      + '<span>' + K(E[k][1]) + '</span><b>+' + E[k][0] + '</b></div>';
+  }).join('')
+  + '<div style="grid-column:1/-1;background:#fefce8;border-color:#fde68a">'
+  + '<span>🏆</span><span>コンテストの しょうきんは 1日の かぎりに '
+  + '入りません（1位 1000〜10000 PT、さんかしょう 100 PT）</span></div>';
+
+  $('logList').innerHTML = (d.logs || []).length
+    ? d.logs.map(function(x){
+        var plus = x.amount >= 0;
+        return '<div class="log">'
+          + '<span style="font-size:17px">' + (ICON[x.reason] || '🫘') + '</span>'
+          + '<span class="t">' + K(x.detail || x.reason) + '</span>'
+          + '<span class="a ' + (plus ? 'p' : 'm') + '">'
+          + (plus ? '+' : '') + x.amount + '</span>'
+          + '<span class="w">' + ago(x.created_at) + '</span></div>';
+      }).join('')
+    : '<div class="empty">まだ ありません</div>';
+}
+
+async function loadRank(){
+  var d = await J('/api/pt/rank');
+  if (d.ok !== true){ $('rankList').innerHTML = ''; return; }
+  $('rankList').innerHTML = d.rank.length
+    ? d.rank.map(function(r, i){
+        var mine = ME && ME.member_id === r.member_id;
+        var g = (i < 3) ? ' g' + (i + 1) : '';
+        return '<div class="rk' + (mine ? ' me' : '') + '">'
+          + '<span class="no' + g + '">' + (i + 1) + '</span>'
+          + avHtml(r, true)
+          + '<span class="nm" style="cursor:pointer" onclick="goOwner(\''
+          + K(r.owner_id || '') + '\',\'prog_code\')">'
+          + K(r.nickname || r.member_id) + '</span>'
+          + '<span class="pt">' + r.total + ' PT</span></div>';
+      }).join('')
+    : '<div class="empty">まだ ありません</div>';
+}
+
+loadMe().then(function(m){
+  if (!m) return;
+  loadPt();
+  loadRank();
+});
+</script>
+{% endblock %}

@@ -498,3 +498,11 @@ def api_proj_list(proj):
 # ---- コレクションの API を つなぐ ----
 from oma_api import _install as _oma_install
 _oma_install(bp_oma, PROJS, _db, _me, owner_to_member, member_to_owner, new_col_id)
+
+
+@bp_oma.route('/oma_pt')
+def oma_pt_page():
+    r = _need_login()
+    if r:
+        return r
+    return render_template('oma/pt.html', page='pt')
