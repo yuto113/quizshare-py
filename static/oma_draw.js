@@ -519,7 +519,7 @@ function avHtml(m, small){
 }
 
 function pickColor(seed){
-  var C = ['#0891b2','#7c3aed','#db2777','#16a34a','#ea580c','#0284c7',
+  var C = ['#0891b2','#7c3aed','#db2777','#3d8460','#ea580c','#0284c7',
            '#9333ea','#c2410c','#059669','#dc2626'];
   var n = 0;
   for (var i = 0; i < String(seed).length; i++) n += String(seed).charCodeAt(i);

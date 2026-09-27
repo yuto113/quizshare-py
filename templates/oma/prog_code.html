@@ -37,12 +37,12 @@
 
 .edit{flex:1;min-width:0;display:flex;flex-direction:column}
 .ed-hd{display:flex;align-items:center;gap:7px;background:var(--dark);
-  color:#bbf7d0;padding:7px 12px;border-radius:10px 10px 0 0;font-size:12px;
+  color:#d4e8dc;padding:7px 12px;border-radius:10px 10px 0 0;font-size:12px;
   font-family:ui-monospace,Menlo,Consolas,monospace}
 .ed-hd .sp{flex:1}
 .ed-hd .btn{padding:3px 10px;font-size:11px;background:none;
-  border:1px solid #15803d;color:#bbf7d0}
-.ed-hd .btn:hover{background:#064e3b}
+  border:1px solid #15803d;color:#d4e8dc}
+.ed-hd .btn:hover{background:#2a4437}
 .code2{width:100%;min-height:380px;padding:12px;border:1px solid var(--line2);
   border-top:none;border-radius:0 0 10px 10px;
   font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;
@@ -51,10 +51,10 @@
 #preview{width:100%;height:340px;border:1px solid var(--line2);
   border-radius:0 0 10px 10px;background:#fff;display:none}
 #prevBar{display:none;align-items:center;gap:7px;margin-top:11px;
-  padding:6px 11px;background:var(--dark);color:#bbf7d0;
+  padding:6px 11px;background:var(--dark);color:#d4e8dc;
   border-radius:10px 10px 0 0;font-size:12px}
 #prevBar .btn{padding:3px 10px;font-size:11px;background:none;
-  border:1px solid #15803d;color:#bbf7d0}
+  border:1px solid #15803d;color:#d4e8dc}
 
 .owner-hd{background:linear-gradient(135deg,var(--dark),var(--dark2));
   color:#fff;border-radius:14px;padding:22px 24px;margin-bottom:20px;
@@ -211,7 +211,7 @@ function copyLink(){
 async function showMake(){
   $('body').innerHTML =
       (IS_EX
-        ? '<div class="note" style="background:#dcfce7;border-color:#22c55e">'
+        ? '<div class="note" style="background:#e8f2ec;border-color:#4a9d6e">'
           + '<b>🫘 体験版です</b>'
           + 'ログインしないで プログラミングを ためせます。'
           + 'できた ものを のこしたい ときは、下の「のこす」を おして ください。'
@@ -514,18 +514,18 @@ function setupGamen(frameEl, files){
   window.gamenReady = function(){
     frameEl.srcdoc = '<!DOCTYPE html><html><head><meta charset="utf-8">'
       + '<style>body{font-family:"Hiragino Sans","Noto Sans JP",sans-serif;'
-      + 'padding:16px;line-height:1.85;font-size:14px;margin:0;color:#052e16}'
+      + 'padding:16px;line-height:1.85;font-size:14px;margin:0;color:#1c2e24}'
       + 'button,input[type=submit]{font-size:14px;padding:8px 18px;'
-      + 'margin:4px 6px 4px 0;border:none;border-radius:8px;background:#22c55e;'
+      + 'margin:4px 6px 4px 0;border:none;border-radius:8px;background:#4a9d6e;'
       + 'color:#fff;cursor:pointer;font-family:inherit}'
-      + 'button:hover{background:#16a34a}'
+      + 'button:hover{background:#3d8460}'
       + 'input,select,textarea{font-size:14px;padding:7px 11px;'
-      + 'border:1px solid #bbf7d0;border-radius:7px;margin:4px 6px 4px 0;'
+      + 'border:1px solid #d4e8dc;border-radius:7px;margin:4px 6px 4px 0;'
       + 'font-family:inherit}'
-      + 'a{color:#16a34a}'
+      + 'a{color:#3d8460}'
       + 'table{border-collapse:collapse;margin:8px 0}'
-      + 'th,td{border:1px solid #bbf7d0;padding:6px 12px;text-align:left}'
-      + 'th{background:#f0fdf4}'
+      + 'th,td{border:1px solid #d4e8dc;padding:6px 12px;text-align:left}'
+      + 'th{background:#f6faf7}'
       + 'h1{font-size:21px;margin:10px 0}h2{font-size:17px;margin:9px 0}'
       + '</style>' + (css ? '<style>' + css + '</style>' : '')
       + '</head><body><div id="g"></div>'
@@ -829,7 +829,8 @@ function bigRun(){
 
 /* ============ はじまり ============ */
 loadMe().then(function(m){
-  if (!m) return;
+  // 体験版は ログインして いなくても すすむ
+  if (!m && !IS_EX) return;
   if (VIEW === 'watch') showWatch();
   else if (VIEW === 'make') showMake();
   else if (VIEW === 'every_watch') showList(OWNER_ID);
