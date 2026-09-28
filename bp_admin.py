@@ -45,6 +45,7 @@ PAGES = {
     'errors': ('admin/errors.html', 'エラー監視', True),
     'mpadmin': ('admin/mpadmin.html', '会員システム', True),
     'mpsocial': ('admin/mpsocial.html', '会員システム（ひろい）', True),
+    'omagames': ('admin/omagames.html', 'Omame Games', True),
     'ops': ('admin/ops.html', 'システム状況', True),
     'alert': ('admin/alert.html', '天気・防災情報', False),
     'call': ('admin/call.html', '通話', False),

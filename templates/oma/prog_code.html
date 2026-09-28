@@ -245,6 +245,8 @@ async function showMake(){
     + '<button class="btn mn" onclick="runCode()">▶ うごかす</button>'
     + (IS_EX ? '' : '<button class="btn gh" onclick="openPages()">'
         + '🌐 ページ</button>')
+    + '<button class="btn gh" onclick="openAI()" title="AIに たのむ">'
+    + '❓ AIに きく</button>'
     + (IS_EX
         ? '<button class="btn mn" onclick="saveApp(0)">'
           + '💾 のこす（会員に なる）</button>'
@@ -613,6 +615,209 @@ function setupGamen(frameEl, files){
 }
 
 
+
+
+/* ============ AIに たのむ ============ */
+var AI_SITES = [
+  ['ChatGPT',  'https://chatgpt.com/',        '#10a37f'],
+  ['Gemini',   'https://gemini.google.com/',  '#4285f4'],
+  ['Claude',   'https://claude.ai/',          '#d97757'],
+  ['Copilot',  'https://copilot.microsoft.com/', '#0078d4']
+];
+
+var AI_P = {};
+
+AI_P.make = [
+  'Python（または HTML）で プログラムを 作って ください。',
+  '',
+  '【まもって ほしい こと】',
+  '1. ブラウザの 中だけで うごきます（サーバーは つかえません）。',
+  '   Flask・Django・Node.js などは つかえません。',
+  '2. 外の サイトには つなげません。',
+  '   requests・fetch で よそから データを とるのは できません。',
+  '   CDN の 読みこみも できません。',
+  '3. tkinter・turtle・pygame は つかえません。',
+  '   絵を かきたい ときは HTML の canvas を つかって ください。',
+  '4. ファイルは これだけ つかえます：',
+  '   .py / .html / .css / .js / .sql',
+  '5. input() は つかえます（入力の まどが 出ます）。',
+  '6. while True は 気を つけて。かならず break を 入れて ください。',
+  '7. コメントは 日本語で、なにを して いるか 書いて ください。',
+  '8. 小学生〜中学生が 読みます。むずかしい ことばは つかわないで。',
+  '',
+  '【作って ほしい もの】',
+  '（ここに 書いて ください）'
+].join('\n');
+
+AI_P.flask = [
+  'Python で、Flask みたいな 書き方が できる プログラムを 作って ください。',
+  '',
+  'gamen という しくみを つかいます。本物の Flask では ありませんが、',
+  '書き方は ほとんど 同じです。',
+  '',
+  '  import gamen',
+  '',
+  '  @gamen.route("/")',
+  '  def home():',
+  '      return gamen.hyouji("index.html", namae="ゆうと", ten=100)',
+  '',
+  '  @gamen.route("/next")',
+  '  def next_page():',
+  '      return gamen.hyouji("page2.html", kudamono=["りんご","みかん"])',
+  '',
+  '  gamen.run()',
+  '',
+  'HTML の がわ（index.html）:',
+  '',
+  '  <h1>こんにちは、{{ namae }}</h1>',
+  '  <p>てんすう: {{ ten }}</p>',
+  '  <a href="/next">つぎへ</a>',
+  '',
+  'くりかえしと もし も つかえます:',
+  '',
+  '  {% for x in kudamono %}<p>{{ x }}</p>{% endfor %}',
+  '  {% if ten %}<p>てんすう あり</p>{% endif %}',
+  '',
+  '入力らんの 中身を よむ:',
+  '',
+  '  namae = gamen.request_arg("namae")',
+  '',
+  '【まもって ほしい こと】',
+  '・render_template では なく gamen.hyouji を つかう',
+  '・外の サイトには つなげない',
+  '・ファイルは main.py と .html だけ',
+  '・コメントは 日本語で',
+  '',
+  '【作って ほしい もの】',
+  '（ここに 書いて ください）'
+].join('\n');
+
+AI_P.fix = [
+  'つぎの プログラムが うまく うごきません。なおして ください。',
+  '',
+  '【うごく ところ】',
+  'ブラウザの 中だけです（Pyodide）。サーバーは つかえません。',
+  '外の サイトにも つなげません。',
+  '',
+  '【エラー】',
+  '（ここに エラーを はって ください）',
+  '',
+  '【コード】',
+  '（ここに コードを はって ください）',
+  '',
+  '【おねがい】',
+  '・どこが まちがって いたか、日本語で かんたんに おしえて ください',
+  '・なおした コード ぜんぶを 出して ください',
+  '・小学生にも わかる ことばで'
+].join('\n');
+
+AI_P.learn = [
+  'プログラミングの ことを 教えて ください。',
+  '',
+  '【わたしに ついて】',
+  '（学年や、どこまで わかるか 書いて ください）',
+  '例: 小学5年生です。print と for は わかります。',
+  '',
+  '【ききたい こと】',
+  '（ここに 書いて ください）',
+  '',
+  '【おねがい】',
+  '・むずかしい ことばは つかわないで ください',
+  '・みじかい 例を 見せて ください',
+  '・ブラウザの 中だけで うごく コードで おねがいします',
+  '  （tkinter・pygame・requests は つかえません）'
+].join('\n');
+
+AI_P.game = [
+  'ブラウザで あそべる ゲームを 作って ください。',
+  '',
+  '【まもって ほしい こと】',
+  '1. ファイルは index.html / style.css / script.js の 3つだけ。',
+  '2. 外の サイトから 画像・音・ライブラリを 読みこまないで ください。',
+  '   （CDN も だめです。絵は canvas か 絵文字か CSS で）',
+  '3. localStorage は つかえません。',
+  '   とくてんを のこしたい ときは、画面に 出すだけに して ください。',
+  '4. スマホでも あそべるように。タッチ操作にも 対応して ください。',
+  '5. コメントは 日本語で。',
+  '',
+  '【どんな ゲームか】',
+  '（ここに 書いて ください）',
+  '',
+  '【出しかた】',
+  'index.html / style.css / script.js を 分けて、',
+  'そのまま コピーできる 形で 出して ください。'
+].join('\n');
+
+var AI_LBL = {
+  make:  '🆕 新しく 作って もらう',
+  flask: '🌐 Flask風（ページが ある もの）',
+  fix:   '🔧 エラーを なおして もらう',
+  learn: '📚 わからない ことを きく',
+  game:  '🎮 ゲームを 作って もらう'
+};
+
+function openAI(){
+  openModal(
+      '<h1 style="font-size:18px;margin-bottom:4px">❓ AIに たのむ</h1>'
+    + '<p style="font-size:12.5px;color:var(--muted);line-height:1.8;'
+    + 'margin-bottom:13px">下の 文を コピーして、AIに わたして ください。'
+    + 'ここで うごく ための きまりが 書いて あります。</p>'
+    + '<div class="warn" style="margin-bottom:13px">'
+    + '<b>気を つけて</b><br>'
+    + '本名・住所・パスワードは AIに 書かないで ください。<br>'
+    + 'AIの こたえは まちがって いる ことも あります。'
+    + 'かならず じぶんで ためして ください。<br>'
+    + 'まるごと コピーするだけでは、じぶんの 力に なりません。</div>'
+    + '<div class="row">'
+    + Object.keys(AI_LBL).map(function(k){
+        return '<button class="btn gh sm" id="aik_' + k + '" '
+          + 'onclick="pickAI(\'' + k + '\')">' + K(AI_LBL[k]) + '</button>';
+      }).join('') + '</div>'
+    + '<div class="row"><button class="btn mn" onclick="copyAI()">'
+    + '📋 コピー</button>'
+    + '<span id="aiMsg" style="font-size:12px"></span></div>'
+    + '<pre id="aiBox" style="background:var(--dark);color:#d4e8dc;'
+    + 'border-radius:10px;padding:14px;font-family:ui-monospace,monospace;'
+    + 'font-size:11.5px;line-height:1.8;white-space:pre-wrap;max-height:320px;'
+    + 'overflow:auto;margin:0"></pre>'
+    + '<div style="font-size:11px;color:var(--muted);margin:13px 0 6px">'
+    + 'AIの ページを 開く（べつの タブ）</div>'
+    + '<div class="row">'
+    + AI_SITES.map(function(a){
+        return '<a class="btn gh sm" href="' + a[1] + '" target="_blank" '
+          + 'rel="noopener" style="border-color:' + a[2] + ';color:' + a[2]
+          + '">' + a[0] + ' ↗</a>';
+      }).join('') + '</div>'
+    + '<div class="row" style="margin-top:12px">'
+    + '<button class="btn gh" onclick="closeModal()">とじる</button></div>');
+  pickAI('make');
+}
+
+function pickAI(k){
+  window.AI_CUR = k;
+  $('aiBox').textContent = AI_P[k];
+  Object.keys(AI_LBL).forEach(function(x){
+    var b = $('aik_' + x);
+    if (b){
+      b.style.background = (x === k) ? 'var(--dark)' : '';
+      b.style.color = (x === k) ? '#fff' : '';
+      b.style.borderColor = (x === k) ? 'var(--dark)' : '';
+    }
+  });
+}
+
+function copyAI(){
+  var t = $('aiBox').textContent;
+  var m = $('aiMsg');
+  if (navigator.clipboard){
+    navigator.clipboard.writeText(t).then(function(){
+      m.style.color = 'var(--main2)';
+      m.textContent = 'コピーしました。AIの ページで はって ください';
+    });
+  } else {
+    prompt('コピーして ください', t);
+  }
+}
 
 /* ============ 公開ページ ============ */
 async function openPages(){

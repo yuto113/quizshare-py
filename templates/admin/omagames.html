@@ -1,0 +1,460 @@
+<style>
+.gw{max-width:1040px;margin:0 auto;padding:18px 20px 60px;
+  font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;color:#0a1628}
+.gw h2{font-size:19px;margin:0 0 4px;display:flex;align-items:center;gap:9px}
+.gw .lead{font-size:12.5px;color:#7a8794;margin:0 0 16px;line-height:1.7}
+
+.gtabs{display:flex;gap:2px;border-bottom:1px solid #dde5ea;margin-bottom:18px;
+  overflow-x:auto}
+.gtab{padding:9px 15px;font-size:12.5px;color:#7a8794;cursor:pointer;
+  white-space:nowrap;background:none;border:none;
+  border-bottom:2px solid transparent;font-family:inherit}
+.gtab:hover{color:#0a1628}
+.gtab.on{color:#0a1628;border-bottom-color:#3d8460;font-weight:600}
+.gpane{display:none}.gpane.on{display:block}
+
+.gform{background:#f7f9fa;border:1px solid #dde5ea;border-radius:10px;
+  padding:14px;margin-bottom:18px}
+.gform h4{font-size:12.5px;margin:0 0 10px}
+.grow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:9px}
+.ginp,.gsel{padding:7px 10px;border:1px solid #dde5ea;border-radius:7px;
+  font-size:12.5px;font-family:inherit}
+.gbtn{background:#0a1628;color:#fff;border:none;padding:7px 15px;
+  border-radius:7px;font-size:12px;cursor:pointer;font-family:inherit;
+  white-space:nowrap}
+.gbtn:hover{background:#123047}
+.gbtn.gh{background:none;border:1px solid #dde5ea;color:#0a1628;
+  padding:5px 11px;font-size:11.5px}
+.gbtn.gh:hover{background:#f0f4f6}
+.gbtn.mn{background:#3d8460}.gbtn.mn:hover{background:#2f6b4d}
+.gbtn.ng{background:#dc2626}
+
+.gtbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.gtbl th{text-align:left;font-size:11px;color:#7a8794;padding:7px 9px;
+  border-bottom:1px solid #dde5ea;white-space:nowrap}
+.gtbl td{padding:8px 9px;border-bottom:1px solid #eef3f5;vertical-align:middle}
+.gtbl tr:hover td{background:#fafcfd}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;
+  color:#7a8794}
+.tg{font-size:10.5px;padding:2px 8px;border-radius:99px;font-weight:700}
+.tg.on{background:#d1fae5;color:#046c4e}
+.tg.off{background:#e5e7eb;color:#4b5563}
+.tg.free{background:#dbeafe;color:#1e40af}
+.tg.paid{background:#fef3c7;color:#92400e}
+.gempty{padding:26px 0;text-align:center;color:#9aa8b2;font-size:12.5px}
+
+/* ---- ファイル編集 ---- */
+.fide{display:flex;gap:11px;align-items:flex-start}
+.flist{width:200px;flex:none;background:#fff;border:1px solid #dde5ea;
+  border-radius:10px;padding:10px;max-height:520px;overflow-y:auto}
+.fitem{padding:6px 9px;border-radius:6px;font-size:11.5px;cursor:pointer;
+  font-family:ui-monospace,monospace;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.fitem:hover{background:#f0f4f6}
+.fitem.on{background:#0a1628;color:#fff}
+.fitem .sz{float:right;opacity:.5;font-size:10px}
+.fedit{flex:1;min-width:0}
+.fhd{background:#0a1628;color:#cfe3ea;padding:6px 11px;
+  border-radius:9px 9px 0 0;font-size:11.5px;display:flex;
+  align-items:center;gap:7px;font-family:ui-monospace,monospace}
+.fhd .sp{flex:1}
+.fhd .gbtn{padding:3px 9px;font-size:10.5px;background:none;
+  border:1px solid #2a4360;color:#cfe3ea}
+.fcode{width:100%;min-height:440px;padding:11px;border:1px solid #dde5ea;
+  border-top:none;border-radius:0 0 9px 9px;
+  font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;
+  line-height:1.6;resize:vertical}
+.fcode:focus{outline:none}
+
+/* ---- AIプロンプト ---- */
+.prompt{background:#0a1628;color:#cfe3ea;border-radius:10px;padding:16px;
+  font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;
+  line-height:1.75;white-space:pre-wrap;max-height:460px;overflow:auto}
+.pnote{background:#eefcff;border:1px solid #b8e8f2;border-radius:9px;
+  padding:11px 14px;font-size:11.5px;color:#1a5966;line-height:1.75;
+  margin-bottom:14px}
+</style>
+
+<div class="gw">
+  <h2>🎮 Omame Group Games</h2>
+  <p class="lead">毎月 無料1・有料2 の 公式ゲームを 出します。
+    ファイルは <span class="mono">static/games/&lt;slug&gt;/</span> に 入ります。</p>
+
+  <div class="gtabs">
+    <button class="gtab on" data-p="list">📋 ゲーム</button>
+    <button class="gtab" data-p="edit">✏️ ファイル</button>
+    <button class="gtab" data-p="item">🎁 中のもの</button>
+    <button class="gtab" data-p="ai">🤖 AIに たのむ</button>
+  </div>
+
+  <!-- ゲーム一覧 -->
+  <div class="gpane on" id="g-list">
+    <div class="gform">
+      <h4>＋ ゲームを つくる／なおす</h4>
+      <div class="grow">
+        <input class="ginp" id="gSlug" placeholder="slug（英小文字）"
+          style="max-width:150px">
+        <input class="ginp" id="gTitle" placeholder="だいめい"
+          style="flex:1;min-width:150px">
+        <input class="ginp" id="gIcon" placeholder="🎮" maxlength="4"
+          style="max-width:58px">
+      </div>
+      <div class="grow">
+        <input class="ginp" id="gSummary" placeholder="せつめい"
+          style="flex:1;min-width:200px">
+        <input class="ginp" id="gPrice" type="number" value="0"
+          placeholder="PT" style="max-width:90px" title="0 なら 無料">
+        <input class="ginp" id="gMonth" placeholder="2026-10"
+          style="max-width:110px">
+        <button class="gbtn mn" onclick="saveGame()">ほぞん</button>
+      </div>
+      <div id="gMsg" style="font-size:12px"></div>
+    </div>
+    <div id="gameList"></div>
+  </div>
+
+  <!-- ファイル編集 -->
+  <div class="gpane" id="g-edit">
+    <div class="grow">
+      <select class="gsel" id="edGame" onchange="loadFiles()"
+        style="min-width:180px"></select>
+      <button class="gbtn gh" onclick="newFile()">＋ ファイル</button>
+      <span id="edSize" style="font-size:11.5px;color:#7a8794"></span>
+      <span class="sp" style="flex:1"></span>
+      <a id="edPlay" class="gbtn gh" href="#" target="_blank">▶ ためす</a>
+    </div>
+    <div class="fide">
+      <div class="flist" id="fList"></div>
+      <div class="fedit">
+        <div class="fhd"><span id="fPath">—</span><span class="sp"></span>
+          <button class="gbtn" onclick="saveFile()">ほぞん (Ctrl+S)</button>
+          <button class="gbtn" onclick="delFile()">けす</button></div>
+        <textarea class="fcode" id="fCode" spellcheck="false"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- アイテム -->
+  <div class="gpane" id="g-item">
+    <div class="gform">
+      <h4>＋ ゲームの 中で 売る もの</h4>
+      <div class="grow">
+        <select class="gsel" id="itGame" style="min-width:160px"></select>
+        <input class="ginp" id="itCode" placeholder="code（英小文字）"
+          style="max-width:140px">
+        <input class="ginp" id="itName" placeholder="なまえ"
+          style="flex:1;min-width:130px">
+        <input class="ginp" id="itPrice" type="number" value="50"
+          style="max-width:80px">
+      </div>
+      <div class="grow">
+        <input class="ginp" id="itSummary" placeholder="せつめい"
+          style="flex:1;min-width:200px">
+        <button class="gbtn mn" onclick="saveItem()">ほぞん</button>
+      </div>
+      <div id="itMsg" style="font-size:12px"></div>
+    </div>
+    <div class="pnote">
+      ゲームの 中では <span class="mono">omame.has('code')</span> で
+      もっているか しらべ、<span class="mono">omame.buy('code')</span> で
+      買わせます。
+    </div>
+  </div>
+
+  <!-- AIプロンプト -->
+  <div class="gpane" id="g-ai">
+    <div class="pnote">
+      ほかの AI（ChatGPT / Gemini / Claude など）に ゲームを つくって もらう
+      ときは、下の 文を そのまま わたして ください。
+      <b>「ためす」で うごきを たしかめてから 公開</b> しましょう。
+    </div>
+    <div class="grow">
+      <button class="gbtn mn" onclick="copyPrompt()">📋 コピー</button>
+      <select class="gsel" id="pKind" onchange="drawPrompt()">
+        <option value="full">ぜんぶ（はじめて たのむ とき）</option>
+        <option value="short">みじかく（つづきを たのむ とき）</option>
+        <option value="item">アイテムつき ゲーム</option>
+      </select>
+    </div>
+    <div class="prompt" id="promptBox"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+var GAMES = [], CURF = null, CURG = null;
+var K = function(s){ return String(s==null?'':s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  .replace(/"/g,'&quot;'); };
+function T(m,t){ if(window.toast) window.toast(m,t); else alert(m); }
+async function J(u,o){ var r=await fetch(u,o);
+  return await r.json().catch(function(){
+    return {ok:false,error:'こたえを よめません'}; }); }
+function P(u,b){ return J(u,{method:'POST',
+  headers:{'Content-Type':'application/json'}, body:JSON.stringify(b||{})}); }
+function $(i){ return document.getElementById(i); }
+
+/* ---- ゲーム一覧 ---- */
+async function load(){
+  var d = await J('/api/admin/games');
+  if (d.ok !== true){
+    $('gameList').innerHTML = '<div class="gempty">' + K(d.error) + '</div>';
+    return;
+  }
+  GAMES = d.games;
+  $('gameList').innerHTML = GAMES.length
+    ? '<div style="overflow-x:auto"><table class="gtbl"><thead><tr>'
+      + '<th>ゲーム</th><th>ねだん</th><th>月</th><th>もっている人</th>'
+      + '<th>ファイル</th><th>▶</th><th>状態</th><th></th></tr></thead><tbody>'
+      + GAMES.map(function(g){
+          return '<tr><td>' + K(g.icon || '🎮') + ' <b>' + K(g.title) + '</b>'
+            + '<div class="mono">/oma_games/' + K(g.slug) + '</div></td>'
+            + '<td>' + (g.price > 0
+                ? '<span class="tg paid">' + g.price + ' PT</span>'
+                : '<span class="tg free">むりょう</span>') + '</td>'
+            + '<td class="mono">' + K(g.month || '—') + '</td>'
+            + '<td>' + g.owners + '</td>'
+            + '<td>' + g.files + '</td>'
+            + '<td>' + (g.plays || 0) + '</td>'
+            + '<td><span class="tg ' + (g.active ? 'on' : 'off') + '">'
+            + (g.active ? '出てる' : '止めた') + '</span></td>'
+            + '<td><button class="gbtn gh" onclick="pickGame(\'' + K(g.slug)
+            + '\')">なおす</button> '
+            + '<a class="gbtn gh" href="/oma_games/' + K(g.slug)
+            + '" target="_blank">見る</a></td></tr>';
+        }).join('') + '</tbody></table></div>'
+    : '<div class="gempty">まだ ゲームが ありません</div>';
+
+  var opts = GAMES.map(function(g){
+    return '<option value="' + K(g.slug) + '">' + K(g.icon || '🎮') + ' '
+      + K(g.title) + '</option>'; }).join('');
+  $('edGame').innerHTML = opts;
+  $('itGame').innerHTML = opts;
+  if (GAMES.length && !CURG){ CURG = GAMES[0].slug; loadFiles(); }
+}
+
+window.saveGame = async function(){
+  var m = $('gMsg');
+  var r = await P('/api/admin/game', {
+    slug: $('gSlug').value.trim().toLowerCase(),
+    title: $('gTitle').value.trim(),
+    summary: $('gSummary').value,
+    price: parseInt($('gPrice').value) || 0,
+    month: $('gMonth').value.trim(),
+    icon: $('gIcon').value.trim()});
+  if (r.ok !== true){ m.style.color='#c0453b'; m.textContent = r.error; return; }
+  m.style.color='#046c4e';
+  m.textContent = 'ほぞんしました。ファイルの タブで 中身を 書いて ください';
+  $('gSlug').value = ''; $('gTitle').value = ''; $('gSummary').value = '';
+  load();
+};
+
+window.pickGame = function(slug){
+  var g = GAMES.filter(function(x){ return x.slug === slug; })[0];
+  if (!g) return;
+  $('gSlug').value = g.slug; $('gTitle').value = g.title;
+  $('gSummary').value = g.summary || ''; $('gPrice').value = g.price;
+  $('gMonth').value = g.month || ''; $('gIcon').value = g.icon || '';
+  window.scrollTo(0, 0);
+};
+
+/* ---- ファイル ---- */
+window.loadFiles = async function(){
+  CURG = $('edGame').value;
+  if (!CURG) return;
+  $('edPlay').href = '/oma_games/' + CURG + '/play';
+  var d = await J('/api/admin/game/' + CURG + '/files');
+  if (d.ok !== true) return;
+  $('edSize').textContent = Math.round(d.total / 1024) + ' KB / '
+    + Math.round(d.max / 1024) + ' KB';
+  $('fList').innerHTML = d.files.length
+    ? d.files.map(function(f){
+        return '<div class="fitem' + (f.path === CURF ? ' on' : '') + '" '
+          + 'onclick="openFile(\'' + K(f.path) + '\')">' + K(f.path)
+          + '<span class="sz">' + Math.round(f.size / 100) / 10 + 'k</span>'
+          + '</div>'; }).join('')
+    : '<div class="gempty" style="padding:14px 0">ファイルが ありません</div>';
+  if (!CURF && d.files.length) openFile(d.files[0].path);
+};
+
+window.openFile = async function(path){
+  var d = await J('/api/admin/game/' + CURG + '/file?path='
+    + encodeURIComponent(path));
+  if (d.ok !== true){ T(d.error, 'error'); return; }
+  CURF = path;
+  $('fPath').textContent = path;
+  $('fCode').value = d.content;
+  loadFiles();
+};
+
+window.saveFile = async function(){
+  if (!CURF) return;
+  var r = await P('/api/admin/game/' + CURG + '/file',
+    {path: CURF, content: $('fCode').value});
+  if (r.ok !== true){ T(r.error, 'error'); return; }
+  T('ほぞんしました');
+  loadFiles();
+};
+
+window.newFile = function(){
+  var p = prompt('ファイルの 名前\n\n例: index.html / script.js / lib/util.js');
+  if (!p) return;
+  CURF = p.trim();
+  $('fPath').textContent = CURF;
+  $('fCode').value = '';
+};
+
+window.delFile = async function(){
+  if (!CURF || !confirm(CURF + ' を けしますか？')) return;
+  await fetch('/api/admin/game/' + CURG + '/file?path='
+    + encodeURIComponent(CURF), {method:'DELETE'});
+  CURF = null; $('fCode').value = ''; $('fPath').textContent = '—';
+  loadFiles();
+};
+
+document.addEventListener('keydown', function(e){
+  if ((e.ctrlKey || e.metaKey) && e.key === 's'){
+    e.preventDefault();
+    if ($('g-edit').classList.contains('on')) saveFile();
+  }
+});
+
+/* ---- アイテム ---- */
+window.saveItem = async function(){
+  var m = $('itMsg');
+  var r = await P('/api/admin/game/' + $('itGame').value + '/item', {
+    code: $('itCode').value.trim().toLowerCase(),
+    name: $('itName').value.trim(),
+    summary: $('itSummary').value,
+    price: parseInt($('itPrice').value) || 0});
+  if (r.ok !== true){ m.style.color='#c0453b'; m.textContent = r.error; return; }
+  m.style.color='#046c4e'; m.textContent = 'ほぞんしました';
+  $('itCode').value = ''; $('itName').value = ''; $('itSummary').value = '';
+  load();
+};
+
+/* ---- AIプロンプト ---- */
+var P_FULL = [
+'Omame Group Games という サイトで あそべる ゲームを 作ってください。',
+'',
+'【かならず まもること】',
+'1. ファイルは index.html / style.css / script.js の 3つだけ。',
+'   index.html から この2つを 読みこむ形に してください。',
+'   <link rel="stylesheet" href="style.css">',
+'   <script src="script.js"></script>',
+'',
+'2. index.html の <head> の 中に、かならず これを 入れてください。',
+'   <script src="/static/games/omame.js"></script>',
+'   （style.css や script.js より 先に 書く）',
+'',
+'3. セーブは localStorage を つかわないでください。',
+'   かわりに omame という しくみを つかいます。',
+'',
+'   omame.ready.then(function(data){',
+'     // data に まえの セーブデータが 入っています（はじめては {}）',
+'     highScore = omame.getScore("high");',
+'   });',
+'',
+'   omame.setScore("high", score);   // ハイスコアを のこす',
+'   omame.getScore("high");          // よみだす',
+'   omame.save({stage:5, coin:120}); // すきな データを のこす',
+'   omame.data                       // いまの セーブデータ',
+'',
+'   これで アカウントごとに 記録が のこり、べつの パソコンでも',
+'   つづきから あそべます。',
+'',
+'4. 外の サイトから 画像・音・ライブラリを 読みこまないでください。',
+'   （CDN も だめです。すべて 自分で 書く）',
+'   絵は canvas か 絵文字か CSS で 作ってください。',
+'',
+'5. スマホでも あそべるように してください。',
+'   タッチ操作（touchstart など）に 対応し、画面の 幅に 合わせる。',
+'',
+'6. 日本語で 書いてください。小学生〜中学生が あそびます。',
+'   むずかしい 漢字には ふりがな か、ひらがなを つかう。',
+'',
+'7. コードの 中の コメントも 日本語で、なにを して いるか 書いてください。',
+'',
+'【ゲームの ないよう】',
+'（ここに どんな ゲームか 書いてください）',
+'',
+'【出力の しかた】',
+'index.html / style.css / script.js を それぞれ 分けて、',
+'そのまま コピーできる 形で 出してください。'
+].join('\n');
+
+var P_SHORT = [
+'さっきの ゲームの つづきです。',
+'',
+'ルールは 同じです：',
+'・ファイルは index.html / style.css / script.js の 3つだけ',
+'・localStorage は つかわず、omame.save() / omame.getScore() で のこす',
+'・外部の CDN・画像・音は 読みこまない',
+'・スマホの タッチにも 対応',
+'・日本語、小中学生むけ',
+'',
+'【なおしたい ところ】',
+'（ここに 書いてください）'
+].join('\n');
+
+var P_ITEM = [
+'Omame Group Games の ゲームを 作ってください。',
+'アイテム（ゲーム内で PT で 買える もの）が ある ゲームです。',
+'',
+'【かならず まもること】',
+'1. ファイルは index.html / style.css / script.js の 3つ。',
+'2. <head> に <script src="/static/games/omame.js"></script> を 入れる。',
+'3. localStorage は つかわない。omame で セーブする。',
+'4. 外部の CDN・画像・音は 読みこまない。',
+'5. スマホの タッチにも 対応。日本語で 書く。',
+'',
+'【アイテムの つかいかた】',
+'',
+'  omame.has("kaifuku")          // もっているか（true / false）',
+'  omame.items                   // {"kaifuku": 3} のような かたち',
+'  omame.use("kaifuku")          // 1つ へらす（見た目だけ）',
+'  omame.save()                  //   → そのあと save で のこす',
+'',
+'  omame.buy("kaifuku").then(function(r){',
+'    if (r.ok) { /* 買えた */ }',
+'    else      { alert(r.error); }   // PT が たりない など',
+'  });',
+'',
+'  ※ アイテムの code は 運営が 管理ページで きめます。',
+'    コードの 中では code を つかうだけで、ねだんは 書かないで ください。',
+'',
+'【ゲームの ないよう】',
+'（ここに どんな ゲームか、どんな アイテムが あるか 書いてください）',
+'',
+'【出力の しかた】',
+'index.html / style.css / script.js を 分けて、',
+'そのまま コピーできる 形で 出してください。',
+'あわせて、必要な アイテムの code と なまえの 一覧も 出してください。'
+].join('\n');
+
+window.drawPrompt = function(){
+  var k = $('pKind').value;
+  $('promptBox').textContent =
+    (k === 'short') ? P_SHORT : (k === 'item') ? P_ITEM : P_FULL;
+};
+
+window.copyPrompt = function(){
+  var t = $('promptBox').textContent;
+  if (navigator.clipboard) navigator.clipboard.writeText(t)
+    .then(function(){ T('コピーしました'); });
+  else prompt('コピーして ください', t);
+};
+
+document.querySelectorAll('.gtab').forEach(function(t){
+  t.onclick = function(){
+    document.querySelectorAll('.gtab').forEach(function(x){
+      x.classList.toggle('on', x === t); });
+    document.querySelectorAll('.gpane').forEach(function(p){
+      p.classList.toggle('on', p.id === 'g-' + t.dataset.p); });
+  };
+});
+
+drawPrompt();
+load();
+})();
+</script>

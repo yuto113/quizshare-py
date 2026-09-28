@@ -1580,6 +1580,10 @@ app.register_blueprint(_bp_member)
 from bp_oma import bp_oma as _bp_oma
 app.register_blueprint(_bp_oma)
 
+# Omame Group Games
+from oma_games import bp_games as _bp_games
+app.register_blueprint(_bp_games)
+
 from bp_admin import bp as _bp_admin
 app.register_blueprint(_bp_admin)
 

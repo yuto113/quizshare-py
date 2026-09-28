@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ja"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ game.title }} — Omame Games</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>{{ game.icon or '🎮' }}</text></svg>">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;
+  background:#1c2e24;color:#fff;display:flex;flex-direction:column}
+.bar{background:#1c2e24;padding:8px 14px;display:flex;align-items:center;
+  gap:10px;font-size:13px;flex:none;border-bottom:1px solid #2a4437}
+.bar b{font-size:14px}
+.bar .sp{flex:1}
+.bar button{background:none;border:1px solid #2a4437;color:#a7f3d0;
+  padding:4px 12px;border-radius:7px;font-size:11.5px;cursor:pointer;
+  font-family:inherit}
+.bar button:hover{background:#2a4437}
+.bar .pt{background:#3d8460;color:#fff;padding:3px 11px;border-radius:99px;
+  font-size:11.5px;font-weight:700}
+#stage{flex:1;min-height:0;position:relative}
+iframe{width:100%;height:100%;border:none;display:block;background:#fff}
+</style></head><body>
+
+<div class="bar">
+  <span>{{ game.icon or '🎮' }}</span><b>{{ game.title }}</b>
+  <span class="sp"></span>
+  <span class="pt">🫘 <span id="pt">—</span> PT</span>
+  <button onclick="fs()">⛶ 全画面</button>
+  <button onclick="location.href='/oma_games/{{ slug }}'">← もどる</button>
+</div>
+<div id="stage">
+  <iframe id="fr" src="/oma_games/{{ slug }}/file/index.html"
+    sandbox="allow-scripts allow-modals allow-same-origin"></iframe>
+</div>
+
+<script>
+var SLUG = '{{ slug }}';
+
+function fs(){
+  var el = document.documentElement;
+  if (document.fullscreenElement) document.exitFullscreen();
+  else if (el.requestFullscreen) el.requestFullscreen();
+}
+
+/* ゲームの 中から よばれる しくみ */
+window.addEventListener('message', async function(e){
+  var d = e.data;
+  if (!d || !d.omame) return;
+  var fr = document.getElementById('fr');
+
+  if (d.omame === 'save'){
+    await fetch('/api/games/' + SLUG + '/save', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({data: d.data})});
+    fr.contentWindow.postMessage({omameOk:'save'}, '*');
+  }
+  else if (d.omame === 'load'){
+    var r = await fetch('/api/games/' + SLUG + '/save');
+    var j = await r.json();
+    fr.contentWindow.postMessage({omameOk:'load', data:j.data,
+                                  items:j.items}, '*');
+  }
+  else if (d.omame === 'buy'){
+    var r2 = await fetch('/api/games/' + SLUG + '/item/' + d.code + '/buy',
+      {method:'POST'});
+    var j2 = await r2.json();
+    if (j2.ok) document.getElementById('pt').textContent = j2.pt;
+    fr.contentWindow.postMessage({omameOk:'buy', result:j2}, '*');
+  }
+});
+
+(async function(){
+  var r = await fetch('/api/mp/me');
+  var d = await r.json();
+  document.getElementById('pt').textContent = (d.pt != null ? d.pt : 0);
+})();
+</script>
+</body></html>

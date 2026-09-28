@@ -1,0 +1,175 @@
+{% extends "oma/_base.html" %}
+{% block title %}Omame Group Games{% endblock %}
+
+{% block style %}
+.gcard{background:#fff;border:1px solid var(--line2);border-radius:14px;
+  padding:20px 18px;cursor:pointer;transition:.15s;position:relative;
+  overflow:hidden}
+.gcard:hover{border-color:var(--main);transform:translateY(-3px);
+  box-shadow:0 6px 18px rgba(28,46,36,.09)}
+.gcard .ic{font-size:38px;line-height:1}
+.gcard .t{font-size:16px;font-weight:700;margin-top:9px}
+.gcard .d{font-size:12.5px;color:var(--muted);margin-top:5px;line-height:1.7;
+  min-height:3.4em}
+.gcard .foot{display:flex;align-items:center;gap:8px;margin-top:11px;
+  flex-wrap:wrap}
+.price{font-weight:800;font-size:15px;color:var(--main2)}
+.price.free{color:#0284c7}
+.mon{position:absolute;top:12px;right:12px;font-size:10.5px;
+  background:var(--line);color:var(--main2);padding:2px 9px;border-radius:99px;
+  font-weight:700}
+.owned{background:var(--main);color:#fff;font-size:10.5px;padding:2px 9px;
+  border-radius:99px;font-weight:700}
+
+.ghero{background:linear-gradient(140deg,#1c2e24,#2a4437);color:#fff;
+  border-radius:16px;padding:30px 28px;margin-bottom:22px;display:flex;
+  gap:22px;align-items:center;flex-wrap:wrap}
+.ghero .ic{font-size:58px;line-height:1}
+.ghero h1{font-size:25px;margin-bottom:7px}
+.ghero p{font-size:13.5px;color:#a7f3d0;line-height:1.85}
+.ghero .buy{margin-left:auto;text-align:center}
+.ghero .buy .p{font-size:26px;font-weight:800;color:#5fd99a}
+
+.item{background:#fff;border:1px solid var(--line2);border-radius:11px;
+  padding:13px 16px;margin-bottom:9px;display:flex;align-items:center;gap:13px}
+.item .n{font-size:13.5px;font-weight:700}
+.item .s{font-size:12px;color:var(--muted);margin-top:2px}
+.item .b{margin-left:auto;text-align:right}
+{% endblock %}
+
+{% block body %}
+<div id="body"><div class="empty">よみこみ中…</div></div>
+{% endblock %}
+
+{% block script %}
+<script>
+var VIEW = {{ view | tojson }};
+var SLUG = {{ (slug or none) | tojson }};
+
+async function showList(){
+  var d = await J('/api/games');
+  var el = $('body');
+  if (d.ok !== true){ el.innerHTML = '<div class="empty">' + K(d.error)
+    + '</div>'; return; }
+
+  // 月ごとに まとめる
+  var by = {};
+  d.games.forEach(function(g){
+    var m = g.month || 'そのほか';
+    (by[m] = by[m] || []).push(g);
+  });
+  var months = Object.keys(by).sort().reverse();
+
+  el.innerHTML = '<h1>🎮 Omame Group Games</h1>'
+    + '<p class="lead">毎月 3つ、公式の ゲームを 出します。'
+    + '無料が 1つ、PT で あそべる ものが 2つ。</p>'
+    + '<div class="note">いま もっている PT: <b>' + d.pt + '</b> PT　'
+    + '<a href="/oma_pt" style="color:var(--main2)">ためかたを 見る →</a></div>'
+    + (months.length ? months.map(function(m){
+        return '<h2>' + K(m === 'そのほか' ? m : m.replace('-', '年') + '月')
+          + '</h2><div class="grid">'
+          + by[m].map(gcard).join('') + '</div>';
+      }).join('')
+      : '<div class="empty">まだ ゲームが ありません</div>');
+}
+
+function gcard(g){
+  return '<div class="gcard" onclick="location.href=\'/oma_games/'
+    + K(g.slug) + '\'">'
+    + (g.month ? '<span class="mon">' + K(g.month) + '</span>' : '')
+    + '<div class="ic">' + K(g.icon || '🎮') + '</div>'
+    + '<div class="t">' + K(g.title) + '</div>'
+    + '<div class="d">' + K(g.summary || '') + '</div>'
+    + '<div class="foot">'
+    + (g.price > 0
+        ? '<span class="price">' + g.price + ' PT</span>'
+        : '<span class="price free">むりょう</span>')
+    + (g.mine ? '<span class="owned">もっている</span>' : '')
+    + '<span style="margin-left:auto;font-size:11.5px;color:var(--muted)">'
+    + '▶ ' + (g.plays || 0) + '</span></div></div>';
+}
+
+async function showOne(){
+  var d = await J('/api/games/' + SLUG);
+  var el = $('body');
+  if (d.ok !== true){ el.innerHTML = '<div class="empty">' + K(d.error)
+    + '</div>'; return; }
+  var g = d.game;
+
+  el.innerHTML =
+      '<button class="btn gh sm" onclick="location.href=\'/oma_games\'">'
+    + '← いちらん</button>'
+    + '<div class="ghero" style="margin-top:12px">'
+    + '<span class="ic">' + K(g.icon || '🎮') + '</span>'
+    + '<div style="flex:1;min-width:180px">'
+    + '<h1>' + K(g.title) + '</h1>'
+    + '<p>' + K(g.summary || '') + '</p>'
+    + '<p style="font-size:11.5px;opacity:.7;margin-top:6px">'
+    + (g.month ? K(g.month) + ' · ' : '') + '▶ ' + (g.plays || 0)
+    + ' かい あそばれた</p></div>'
+    + '<div class="buy">'
+    + (d.mine
+        ? '<button class="btn mn" style="padding:13px 28px;font-size:15px" '
+          + 'onclick="location.href=\'/oma_games/' + K(SLUG) + '/play\'">'
+          + '▶ あそぶ</button>'
+        : (g.price > 0
+            ? '<div class="p">' + g.price + ' PT</div>'
+              + '<button class="btn mn" style="padding:11px 24px;margin-top:8px" '
+              + 'onclick="buyGame()">🫘 かう</button>'
+              + '<div style="font-size:11.5px;color:#86c9a4;margin-top:6px">'
+              + 'もっている: ' + d.pt + ' PT</div>'
+            : '<button class="btn mn" style="padding:13px 28px;font-size:15px" '
+              + 'onclick="location.href=\'/oma_games/' + K(SLUG) + '/play\'">'
+              + '▶ むりょうで あそぶ</button>'))
+    + '</div></div>'
+    + ((d.items || []).length
+        ? '<h2>ゲームの 中の もの</h2>'
+          + d.items.map(function(i){
+              return '<div class="item">'
+                + '<div style="flex:1;min-width:0">'
+                + '<div class="n">' + K(i.name) + '</div>'
+                + '<div class="s">' + K(i.summary || '') + '</div></div>'
+                + '<div class="b">'
+                + (i.mine
+                    ? '<span class="owned">' + i.mine + ' こ</span> '
+                    : '')
+                + '<span class="price">' + i.price + ' PT</span><br>'
+                + '<button class="btn gh sm" style="margin-top:5px" '
+                + 'onclick="buyItem(\'' + K(i.code) + '\')">かう</button>'
+                + '</div></div>';
+            }).join('')
+        : '');
+}
+
+async function buyGame(){
+  var d = await J('/api/games/' + SLUG);
+  if (!confirm(d.game.title + ' を ' + d.game.price + ' PT で かいますか？\n'
+      + 'いま もっている: ' + d.pt + ' PT')) return;
+  var r = await P('/api/games/' + SLUG + '/buy');
+  if (r.ok !== true){
+    toast(r.error + (r.need ? '（あと ' + r.need + ' PT）' : ''), 'error');
+    return;
+  }
+  toast('かいました！');
+  if ($('ptNum')) $('ptNum').textContent = r.pt;
+  showOne();
+}
+
+async function buyItem(code){
+  var r = await P('/api/games/' + SLUG + '/item/' + code + '/buy');
+  if (r.ok !== true){
+    toast(r.error + (r.need ? '（あと ' + r.need + ' PT）' : ''), 'error');
+    return;
+  }
+  toast(r.item.name + ' を かいました');
+  if ($('ptNum')) $('ptNum').textContent = r.pt;
+  showOne();
+}
+
+loadMe().then(function(m){
+  if (!m) return;
+  if (VIEW === 'one') showOne();
+  else showList();
+});
+</script>
+{% endblock %}
