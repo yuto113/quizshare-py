@@ -82,6 +82,25 @@ function drawMenu(counts){
   }).join('');
 }
 
+function showGamesCard(){
+  var el = $('menu');
+  if (!el || document.getElementById('gamesBig')) return;
+  var card = document.createElement('a');
+  card.id = 'gamesBig';
+  card.href = '/oma_games';
+  card.style.cssText = 'grid-column:1/-1;background:linear-gradient(135deg,'
+    + '#1c2e24,#2a4437);color:#fff;border-radius:14px;padding:20px 22px;'
+    + 'text-decoration:none;display:flex;align-items:center;gap:16px;'
+    + 'border:1px solid #4d7c0f';
+  card.innerHTML = '<span style="font-size:40px">🎮</span>'
+    + '<div style="flex:1"><div style="font-size:17px;font-weight:800">'
+    + 'Omame Group Games</div>'
+    + '<div style="font-size:12.5px;color:#a7f3d0;margin-top:3px">'
+    + '毎月 3つ、公式の ゲームが あそべる！ PT で 買える ものも</div></div>'
+    + '<span style="font-size:20px;color:#5fd99a">→</span>';
+  el.parentNode.insertBefore(card, el);
+}
+
 async function loadHome(){
   drawMenu(null);
 
@@ -91,6 +110,7 @@ async function loadHome(){
     $('stPeople').textContent = d.people;
     $('stMine').textContent = d.mine;
     drawMenu(d.counts);
+  if (ME && ME.games_open) showGamesCard();
     $('recent').innerHTML = (d.recent || []).length
       ? d.recent.map(function(x){
           return '<div class="rc" onclick="goCol(\'' + K(x.owner_id) + '\',\''

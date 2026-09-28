@@ -27,6 +27,27 @@ bp_oma = Blueprint('oma', __name__)
 PROJS = ('prog_code', 'prog_block', 'draw', 'talk',
          'wiki', 'shelf', 'qa', 'poll')
 
+from datetime import datetime, timedelta, timezone
+
+# 公式ゲームを 一般に 公開する 日時（日本時間）
+GAMES_OPEN = datetime(2026, 10, 1, 0, 0, tzinfo=timezone(timedelta(hours=9)))
+
+
+def games_open():
+    """いま ゲームを 見せて よいか。
+       社員・管理者は いつでも。一般は 10/1 00:00 から。"""
+    u = _me()
+    if u:
+        c = _db()
+        r = c.execute('SELECT tier FROM mp_member WHERE member_id=?',
+                      (u['member_id'],)).fetchone()
+        c.close()
+        if r and r['tier'] in ('staff', 'admin'):
+            return True
+    now = datetime.now(timezone(timedelta(hours=9)))
+    return now >= GAMES_OPEN
+
+
 PROJ_NAME = {
     'prog_code':  '⌨️ コードで つくる',
     'prog_block': '🧩 ブロックで つくる',

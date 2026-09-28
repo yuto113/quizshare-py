@@ -199,6 +199,7 @@ label.lb{font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px}
   <a href="/oma_pj/shelf" {% if page=='shelf' %}class="on"{% endif %}>🗂 たな</a>
   <a href="/oma_pj/qa" {% if page=='qa' %}class="on"{% endif %}>❓ しつもん</a>
   <a href="/oma_pj/poll" {% if page=='poll' %}class="on"{% endif %}>🗳 とうひょう</a>
+  <a href="/oma_games" id="navGames" style="display:none">🎮 ゲーム</a>
   <a href="/oma_pj/rules" {% if page=='rules' %}class="on"{% endif %}>📜 きまり</a>
 </div>
 {% endif %}
@@ -264,6 +265,7 @@ async function loadMe(){
   ME = d;
   if ($('whoami')) $('whoami').textContent = d.nickname || '';
   if ($('ptNum')) $('ptNum').textContent = (d.pt != null ? d.pt : 0);
+  if ($('navGames') && d.games_open) $('navGames').style.display = '';
   checkDebt();
   document.body.classList.toggle('furi', !!d.furigana);
   checkNotices();

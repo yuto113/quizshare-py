@@ -1,0 +1,202 @@
+<style>
+.pw{max-width:960px;margin:0 auto;padding:18px 20px 60px;
+  font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;color:#0a1628}
+.pw h2{font-size:19px;margin:0 0 4px;display:flex;align-items:center;gap:9px}
+.pw .lead{font-size:12.5px;color:#7a8794;margin:0 0 16px;line-height:1.7}
+
+.ptabs{display:flex;gap:2px;border-bottom:1px solid #dde5ea;margin-bottom:18px}
+.ptab{padding:9px 15px;font-size:12.5px;color:#7a8794;cursor:pointer;
+  background:none;border:none;border-bottom:2px solid transparent;
+  font-family:inherit}
+.ptab:hover{color:#0a1628}
+.ptab.on{color:#0a1628;border-bottom-color:#4d7c0f;font-weight:600}
+.ppane{display:none}.ppane.on{display:block}
+
+.pcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));
+  gap:9px;margin-bottom:18px}
+.pcard{background:#fff;border:1px solid #dde5ea;border-radius:10px;
+  padding:12px 14px}
+.pcard .n{font-size:21px;font-weight:700}
+.pcard .l{font-size:11px;color:#7a8794;margin-top:2px}
+.pcard.warn{border-color:#fca5a5;background:#fef2f2}
+.pcard.warn .n{color:#dc2626}
+
+.ptbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.ptbl th{text-align:left;font-size:11px;color:#7a8794;padding:7px 9px;
+  border-bottom:1px solid #dde5ea;white-space:nowrap}
+.ptbl td{padding:8px 9px;border-bottom:1px solid #eef3f5}
+.ptbl tr:hover td{background:#fafcfd}
+.ptbl tr.late td{background:#fef2f2}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;
+  color:#7a8794}
+.tg{font-size:10.5px;padding:2px 8px;border-radius:99px;font-weight:700;
+  white-space:nowrap}
+.tg.open{background:#dcfce7;color:#166534}
+.tg.late{background:#fee2e2;color:#991b1b}
+.tg.done{background:#e5e7eb;color:#4b5563}
+.tg.staff{background:#e0e7ff;color:#3730a3}
+.tg.admin{background:#fef3c7;color:#92400e}
+.pempty{padding:26px 0;text-align:center;color:#9aa8b2;font-size:12.5px}
+.pbtn{background:none;border:1px solid #dde5ea;color:#0a1628;padding:5px 12px;
+  border-radius:7px;font-size:11.5px;cursor:pointer;font-family:inherit}
+.pbtn:hover{background:#f0f4f6}
+.pform{background:#f7f9fa;border:1px solid #dde5ea;border-radius:10px;
+  padding:14px;margin-bottom:18px}
+.pform h4{font-size:12.5px;margin:0 0 10px}
+.pinp{padding:7px 10px;border:1px solid #dde5ea;border-radius:7px;
+  font-size:12.5px;font-family:inherit}
+</style>
+
+<div class="pw">
+  <h2>💰 PT・かし</h2>
+  <p class="lead">みんなの Omame Point と、社員が かりて いる PT を 見ます。</p>
+
+  <div class="pcards" id="pCards"></div>
+
+  <div class="ptabs">
+    <button class="ptab on" data-p="loans">🤝 かして いる</button>
+    <button class="ptab" data-p="pts">🫘 みんなの PT</button>
+    <button class="ptab" data-p="give">＋ PTを あげる</button>
+  </div>
+
+  <div class="ppane on" id="p-loans">
+    <div id="loanList"></div>
+  </div>
+
+  <div class="ppane" id="p-pts">
+    <div id="ptList"></div>
+  </div>
+
+  <div class="ppane" id="p-give">
+    <div class="pform">
+      <h4>＋ PT を あげる（コンテストの しょうきん など）</h4>
+      <div class="row" style="display:flex;gap:8px;flex-wrap:wrap;
+        align-items:center;margin-bottom:9px">
+        <input class="pinp" id="gvId" placeholder="あいて の ID"
+          style="min-width:150px">
+        <input class="pinp" id="gvAmt" type="number" placeholder="いくつ"
+          style="max-width:100px">
+        <input class="pinp" id="gvWhy" placeholder="りゆう"
+          style="flex:1;min-width:150px">
+        <button class="pbtn" onclick="giveePt()"
+          style="background:#4d7c0f;color:#fff;border-color:#4d7c0f">あげる</button>
+      </div>
+      <div id="gvMsg" style="font-size:12px"></div>
+    </div>
+    <p style="font-size:11.5px;color:#7a8794;line-height:1.8">
+      ここで あげた PT は「ためた ごうけい」にも 入ります。<br>
+      きろくに のこるので、あとから 見られます。
+    </p>
+  </div>
+</div>
+
+<script>
+(function(){
+var D = null;
+var K = function(s){ return String(s==null?'':s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  .replace(/"/g,'&quot;'); };
+function T(m,t){ if(window.toast) window.toast(m,t); else alert(m); }
+async function J(u,o){ var r=await fetch(u,o);
+  return await r.json().catch(function(){
+    return {ok:false,error:'こたえを よめません'}; }); }
+function P(u,b){ return J(u,{method:'POST',
+  headers:{'Content-Type':'application/json'}, body:JSON.stringify(b||{})}); }
+function $(i){ return document.getElementById(i); }
+
+async function load(){
+  D = await J('/api/admin/pt/loans');
+  if (D.ok !== true){
+    $('loanList').innerHTML = '<div class="pempty">' + K(D.error) + '</div>';
+    return;
+  }
+
+  var open = D.loans.filter(function(l){ return l.status !== 'done'; });
+  var late = D.loans.filter(function(l){ return l.late; });
+  var totalOut = 0;
+  open.forEach(function(l){ totalOut += l.nokori; });
+
+  $('pCards').innerHTML =
+      card(D.pts.length, '会員')
+    + card(open.length, 'かして いる 件数', late.length > 0)
+    + card(totalOut, 'かして いる ごうけい PT', totalOut > 0)
+    + card(late.length, '期日ぎれ', late.length > 0);
+
+  drawLoans();
+  drawPts();
+}
+function card(n, l, warn){
+  return '<div class="pcard' + (warn ? ' warn' : '') + '">'
+    + '<div class="n">' + (n||0) + '</div>'
+    + '<div class="l">' + K(l) + '</div></div>';
+}
+
+function drawLoans(){
+  var rows = D.loans;
+  $('loanList').innerHTML = rows.length
+    ? '<div style="overflow-x:auto"><table class="ptbl"><thead><tr>'
+      + '<th>かりた人</th><th>かりた</th><th>のこり</th><th>期日</th>'
+      + '<th>ゆうよ</th><th>りゆう</th><th>状態</th></tr></thead><tbody>'
+      + rows.map(function(l){
+          var st = l.status === 'done' ? 'done'
+                 : (l.late ? 'late' : 'open');
+          var stName = l.status === 'done' ? '返した'
+                     : (l.late ? '期日ぎれ' : '返済中');
+          return '<tr' + (l.late ? ' class="late"' : '') + '>'
+            + '<td><b>' + K(l.nickname || l.member_id) + '</b>'
+            + '<div class="mono">' + K(l.member_id) + '</div></td>'
+            + '<td>' + l.amount + ' PT</td>'
+            + '<td><b>' + l.nokori + '</b> PT</td>'
+            + '<td class="mono">' + K(l.due_date) + '</td>'
+            + '<td class="mono">' + K(l.grace_date) + '</td>'
+            + '<td>' + K(l.reason || '') + '</td>'
+            + '<td><span class="tg ' + st + '">' + stName + '</span></td>'
+            + '</tr>';
+        }).join('') + '</tbody></table></div>'
+    : '<div class="pempty">かして いる ものは ありません</div>';
+}
+
+function drawPts(){
+  $('ptList').innerHTML = D.pts.length
+    ? '<div style="overflow-x:auto"><table class="ptbl"><thead><tr>'
+      + '<th>#</th><th>会員</th><th>区分</th><th>いま</th>'
+      + '<th>ためた</th></tr></thead><tbody>'
+      + D.pts.map(function(p, i){
+          return '<tr><td class="mono">' + (i + 1) + '</td>'
+            + '<td><b>' + K(p.nickname || p.member_id) + '</b>'
+            + '<div class="mono">' + K(p.member_id) + '</div></td>'
+            + '<td>' + (p.tier === 'admin'
+                ? '<span class="tg admin">管理者</span>'
+                : p.tier === 'staff' ? '<span class="tg staff">社員</span>' : '')
+            + '</td>'
+            + '<td>' + p.pt + ' PT</td>'
+            + '<td><b>' + p.total + '</b> PT</td></tr>';
+        }).join('') + '</tbody></table></div>'
+    : '<div class="pempty">まだ ありません</div>';
+}
+
+window.giveePt = async function(){
+  var m = $('gvMsg');
+  var id = $('gvId').value.trim();
+  var amt = parseInt($('gvAmt').value) || 0;
+  if (!id || amt === 0){ m.style.color='#c0453b';
+    m.textContent = 'ID と かずを 入れて ください'; return; }
+  var r = await P('/api/admin/pt/give', {
+    member_id: id, amount: amt, reason: $('gvWhy').value});
+  if (r.ok !== true){ m.style.color='#c0453b'; m.textContent = r.error; return; }
+  m.style.color='#4d7c0f'; m.textContent = 'あげました（いま ' + r.pt + ' PT）';
+  $('gvId').value=''; $('gvAmt').value=''; $('gvWhy').value='';
+  load();
+};
+
+document.querySelectorAll('.ptab').forEach(function(t){
+  t.onclick = function(){
+    document.querySelectorAll('.ptab').forEach(function(x){
+      x.classList.toggle('on', x===t); });
+    document.querySelectorAll('.ppane').forEach(function(p){
+      p.classList.toggle('on', p.id === 'p-'+t.dataset.p); });
+  };
+});
+load();
+})();
+</script>

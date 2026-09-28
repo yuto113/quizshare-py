@@ -46,6 +46,7 @@ PAGES = {
     'mpadmin': ('admin/mpadmin.html', '会員システム', True),
     'mpsocial': ('admin/mpsocial.html', '会員システム（ひろい）', True),
     'omagames': ('admin/omagames.html', 'Omame Games', True),
+    'omapt': ('admin/omapt.html', 'PT・かし', True),
     'ops': ('admin/ops.html', 'システム状況', True),
     'alert': ('admin/alert.html', '天気・防災情報', False),
     'call': ('admin/call.html', '通話', False),
@@ -1821,3 +1822,33 @@ def api_mp_ann_edit(aid):
                   (1 if d['pinned'] else 0, aid))
     c.commit(); c.close()
     return jsonify(ok=True)
+
+
+@bp.route('/api/admin/pt/give', methods=['POST'])
+def api_admin_pt_give():
+    """PT を あげる（コンテストの しょうきん・お礼 など）"""
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    d = request.get_json(silent=True) or {}
+    mid = (d.get('member_id') or '').strip()
+    try:
+        amt = int(d.get('amount') or 0)
+    except Exception:
+        return jsonify(ok=False, error='かずが おかしい'), 400
+    if not mid or amt == 0:
+        return jsonify(ok=False, error='ID と かずを 入れて ください'), 400
+
+    c = _db()
+    hit = c.execute('SELECT 1 FROM mp_member WHERE member_id=?', (mid,)).fetchone()
+    c.close()
+    if not hit:
+        return jsonify(ok=False, error='その ID は いません'), 404
+
+    try:
+        import oma_pt, secrets
+        r = oma_pt.add_pt(mid, 'admin', ref_id='give-' + secrets.token_hex(4),
+                          n=amt, detail=(d.get('reason') or '運営から')[:100])
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)[:120]), 500
+    audit('pt_give', mid, str(amt) + ' / ' + (d.get('reason') or ''))
+    return jsonify(ok=True, pt=r.get('pt'))

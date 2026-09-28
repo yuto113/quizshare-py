@@ -188,6 +188,7 @@ def mp_me():
                    grade=m.get('grade'), school=m.get('school'),
                    pt=(oma_pt.get_pt(m['member_id'])['pt'] if oma_pt else 0),
                    debt=(oma_pt.debt_total(m['member_id']) if oma_pt else 0),
+                   games_open=(_games_open() if _games_open else True),
                    owner_id=m.get('owner_id'),
                    avatar=m.get('avatar'),
                    avatar_kind=m.get('avatar_kind'),
@@ -475,6 +476,10 @@ def mp_app_fork(aid):
 # ====================================================================
 # 決まりごと
 # ====================================================================
+try:
+    from bp_oma import games_open as _games_open
+except Exception:
+    _games_open = None
 try:
     import oma_pt
 except Exception:
