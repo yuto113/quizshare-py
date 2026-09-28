@@ -187,6 +187,7 @@ def mp_me():
                    published=published_count(m['member_id']),
                    grade=m.get('grade'), school=m.get('school'),
                    pt=(oma_pt.get_pt(m['member_id'])['pt'] if oma_pt else 0),
+                   debt=(oma_pt.debt_total(m['member_id']) if oma_pt else 0),
                    owner_id=m.get('owner_id'),
                    avatar=m.get('avatar'),
                    avatar_kind=m.get('avatar_kind'),
@@ -2528,3 +2529,51 @@ def api_pt_rank():
         WHERE m.status='active' ORDER BY p.total DESC LIMIT 30""").fetchall()]
     c.close()
     return jsonify(ok=True, rank=rows)
+
+
+# ====================================================================
+# PT を かりる（社員と管理者だけ）
+# ====================================================================
+
+@bp.route('/api/pt/loans')
+def api_loans():
+    u = me()
+    if not u:
+        return jsonify(ok=False), 401
+    if not oma_pt:
+        return jsonify(ok=False, error='まだ つかえません'), 503
+    staff = oma_pt._is_staff(u['member_id'])
+    if not staff:
+        return jsonify(ok=True, can=False, loans=[], debt=0)
+    oma_pt.check_loans(u['member_id'])      # 期日ぎれを 強制回収
+    return jsonify(ok=True, can=True,
+                   loans=oma_pt.my_loans(u['member_id']),
+                   debt=oma_pt.debt_total(u['member_id']),
+                   pt=oma_pt.get_pt(u['member_id'])['pt'],
+                   max_days=oma_pt.MAX_DUE_DAYS,
+                   grace=oma_pt.GRACE_DAYS)
+
+
+@bp.route('/api/pt/borrow', methods=['POST'])
+def api_borrow():
+    u = me()
+    if not u or not oma_pt:
+        return jsonify(ok=False), 401
+    d = request.get_json(silent=True) or {}
+    r = oma_pt.borrow(u['member_id'], d.get('amount'), d.get('days'),
+                      d.get('reason'))
+    if not r['ok']:
+        return jsonify(ok=False, error=r['why']), 400
+    return jsonify(r)
+
+
+@bp.route('/api/pt/repay', methods=['POST'])
+def api_repay():
+    u = me()
+    if not u or not oma_pt:
+        return jsonify(ok=False), 401
+    d = request.get_json(silent=True) or {}
+    r = oma_pt.repay(u['member_id'], d.get('amount'), d.get('loan_id'))
+    if not r['ok']:
+        return jsonify(ok=False, error=r['why'], have=r.get('have')), 400
+    return jsonify(r)

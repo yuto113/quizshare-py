@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>スネーク</title>
+
+<!-- Omame のしくみ。かならず いちばん さきに よみこむ -->
+<script src="/static/games/omame.js"></script>
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="wrap">
+
+  <!-- てんすう -->
+  <div id="bar">
+    <div class="box">
+      <div class="lbl">てんすう</div>
+      <div class="num" id="score">0</div>
+    </div>
+    <div class="box">
+      <div class="lbl">さいこう</div>
+      <div class="num best" id="best">0</div>
+    </div>
+    <div class="box">
+      <div class="lbl">ながさ</div>
+      <div class="num" id="len">3</div>
+    </div>
+  </div>
+
+  <!-- ゲームの ばめん -->
+  <div id="stage">
+    <canvas id="cv" width="400" height="400"></canvas>
+
+    <!-- はじめる まえ / おわった あと に 出る まく -->
+    <div id="cover">
+      <div id="ctitle">🐍 スネーク</div>
+      <div id="cmsg">エサを たべて ながく しよう！</div>
+      <div id="cscore"></div>
+      <button id="startBtn">はじめる</button>
+      <div id="chow">
+        パソコン: やじるしキー か W A S D<br>
+        スマホ: 画面を なぞる（フリック）
+      </div>
+    </div>
+  </div>
+
+  <!-- スマホ用の ボタン -->
+  <div id="pad">
+    <button class="pb" data-dir="up">▲</button>
+    <div class="prow">
+      <button class="pb" data-dir="left">◀</button>
+      <button class="pb" data-dir="down">▼</button>
+      <button class="pb" data-dir="right">▶</button>
+    </div>
+  </div>
+
+  <!-- はやさ -->
+  <div id="speedbox">
+    <span>はやさ</span>
+    <button class="sp" data-sp="200">ゆっくり</button>
+    <button class="sp on" data-sp="130">ふつう</button>
+    <button class="sp" data-sp="80">はやい</button>
+  </div>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

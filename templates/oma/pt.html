@@ -1,5 +1,25 @@
 {% extends "oma/_base.html" %}
-{% block title %}Omame Point — Omame PJ{% endblock %}
+{% block title %}Omame Point — Omame PJ
+.loan{background:#fff;border:1px solid var(--line2);border-radius:13px;
+  padding:16px 18px;margin-bottom:14px}
+.loan .warn2{background:#fffbeb;border:1px solid #fde68a;border-radius:9px;
+  padding:10px 13px;font-size:11.5px;color:#78350f;line-height:1.85;
+  margin-bottom:12px}
+.lrow{background:var(--paper);border:1px solid var(--line2);border-radius:10px;
+  padding:11px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;
+  flex-wrap:wrap}
+.lrow.late{border-color:#fca5a5;background:#fef2f2}
+.lrow .amt{font-size:17px;font-weight:800;color:var(--main2)}
+.lrow.late .amt{color:#dc2626}
+.lrow .when{font-size:11.5px;color:var(--muted)}
+.tag2{font-size:10px;padding:2px 8px;border-radius:99px;font-weight:700}
+.tag2.ok{background:#dcfce7;color:#166534}
+.tag2.soon{background:#fef3c7;color:#92400e}
+.tag2.bad{background:#fee2e2;color:#991b1b}
+.debtbox{background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;
+  border-radius:10px;padding:11px 15px;font-size:13px;margin-bottom:12px;
+  font-weight:600}
+{% endblock %}
 
 {% block style %}
 .ptbig{background:linear-gradient(140deg,#1c2e24,#2a4437);color:#fff;
@@ -44,12 +64,23 @@
   ゲームや アイテムと こうかん できます。</p>
 
 <div class="ptbig">
-  <div><span class="n" id="ptNow">—</span><span class="u">PT</span></div>
-  <div class="sub">これまで ためた ぜんぶ： <b id="ptTotal">—</b> PT</div>
+  <div style="display:flex;justify-content:center;gap:40px;flex-wrap:wrap">
+    <div>
+      <div style="font-size:11.5px;color:#86c9a4">いま もっている</div>
+      <div><span class="n" id="ptNow">—</span><span class="u">PT</span></div>
+    </div>
+    <div>
+      <div style="font-size:11.5px;color:#86c9a4">これまで ためた</div>
+      <div><span class="n" id="ptTotal" style="font-size:38px;color:#a7f3d0">—</span>
+        <span class="u" style="color:#86c9a4">PT</span></div>
+    </div>
+  </div>
   <div class="bar"><i id="ptBar" style="width:0%"></i></div>
   <div class="sub">今日 ためた ぶん： <b id="ptToday">0</b> / <span id="ptMax">50</span>
     <span id="ptCap"></span></div>
 </div>
+
+<div id="loanBox"></div>
 
 <h2>どうすると たまるか</h2>
 <div class="earn" id="earnList"></div>
@@ -58,6 +89,9 @@
 <div id="logList"><div class="empty">よみこみ中…</div></div>
 
 <h2>みんなの ならび</h2>
+<p style="font-size:12px;color:var(--muted);margin:-4px 0 10px">
+  これまで <b>じぶんで ためた</b> ごうけいの じゅんです。
+  つかっても へりません。かりた ぶんは 入りません。</p>
 <div id="rankList"><div class="empty">よみこみ中…</div></div>
 {% endblock %}
 
@@ -123,15 +157,107 @@ async function loadRank(){
           + '<span class="nm" style="cursor:pointer" onclick="goOwner(\''
           + K(r.owner_id || '') + '\',\'prog_code\')">'
           + K(r.nickname || r.member_id) + '</span>'
-          + '<span class="pt">' + r.total + ' PT</span></div>';
+          + '<span class="pt">' + r.total + ' PT</span>'
+          + '<span style="font-size:10.5px;color:var(--muted)">ためた</span>'
+          + '</div>';
       }).join('')
     : '<div class="empty">まだ ありません</div>';
+}
+
+
+/* ============ PT を かりる（社員だけ） ============ */
+async function loadLoans(){
+  var el = $('loanBox');
+  if (!el) return;
+  var d = await J('/api/pt/loans');
+  if (d.ok !== true || !d.can){ el.innerHTML = ''; return; }
+
+  var late = 0;
+  (d.loans || []).forEach(function(x){ if (x.late) late += x.nokori; });
+
+  el.innerHTML = '<h2>🤝 PT を かりる（社員だけ）</h2>'
+    + (late
+        ? '<div class="debtbox">期日を すぎて います（' + late
+          + ' PT）。つぎに ひらいた とき、自動で ひかれます。</div>'
+        : '')
+    + '<div class="loan">'
+    + '<div class="warn2">'
+    + '<b>かりる まえに 読んで ください</b><br>'
+    + '・返す 日は じぶんで きめます（さいちょう ' + d.max_days + '日）<br>'
+    + '・期日から ' + d.grace + '日 すぎたら、のこりを 強制的に ひきます<br>'
+    + '　（PT が マイナスに なる ことも あります）<br>'
+    + '・かりた ことは <b>社員 ぜんいんに 知らされます</b><br>'
+    + '・1回 かりたら、返すまで つぎは かりられません'
+    + '</div>'
+    + (d.loans.length
+        ? d.loans.map(function(l){
+            return '<div class="lrow' + (l.late ? ' late' : '') + '">'
+              + '<span class="amt">' + l.nokori + ' PT</span>'
+              + '<div style="flex:1;min-width:120px">'
+              + '<div class="when">' + l.amount + ' PT かりた'
+              + (l.repaid ? '（' + l.repaid + ' PT 返した）' : '') + '</div>'
+              + '<div class="when">期日 ' + K(l.due_date)
+              + ' / ゆうよ ' + K(l.grace_date) + '</div>'
+              + (l.reason ? '<div class="when">' + K(l.reason) + '</div>' : '')
+              + '</div>'
+              + '<span class="tag2 '
+              + (l.late ? 'bad' : (l.due_soon ? 'soon' : 'ok')) + '">'
+              + (l.late ? '期日ぎれ' : (l.due_soon ? 'ゆうよ中' : '返済中'))
+              + '</span>'
+              + '<button class="btn mn sm" onclick="doRepay(' + l.id + ','
+              + l.nokori + ')">返す</button></div>';
+          }).join('')
+        : '<div style="font-size:12.5px;color:var(--muted);padding:6px 0">'
+          + 'いまは かりて いません</div>')
+    + '<div class="row" style="margin-top:12px">'
+    + (d.loans.length
+        ? '<span style="font-size:12px;color:var(--muted)">'
+          + '返すまで あたらしく かりられません</span>'
+        : '<input class="inp" id="lnAmt" type="number" placeholder="いくつ" '
+          + 'style="max-width:110px">'
+          + '<input class="inp" id="lnDays" type="number" value="14" min="1" '
+          + 'max="' + d.max_days + '" style="max-width:85px">'
+          + '<span style="font-size:12px;color:var(--muted)">日で 返す</span>'
+          + '<input class="inp" id="lnWhy" placeholder="なにに つかうか" '
+          + 'style="flex:1;min-width:140px">'
+          + '<button class="btn" onclick="doBorrow()">かりる</button>')
+    + '<span id="lnMsg" style="font-size:12px"></span></div></div>';
+}
+
+async function doBorrow(){
+  var m = $('lnMsg');
+  var a = parseInt($('lnAmt').value) || 0;
+  var dd = parseInt($('lnDays').value) || 14;
+  if (a <= 0){ m.style.color = '#c0453b';
+    m.textContent = 'いくつ かりるか 入れて ください'; return; }
+  if (!confirm(a + ' PT を ' + dd + '日で 返す やくそくで かりますか？'
+      + String.fromCharCode(10) + String.fromCharCode(10)
+      + 'この ことは 社員 ぜんいんに 知らされます。')) return;
+  var r = await P('/api/pt/borrow',
+    {amount: a, days: dd, reason: $('lnWhy').value});
+  if (r.ok !== true){ m.style.color = '#c0453b'; m.textContent = r.error; return; }
+  toast(a + ' PT を かりました（' + r.due + ' までに 返す）');
+  loadPt(); loadLoans();
+}
+
+async function doRepay(id, nokori){
+  var a = prompt('いくつ 返しますか？（のこり ' + nokori + ' PT）', nokori);
+  if (!a) return;
+  var r = await P('/api/pt/repay', {amount: parseInt(a), loan_id: id});
+  if (r.ok !== true){
+    toast(r.error + (r.have != null ? '（もっている ' + r.have + ' PT）' : ''),
+          'error');
+    return;
+  }
+  toast(r.paid + ' PT 返しました');
+  loadPt(); loadLoans();
 }
 
 loadMe().then(function(m){
   if (!m) return;
   loadPt();
   loadRank();
+  loadLoans();
 });
 </script>
 {% endblock %}

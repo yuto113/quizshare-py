@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>くらしバトル</title>
+<script src="/static/games/omame.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ゲーム全体を包むコンテナ（スクロールなしで収める） -->
+  <div class="game-container">
+    
+    <!-- 画面上部のステータスヘッダー -->
+    <header class="top-header">
+      <div class="status-badge coin-badge">🪙 <span id="coin-count">0</span> コイン</div>
+      <div class="status-badge card-badge">📖 <span id="card-count">0/45</span> 種類</div>
+      <div class="status-badge record-badge">⚔️ <span id="win-count">0</span>勝 <span id="lose-count">0</span>敗</div>
+      <button id="btn-home" class="header-home-btn">🏠 ホーム</button>
+    </header>
+
+    <!-- 1. ホーム画面 -->
+    <section id="screen-home" class="screen active">
+      <div class="home-title-area">
+        <h1 class="main-title">🏠 くらしバトル ⚔️</h1>
+        <p class="sub-title">身のまわりの モノで かんがえて 勝負しよう！</p>
+      </div>
+
+      <div class="menu-grid">
+        <button class="menu-card btn-battle" onclick="goToCpuSelect()">
+          <div class="menu-icon">⚔️</div>
+          <div class="menu-text">バトルする</div>
+          <div class="menu-desc">CPUと 3枚の カードで 勝負！</div>
+        </button>
+
+        <button class="menu-card btn-pack" onclick="goToScreen('screen-pack')">
+          <div class="menu-icon">🎁</div>
+          <div class="menu-text">パックを かう</div>
+          <div class="menu-desc">20コインで 3枚ゲット！</div>
+        </button>
+
+        <button class="menu-card btn-zukan" onclick="renderZukan(); goToScreen('screen-zukan');">
+          <div class="menu-icon">📖</div>
+          <div class="menu-text">ずかん</div>
+          <div class="menu-desc">あつめた カードを 見る</div>
+        </button>
+
+        <button class="menu-card btn-pt" onclick="goToScreen('screen-exchange')">
+          <div class="menu-icon">🫘</div>
+          <div class="menu-text">PT りょうがえ</div>
+          <div class="menu-desc">1 PT ＝ 10 コイン</div>
+        </button>
+      </div>
+    </section>
+
+    <!-- 2. CPU難易度選択画面 -->
+    <section id="screen-cpu-select" class="screen">
+      <h2 class="section-title">相手の つよさを えらんでね</h2>
+      <div class="cpu-list">
+        <button class="cpu-btn easy" onclick="selectCpu('easy')">
+          <span class="cpu-rank">よわい 🐣</span>
+          <span class="cpu-detail">てきとうに カードを 出してくるよ</span>
+        </button>
+        <button class="cpu-btn normal" onclick="selectCpu('normal')">
+          <span class="cpu-rank">ふつう 🐱</span>
+          <span class="cpu-detail">つよい カードから 出してくるよ</span>
+        </button>
+        <button class="cpu-btn hard" onclick="selectCpu('hard')">
+          <span class="cpu-rank">つよい 🦁</span>
+          <span class="cpu-detail">こちらの 勝負にあわせて さいこうの カードを 出すよ</span>
+        </button>
+      </div>
+      <button class="btn-secondary" onclick="goToScreen('screen-home')">もどる</button>
+    </section>
+
+    <!-- 3. バトルデッキ選択画面 -->
+    <section id="screen-deck-select" class="screen">
+      <div class="deck-select-header">
+        <h2>バトルに つかう 3枚を えらぼう！</h2>
+        <p class="select-info">えらんだ数: <span id="deck-selected-count">0</span> / 3</p>
+      </div>
+      <div id="deck-pool" class="card-grid-scroll"></div>
+      <div class="deck-actions">
+        <button class="btn-secondary" onclick="autoSelectDeck()">🤖 おまかせ</button>
+        <button id="btn-start-battle" class="btn-primary" onclick="startBattle()" disabled>勝負スタート！ ⚔️</button>
+      </div>
+    </section>
+
+    <!-- 4. バトルメイン画面 -->
+    <section id="screen-battle" class="screen">
+      <div class="battle-top-bar">
+        <div id="round-indicator" class="round-badge">ラウンド 1 / 3</div>
+        <div class="score-board">
+          <span class="p-score">あなた: <b id="player-score">0</b></span>
+          <span class="score-vs">- VS -</span>
+          <span class="c-score">CPU: <b id="cpu-score">0</b></span>
+        </div>
+      </div>
+
+      <!-- CPUのフィールド -->
+      <div class="field-area cpu-area">
+        <div class="area-label">相手（CPU）の手札</div>
+        <div id="cpu-card-slot" class="card-slot">
+          <div class="card-back-placeholder">❓</div>
+        </div>
+      </div>
+
+      <!-- 中央の勝負ステータス選択エリア -->
+      <div id="stat-selector" class="stat-selector">
+        <div class="selector-title">どの すうじで 勝負する？</div>
+        <div class="stat-btn-group">
+          <button class="stat-btn" onclick="chooseStat('use')">つかう度</button>
+          <button class="stat-btn" onclick="chooseStat('fame')">ゆうめい度</button>
+          <button class="stat-btn" onclick="chooseStat('conv')">べんり度</button>
+          <button class="stat-btn total-btn" onclick="chooseStat('total')">3つの 合計</button>
+        </div>
+      </div>
+
+      <!-- プレイヤーのフィールド＆手札 -->
+      <div class="field-area player-area">
+        <div class="area-label">あなたの 手札（1枚えらんでね）</div>
+        <div id="player-hand" class="hand-grid"></div>
+      </div>
+
+      <!-- ラウンド結果オーバーレイ -->
+      <div id="round-result-modal" class="modal-overlay hidden">
+        <div class="modal-box">
+          <h2 id="round-result-title">ラウンド結果</h2>
+          <div class="battle-compare-view">
+            <div id="compare-player-card"></div>
+            <div class="vs-divider">VS</div>
+            <div id="compare-cpu-card"></div>
+          </div>
+          <p id="round-result-desc" class="result-detail-text"></p>
+          <button class="btn-primary" onclick="nextRound()">つぎの ラウンドへ ➔</button>
+        </div>
+      </div>
+
+      <!-- 最終結果ダイアログ -->
+      <div id="battle-finish-modal" class="modal-overlay hidden">
+        <div class="modal-box finish-box">
+          <h2 id="finish-title">勝敗結果</h2>
+          <div id="finish-rewards" class="reward-box"></div>
+          <div class="finish-actions">
+            <button class="btn-primary" onclick="goToCpuSelect()">もう一度 バトル</button>
+            <button class="btn-secondary" onclick="goToScreen('screen-home')">ホームへ</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. パック購入画面 -->
+    <section id="screen-pack" class="screen">
+      <h2 class="section-title">🎁 カードパックを かう</h2>
+      <p class="pack-sub">1パック 20コイン（3枚入り）</p>
+
+      <div class="pack-stage">
+        <div id="pack-visual" class="pack-box" onclick="buyPack()">
+          <div class="pack-ribbon">くらし パック</div>
+          <div class="pack-emoji">🫘</div>
+          <div class="pack-click-notice">タップして あける！</div>
+        </div>
+        <div id="pack-reveal-area" class="pack-cards-hidden"></div>
+      </div>
+
+      <div class="pack-actions">
+        <button id="btn-buy-pack" class="btn-primary" onclick="buyPack()">20コインで 買う 🪙</button>
+        <button class="btn-secondary" onclick="goToScreen('screen-home')">ホームへ</button>
+      </div>
+    </section>
+
+    <!-- 6. ずかん画面 -->
+    <section id="screen-zukan" class="screen">
+      <div class="zukan-header">
+        <h2 class="section-title">📖 くらしずかん</h2>
+        <div class="zukan-filter">
+          <button class="filter-btn active" onclick="filterZukan('all', this)">すべて</button>
+          <button class="filter-btn" onclick="filterZukan('owned', this)">もってる</button>
+          <button class="filter-btn" onclick="filterZukan('rare', this)">★4〜5</button>
+        </div>
+      </div>
+      <div id="zukan-grid" class="card-grid-scroll"></div>
+      <button class="btn-secondary zukan-back" onclick="goToScreen('screen-home')">ホームへ</button>
+    </section>
+
+    <!-- 7. PTりょうがえ画面 -->
+    <section id="screen-exchange" class="screen">
+      <h2 class="section-title">🫘 PT を コインに りょうがえ</h2>
+      <div class="exchange-card">
+        <div class="exchange-icon">🪙</div>
+        <p class="exchange-desc">サイトの ポイント（PT）を つかって<br>ゲームの コインに りょうがえ できます！</p>
+        <div class="rate-badge">1 PT ➔ 10 コイン</div>
+        <button class="btn-primary exchange-btn" onclick="exchangePT()">10 PT を 100 コインに かえる 🫘</button>
+      </div>
+      <button class="btn-secondary" onclick="goToScreen('screen-home')">ホームへ</button>
+    </section>
+
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

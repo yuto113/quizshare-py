@@ -144,6 +144,15 @@ label.lb{font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px}
   cursor:pointer;white-space:nowrap;transition:.14s}
 .ptbox:hover{filter:brightness(1.12)}
 .ptbox b{font-size:13.5px;color:#5fd99a}
+
+.debtbox2{background:#dc2626;color:#fff;padding:4px 13px;border-radius:99px;
+  font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;
+  animation:debtpulse 2s infinite}
+.debtbox2 b{font-size:13.5px}
+@keyframes debtpulse{
+  0%,100%{opacity:1}
+  50%{opacity:.62}
+}
 </style></head><body>
 
 <div class="hd">
@@ -154,6 +163,8 @@ label.lb{font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px}
   {% if not ex %}
   <span class="ptbox" id="ptBox" onclick="location.href='/oma_pt'"
     title="Omame Point">🫘 <b id="ptNum">—</b> PT</span>
+  <span class="debtbox2" id="debtBox" onclick="location.href='/oma_pt'"
+    style="display:none" title="かりて いる PT">⚠ <b id="debtNum">0</b> PT</span>
   {% endif %}
   {% if ex %}
   <span style="font-size:11.5px;background:#5fd99a;color:#042f1a;
@@ -253,9 +264,32 @@ async function loadMe(){
   ME = d;
   if ($('whoami')) $('whoami').textContent = d.nickname || '';
   if ($('ptNum')) $('ptNum').textContent = (d.pt != null ? d.pt : 0);
+  checkDebt();
   document.body.classList.toggle('furi', !!d.furigana);
   checkNotices();
   return d;
+}
+
+/* かりて いる PT。期日を すぎた ときだけ ヘッダーに 出す */
+async function checkDebt(){
+  var box = $('debtBox');
+  if (!box) return;
+  var d = await J('/api/pt/loans');
+  if (d.ok !== true || !d.can){ box.style.display = 'none'; return; }
+
+  // 期日を すぎた ものが あるか
+  var late = 0;
+  (d.loans || []).forEach(function(l){
+    if (l.late || l.due_soon) late += l.nokori;
+  });
+
+  if (late > 0){
+    $('debtNum').textContent = late;
+    box.style.display = '';
+    box.title = '期日を すぎて います。はやく 返して ください';
+  } else {
+    box.style.display = 'none';
+  }
 }
 
 async function checkNotices(){

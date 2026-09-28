@@ -1,0 +1,439 @@
+/* ==========================================================================
+   くらしバトル - スタイルシート (style.css)
+   完全レスポンシブ / スクロール非表示 / 外部ライブラリ依存なし
+   ========================================================================== */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  touch-action: manipulation;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #0b1320;
+  color: #f1f5f9;
+  font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Meiryo", sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ゲーム全体のベースコンテナ */
+.game-container {
+  width: 100%;
+  height: 100%;
+  max-width: 1000px;
+  max-height: 600px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+  overflow: hidden;
+}
+
+/* 上部ステータスバー */
+.top-header {
+  height: 48px;
+  background-color: rgba(15, 23, 42, 0.9);
+  border-bottom: 2px solid #334155;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.status-badge {
+  font-size: 0.85rem;
+  font-weight: bold;
+  background: #1e293b;
+  padding: 6px 10px;
+  border-radius: 20px;
+  border: 1px solid #475569;
+  color: #f8fafc;
+}
+
+.coin-badge { color: #fbbf24; border-color: #f59e0b; }
+.card-badge { color: #38bdf8; border-color: #0284c7; }
+.record-badge { color: #4ade80; border-color: #16a34a; }
+
+.header-home-btn {
+  background: #334155;
+  color: #fff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  cursor: pointer;
+  min-height: 36px;
+}
+.header-home-btn:active { background: #475569; }
+
+/* 画面切り替えのベース設定 */
+.screen {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  overflow: hidden;
+}
+
+.screen.active {
+  display: flex;
+}
+
+/* ボタン共通デザイン */
+.btn-primary, .btn-secondary {
+  min-height: 48px;
+  padding: 10px 20px;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: bold;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.1s, filter 0.1s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.4);
+}
+.btn-primary:disabled {
+  background: #64748b;
+  box-shadow: none;
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: #475569;
+  color: #ffffff;
+}
+
+.btn-primary:active, .btn-secondary:active {
+  transform: scale(0.96);
+}
+
+/* ホーム画面 */
+.home-title-area {
+  text-align: center;
+  margin-top: 8px;
+}
+.main-title {
+  font-size: 1.8rem;
+  color: #facc15;
+  text-shadow: 0 2px 8px rgba(250, 204, 21, 0.3);
+}
+.sub-title {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  margin-top: 4px;
+}
+
+.menu-grid {
+  width: 100%;
+  max-width: 600px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: auto 0;
+}
+
+.menu-card {
+  background: linear-gradient(135deg, #1e293b, #334155);
+  border: 2px solid #475569;
+  border-radius: 16px;
+  padding: 14px;
+  color: #fff;
+  cursor: pointer;
+  text-align: center;
+  min-height: 90px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.menu-card:active { transform: scale(0.97); }
+
+.menu-icon { font-size: 2rem; margin-bottom: 4px; }
+.menu-text { font-size: 1.1rem; font-weight: bold; }
+.menu-desc { font-size: 0.7rem; color: #cbd5e1; margin-top: 2px; }
+
+/* CPU選択画面 */
+.section-title {
+  font-size: 1.3rem;
+  color: #38bdf8;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.cpu-list {
+  width: 100%;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: auto 0;
+}
+
+.cpu-btn {
+  background: #1e293b;
+  border: 2px solid #3b82f6;
+  border-radius: 12px;
+  padding: 12px 16px;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-height: 54px;
+  cursor: pointer;
+}
+.cpu-btn.easy { border-color: #22c55e; }
+.cpu-btn.normal { border-color: #3b82f6; }
+.cpu-btn.hard { border-color: #ef4444; }
+
+.cpu-rank { font-size: 1.1rem; font-weight: bold; }
+.cpu-detail { font-size: 0.75rem; color: #94a3b8; margin-top: 2px; }
+
+/* カード汎用スタイル */
+.card-item {
+  width: 100px;
+  height: 140px;
+  border-radius: 10px;
+  background: #1e293b;
+  border: 3px solid #64748b;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+  transition: transform 0.15s, border-color 0.15s;
+}
+
+.card-item.selected {
+  border-color: #f59e0b !important;
+  transform: translateY(-6px) scale(1.03);
+  box-shadow: 0 0 12px #f59e0b;
+}
+
+/* レアリティ別カードフレームカラー */
+.rarity-5 { border-color: #f59e0b; background: linear-gradient(135deg, #2a1f00, #1e293b); }
+.rarity-4 { border-color: #a855f7; background: linear-gradient(135deg, #230f38, #1e293b); }
+.rarity-3 { border-color: #3b82f6; background: linear-gradient(135deg, #0b1f3a, #1e293b); }
+.rarity-2 { border-color: #10b981; background: linear-gradient(135deg, #062b1e, #1e293b); }
+.rarity-1 { border-color: #64748b; background: linear-gradient(135deg, #1e293b, #0f172a); }
+
+.card-stars { font-size: 0.6rem; color: #facc15; text-align: center; }
+.card-emoji { font-size: 2.2rem; text-align: center; margin: 2px 0; }
+.card-name { font-size: 0.75rem; font-weight: bold; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.card-stats-mini {
+  margin-top: auto;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 6px;
+  padding: 2px 4px;
+  font-size: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.stat-line { display: flex; justify-content: space-between; color: #cbd5e1; }
+.stat-line b { color: #facc15; }
+
+/* シルエット（未所持）表示 */
+.card-item.locked {
+  filter: brightness(0.2) grayscale(1);
+}
+.card-item.locked .card-name { visibility: hidden; }
+
+/* カードグリッド・スクロール表示 */
+.card-grid-scroll {
+  width: 100%;
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
+  gap: 8px;
+  padding: 8px;
+  overflow-y: auto;
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 12px;
+  border: 1px solid #334155;
+}
+
+/* バトル画面 */
+.battle-top-bar {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  background: #1e293b;
+  border-radius: 10px;
+}
+.round-badge { font-size: 0.85rem; font-weight: bold; color: #38bdf8; }
+.score-board { font-size: 0.9rem; font-weight: bold; }
+.p-score b { color: #4ade80; }
+.c-score b { color: #f87171; }
+
+.field-area {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.area-label { font-size: 0.75rem; color: #94a3b8; margin-bottom: 4px; }
+
+.card-slot {
+  width: 100px;
+  height: 140px;
+  border: 2px dashed #475569;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.card-back-placeholder { font-size: 2.5rem; opacity: 0.4; }
+
+.stat-selector {
+  width: 100%;
+  background: rgba(30, 41, 59, 0.95);
+  border: 2px solid #38bdf8;
+  border-radius: 12px;
+  padding: 8px;
+  text-align: center;
+}
+.selector-title { font-size: 0.8rem; font-weight: bold; margin-bottom: 6px; color: #e2e8f0; }
+.stat-btn-group { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; }
+
+.stat-btn {
+  background: #334155;
+  color: #fff;
+  border: 1px solid #64748b;
+  border-radius: 8px;
+  padding: 8px 2px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  min-height: 44px;
+  cursor: pointer;
+}
+.stat-btn:active { background: #0284c7; }
+.stat-btn.total-btn { background: #854d0e; border-color: #ca8a04; }
+
+.hand-grid {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+/* パック画面 */
+.pack-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+.pack-box {
+  width: 160px;
+  height: 220px;
+  background: linear-gradient(135deg, #dc2626, #991b1b);
+  border: 4px solid #fef08a;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 20px rgba(220, 38, 38, 0.5);
+  cursor: pointer;
+}
+.pack-ribbon { background: #fef08a; color: #991b1b; font-weight: bold; padding: 2px 10px; font-size: 0.8rem; border-radius: 10px; }
+.pack-emoji { font-size: 4rem; margin: 10px 0; }
+.pack-click-notice { font-size: 0.75rem; color: #fff; font-weight: bold; }
+
+.pack-cards-hidden {
+  display: flex;
+  gap: 12px;
+}
+
+/* モーダルオーバーレイ */
+.modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 16px;
+}
+.modal-overlay.hidden { display: none; }
+
+.modal-box {
+  background: #1e293b;
+  border: 2px solid #475569;
+  border-radius: 16px;
+  padding: 16px;
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
+}
+
+.battle-compare-view {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  margin: 12px 0;
+}
+.vs-divider { font-size: 1.4rem; font-weight: bold; color: #f87171; }
+.result-detail-text { font-size: 0.9rem; margin-bottom: 12px; color: #cbd5e1; }
+
+/* ずかんフィルタ */
+.zukan-header { width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.zukan-filter { display: flex; gap: 4px; }
+.filter-btn { background: #334155; color: #fff; border: none; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; min-height: 36px; }
+.filter-btn.active { background: #0284c7; }
+
+/* PT両画面 */
+.exchange-card {
+  background: #1e293b;
+  border: 2px solid #f59e0b;
+  border-radius: 16px;
+  padding: 20px;
+  text-align: center;
+  margin: auto 0;
+  max-width: 400px;
+}
+.exchange-icon { font-size: 3.5rem; }
+.exchange-desc { font-size: 0.85rem; color: #cbd5e1; margin: 12px 0; line-height: 1.4; }
+.rate-badge { background: #78350f; color: #fef08a; padding: 6px; font-weight: bold; border-radius: 8px; margin-bottom: 16px; }
+
+/* レスポンシブ調整（スマホサイズ用） */
+@media (max-width: 500px) {
+  .card-item { width: 85px; height: 125px; padding: 2px; }
+  .card-emoji { font-size: 1.8rem; }
+  .card-name { font-size: 0.65rem; }
+  .card-stats-mini { font-size: 0.55rem; }
+  .stat-btn { font-size: 0.65rem; padding: 4px 1px; }
+  .main-title { font-size: 1.4rem; }
+  .menu-card { min-height: 75px; padding: 8px; }
+  .menu-icon { font-size: 1.5rem; }
+}
