@@ -47,6 +47,7 @@ PAGES = {
     'mpsocial': ('admin/mpsocial.html', '会員システム（ひろい）', True),
     'omagames': ('admin/omagames.html', 'Omame Games', True),
     'omapt': ('admin/omapt.html', 'PT・かし', True),
+    'omacontest': ('admin/omacontest.html', 'コンテスト', True),
     'ops': ('admin/ops.html', 'システム状況', True),
     'alert': ('admin/alert.html', '天気・防災情報', False),
     'call': ('admin/call.html', '通話', False),
@@ -1852,3 +1853,74 @@ def api_admin_pt_give():
         return jsonify(ok=False, error=str(e)[:120]), 500
     audit('pt_give', mid, str(amt) + ' / ' + (d.get('reason') or ''))
     return jsonify(ok=True, pt=r.get('pt'))
+
+
+# ---------- コンテスト（管理） ----------
+@bp.route('/api/admin/contests')
+def api_admin_contests():
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    c = _db()
+    rows = [dict(r) for r in c.execute("""
+        SELECT ct.*, (SELECT COUNT(*) FROM oma_contest_entry e
+                      WHERE e.contest_id=ct.id) AS entries
+        FROM oma_contest ct ORDER BY ct.id DESC""").fetchall()]
+    c.close()
+    return jsonify(ok=True, contests=rows)
+
+
+@bp.route('/api/admin/contest', methods=['POST'])
+def api_admin_contest_new():
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    import re as _re
+    d = request.get_json(silent=True) or {}
+    slug = (d.get('slug') or '').strip().lower()
+    if not _re.fullmatch(r'[a-z0-9][a-z0-9_-]{1,40}', slug):
+        return jsonify(ok=False, error='URLの名前は 小文字英数字と - _'), 400
+    title = (d.get('title') or '').strip()
+    if not title:
+        return jsonify(ok=False, error='だいめいを 入れて'), 400
+    scale = d.get('scale') if d.get('scale') in ('small','mid','big','special') else 'small'
+    proj = d.get('proj') or 'prog_code'
+    c = _db()
+    old = c.execute('SELECT id FROM oma_contest WHERE slug=?', (slug,)).fetchone()
+    if old:
+        c.execute("""UPDATE oma_contest SET title=?,summary=?,scale=?,proj=?,
+                     ends_at=?,vote_ends_at=? WHERE slug=?""",
+                  (title[:80], (d.get('summary') or '')[:400], scale, proj,
+                   d.get('ends_at') or None, d.get('vote_ends_at') or None, slug))
+    else:
+        c.execute("""INSERT INTO oma_contest(slug,title,summary,scale,proj,
+                     ends_at,vote_ends_at) VALUES(?,?,?,?,?,?,?)""",
+                  (slug, title[:80], (d.get('summary') or '')[:400], scale, proj,
+                   d.get('ends_at') or None, d.get('vote_ends_at') or None))
+    c.commit(); c.close()
+    return jsonify(ok=True, slug=slug)
+
+
+@bp.route('/api/admin/contest/<slug>/phase', methods=['POST'])
+def api_admin_contest_phase(slug):
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    d = request.get_json(silent=True) or {}
+    ph = d.get('phase')
+    if ph not in ('open', 'voting', 'done'):
+        return jsonify(ok=False, error='状態が おかしい'), 400
+    c = _db()
+    ct = c.execute('SELECT id FROM oma_contest WHERE slug=?', (slug,)).fetchone()
+    c.close()
+    if not ct:
+        return jsonify(ok=False, error='ありません'), 404
+    if ph == 'done':
+        # 締める＝順位づけ＋しょうきん
+        try:
+            import oma_pt
+            res = oma_pt.close_contest(ct['id'])
+            return jsonify(ok=True, results=res)
+        except Exception as e:
+            return jsonify(ok=False, error=str(e)[:120]), 500
+    c = _db()
+    c.execute('UPDATE oma_contest SET phase=? WHERE slug=?', (ph, slug))
+    c.commit(); c.close()
+    return jsonify(ok=True)

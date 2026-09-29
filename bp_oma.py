@@ -527,3 +527,149 @@ def oma_pt_page():
     if r:
         return r
     return render_template('oma/pt.html', page='pt')
+
+
+# ====================================================================
+# コンテスト
+# ====================================================================
+CONTEST_SCALE = {'small': '小規模', 'mid': '中規模',
+                 'big': '大規模', 'special': '特別'}
+
+
+@bp_oma.route('/oma_contest')
+def oma_contest_page():
+    r = _need_login()
+    if r:
+        return r
+    return render_template('oma/contest.html', page='contest', view='list')
+
+
+@bp_oma.route('/oma_contest/<slug>')
+def oma_contest_one(slug):
+    r = _need_login()
+    if r:
+        return r
+    return render_template('oma/contest.html', page='contest',
+                           view='one', slug=slug)
+
+
+@bp_oma.route('/api/contest')
+def api_contest_list():
+    if not _me():
+        return jsonify(ok=False), 401
+    try:
+        import oma_pt
+        oma_pt.auto_close_due()      # しめきりを すぎた ものを 締める
+    except Exception:
+        pass
+    c = _db()
+    rows = [dict(r) for r in c.execute("""
+        SELECT ct.*, (SELECT COUNT(*) FROM oma_contest_entry e
+                      WHERE e.contest_id=ct.id) AS entries
+        FROM oma_contest ct ORDER BY ct.id DESC""").fetchall()]
+    c.close()
+    for r in rows:
+        r['scale_name'] = CONTEST_SCALE.get(r['scale'], r['scale'])
+    return jsonify(ok=True, contests=rows)
+
+
+@bp_oma.route('/api/contest/<slug>')
+def api_contest_one(slug):
+    u = _me()
+    if not u:
+        return jsonify(ok=False), 401
+    try:
+        import oma_pt
+        oma_pt.auto_close_due()
+    except Exception:
+        pass
+    c = _db()
+    ct = c.execute('SELECT * FROM oma_contest WHERE slug=?', (slug,)).fetchone()
+    if not ct:
+        c.close()
+        return jsonify(ok=False, error='ありません'), 404
+
+    entries = [dict(r) for r in c.execute("""
+        SELECT e.*, m.nickname, m.owner_id,
+               (SELECT COUNT(*) FROM oma_contest_vote v
+                WHERE v.contest_id=e.contest_id AND v.member_id=? ) AS i_voted,
+               (SELECT entry_id FROM oma_contest_vote v
+                WHERE v.contest_id=e.contest_id AND v.member_id=?) AS my_pick
+        FROM oma_contest_entry e LEFT JOIN mp_member m
+        ON m.member_id=e.member_id
+        WHERE e.contest_id=? ORDER BY e.votes DESC, e.id""",
+        (u['member_id'], u['member_id'], ct['id'])).fetchall()]
+
+    # じぶんが 応募して いるか
+    mine = c.execute('SELECT id FROM oma_contest_entry '
+                     'WHERE contest_id=? AND member_id=?',
+                     (ct['id'], u['member_id'])).fetchone()
+    # じぶんの 作品（応募用）
+    my_apps = []
+    if ct['proj'] in ('prog_code', 'prog_block'):
+        my_apps = [dict(r) for r in c.execute(
+            "SELECT col_id, title FROM mp_app WHERE member_id=? "
+            "AND status='published' ORDER BY id DESC", (u['member_id'],)).fetchall()]
+    elif ct['proj'] == 'draw':
+        my_apps = [dict(r) for r in c.execute(
+            "SELECT col_id, title FROM mp_draw WHERE member_id=? "
+            "AND public=1 AND hidden=0 ORDER BY id DESC",
+            (u['member_id'],)).fetchall()]
+    c.close()
+
+    d = dict(ct)
+    d['scale_name'] = CONTEST_SCALE.get(ct['scale'], ct['scale'])
+    return jsonify(ok=True, contest=d, entries=entries,
+                   mine=bool(mine), my_apps=my_apps)
+
+
+@bp_oma.route('/api/contest/<slug>/enter', methods=['POST'])
+def api_contest_enter(slug):
+    u = _me()
+    if not u:
+        return jsonify(ok=False, error='ログインして ください'), 401
+    d = request.get_json(silent=True) or {}
+    c = _db()
+    ct = c.execute('SELECT * FROM oma_contest WHERE slug=?', (slug,)).fetchone()
+    if not ct:
+        c.close(); return jsonify(ok=False, error='ありません'), 404
+    if ct['phase'] != 'open':
+        c.close(); return jsonify(ok=False, error='もう 応募 できません'), 403
+    try:
+        c.execute("""INSERT INTO oma_contest_entry(contest_id,member_id,proj,
+                     col_id,comment) VALUES(?,?,?,?,?)""",
+                  (ct['id'], u['member_id'], ct['proj'],
+                   (d.get('col_id') or '')[:20], (d.get('comment') or '')[:200]))
+    except Exception:
+        c.close(); return jsonify(ok=False, error='もう 応募して います'), 409
+    c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+@bp_oma.route('/api/contest/<slug>/vote', methods=['POST'])
+def api_contest_vote(slug):
+    u = _me()
+    if not u:
+        return jsonify(ok=False, error='ログインして ください'), 401
+    d = request.get_json(silent=True) or {}
+    eid = d.get('entry_id')
+    c = _db()
+    ct = c.execute('SELECT * FROM oma_contest WHERE slug=?', (slug,)).fetchone()
+    if not ct:
+        c.close(); return jsonify(ok=False, error='ありません'), 404
+    if ct['phase'] != 'voting':
+        c.close(); return jsonify(ok=False, error='いまは 投票 できません'), 403
+    e = c.execute('SELECT member_id FROM oma_contest_entry WHERE id=? '
+                  'AND contest_id=?', (eid, ct['id'])).fetchone()
+    if not e:
+        c.close(); return jsonify(ok=False, error='その 作品は ありません'), 404
+    if e['member_id'] == u['member_id']:
+        c.close(); return jsonify(ok=False, error='じぶんには 投票 できません'), 403
+    try:
+        c.execute('INSERT INTO oma_contest_vote(contest_id,member_id,entry_id) '
+                  'VALUES(?,?,?)', (ct['id'], u['member_id'], eid))
+    except Exception:
+        c.close(); return jsonify(ok=False, error='もう 投票して います'), 409
+    c.execute('UPDATE oma_contest_entry SET votes=votes+1 WHERE id=?', (eid,))
+    c.commit(); c.close()
+    return jsonify(ok=True)

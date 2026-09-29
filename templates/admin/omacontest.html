@@ -1,0 +1,166 @@
+<style>
+.cw{max-width:920px;margin:0 auto;padding:18px 20px 60px;
+  font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;color:#0a1628}
+.cw h2{font-size:19px;margin:0 0 4px}
+.cw .lead{font-size:12.5px;color:#7a8794;margin:0 0 16px;line-height:1.7}
+.cform{background:#f7f9fa;border:1px solid #dde5ea;border-radius:10px;
+  padding:14px;margin-bottom:18px}
+.cform h4{font-size:12.5px;margin:0 0 10px}
+.crow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:9px}
+.cinp,.csel{padding:7px 10px;border:1px solid #dde5ea;border-radius:7px;
+  font-size:12.5px;font-family:inherit}
+.cbtn{background:#0a1628;color:#fff;border:none;padding:7px 14px;border-radius:7px;
+  font-size:12px;cursor:pointer;font-family:inherit}
+.cbtn.mn{background:#4d7c0f}
+.cbtn.gh{background:none;border:1px solid #dde5ea;color:#0a1628;padding:5px 11px}
+.ctbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.ctbl th{text-align:left;font-size:11px;color:#7a8794;padding:7px 9px;
+  border-bottom:1px solid #dde5ea}
+.ctbl td{padding:8px 9px;border-bottom:1px solid #eef3f5;vertical-align:middle}
+.mono{font-family:ui-monospace,monospace;font-size:11px;color:#7a8794}
+.ph{font-size:10.5px;padding:2px 8px;border-radius:99px;font-weight:700}
+.ph.open{background:#dcfce7;color:#166534}
+.ph.voting{background:#fef3c7;color:#92400e}
+.ph.done{background:#e5e7eb;color:#4b5563}
+.cempty{padding:24px 0;text-align:center;color:#9aa8b2;font-size:12.5px}
+.cnote{background:#eefcff;border:1px solid #b8e8f2;border-radius:8px;
+  padding:10px 13px;font-size:11.5px;color:#1a5966;line-height:1.7;
+  margin-bottom:14px}
+</style>
+
+<div class="cw">
+  <h2>🏆 コンテスト</h2>
+  <p class="lead">開いて、応募 → 投票 → 締める、と すすめます。</p>
+
+  <div class="cnote">
+    しょうきん（自動で 配られます）<br>
+    小規模 1位1000 2位800 3位500 ／ 中規模 1位2000 2位1600 3位1000<br>
+    大規模・特別 1位10000 2位8000 3位5000 ／ 4位いか みんな 100
+  </div>
+
+  <div class="cform">
+    <h4>＋ コンテストを ひらく／なおす</h4>
+    <div class="crow">
+      <input class="cinp" id="cSlug" placeholder="slug（英小文字）" style="max-width:150px">
+      <input class="cinp" id="cTitle" placeholder="だいめい" style="flex:1;min-width:160px">
+    </div>
+    <div class="crow">
+      <select class="csel" id="cScale">
+        <option value="small">小規模</option>
+        <option value="mid">中規模</option>
+        <option value="big">大規模</option>
+        <option value="special">特別</option>
+      </select>
+      <select class="csel" id="cProj">
+        <option value="prog_code">コード</option>
+        <option value="prog_block">ブロック</option>
+        <option value="draw">おえかき</option>
+      </select>
+      <input class="cinp" id="cVoteEnd" placeholder="投票しめきり 2026-10-15 20:00"
+        style="flex:1;min-width:180px">
+    </div>
+    <div class="crow">
+      <input class="cinp" id="cSummary" placeholder="せつめい" style="flex:1;min-width:220px">
+      <button class="cbtn mn" onclick="saveContest()">ほぞん</button>
+    </div>
+    <div id="cMsg" style="font-size:12px"></div>
+  </div>
+
+  <div id="cList"></div>
+</div>
+
+<script>
+(function(){
+var K = function(s){ return String(s==null?'':s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+function T(m,t){ if(window.toast) window.toast(m,t); else alert(m); }
+async function J(u,o){ var r=await fetch(u,o);
+  return await r.json().catch(function(){ return {ok:false,error:'よめません'}; }); }
+function P(u,b){ return J(u,{method:'POST',headers:{'Content-Type':'application/json'},
+  body:JSON.stringify(b||{})}); }
+function $(i){ return document.getElementById(i); }
+
+var SCALE = {small:'小規模', mid:'中規模', big:'大規模', special:'特別'};
+var PHNAME = {open:'応募中', voting:'投票中', done:'おわり'};
+
+async function load(){
+  var d = await J('/api/admin/contests');
+  if (d.ok !== true){ $('cList').innerHTML='<div class="cempty">'+K(d.error)+'</div>'; return; }
+  $('cList').innerHTML = d.contests.length
+    ? '<div style="overflow-x:auto"><table class="ctbl"><thead><tr>'
+      + '<th>コンテスト</th><th>規模</th><th>作品</th><th>状態</th>'
+      + '<th>投票しめきり</th><th>すすめる</th></tr></thead><tbody>'
+      + d.contests.map(function(ct){
+          return '<tr><td><b>'+K(ct.title)+'</b>'
+            + '<div class="mono">/'+K(ct.slug)+'</div></td>'
+            + '<td>'+K(SCALE[ct.scale]||ct.scale)+'</td>'
+            + '<td>'+ct.entries+'</td>'
+            + '<td><span class="ph '+K(ct.phase)+'">'+K(PHNAME[ct.phase])+'</span></td>'
+            + '<td class="mono">'+K(ct.vote_ends_at||'—')+'</td>'
+            + '<td>'+ btns(ct) +'</td></tr>';
+        }).join('') + '</tbody></table></div>'
+    : '<div class="cempty">まだ ありません</div>';
+}
+
+function btns(ct){
+  var b = '';
+  if (ct.phase === 'open')
+    b = '<button class="cbtn gh" onclick="phase(\''+K(ct.slug)+'\',\'voting\')">'
+      + '投票に すすむ</button>';
+  else if (ct.phase === 'voting')
+    b = '<button class="cbtn mn" onclick="closeIt(\''+K(ct.slug)+'\')">'
+      + '締めて しょうきん</button>';
+  else
+    b = '<span class="mono">おわり</span>';
+  b += ' <button class="cbtn gh" onclick="editC(\''+K(ct.slug)+'\')">なおす</button>'
+    + ' <a class="cbtn gh" href="/oma_contest/'+K(ct.slug)+'" target="_blank">見る</a>';
+  return b;
+}
+
+window.saveContest = async function(){
+  var m = $('cMsg');
+  var r = await P('/api/admin/contest', {
+    slug: $('cSlug').value.trim().toLowerCase(),
+    title: $('cTitle').value.trim(),
+    summary: $('cSummary').value,
+    scale: $('cScale').value, proj: $('cProj').value,
+    vote_ends_at: $('cVoteEnd').value.trim().replace('T',' ')});
+  if (r.ok !== true){ m.style.color='#c0453b'; m.textContent=r.error; return; }
+  m.style.color='#4d7c0f'; m.textContent='ほぞんしました';
+  $('cSlug').value=''; $('cTitle').value=''; $('cSummary').value='';
+  load();
+};
+
+window.phase = async function(slug, ph){
+  if (!confirm(ph==='voting'?'投票に すすめますか？（もう 応募 できなくなります）':'')) return;
+  var r = await P('/api/admin/contest/'+slug+'/phase', {phase: ph});
+  if (r.ok !== true){ T(r.error,'error'); return; }
+  T('すすめました'); load();
+};
+
+window.closeIt = async function(slug){
+  if (!confirm('締めて しょうきんを 配りますか？\nもとに もどせません。')) return;
+  var r = await P('/api/admin/contest/'+slug+'/phase', {phase:'done'});
+  if (r.ok !== true){ T(r.error,'error'); return; }
+  var msg = 'しめました。';
+  if (r.results){
+    var top = r.results.filter(function(x){return x.rank<=3;});
+    msg += top.map(function(x){
+      return x.rank+'位 '+x.member_id+'（'+x.amount+'PT）'; }).join(' / ');
+  }
+  T(msg); load();
+};
+
+window.editC = async function(slug){
+  var d = await J('/api/admin/contests');
+  var ct = d.contests.filter(function(x){return x.slug===slug;})[0];
+  if (!ct) return;
+  $('cSlug').value=ct.slug; $('cTitle').value=ct.title;
+  $('cSummary').value=ct.summary||''; $('cScale').value=ct.scale;
+  $('cProj').value=ct.proj||'prog_code'; $('cVoteEnd').value=ct.vote_ends_at||'';
+  window.scrollTo(0,0);
+};
+
+load();
+})();
+</script>

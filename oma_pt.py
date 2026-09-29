@@ -437,3 +437,56 @@ def all_loans():
     for r in rows:
         r['late'] = (r['status'] != 'done' and today > r['grace_date'])
     return rows
+
+
+# ====================================================================
+# コンテストの しめきり と しょうきん
+# ====================================================================
+def close_contest(contest_id):
+    """票の おおい じゅんに 順位を つけて、しょうきんを 配る。
+       もう done なら なにも しない。"""
+    c = _db()
+    ct = c.execute('SELECT * FROM oma_contest WHERE id=?', (contest_id,)).fetchone()
+    if not ct or ct['phase'] == 'done':
+        c.close()
+        return None
+
+    entries = c.execute("""SELECT * FROM oma_contest_entry
+                           WHERE contest_id=? ORDER BY votes DESC, id ASC""",
+                        (contest_id,)).fetchall()
+    scale = ct['scale'] or 'small'
+    prize = PRIZE.get(scale, PRIZE['small'])
+
+    results = []
+    for i, e in enumerate(entries):
+        rank = i + 1
+        # おなじ 票数は おなじ 順位に
+        if i > 0 and e['votes'] == entries[i-1]['votes']:
+            rank = results[-1]['rank']
+        amount = prize.get(rank, PRIZE_JOIN)
+        c.execute('UPDATE oma_contest_entry SET rank=?, paid=1 WHERE id=?',
+                  (rank, e['id']))
+        # しょうきんを 配る（1日の かぎり なし）
+        give_prize(contest_id, e['id'], e['member_id'], scale, rank)
+        results.append({'member_id': e['member_id'], 'rank': rank,
+                        'votes': e['votes'], 'amount': amount})
+
+    c.execute("UPDATE oma_contest SET phase='done' WHERE id=?", (contest_id,))
+    c.commit()
+    c.close()
+    return results
+
+
+def auto_close_due():
+    """しめきりを すぎた コンテストを ぜんぶ 締める。
+       ページを 見た とき・ログインの ときに よぶ。"""
+    today = now_jst().strftime('%Y-%m-%d %H:%M:%S')
+    c = _db()
+    rows = c.execute("""SELECT id FROM oma_contest
+                        WHERE phase<>'done' AND vote_ends_at IS NOT NULL
+                        AND vote_ends_at < ?""", (today,)).fetchall()
+    ids = [r['id'] for r in rows]
+    c.close()
+    for cid in ids:
+        close_contest(cid)
+    return len(ids)

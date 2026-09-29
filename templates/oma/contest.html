@@ -1,0 +1,150 @@
+{% extends "oma/_base.html" %}
+{% block title %}コンテスト — Omame PJ{% endblock %}
+
+{% block style %}
+.ct{background:#fff;border:1px solid var(--line2);border-radius:13px;
+  padding:16px 18px;margin-bottom:12px;cursor:pointer;transition:.14s}
+.ct:hover{border-color:var(--main);transform:translateY(-2px)}
+.ct .t{font-size:15.5px;font-weight:700}
+.ct .d{font-size:12.5px;color:var(--muted);margin-top:4px;line-height:1.7}
+.ct .m{font-size:11.5px;color:var(--muted);margin-top:8px;display:flex;
+  gap:9px;flex-wrap:wrap;align-items:center}
+.ph{font-size:10.5px;padding:2px 9px;border-radius:99px;font-weight:700}
+.ph.open{background:#dcfce7;color:#166534}
+.ph.voting{background:#fef3c7;color:#92400e}
+.ph.done{background:#e5e7eb;color:#4b5563}
+.sc{font-size:10.5px;padding:2px 8px;border-radius:99px;background:var(--line);
+  color:var(--main2);font-weight:700}
+
+.entry{background:#fff;border:1px solid var(--line2);border-radius:12px;
+  padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:13px}
+.entry.win{border-color:#fbbf24;background:#fffbeb}
+.entry .rk{width:34px;text-align:center;font-weight:800;font-size:16px;
+  color:var(--muted)}
+.entry .rk.r1{color:#d4a017;font-size:22px}
+.entry .rk.r2{color:#94a3b8;font-size:20px}
+.entry .rk.r3{color:#c08552;font-size:18px}
+.entry .nm{flex:1;min-width:0}
+.entry .nm b{font-size:13.5px}
+.entry .nm .cm{font-size:11.5px;color:var(--muted);margin-top:2px}
+.entry .vt{font-size:13px;font-weight:700;color:var(--main2);white-space:nowrap}
+{% endblock %}
+
+{% block body %}
+<div id="body"><div class="empty">よみこみ中…</div></div>
+{% endblock %}
+
+{% block script %}
+<script>
+var VIEW = {{ view | tojson }};
+var SLUG = {{ (slug or none) | tojson }};
+
+var PHNAME = {open:'応募中', voting:'投票中', done:'おわり'};
+
+async function showList(){
+  var d = await J('/api/contest');
+  var el = $('body');
+  if (d.ok !== true){ el.innerHTML = '<div class="empty">' + K(d.error) + '</div>'; return; }
+  el.innerHTML = '<h1>🏆 コンテスト</h1>'
+    + '<p class="lead">作品を 出して、みんなで 投票。'
+    + '1位に なると PT が もらえます。</p>'
+    + (d.contests.length ? d.contests.map(function(ct){
+        return '<div class="ct" onclick="location.href=\'/oma_contest/'
+          + K(ct.slug) + '\'">'
+          + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+          + '<span class="ph ' + K(ct.phase) + '">' + K(PHNAME[ct.phase]) + '</span>'
+          + '<span class="sc">' + K(ct.scale_name) + '</span>'
+          + '<b class="t">' + K(ct.title) + '</b></div>'
+          + '<div class="d">' + K(ct.summary || '') + '</div>'
+          + '<div class="m"><span>' + ct.entries + ' 作品</span>'
+          + (ct.vote_ends_at ? '<span>投票しめきり ' + K(ct.vote_ends_at) + '</span>' : '')
+          + '</div></div>';
+      }).join('') : '<div class="empty">まだ コンテストが ありません</div>');
+}
+
+async function showOne(){
+  var d = await J('/api/contest/' + SLUG);
+  var el = $('body');
+  if (d.ok !== true){ el.innerHTML = '<div class="empty">' + K(d.error) + '</div>'; return; }
+  var ct = d.contest;
+
+  var head = '<button class="btn gh sm" onclick="location.href=\'/oma_contest\'">'
+    + '← いちらん</button>'
+    + '<h1 style="margin-top:12px">🏆 ' + K(ct.title) + '</h1>'
+    + '<p class="lead"><span class="ph ' + K(ct.phase) + '">'
+    + K(PHNAME[ct.phase]) + '</span> <span class="sc">' + K(ct.scale_name)
+    + '</span></p>'
+    + (ct.summary ? '<div class="card">' + K(ct.summary) + '</div>' : '');
+
+  // 応募（open のとき、まだ 出して いない）
+  if (ct.phase === 'open' && !d.mine){
+    head += '<div class="card" style="background:var(--paper)">'
+      + '<b style="font-size:13px">この コンテストに 出す</b>';
+    if (d.my_apps.length){
+      head += '<div class="row" style="margin-top:9px">'
+        + '<select class="sel" id="ceApp" style="flex:1;min-width:150px">'
+        + d.my_apps.map(function(a){
+            return '<option value="' + K(a.col_id) + '">' + K(a.title)
+              + '</option>'; }).join('') + '</select></div>'
+        + '<div class="row"><input class="inp" id="ceCm" '
+        + 'placeholder="ひとこと（にんい）" style="flex:1;min-width:150px">'
+        + '<button class="btn mn" onclick="enter()">出す</button></div>';
+    } else {
+      head += '<div style="font-size:12.5px;color:var(--muted);margin-top:8px">'
+        + 'この しゅるいの 公開ずみ 作品が ありません。<br>'
+        + 'さきに ' + K(ct.proj) + ' で 作って 公開して ください。</div>';
+    }
+    head += '</div>';
+  } else if (d.mine){
+    head += '<div class="note">この コンテストに 出して います。'
+      + (ct.phase === 'voting' ? 'いまは 投票中です。' : '') + '</div>';
+  }
+
+  // 作品ならび
+  head += '<h2>' + (ct.phase === 'done' ? 'けっか' : '作品')
+    + '（' + d.entries.length + '）</h2>'
+    + (d.entries.length ? d.entries.map(function(e){
+        var win = (ct.phase === 'done' && e.rank && e.rank <= 3);
+        return '<div class="entry' + (win ? ' win' : '') + '">'
+          + (ct.phase === 'done' && e.rank
+              ? '<span class="rk r' + e.rank + '">' + e.rank + '</span>'
+              : '<span class="rk">•</span>')
+          + '<div class="nm"><b style="cursor:pointer" onclick="goCol(\''
+          + K(e.owner_id||'') + '\',\'' + K(e.col_id) + '\',\'' + K(e.proj) + '\')">'
+          + K(e.nickname || e.member_id) + ' の 作品</b>'
+          + (e.comment ? '<div class="cm">' + K(e.comment) + '</div>' : '') + '</div>'
+          + '<span class="vt">' + e.votes + ' 票</span>'
+          + (ct.phase === 'voting'
+              ? (e.my_pick == e.id
+                  ? '<span class="ph voting">投票ずみ</span>'
+                  : (e.i_voted
+                      ? ''
+                      : '<button class="btn mn sm" onclick="vote(' + e.id
+                        + ')">投票</button>'))
+              : '')
+          + '</div>';
+      }).join('') : '<div class="empty">まだ 作品が ありません</div>');
+
+  el.innerHTML = head;
+}
+
+async function enter(){
+  var d = await P('/api/contest/' + SLUG + '/enter', {
+    col_id: $('ceApp').value, comment: $('ceCm').value});
+  if (d.ok !== true){ toast(d.error, 'error'); return; }
+  toast('出しました！'); showOne();
+}
+
+async function vote(eid){
+  var d = await P('/api/contest/' + SLUG + '/vote', {entry_id: eid});
+  if (d.ok !== true){ toast(d.error, 'error'); return; }
+  toast('投票しました'); showOne();
+}
+
+loadMe().then(function(m){
+  if (!m) return;
+  if (VIEW === 'one') showOne();
+  else showList();
+});
+</script>
+{% endblock %}
