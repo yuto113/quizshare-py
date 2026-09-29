@@ -95,7 +95,7 @@ async function run(){
 
   // HTML は サーバーが 作った ものを そのまま よむ
   if (HAS_HTML){
-    $('fr').src = '/page/{{ slug }}/raw';
+    $('fr').src = '/oma_pj/page/{{ slug }}/raw';
     $('loading').style.display = 'none';
     if (!pys.length && !sql) return;
   } else {

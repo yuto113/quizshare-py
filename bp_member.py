@@ -2213,8 +2213,22 @@ def page_raw(slug):
     tail = ''.join('<scr' + 'ipt>' + (f['content'] or '') + '</scr' + 'ipt>'
                    for f in files if f['kind'] == 'js')
 
+    # localStorage が つかえない ので、にせものを 入れて おく
+    shim = ('<scr' + 'ipt>(function(){try{window.localStorage.getItem("_t");'
+            'return;}catch(e){}var m={};var f={getItem:function(k){'
+            'return (k in m)?m[k]:null;},setItem:function(k,v){m[k]=String(v);},'
+            'removeItem:function(k){delete m[k];},clear:function(){m={};},'
+            'key:function(i){return Object.keys(m)[i]||null;},length:0};'
+            'try{Object.defineProperty(window,"localStorage",'
+            '{value:f,configurable:true});Object.defineProperty(window,'
+            '"sessionStorage",{value:f,configurable:true});}catch(e){}'
+            '})();</scr' + 'ipt>')
     low = body.lstrip()[:20].lower()
     if low.startswith('<!doctype') or low.startswith('<html'):
+        if '<head>' in body:
+            body = body.replace('<head>', '<head>' + shim, 1)
+        elif '</head>' in body:
+            body = body.replace('</head>', shim + '</head>', 1)
         if head:
             body = body.replace('</head>', head + '</head>', 1)
         if tail:

@@ -1584,6 +1584,10 @@ app.register_blueprint(_bp_oma)
 from oma_games import bp_games as _bp_games
 app.register_blueprint(_bp_games)
 
+# Omame Mail
+from oma_mail import bp_mail as _bp_mail
+app.register_blueprint(_bp_mail)
+
 from bp_admin import bp as _bp_admin
 app.register_blueprint(_bp_admin)
 

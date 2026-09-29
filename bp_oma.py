@@ -187,6 +187,13 @@ def oma_page(slug):
     return page_public(slug)
 
 
+@bp_oma.route('/oma_pj/page/<slug>/raw')
+def oma_page_raw(slug):
+    """作品の 中身。iframe が これを よむ。"""
+    from bp_member import page_raw
+    return page_raw(slug)
+
+
 # ---- プロジェクトごと ----
 @bp_oma.route('/oma_pj/<proj>/ex')
 def oma_ex(proj):
