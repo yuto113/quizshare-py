@@ -457,3 +457,121 @@ def api_admin_item(slug):
                (d.get('summary') or '')[:200], int(d.get('price') or 0)))
     c.commit(); c.close()
     return jsonify(ok=True)
+
+
+# ====================================================================
+# 追加コンテンツ（DLC）
+# ====================================================================
+@bp_games.route('/api/games/<slug>/dlc')
+def api_dlc_list(slug):
+    """その ゲームの 追加コンテンツ 一覧"""
+    u = _me()
+    if not u:
+        return jsonify(ok=False), 401
+    c = _db()
+    g = c.execute('SELECT id FROM oma_game WHERE slug=?', (slug,)).fetchone()
+    if not g:
+        c.close(); return jsonify(ok=False, error='ありません'), 404
+    rows = [dict(r) for r in c.execute("""
+        SELECT d.*, (SELECT 1 FROM oma_dlc_own o
+                     WHERE o.dlc_id=d.id AND o.member_id=?) AS mine
+        FROM oma_dlc d WHERE d.game_id=? AND d.active=1
+        ORDER BY d.id""", (u['member_id'], g['id'])).fetchall()]
+    c.close()
+    try:
+        import oma_pt
+        pt = oma_pt.get_pt(u['member_id'])['pt']
+    except Exception:
+        pt = 0
+    return jsonify(ok=True, dlc=rows, pt=pt)
+
+
+@bp_games.route('/api/games/<slug>/dlc/<code>/buy', methods=['POST'])
+def api_dlc_buy(slug, code):
+    """追加コンテンツを かう（PT）"""
+    u = _me()
+    if not u:
+        return jsonify(ok=False, error='ログインして'), 401
+    c = _db()
+    g = c.execute('SELECT id,title FROM oma_game WHERE slug=?', (slug,)).fetchone()
+    if not g:
+        c.close(); return jsonify(ok=False, error='ありません'), 404
+    d = c.execute('SELECT * FROM oma_dlc WHERE game_id=? AND code=? AND active=1',
+                  (g['id'], code)).fetchone()
+    if not d:
+        c.close(); return jsonify(ok=False, error='その 追加は ありません'), 404
+    own = c.execute('SELECT 1 FROM oma_dlc_own WHERE member_id=? AND dlc_id=?',
+                    (u['member_id'], d['id'])).fetchone()
+    c.close()
+    if own:
+        return jsonify(ok=True, already=True)
+
+    import oma_pt
+    r = oma_pt.spend_pt(u['member_id'], d['price'], 'dlc',
+                        ref_id='dlc%s' % d['id'],
+                        detail='%s（%s）' % (d['name'], g['title']))
+    if not r['ok']:
+        return jsonify(ok=False, error=r['why'],
+                       need=r.get('need'), have=r.get('have')), 402
+    c = _db()
+    c.execute('INSERT OR IGNORE INTO oma_dlc_own(member_id,dlc_id) VALUES(?,?)',
+              (u['member_id'], d['id']))
+    c.commit(); c.close()
+    return jsonify(ok=True, pt=r['pt'])
+
+
+@bp_games.route('/api/games/<slug>/mydlc')
+def api_my_dlc(slug):
+    """ゲームが 聞く：じぶんが 買った 追加の コード一覧"""
+    u = _me()
+    if not u:
+        return jsonify(ok=True, codes=[])
+    c = _db()
+    g = c.execute('SELECT id FROM oma_game WHERE slug=?', (slug,)).fetchone()
+    if not g:
+        c.close(); return jsonify(ok=True, codes=[])
+    rows = c.execute("""SELECT d.code FROM oma_dlc_own o
+                        JOIN oma_dlc d ON d.id=o.dlc_id
+                        WHERE o.member_id=? AND d.game_id=?""",
+                     (u['member_id'], g['id'])).fetchall()
+    c.close()
+    return jsonify(ok=True, codes=[r['code'] for r in rows])
+
+
+# ---- 管理 ----
+@bp_games.route('/api/admin/game/<slug>/dlc', methods=['POST'])
+def api_admin_dlc(slug):
+    if not _is_admin():
+        return jsonify(ok=False, error='管理者のみ'), 403
+    d = request.get_json(silent=True) or {}
+    c = _db()
+    g = c.execute('SELECT id FROM oma_game WHERE slug=?', (slug,)).fetchone()
+    if not g:
+        c.close(); return jsonify(ok=False, error='ありません'), 404
+    code = (d.get('code') or '').strip()
+    if not re.match(r'^[a-z0-9_]{1,30}$', code):
+        c.close(); return jsonify(ok=False, error='コードは 小文字英数字と _'), 400
+    c.execute("""INSERT INTO oma_dlc(game_id,code,name,summary,price)
+                 VALUES(?,?,?,?,?)
+                 ON CONFLICT(game_id,code) DO UPDATE SET
+                 name=excluded.name, summary=excluded.summary,
+                 price=excluded.price""",
+              (g['id'], code, (d.get('name') or code)[:60],
+               (d.get('summary') or '')[:200], int(d.get('price') or 0)))
+    c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+@bp_games.route('/api/admin/game/<slug>/dlc')
+def api_admin_dlc_list(slug):
+    if not _is_admin():
+        return jsonify(ok=False), 403
+    c = _db()
+    g = c.execute('SELECT id FROM oma_game WHERE slug=?', (slug,)).fetchone()
+    if not g:
+        c.close(); return jsonify(ok=True, dlc=[])
+    rows = [dict(r) for r in c.execute("""
+        SELECT d.*, (SELECT COUNT(*) FROM oma_dlc_own o WHERE o.dlc_id=d.id) AS owners
+        FROM oma_dlc d WHERE d.game_id=? ORDER BY d.id""", (g['id'],)).fetchall()]
+    c.close()
+    return jsonify(ok=True, dlc=rows)

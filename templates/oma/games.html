@@ -122,6 +122,7 @@ async function showOne(){
               + 'onclick="location.href=\'/oma_games/' + K(SLUG) + '/play\'">'
               + '▶ むりょうで あそぶ</button>'))
     + '</div></div>'
+    + await dlcHtml()
     + ((d.items || []).length
         ? '<h2>ゲームの 中の もの</h2>'
           + d.items.map(function(i){
@@ -139,6 +140,40 @@ async function showOne(){
                 + '</div></div>';
             }).join('')
         : '');
+}
+
+async function dlcHtml(){
+  var d = await J('/api/games/' + SLUG + '/dlc');
+  if (d.ok !== true || !d.dlc.length) return '';
+  return '<h2>📦 追加コンテンツ</h2>'
+    + d.dlc.map(function(x){
+        return '<div class="item">'
+          + '<div style="flex:1;min-width:0">'
+          + '<div class="n">' + K(x.name) + '</div>'
+          + '<div class="s">' + K(x.summary || '') + '</div></div>'
+          + '<div class="b">'
+          + (x.mine
+              ? '<span class="owned">もっている</span>'
+              : '<span class="price">' + x.price + ' PT</span><br>'
+                + '<button class="btn mn sm" style="margin-top:5px" '
+                + 'onclick="buyDlc(\'' + K(x.code) + '\')">かう</button>')
+          + '</div></div>';
+      }).join('');
+}
+
+async function buyDlc(code){
+  var d = await J('/api/games/' + SLUG + '/dlc');
+  var it = (d.dlc || []).filter(function(x){ return x.code === code; })[0];
+  if (!it) return;
+  if (!confirm(it.name + ' を ' + it.price + ' PT で かいますか？')) return;
+  var r = await P('/api/games/' + SLUG + '/dlc/' + code + '/buy');
+  if (r.ok !== true){
+    toast(r.error + (r.need ? '（あと ' + r.need + ' PT）' : ''), 'error');
+    return;
+  }
+  toast('かいました！ ゲームを ひらくと ふえて います');
+  if ($('ptNum')) $('ptNum').textContent = r.pt;
+  showOne();
 }
 
 async function buyGame(){

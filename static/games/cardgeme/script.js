@@ -85,6 +85,28 @@ let battleState = {
   cpuScore: 0
 };
 
+
+/* ==== 追加コンテンツ（DLC）を よみこむ ==== */
+async function checkDLC() {
+  try {
+    const res = await fetch('/api/games/cardgeme/mydlc');
+    const d = await res.json();
+    if (d.ok && d.codes && d.codes.indexOf('extra155') >= 0) {
+      // extra155 を 買って いる → 166枚を 足す
+      if (window.DLC_CARDS_extra155) {
+        window.DLC_CARDS_extra155.forEach(function(card) {
+          // すでに 入って いなければ 足す
+          if (!CARD_DATABASE.some(function(c){ return c.id === card.id; })) {
+            CARD_DATABASE.push(card);
+          }
+        });
+      }
+    }
+  } catch (e) {
+    // 聞けなくても ゲームは うごく
+  }
+}
+
 // --- 3. 音声効果（Web Audio API） ---
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
@@ -128,7 +150,9 @@ function playSound(type) {
 }
 
 // --- 4. 初期化（omame.ready） ---
-omame.ready.then(function(savedData) {
+omame.ready.then(async function(savedData) {
+    await checkDLC();  // 買った 追加を よみこむ
+
   if (savedData && typeof savedData === 'object') {
     if (typeof savedData.coin === 'number') userState.coin = savedData.coin;
     if (savedData.cards && typeof savedData.cards === 'object') userState.cards = savedData.cards;
