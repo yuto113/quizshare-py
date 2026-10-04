@@ -77,8 +77,9 @@ def _install(bp_oma, PROJS, _db, _me, owner_to_member, member_to_owner,
         if not u:
             return jsonify(ok=False, error='ログインして ください'), 401
 
-        from bp_member import (check_content, my_tier, PUBLISH_LIMITS,
-                               FILE_MAX, CODE_MAX)
+        from bp_member import check_content, my_tier, LIMITS
+        FILE_MAX = 30
+        CODE_MAX = 400000
         d = request.get_json(silent=True) or {}
         col_id = d.get('col_id')
         title = (d.get('title') or '').strip()
@@ -97,7 +98,7 @@ def _install(bp_oma, PROJS, _db, _me, owner_to_member, member_to_owner,
                 return jsonify(ok=False, need_agree=True,
                     error='さきに「きまり」を 読んで ください'), 403
             tier = my_tier(u)
-            lim = PUBLISH_LIMITS.get(tier, 15)
+            lim = LIMITS.get(tier, 15)
             n = c.execute("SELECT COUNT(*) AS n FROM mp_app WHERE member_id=? "
                           "AND status='published' AND col_id<>?",
                           (u['member_id'], col_id or '')).fetchone()
@@ -143,8 +144,8 @@ def _install(bp_oma, PROJS, _db, _me, owner_to_member, member_to_owner,
                                  (col_id,)).fetchone():
                     break
             cur = c.execute("""INSERT INTO mp_app(member_id,title,summary,tags,
-                               difficulty,status,col_id)
-                               VALUES(?,?,?,?,?,?,?)""",
+                               difficulty,status,col_id,code)
+                               VALUES(?,?,?,?,?,?,?,'')""",
                             (u['member_id'], title[:80],
                              (d.get('summary') or '')[:300],
                              (d.get('tags') or '')[:120],

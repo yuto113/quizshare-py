@@ -18,6 +18,12 @@ bp_mail = Blueprint('mail', __name__)
 _MAIL_KEY = os.environ.get('MAIL_KEY', '')
 
 
+from datetime import datetime, timedelta, timezone
+
+def jst_str():
+    return datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d %H:%M:%S')
+
+
 def _db():
     c = sqlite3.connect(os.environ.get('SQLITE_PATH',
                                        '/home/yuto113/quizshare.db'))
@@ -166,6 +172,8 @@ def api_mail_request():
     to = r['member_id']
     if to == u['member_id']:
         return jsonify(ok=False, error='じぶんです'), 400
+    if _is_blocked(u['member_id'], to):
+        return jsonify(ok=False, error='この人とは つながれません'), 403
     if _are_friends(u['member_id'], to):
         return jsonify(ok=True, already=True)
 
@@ -185,10 +193,10 @@ def api_mail_request():
     # 相手に しらせる
     from bp_member import notify
     c.execute("""INSERT INTO mp_notice(member_id,kind,actor,body,created_at)
-                 VALUES(?,?,?,?,datetime('now','localtime'))""",
+                 VALUES(?,?,?,?,?)""",
               (to, 'mail_req', u['member_id'],
                (u.get('nickname') or u['member_id'])
-               + ' さんが つながりたいそうです'))
+               + ' さんが つながりたいそうです', jst_str()))
     c.commit(); c.close()
     return jsonify(ok=True, waiting=True)
 
@@ -332,6 +340,22 @@ def api_mail_room(rid):
                        (rid, after)).fetchall():
         d = dict(m)
         d['body'] = dec(m['body'])
+        if m['kind'] == 'image' and m['extra']:
+            d['extra'] = dec(m['extra'])    # 画像を もどす
+        # 返信元の 中身
+        if m['reply_to']:
+            rp = c.execute('SELECT member_id, body, kind FROM oma_msg WHERE id=?',
+                           (m['reply_to'],)).fetchone()
+            if rp:
+                d['reply'] = {'member_id': rp['member_id'],
+                              'body': (dec(rp['body'])[:40] if rp['kind']=='text'
+                                       else '［' + (rp['kind']) + '］')}
+        # リアクション
+        rs = c.execute('SELECT emoji, COUNT(*) AS n, '
+                       'SUM(CASE WHEN member_id=? THEN 1 ELSE 0 END) AS mine '
+                       'FROM oma_react WHERE msg_id=? GROUP BY emoji',
+                       (u['member_id'], m['id'])).fetchall()
+        d['reacts'] = [dict(x) for x in rs]
         msgs.append(d)
     # だれが どこまで 読んだか（既読）
     reads = [dict(r) for r in c.execute(
@@ -357,14 +381,31 @@ def api_mail_send():
     body = (d.get('body') or '').strip()
     if not _in_room(rid, u['member_id']):
         return jsonify(ok=False, error='入って いません'), 403
-    if not body:
+    _kind = (d.get('kind') or 'text')
+    if not body and _kind == 'text':
         return jsonify(ok=False, error='なにか 書いて'), 400
     if len(body) > 2000:
         return jsonify(ok=False, error='ながすぎます'), 400
+    # 1対1で ブロックの 関係なら 送れない
+    cc = _db()
+    rk = cc.execute('SELECT kind FROM oma_room WHERE id=?', (rid,)).fetchone()
+    if rk and rk['kind'] == 'dm':
+        other = cc.execute('SELECT member_id FROM oma_room_member '
+                           'WHERE room_id=? AND member_id<>?',
+                           (rid, u['member_id'])).fetchone()
+        cc.close()
+        if other and _is_blocked(u['member_id'], other['member_id']):
+            return jsonify(ok=False, error='この人とは やりとり できません'), 403
+    else:
+        cc.close()
     c = _db()
-    cur = c.execute("""INSERT INTO oma_msg(room_id,member_id,body,created_at)
-                       VALUES(?,?,?,datetime('now','localtime'))""",
-                    (rid, u['member_id'], enc(body)))
+    kind = d.get('kind') or 'text'
+    extra = d.get('extra') or None
+    reply = d.get('reply_to') or None
+    cur = c.execute("""INSERT INTO oma_msg(room_id,member_id,body,created_at,
+                       kind,extra,reply_to) VALUES(?,?,?,?,?,?,?)""",
+                    (rid, u['member_id'], enc(body), jst_str(),
+                     kind, extra, reply))
     mid = cur.lastrowid
     # じぶんは そこまで 読んだ ことに
     c.execute('UPDATE oma_room_member SET last_read=? WHERE room_id=? '
@@ -479,3 +520,305 @@ def oma_mail_page():
         return redirect('/oma_pj')
     from flask import render_template
     return render_template('oma/mail.html', page='mail')
+
+
+# ====================================================================
+# 新着の かず（ヘッダー用）
+# ====================================================================
+@bp_mail.route('/api/mail/unread')
+def api_mail_unread():
+    """まだ 読んで いない メッセージの ごうけい"""
+    u = _me()
+    if not u:
+        return jsonify(ok=False, n=0), 401
+    me_id = u['member_id']
+    c = _db()
+    r = c.execute("""
+        SELECT COALESCE(SUM(x.un), 0) AS n FROM (
+          SELECT (SELECT COUNT(*) FROM oma_msg o
+                  WHERE o.room_id=rm.room_id AND o.id>rm.last_read
+                  AND o.member_id<>? AND o.hidden=0) AS un
+          FROM oma_room_member rm WHERE rm.member_id=?
+        ) x""", (me_id, me_id)).fetchone()
+    # つながり ねがいの かずも
+    req = c.execute("SELECT COUNT(*) AS n FROM oma_friend_req "
+                    "WHERE to_id=? AND status='wait'", (me_id,)).fetchone()
+    c.close()
+    return jsonify(ok=True, n=(r['n'] or 0), req=(req['n'] or 0))
+
+
+# ====================================================================
+# グループを 抜ける
+# ====================================================================
+@bp_mail.route('/api/mail/leave', methods=['POST'])
+def api_mail_leave():
+    u = _me()
+    if not u:
+        return jsonify(ok=False), 401
+    d = request.get_json(silent=True) or {}
+    rid = d.get('room_id')
+    c = _db()
+    room = c.execute('SELECT kind, owner FROM oma_room WHERE id=?', (rid,)).fetchone()
+    if not room:
+        c.close(); return jsonify(ok=False, error='ありません'), 404
+    if room['kind'] != 'group':
+        c.close(); return jsonify(ok=False, error='1対1は 抜けられません'), 400
+    # 抜ける
+    c.execute('DELETE FROM oma_room_member WHERE room_id=? AND member_id=?',
+              (rid, u['member_id']))
+    # みんな 抜けたら 部屋も けす
+    n = c.execute('SELECT COUNT(*) AS n FROM oma_room_member WHERE room_id=?',
+                  (rid,)).fetchone()
+    if n and n['n'] == 0:
+        c.execute('DELETE FROM oma_msg WHERE room_id=?', (rid,))
+        c.execute('DELETE FROM oma_room WHERE id=?', (rid,))
+    else:
+        # 「◯◯が ぬけました」と のこす
+        c.execute("""INSERT INTO oma_msg(room_id,member_id,body,created_at)
+                     VALUES(?,?,?,?)""",
+                  (rid, u['member_id'],
+                   enc('（' + (u.get('nickname') or u['member_id'])
+                       + ' が ぬけました）'), jst_str()))
+    c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+# ====================================================================
+# グループに 人を さそう（あとから）
+# ====================================================================
+@bp_mail.route('/api/mail/invite', methods=['POST'])
+def api_mail_invite():
+    u = _me()
+    if not u:
+        return jsonify(ok=False), 401
+    d = request.get_json(silent=True) or {}
+    rid = d.get('room_id')
+    who = d.get('member_id')
+    c = _db()
+    room = c.execute('SELECT kind FROM oma_room WHERE id=?', (rid,)).fetchone()
+    if not room or room['kind'] != 'group':
+        c.close(); return jsonify(ok=False, error='グループでは ありません'), 400
+    if not _in_room(rid, u['member_id']):
+        c.close(); return jsonify(ok=False, error='入って いません'), 403
+    if not _are_friends(u['member_id'], who):
+        c.close(); return jsonify(ok=False, error='つながって いる 人だけ'), 403
+    try:
+        c.execute('INSERT INTO oma_room_member(room_id,member_id) VALUES(?,?)',
+                  (rid, who))
+        nick = c.execute('SELECT nickname FROM mp_member WHERE member_id=?',
+                         (who,)).fetchone()
+        c.execute("""INSERT INTO oma_msg(room_id,member_id,body,created_at)
+                     VALUES(?,?,?,?)""",
+                  (rid, u['member_id'],
+                   enc('（' + (nick['nickname'] if nick else who)
+                       + ' が 入りました）'), jst_str()))
+        c.commit()
+    except Exception:
+        pass
+    c.close()
+    return jsonify(ok=True)
+
+
+# ====================================================================
+# ブロック
+# ====================================================================
+def _is_blocked(a, b):
+    """a が b を ブロックして いるか（どちらかが していれば True）"""
+    c = _db()
+    r = c.execute('SELECT 1 FROM oma_block WHERE '
+                  '(member_id=? AND blocked=?) OR (member_id=? AND blocked=?)',
+                  (a, b, b, a)).fetchone()
+    c.close()
+    return bool(r)
+
+
+@bp_mail.route('/api/mail/block', methods=['POST'])
+def api_mail_block():
+    u = _me()
+    if not u:
+        return jsonify(ok=False), 401
+    d = request.get_json(silent=True) or {}
+    who = d.get('member_id')
+    on = bool(d.get('block'))
+    c = _db()
+    if on:
+        try:
+            c.execute('INSERT INTO oma_block(member_id,blocked) VALUES(?,?)',
+                      (u['member_id'], who))
+        except Exception:
+            pass
+    else:
+        c.execute('DELETE FROM oma_block WHERE member_id=? AND blocked=?',
+                  (u['member_id'], who))
+    c.commit(); c.close()
+    return jsonify(ok=True, blocked=on)
+
+
+@bp_mail.route('/api/mail/blocks')
+def api_mail_blocks():
+    u = _me()
+    if not u:
+        return jsonify(ok=False), 401
+    c = _db()
+    rows = [dict(r) for r in c.execute("""
+        SELECT b.blocked AS member_id, m.nickname
+        FROM oma_block b LEFT JOIN mp_member m ON m.member_id=b.blocked
+        WHERE b.member_id=?""", (u['member_id'],)).fetchall()]
+    c.close()
+    return jsonify(ok=True, blocks=rows)
+
+
+# ====================================================================
+# 通報
+# ====================================================================
+@bp_mail.route('/api/mail/report', methods=['POST'])
+def api_mail_report():
+    u = _me()
+    if not u:
+        return jsonify(ok=False), 401
+    d = request.get_json(silent=True) or {}
+    rid = d.get('room_id')
+    mid = d.get('msg_id')
+    c = _db()
+    snap = None; target = None
+    if mid:
+        m = c.execute('SELECT member_id, body FROM oma_msg WHERE id=?',
+                      (mid,)).fetchone()
+        if m:
+            snap = m['body']        # 暗号の まま のこす
+            target = m['member_id']
+    c.execute("""INSERT INTO oma_mail_report(by_member,room_id,msg_id,target,
+                 reason,snapshot,created_at) VALUES(?,?,?,?,?,?,?)""",
+              (u['member_id'], rid, mid, target or d.get('target'),
+               (d.get('reason') or '')[:300], snap, jst_str()))
+    c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+# ====================================================================
+# リアクション
+# ====================================================================
+@bp_mail.route('/api/mail/react', methods=['POST'])
+def api_mail_react():
+    u = _me()
+    if not u:
+        return jsonify(ok=False), 401
+    d = request.get_json(silent=True) or {}
+    mid = d.get('msg_id')
+    emoji = (d.get('emoji') or '')[:8]
+    if not mid or not emoji:
+        return jsonify(ok=False), 400
+    c = _db()
+    hit = c.execute('SELECT 1 FROM oma_react WHERE msg_id=? AND member_id=? '
+                    'AND emoji=?', (mid, u['member_id'], emoji)).fetchone()
+    if hit:
+        c.execute('DELETE FROM oma_react WHERE msg_id=? AND member_id=? AND emoji=?',
+                  (mid, u['member_id'], emoji))
+        on = False
+    else:
+        c.execute('INSERT INTO oma_react(msg_id,member_id,emoji) VALUES(?,?,?)',
+                  (mid, u['member_id'], emoji))
+        on = True
+    c.commit(); c.close()
+    return jsonify(ok=True, on=on)
+
+
+# ====================================================================
+# スタンプ
+# ====================================================================
+@bp_mail.route('/api/mail/stamps')
+def api_mail_stamps():
+    """つかえる スタンプ 一覧（買った ものと 無料）"""
+    u = _me()
+    if not u:
+        return jsonify(ok=False), 401
+    c = _db()
+    rows = [dict(r) for r in c.execute("""
+        SELECT s.*, (SELECT 1 FROM oma_stamp_own o
+                     WHERE o.stamp_id=s.id AND o.member_id=?) AS mine
+        FROM oma_stamp s WHERE s.active=1 ORDER BY s.price, s.id""",
+        (u['member_id'],)).fetchall()]
+    c.close()
+    try:
+        import oma_pt
+        pt = oma_pt.get_pt(u['member_id'])['pt']
+    except Exception:
+        pt = 0
+    # つかえるか（無料 or 買った）
+    for r in rows:
+        r['usable'] = (r['price'] == 0 or r['mine'])
+    return jsonify(ok=True, stamps=rows, pt=pt)
+
+
+@bp_mail.route('/api/mail/stamp/<code>/buy', methods=['POST'])
+def api_mail_stamp_buy(code):
+    u = _me()
+    if not u:
+        return jsonify(ok=False), 401
+    c = _db()
+    st = c.execute('SELECT * FROM oma_stamp WHERE code=? AND active=1',
+                   (code,)).fetchone()
+    if not st:
+        c.close(); return jsonify(ok=False, error='ありません'), 404
+    if st['price'] <= 0:
+        c.close(); return jsonify(ok=True, free=True)
+    own = c.execute('SELECT 1 FROM oma_stamp_own WHERE member_id=? AND stamp_id=?',
+                    (u['member_id'], st['id'])).fetchone()
+    c.close()
+    if own:
+        return jsonify(ok=True, already=True)
+    import oma_pt
+    r = oma_pt.spend_pt(u['member_id'], st['price'], 'stamp',
+                        ref_id='st%s' % st['id'], detail='スタンプ「%s」' % st['name'])
+    if not r['ok']:
+        return jsonify(ok=False, error=r['why'],
+                       need=r.get('need'), have=r.get('have')), 402
+    c = _db()
+    c.execute('INSERT OR IGNORE INTO oma_stamp_own(member_id,stamp_id) VALUES(?,?)',
+              (u['member_id'], st['id']))
+    c.commit(); c.close()
+    return jsonify(ok=True, pt=r['pt'])
+
+
+# ====================================================================
+# 画像（おえかき から 送る）
+# ====================================================================
+@bp_mail.route('/api/mail/send_draw', methods=['POST'])
+def api_mail_send_draw():
+    """じぶんの おえかきを チャットに 送る"""
+    u = _me()
+    if not u:
+        return jsonify(ok=False), 401
+    d = request.get_json(silent=True) or {}
+    rid = d.get('room_id')
+    draw_id = d.get('draw_id')
+    if not _in_room(rid, u['member_id']):
+        return jsonify(ok=False, error='入って いません'), 403
+    c = _db()
+    dr = c.execute('SELECT thumb FROM mp_draw WHERE id=? AND member_id=?',
+                   (draw_id, u['member_id'])).fetchone()
+    if not dr:
+        c.close(); return jsonify(ok=False, error='その えは ありません'), 404
+    cur = c.execute("""INSERT INTO oma_msg(room_id,member_id,body,created_at,
+                       kind,extra) VALUES(?,?,?,?,'image',?)""",
+                    (rid, u['member_id'], enc(''), jst_str(),
+                     enc(dr['thumb'] or '')))
+    mid = cur.lastrowid
+    c.execute('UPDATE oma_room_member SET last_read=? WHERE room_id=? '
+              'AND member_id=?', (mid, rid, u['member_id']))
+    c.commit(); c.close()
+    return jsonify(ok=True, id=mid)
+
+
+@bp_mail.route('/api/mail/mydraws')
+def api_mail_mydraws():
+    """じぶんの おえかき（送る 用）"""
+    u = _me()
+    if not u:
+        return jsonify(ok=False), 401
+    c = _db()
+    rows = [dict(r) for r in c.execute(
+        "SELECT id, title, thumb FROM mp_draw WHERE member_id=? AND hidden=0 "
+        "ORDER BY id DESC LIMIT 40", (u['member_id'],)).fetchall()]
+    c.close()
+    return jsonify(ok=True, draws=rows)

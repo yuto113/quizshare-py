@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>おまめ フルーツパズル</title>
+<script src="/static/games/omame.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="game-wrapper">
+    
+    <!-- じょうほう バー -->
+    <div id="ui-header">
+      <div class="score-box">スコア: <span id="score-text">0</span></div>
+      <div class="next-box">つぎ: <span id="next-text">🍒</span></div>
+    </div>
+
+    <!-- ゲーム画面 -->
+    <canvas id="game-canvas" width="360" height="550"></canvas>
+    
+    <!-- タイトル画面 -->
+    <div id="title-screen" class="screen">
+      <h1>🍉 フルーツパズル</h1>
+      <p>おなじ フルーツを ぶつけて<br>どんどん 大きく しよう！</p>
+      <button id="start-btn" class="btn">ゲームスタート</button>
+    </div>
+
+    <!-- ゲームオーバー画面 -->
+    <div id="gameover-screen" class="screen" style="display:none;">
+      <h2>ゲームオーバー</h2>
+      <p id="new-record" style="display:none; color:#ff3366; font-weight:bold;">✨スゴイ！ハイスコア！✨</p>
+      <p>スコア: <span id="final-score">0</span></p>
+      <p>ハイスコア: <span id="high-score">0</span></p>
+      
+      <div class="btn-group">
+        <button id="restart-btn" class="btn">もういちど</button>
+        <!-- PTをつかって復活するボタン -->
+        <button id="revive-btn" class="btn btn-pt">💎 ふっかつ (上から3つ消す)</button>
+      </div>
+    </div>
+    
+  </div>
+
+<script src="script.js"></script>
+</body>
+</html>

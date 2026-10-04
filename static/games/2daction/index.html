@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>スマイルアドベンチャー</title>
+<script src="/static/games/omame.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="game-wrapper">
+  
+  <!-- タイトル画面 -->
+  <div id="screen-title" class="screen">
+    <h1>😀 スマイル<br>アドベンチャー</h1>
+    <p>ジャンプして ゴールを めざせ！</p>
+    <button id="btn-start" class="btn">はじめる</button>
+  </div>
+
+  <!-- マップ（ワールド選択）画面 -->
+  <div id="screen-map" class="screen" style="display:none;">
+    <h2>ステージ せんたく</h2>
+    <div class="status-bar">もっている コイン: <span id="val-coin">0</span> 🪙</div>
+    <div id="stage-list">
+      <!-- JavaScriptで 10個のボタンが ならびます -->
+    </div>
+    <button id="btn-go-shop" class="btn btn-shop">🛍️ ショップに いく</button>
+  </div>
+
+  <!-- ショップ画面 -->
+  <div id="screen-shop" class="screen" style="display:none;">
+    <h2>アイテム ショップ</h2>
+    <div class="status-bar">もっている コイン: <span id="val-shop-coin">0</span> 🪙</div>
+    
+    <div class="shop-item">
+      <span>❤️ さいだいライフ +1<br><small>50 コイン</small></span>
+      <button id="btn-buy-life" class="btn">かう</button>
+    </div>
+    <div class="shop-item">
+      <span>👟 ジャンプ力 アップ<br><small>50 コイン</small></span>
+      <button id="btn-buy-jump" class="btn">かう</button>
+    </div>
+    
+    <button id="btn-shop-back" class="btn">マップへ もどる</button>
+  </div>
+
+  <!-- ゲーム画面 -->
+  <div id="screen-game" class="screen" style="display:none;">
+    <!-- じょうほう -->
+    <div class="hud">
+      <div class="hud-left">❤️ <span id="hud-life">3</span></div>
+      <div class="hud-right">🪙 <span id="hud-coin">0</span></div>
+    </div>
+    
+    <!-- 描画エリア（絵をかくところ） -->
+    <div id="canvas-container">
+      <canvas id="game-canvas" width="640" height="360"></canvas>
+    </div>
+    
+    <!-- スマホ用 ボタン（パソコンでも マウスで おせます） -->
+    <div id="virtual-pad">
+      <div class="pad-left">
+        <button id="pad-btn-left" class="pad-btn">◀</button>
+        <button id="pad-btn-right" class="pad-btn">▶</button>
+      </div>
+      <div class="pad-right">
+        <button id="pad-btn-jump" class="pad-btn pad-btn-large">JUMP</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ステージクリア画面 -->
+  <div id="screen-clear" class="screen overlay" style="display:none;">
+    <h2>✨ クリア！ ✨</h2>
+    <p>ゲットした コイン: <span id="clear-coin">0</span> 🪙</p>
+    <button id="btn-next-stage" class="btn">つぎの ステージへ</button>
+    <button id="btn-back-map1" class="btn">マップへ</button>
+  </div>
+
+  <!-- ゲームオーバー画面 -->
+  <div id="screen-gameover" class="screen overlay" style="display:none;">
+    <h2>ゲームオーバー...</h2>
+    <button id="btn-retry" class="btn">もういちど</button>
+    <button id="btn-back-map2" class="btn">マップへ</button>
+  </div>
+
+</div>
+<script src="script.js"></script>
+</body>
+</html>

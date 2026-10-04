@@ -1924,3 +1924,40 @@ def api_admin_contest_phase(slug):
     c.execute('UPDATE oma_contest SET phase=? WHERE slug=?', (ph, slug))
     c.commit(); c.close()
     return jsonify(ok=True)
+
+
+@bp.route('/api/admin/mail/reports')
+def api_admin_mail_reports():
+    """メールの 通報一覧"""
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    import oma_mail
+    c = _db()
+    rows = []
+    for r in c.execute("""
+        SELECT rp.*, bm.nickname AS by_nick, tm.nickname AS target_nick
+        FROM oma_mail_report rp
+        LEFT JOIN mp_member bm ON bm.member_id=rp.by_member
+        LEFT JOIN mp_member tm ON tm.member_id=rp.target
+        ORDER BY rp.id DESC LIMIT 60""").fetchall():
+        d = dict(r)
+        # 通報された メッセージは 中身を 見せる（運営の 確認用）
+        d['text'] = oma_mail.dec(r['snapshot']) if r['snapshot'] else ''
+        d.pop('snapshot', None)
+        rows.append(d)
+    c.close()
+    return jsonify(ok=True, reports=rows)
+
+
+@bp.route('/api/admin/mail/report/<int:rid>', methods=['POST'])
+def api_admin_mail_report(rid):
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    d = request.get_json(silent=True) or {}
+    c = _db()
+    if d.get('hide_msg') and d.get('msg_id'):
+        c.execute('UPDATE oma_msg SET hidden=1 WHERE id=?', (d['msg_id'],))
+    c.execute("UPDATE oma_mail_report SET status=?, handled_by=? WHERE id=?",
+              (d.get('status') or 'closed', session.get('staff_id'), rid))
+    c.commit(); c.close()
+    return jsonify(ok=True)

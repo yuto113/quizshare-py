@@ -175,7 +175,7 @@ label.lb{font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px}
 <div class="hd">
   <span class="logo" onclick="location.href='/oma_pj/home'">
     <span class="bean">🫘</span>Omame<em>PJ</em></span>
-  <button onclick="openHub()" class="hubbtn" title="ほかの サービス">📚</button>
+  <button onclick="openHub()" class="hubbtn" title="ほかの サービス">📚<span id="hubBadge" class="badge" style="display:none"></span></button>
   <span class="sp"></span>
   <span class="who" id="whoami"></span>
   {% if not ex %}
@@ -234,8 +234,9 @@ label.lb{font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px}
       <a class="hub-card" href="/oma_pj/home">
         <div class="i">🫘</div><div class="t">Omame PJ</div>
         <div class="d">プログラミングなど</div></a>
-      <a class="hub-card" href="/oma_mail">
-        <div class="i">💬</div><div class="t">チャット</div>
+      <a class="hub-card" href="/oma_mail" style="position:relative">
+        <div class="i">💬</div><div class="t">チャット<span id="hubMailN"
+        class="badge" style="display:none"></span></div>
         <div class="d">みんなと はなす</div></a>
       <a class="hub-card" id="hubGames" href="/oma_games">
         <div class="i">🎮</div><div class="t">ゲーム</div>
@@ -305,6 +306,7 @@ async function loadMe(){
   checkDebt();
   document.body.classList.toggle('furi', !!d.furigana);
   checkNotices();
+  checkMail();
   return d;
 }
 
@@ -399,6 +401,18 @@ function openHub(){
   document.getElementById('hubModal').classList.add('on');
 }
 function closeHub(){ document.getElementById('hubModal').classList.remove('on'); }
+
+async function checkMail(){
+  try {
+    var d = await (await fetch('/api/mail/unread')).json();
+    if (!d.ok) return;
+    var total = (d.n||0) + (d.req||0);
+    var b = $('hubBadge'), m = $('hubMailN');
+    if (b){ b.textContent = total; b.style.display = total>0?'':'none'; }
+    if (m){ m.textContent = total; m.style.display = total>0?'':'none'; }
+  } catch(e){}
+}
+setInterval(checkMail, 20000);
 
 loadMe();
 </script>

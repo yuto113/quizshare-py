@@ -1,0 +1,120 @@
+/* ぜんたいの リセットと はいち */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: transparent; /* 背景はサイトに合わせる */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: sans-serif;
+  user-select: none;
+}
+
+/* ゲームの わく（スマホ・パソコン両方で きれいに おさまる） */
+#game-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  max-width: 360px;
+  max-height: 550px;
+  aspect-ratio: 360 / 550;
+  background-color: #ffebcd;
+  box-shadow: 0 0 15px rgba(0,0,0,0.2);
+  overflow: hidden;
+}
+
+/* キャンバス */
+canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none; /* スマホで スクロールしない ように */
+}
+
+/* スコアと 次のフルーツの じょうほう */
+#ui-header {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none; /* タッチの じゃまに ならないように */
+}
+
+.score-box, .next-box {
+  background: rgba(255, 255, 255, 0.8);
+  padding: 8px 12px;
+  border-radius: 20px;
+  font-weight: bold;
+  color: #333;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* かさなる 画面（タイトル、ゲームオーバー） */
+.screen {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+h1 {
+  font-size: 28px;
+  color: #ff6600;
+  margin-bottom: 10px;
+}
+h2 {
+  font-size: 32px;
+  color: #333;
+  margin-bottom: 5px;
+}
+p {
+  font-size: 16px;
+  color: #555;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+/* ボタンの デザイン */
+.btn-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.btn {
+  background: linear-gradient(to bottom, #ff9900, #e67e00);
+  border: none;
+  border-radius: 24px;
+  color: white;
+  padding: 14px 24px;
+  font-size: 18px;
+  font-weight: bold;
+  box-shadow: 0 4px 0 #b36200;
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.btn:active {
+  transform: translateY(4px);
+  box-shadow: 0 0 0 #b36200;
+}
+
+/* アイテム（PT）をつかう ボタン */
+.btn-pt {
+  background: linear-gradient(to bottom, #4facfe, #00f2fe);
+  box-shadow: 0 4px 0 #0093d9;
+  font-size: 16px;
+}
+.btn-pt:active {
+  box-shadow: 0 0 0 #0093d9;
+}

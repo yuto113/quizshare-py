@@ -1,5 +1,15 @@
 {% extends "oma/_base.html" %}
-{% block title %}Omame Mail{% endblock %}
+{% block title %}Omame Mail
+.stamp-msg{font-size:46px;line-height:1.1;padding:2px}
+.img-msg{max-width:180px;border-radius:12px;cursor:pointer;display:block}
+.reply-q{font-size:11px;color:#5a7a63;border-left:2px solid #86c9a4;
+  padding-left:7px;margin-bottom:4px;opacity:.85}
+.reacts{display:flex;gap:4px;margin-top:3px;flex-wrap:wrap}
+.reacts .rc{font-size:11px;background:#fff;border:1px solid var(--line2);
+  border-radius:99px;padding:1px 7px;cursor:pointer}
+.reacts .rc.on{background:#d4ebdf;border-color:#86c9a4}
+.mine .reacts{justify-content:flex-end}
+{% endblock %}
 
 {% block style %}
 .mwrap{display:flex;gap:0;height:calc(100vh - 130px);min-height:400px;
@@ -64,6 +74,7 @@
   <button class="btn gh sm" onclick="showQR()">📷 じぶんの QR / コード</button>
   <button class="btn gh sm" onclick="showAdd()">＋ つながる</button>
   <button class="btn gh sm" onclick="showReqs()">🔔 ねがい<span id="reqN"></span></button>
+  <button class="btn gh sm" onclick="showBlocks()">🚫 ブロック</button>
 </div>
 
 <div class="mwrap">
@@ -82,9 +93,21 @@
         <button class="btn gh sm" onclick="backToList()"
           style="display:none" id="mBack">←</button>
         <span id="mTitle"></span>
+        <span class="sp" style="flex:1"></span>
+        <button class="btn gh sm" id="mMenu" onclick="roomMenu()"
+          style="display:none">⋯</button>
       </div>
       <div class="mbody" id="mBody"></div>
+      <div id="replyBar" style="display:none;align-items:center;gap:8px;
+        padding:6px 14px;background:#d4ebd f;font-size:12px;border-top:1px solid var(--line2)">
+        <span id="replyWho" style="flex:1;color:#15803d"></span>
+        <button class="btn gh sm" onclick="cancelReply()">×</button>
+      </div>
       <div class="minput">
+        <button class="btn gh" onclick="openStamps()" title="スタンプ"
+          style="padding:9px 11px">😊</button>
+        <button class="btn gh" onclick="openSendDraw()" title="え"
+          style="padding:9px 11px">🎨</button>
         <textarea id="mText" placeholder="メッセージ…"
           onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"></textarea>
         <button class="btn mn" onclick="sendMsg()">おくる</button>
@@ -154,6 +177,8 @@ async function refreshRoom(full){
     $('mTitle').textContent = d.room.kind==='dm'
       ? (d.members.filter(function(m){return m.member_id!==d.me;})[0]||{}).nickname||'トーク'
       : (d.room.name||'グループ');
+    window.CUR_KIND = d.room.kind;
+    if ($('mMenu')) $('mMenu').style.display = (d.room.kind==='group')?'':'none';
   }
   var body = $('mBody');
   var atBottom = (body.scrollHeight - body.scrollTop - body.clientHeight < 80);
@@ -161,6 +186,13 @@ async function refreshRoom(full){
     if (m.id <= LAST) return;
     LAST = m.id;
     var mine = (m.member_id === d.me);
+    // おしらせ系（◯◯が ぬけました 等）は まんなかに
+    if (m.kind==='text' && /^（.*）$/.test(m.body) && m.body.indexOf('さんが')<0){
+      $('mBody').insertAdjacentHTML('beforeend',
+        '<div style="text-align:center;font-size:11px;color:#5a7a63;'
+        + 'margin:6px 0">' + K(m.body) + '</div>');
+      return;
+    }
     // 既読の かず（相手が 読んだか）
     var readN = 0;
     if (mine){
@@ -170,9 +202,28 @@ async function refreshRoom(full){
     }
     var readTxt = (mine && readN>0) ? '既読'
       + (d.members.length>2 ? ' '+readN : '') : '';
+    // 中身（text / stamp / image）
+    var inner;
+    if (m.kind === 'stamp'){
+      inner = '<div class="stamp-msg">' + K(m.extra||m.body) + '</div>';
+    } else if (m.kind === 'image'){
+      inner = '<img class="img-msg" src="' + K(m.extra||'') + '" '
+        + 'onclick="window.open(this.src)">';
+    } else {
+      inner = '<div class="bub"' + ' onclick="msgMenu('
+        + m.id + ',\'' + K(m.member_id) + '\',\'' + K(m.nickname||m.member_id)
+        + '\',' + mine + ')" style="cursor:pointer">'
+        + (m.reply ? '<div class="reply-q">↩ ' + K(m.reply.body) + '</div>' : '')
+        + linkify(m.body) + '</div>';
+    }
+    var reacts = (m.reacts||[]).length
+      ? '<div class="reacts">' + m.reacts.map(function(r){
+          return '<span class="rc' + (r.mine?' on':'') + '" onclick="react('
+            + m.id + ',\'' + r.emoji + '\')">' + r.emoji + ' ' + r.n
+            + '</span>'; }).join('') + '</div>' : '';
     var html = '<div class="mrow' + (mine?' mine':'') + '">'
       + (mine ? '' : avHtml(m))
-      + '<div><div class="bub">' + linkify(m.body) + '</div></div>'
+      + '<div>' + inner + reacts + '</div>'
       + '<div class="msub"><span>' + hhmm(m.created_at) + '</span>'
       + (readTxt ? '<span>'+readTxt+'</span>' : '') + '</div></div>';
     if (!mine && d.room.kind==='group')
@@ -200,9 +251,155 @@ async function sendMsg(){
   var t = $('mText').value.trim();
   if (!t || !CUR) return;
   $('mText').value = '';
-  var d = await P('/api/mail/send', {room_id:CUR, body:t});
+  var b = {room_id:CUR, body:t};
+  if (REPLY_TO){ b.reply_to = REPLY_TO; cancelReply(); }
+  var d = await P('/api/mail/send', b);
   if (d.ok !== true){ toast(d.error,'error'); return; }
   refreshRoom(false);
+}
+
+/* ---- スタンプ ---- */
+async function openStamps(){
+  var d = await J('/api/mail/stamps');
+  openModal(
+      '<h1 style="font-size:17px;margin-bottom:4px">😊 スタンプ</h1>'
+    + '<p style="font-size:11.5px;color:var(--muted);margin-bottom:12px">'
+    + 'もっている PT: ' + d.pt + '</p>'
+    + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:9px">'
+    + d.stamps.map(function(s){
+        return '<div style="text-align:center;border:1px solid var(--line2);'
+          + 'border-radius:11px;padding:11px 4px;cursor:pointer" onclick="'
+          + (s.usable ? 'sendStamp(\'' + K(s.data) + '\')'
+                      : 'buyStamp(\'' + K(s.code) + '\',' + s.price + ')')
+          + '">'
+          + '<div style="font-size:30px">' + K(s.data) + '</div>'
+          + '<div style="font-size:10.5px;margin-top:3px">'
+          + (s.usable ? K(s.name) : s.price + ' PT') + '</div></div>';
+      }).join('')
+    + '</div><div class="row" style="margin-top:12px">'
+    + '<button class="btn gh" onclick="closeModal()">とじる</button></div>');
+}
+async function sendStamp(data){
+  closeModal();
+  await P('/api/mail/send', {room_id:CUR, kind:'stamp', extra:data, body:''});
+  refreshRoom(false);
+}
+async function buyStamp(code, price){
+  if (!confirm('この スタンプを ' + price + ' PT で かいますか？')) return;
+  var r = await P('/api/mail/stamp/' + code + '/buy');
+  if (r.ok !== true){ toast(r.error,'error'); return; }
+  toast('かいました'); openStamps();
+}
+
+/* ---- え を 送る ---- */
+async function openSendDraw(){
+  var d = await J('/api/mail/mydraws');
+  openModal(
+      '<h1 style="font-size:17px;margin-bottom:12px">🎨 え を 送る</h1>'
+    + ((d.draws||[]).length
+        ? '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;'
+          + 'max-height:300px;overflow:auto">'
+          + d.draws.filter(function(x){return x.thumb;}).map(function(x){
+              return '<img src="' + K(x.thumb) + '" style="width:100%;'
+                + 'aspect-ratio:1;object-fit:contain;border:1px solid var(--line2);'
+                + 'border-radius:9px;cursor:pointer;background:#fff" '
+                + 'onclick="sendDraw(' + x.id + ')">'; }).join('') + '</div>'
+        : '<div class="empty">まだ えが ありません。<br>'
+          + '<a href="/oma_pj/draw" style="color:var(--main2)">おえかき</a> '
+          + 'で かいて みて ください。</div>')
+    + '<div class="row" style="margin-top:12px">'
+    + '<button class="btn gh" onclick="closeModal()">とじる</button></div>');
+}
+async function sendDraw(id){
+  closeModal();
+  await P('/api/mail/send_draw', {room_id:CUR, draw_id:id});
+  refreshRoom(false);
+}
+
+/* ---- メッセージを おしたとき（通報・ブロック）---- */
+var REACT_EMOJI = ['❤️','👍','😆','😢','😲','🙏'];
+function msgMenu(mid, who, nick, mine){
+  openModal(
+      '<div style="display:flex;gap:7px;justify-content:center;margin-bottom:14px">'
+    + REACT_EMOJI.map(function(e){
+        return '<span style="font-size:26px;cursor:pointer" onclick="react('
+          + mid + ',\'' + e + '\');closeModal()">' + e + '</span>'; }).join('')
+    + '</div>'
+    + '<div style="display:grid;gap:9px">'
+    + '<button class="btn gh" onclick="setReply(' + mid + ',\'' + K(nick)
+    + '\')">↩ 返事を する</button>'
+    + (mine ? ''
+        : '<button class="btn gh" onclick="doReport(' + mid + ')">'
+          + '🚩 通報する</button>'
+          + '<button class="btn ng" onclick="doBlock(\'' + K(who) + '\',\''
+          + K(nick) + '\')">🚫 ブロックする</button>')
+    + '<button class="btn gh" onclick="closeModal()">やめる</button></div>');
+}
+
+var REPLY_TO = null;
+function setReply(mid, nick){
+  REPLY_TO = mid;
+  closeModal();
+  var bar = $('replyBar');
+  if (bar){ bar.style.display = 'flex';
+    $('replyWho').textContent = nick + ' さんに 返事'; }
+  $('mText').focus();
+}
+function cancelReply(){
+  REPLY_TO = null;
+  var bar = $('replyBar');
+  if (bar) bar.style.display = 'none';
+}
+
+async function react(mid, emoji){
+  await P('/api/mail/react', {msg_id:mid, emoji:emoji});
+  LAST = 0; $('mBody').innerHTML = ''; refreshRoom(true);
+}
+
+async function doReport(mid){
+  var why = prompt('どうして 通報しますか？（かいても かかなくても OK）') || '';
+  var d = await P('/api/mail/report', {room_id:CUR, msg_id:mid, reason:why});
+  closeModal();
+  toast(d.ok ? '通報しました。ありがとう。' : 'しっぱい しました');
+}
+
+async function doBlock(who, nick){
+  if (!confirm(nick + ' さんを ブロックしますか？\nおたがいに やりとり できなく なります。')) return;
+  var d = await P('/api/mail/block', {member_id:who, block:true});
+  closeModal();
+  if (d.ok){ toast('ブロックしました'); backToList(); }
+}
+
+/* ---- グループの メニュー ---- */
+async function roomMenu(){
+  var fr = await J('/api/mail/friends');
+  openModal(
+      '<h1 style="font-size:17px;margin-bottom:12px">グループ</h1>'
+    + '<div class="sec" style="font-size:12px;color:var(--muted);margin-bottom:6px">'
+    + 'さそう（つながって いる 人）</div>'
+    + '<div style="max-height:180px;overflow:auto;margin-bottom:12px">'
+    + ((fr.friends||[]).length ? fr.friends.map(function(f){
+        return '<div style="display:flex;align-items:center;gap:9px;padding:6px 2px">'
+          + avHtml(f, true) + '<span style="flex:1">' + K(f.nickname||f.member_id)
+          + '</span><button class="btn gh sm" onclick="invite(\''
+          + K(f.member_id) + '\')">さそう</button></div>';
+      }).join('') : '<div style="font-size:12px;color:var(--muted)">'
+        + 'つながって いる 人が いません</div>')
+    + '</div>'
+    + '<button class="btn ng" onclick="leaveRoom()">このグループを ぬける</button>'
+    + '<button class="btn gh" style="margin-left:8px" onclick="closeModal()">'
+    + 'とじる</button>');
+}
+async function invite(who){
+  var d = await P('/api/mail/invite', {room_id:CUR, member_id:who});
+  if (d.ok !== true){ toast(d.error,'error'); return; }
+  toast('さそいました'); closeModal(); refreshRoom(false);
+}
+async function leaveRoom(){
+  if (!confirm('このグループを ぬけますか？')) return;
+  var d = await P('/api/mail/leave', {room_id:CUR});
+  if (d.ok !== true){ toast(d.error,'error'); return; }
+  closeModal(); backToList();
 }
 
 /* ---- つながる ---- */
@@ -276,6 +473,24 @@ async function checkReqs(){
   var n = (d.requests||[]).length;
   var el = $('reqN');
   if (el) el.textContent = n>0 ? ' '+n : '';
+}
+
+async function showBlocks(){
+  var d = await J('/api/mail/blocks');
+  openModal(
+      '<h1 style="font-size:17px;margin-bottom:12px">🚫 ブロックして いる 人</h1>'
+    + ((d.blocks||[]).length ? d.blocks.map(function(b){
+        return '<div class="card" style="display:flex;align-items:center;gap:10px">'
+          + '<b style="flex:1">' + K(b.nickname||b.member_id) + '</b>'
+          + '<button class="btn gh sm" onclick="unblock(\'' + K(b.member_id)
+          + '\')">かいじょ</button></div>';
+      }).join('') : '<div class="empty">いません</div>')
+    + '<div class="row" style="margin-top:12px">'
+    + '<button class="btn gh" onclick="closeModal()">とじる</button></div>');
+}
+async function unblock(who){
+  await P('/api/mail/block', {member_id:who, block:false});
+  toast('かいじょ しました'); showBlocks();
 }
 
 async function showGroup(){
