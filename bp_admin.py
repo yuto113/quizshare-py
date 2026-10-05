@@ -48,6 +48,7 @@ PAGES = {
     'omagames': ('admin/omagames.html', 'Omame Games', True),
     'omapt': ('admin/omapt.html', 'PT・かし', True),
     'omacontest': ('admin/omacontest.html', 'コンテスト', True),
+    'omaofficial': ('admin/omaofficial.html', '公式アカウント', True),
     'ops': ('admin/ops.html', 'システム状況', True),
     'alert': ('admin/alert.html', '天気・防災情報', False),
     'call': ('admin/call.html', '通話', False),

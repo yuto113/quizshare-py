@@ -1,0 +1,147 @@
+<style>
+.ow{max-width:920px;margin:0 auto;padding:18px 20px 60px;
+  font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;color:#0a1628}
+.ow h2{font-size:19px;margin:0 0 4px}
+.ow .lead{font-size:12.5px;color:#7a8794;margin:0 0 16px;line-height:1.7}
+.otabs{display:flex;gap:2px;border-bottom:1px solid #dde5ea;margin-bottom:18px}
+.otab{padding:9px 15px;font-size:12.5px;color:#7a8794;cursor:pointer;background:none;
+  border:none;border-bottom:2px solid transparent;font-family:inherit}
+.otab:hover{color:#0a1628}
+.otab.on{color:#0a1628;border-bottom-color:#4d7c0f;font-weight:600}
+.opane{display:none}.opane.on{display:block}
+.otbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.otbl th{text-align:left;font-size:11px;color:#7a8794;padding:7px 9px;
+  border-bottom:1px solid #dde5ea;white-space:nowrap}
+.otbl td{padding:9px;border-bottom:1px solid #eef3f5;vertical-align:middle}
+.otbl tr.wait td{background:#fffbeb}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;color:#7a8794}
+.tg{font-size:10.5px;padding:2px 8px;border-radius:99px;font-weight:700;white-space:nowrap}
+.tg.wait{background:#fef3c7;color:#92400e}
+.tg.ok{background:#dcfce7;color:#166534}
+.tg.no{background:#e5e7eb;color:#4b5563}
+.tg.on{background:#dcfce7;color:#166534}
+.tg.off{background:#fee2e2;color:#991b1b}
+.obtn{background:none;border:1px solid #dde5ea;color:#0a1628;padding:5px 12px;
+  border-radius:7px;font-size:11.5px;cursor:pointer;font-family:inherit}
+.obtn:hover{background:#f0f4f6}
+.obtn.mn{background:#4d7c0f;color:#fff;border-color:#4d7c0f}
+.oempty{padding:26px 0;text-align:center;color:#9aa8b2;font-size:12.5px}
+.ocards{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));
+  gap:9px;margin-bottom:18px}
+.ocard{background:#fff;border:1px solid #dde5ea;border-radius:10px;padding:12px 14px}
+.ocard .n{font-size:21px;font-weight:700}
+.ocard .l{font-size:11px;color:#7a8794;margin-top:2px}
+.ocard.warn{border-color:#fcd34d;background:#fffbeb}
+</style>
+
+<div class="ow">
+  <h2>🏢 公式アカウント</h2>
+  <p class="lead">会員からの申請を 認めると、公式が できます（申請した人が オーナー）。<br>
+    止めても 消えません。いつでも もどせます。</p>
+
+  <div class="ocards" id="oCards"></div>
+
+  <div class="otabs">
+    <button class="otab on" data-p="apply">📝 申請</button>
+    <button class="otab" data-p="list">🏢 公式いちらん</button>
+  </div>
+
+  <div class="opane on" id="o-apply"><div id="applyList"></div></div>
+  <div class="opane" id="o-list"><div id="offList"></div></div>
+</div>
+
+<script>
+(function(){
+var D = null;
+var K = function(s){ return String(s==null?'':s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  .replace(/"/g,'&quot;'); };
+function T(m,t){ if(window.toast) window.toast(m,t); else alert(m); }
+async function J(u,o){ var r=await fetch(u,o);
+  return await r.json().catch(function(){ return {ok:false,error:'よめません'}; }); }
+function P(u,b){ return J(u,{method:'POST',headers:{'Content-Type':'application/json'},
+  body:JSON.stringify(b||{})}); }
+function $(i){ return document.getElementById(i); }
+
+var ST = {wait:'まち', ok:'認めた', no:'ことわった'};
+
+async function load(){
+  D = await J('/api/admin/official/applies');
+  if (D.ok !== true){
+    $('applyList').innerHTML = '<div class="oempty">' + K(D.error) + '</div>';
+    return;
+  }
+  var wait = D.applies.filter(function(a){ return a.status === 'wait'; }).length;
+  $('oCards').innerHTML =
+      card(wait, '申請まち', wait > 0)
+    + card(D.officials.filter(function(o){ return o.active; }).length, '公式')
+    + card(D.officials.reduce(function(n,o){ return n + o.users; }, 0), '追加した 人');
+  drawApply(); drawOff();
+}
+function card(n, l, warn){
+  return '<div class="ocard' + (warn ? ' warn' : '') + '"><div class="n">' + (n||0)
+    + '</div><div class="l">' + K(l) + '</div></div>';
+}
+
+function drawApply(){
+  $('applyList').innerHTML = D.applies.length
+    ? '<div style="overflow-x:auto"><table class="otbl"><thead><tr>'
+      + '<th>申請した人</th><th>公式の名前</th><th>せつめい</th><th>日</th>'
+      + '<th>状態</th><th></th></tr></thead><tbody>'
+      + D.applies.map(function(a){
+          return '<tr class="' + (a.status==='wait'?'wait':'') + '">'
+            + '<td><b>' + K(a.nickname||a.member_id) + '</b>'
+            + '<div class="mono">' + K(a.member_id) + '</div></td>'
+            + '<td><b>' + K(a.name) + '</b></td>'
+            + '<td>' + K(a.note||'') + '</td>'
+            + '<td class="mono">' + K((a.created_at||'').slice(0,16)) + '</td>'
+            + '<td><span class="tg ' + K(a.status) + '">' + K(ST[a.status]||a.status)
+            + '</span></td>'
+            + '<td>' + (a.status==='wait'
+                ? '<button class="obtn mn" onclick="decide(' + a.id + ',true)">認める</button> '
+                  + '<button class="obtn" onclick="decide(' + a.id + ',false)">ことわる</button>'
+                : '') + '</td></tr>';
+        }).join('') + '</tbody></table></div>'
+    : '<div class="oempty">申請は ありません</div>';
+}
+
+function drawOff(){
+  $('offList').innerHTML = D.officials.length
+    ? '<div style="overflow-x:auto"><table class="otbl"><thead><tr>'
+      + '<th>公式</th><th>オーナー</th><th>スタッフ</th><th>追加した人</th>'
+      + '<th>状態</th><th></th></tr></thead><tbody>'
+      + D.officials.map(function(o){
+          return '<tr><td><b>' + K(o.name) + '</b><div class="mono">#' + o.id + '</div></td>'
+            + '<td class="mono">' + K(o.owner) + '</td>'
+            + '<td>' + o.staff + ' 人</td><td>' + o.users + ' 人</td>'
+            + '<td><span class="tg ' + (o.active?'on':'off') + '">'
+            + (o.active?'出てる':'止めた') + '</span></td>'
+            + '<td><button class="obtn" onclick="toggle(' + o.id + ',' + (o.active?0:1)
+            + ')">' + (o.active?'止める':'もどす') + '</button></td></tr>';
+        }).join('') + '</tbody></table></div>'
+    : '<div class="oempty">まだ 公式は ありません</div>';
+}
+
+window.decide = async function(id, ok){
+  if (!confirm(ok ? '認めますか？（公式が できます）' : 'ことわりますか？')) return;
+  var r = await P('/api/admin/official/apply/' + id, {ok: ok});
+  if (r.ok !== true){ T(r.error, 'error'); return; }
+  T(ok ? '認めました' : 'ことわりました'); load();
+};
+window.toggle = async function(id, active){
+  var r = await P('/api/admin/official/' + id + '/active', {active: !!active});
+  if (r.ok !== true){ T(r.error, 'error'); return; }
+  T(active ? 'もどしました' : '止めました'); load();
+};
+
+document.querySelectorAll('.otab').forEach(function(t){
+  t.onclick = function(){
+    document.querySelectorAll('.otab').forEach(function(x){
+      x.classList.toggle('on', x === t); });
+    document.querySelectorAll('.opane').forEach(function(p){
+      p.classList.toggle('on', p.id === 'o-' + t.dataset.p); });
+  };
+});
+load();
+})();
+</script>
