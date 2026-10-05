@@ -284,7 +284,10 @@ def api_mail_rooms():
         ORDER BY r.id DESC""", (me_id,)).fetchall():
         d = dict(r)
         # 1対1なら 相手の 名前を だす
-        if r['kind'] == 'dm':
+        if r['kind'] == 'official':
+            d['title'] = r['name'] or '公式'
+            d['official'] = True
+        elif r['kind'] == 'dm':
             o = c.execute("""SELECT m.member_id, m.nickname, m.avatar,
                              m.avatar_kind, m.color
                              FROM oma_room_member rm
@@ -340,6 +343,12 @@ def api_mail_room(rid):
                        (rid, after)).fetchall():
         d = dict(m)
         d['body'] = dec(m['body'])
+        if str(m['member_id']).startswith('off:'):
+            oo = c.execute('SELECT name FROM oma_official WHERE id=?',
+                           (str(m['member_id'])[4:],)).fetchone()
+            d['nickname'] = (oo['name'] if oo else '公式')
+            d['official'] = True
+            d['extra'] = None           # だれが 書いたかは 利用者には 見せない
         if m['kind'] == 'image' and m['extra']:
             d['extra'] = dec(m['extra'])    # 画像を もどす
         # 返信元の 中身
@@ -822,3 +831,257 @@ def api_mail_mydraws():
         "ORDER BY id DESC LIMIT 40", (u['member_id'],)).fetchall()]
     c.close()
     return jsonify(ok=True, draws=rows)
+
+
+# ====================================================================
+# 公式アカウント
+#   ・申請 → 管理者が認める → 公式ができる（申請者がオーナー）
+#   ・オーナーが「公式で送っていい人」を追加できる
+#   ・利用者は 名前で検索して 友達追加（承認なし・すぐ つながる）
+#   ・利用者が書く → 公式の運営者が 公式名義で 返信
+#   ・メッセージの送り主は 'off:<公式ID>' で 保存する
+# ====================================================================
+def _off_role(official_id, member_id):
+    """その人が この公式の owner / staff か。なければ None"""
+    c = _db()
+    r = c.execute('SELECT role FROM oma_official_staff '
+                  'WHERE official_id=? AND member_id=?',
+                  (official_id, member_id)).fetchone()
+    c.close()
+    return r['role'] if r else None
+
+
+def _off_room(official_id, member_id):
+    """利用者と公式の 部屋を 作る／さがす"""
+    c = _db()
+    tag = 'off:%s' % official_id
+    r = c.execute("""SELECT r.id FROM oma_room r
+        JOIN oma_room_member m ON m.room_id=r.id AND m.member_id=?
+        WHERE r.kind='official' AND r.owner=?""", (member_id, tag)).fetchone()
+    if r:
+        c.close()
+        return r['id']
+    cur = c.execute("INSERT INTO oma_room(kind,name,owner) VALUES('official',"
+                    "(SELECT name FROM oma_official WHERE id=?),?)",
+                    (official_id, tag))
+    rid = cur.lastrowid
+    c.execute('INSERT INTO oma_room_member(room_id,member_id) VALUES(?,?)',
+              (rid, member_id))
+    c.commit(); c.close()
+    return rid
+
+
+@bp_mail.route('/api/mail/official/search')
+def api_off_search():
+    """公式アカウントを 名前で さがす（一般の人は 検索に 出ない）"""
+    u = _me()
+    if not u:
+        return jsonify(ok=False), 401
+    q = (request.args.get('q') or '').strip()
+    if not q:
+        return jsonify(ok=True, items=[])
+    c = _db()
+    rows = [dict(r) for r in c.execute(
+        "SELECT id, name, note, icon FROM oma_official "
+        "WHERE active=1 AND name LIKE ? ORDER BY name LIMIT 20",
+        ('%' + q + '%',)).fetchall()]
+    c.close()
+    return jsonify(ok=True, items=rows)
+
+
+@bp_mail.route('/api/mail/official/add', methods=['POST'])
+def api_off_add():
+    """公式を 友達追加（承認なし。すぐ 部屋が できる）"""
+    u = _me()
+    if not u:
+        return jsonify(ok=False), 401
+    d = request.get_json(silent=True) or {}
+    oid = d.get('official_id')
+    c = _db()
+    o = c.execute('SELECT id FROM oma_official WHERE id=? AND active=1',
+                  (oid,)).fetchone()
+    c.close()
+    if not o:
+        return jsonify(ok=False, error='ありません'), 404
+    rid = _off_room(oid, u['member_id'])
+    return jsonify(ok=True, room_id=rid)
+
+
+@bp_mail.route('/api/mail/official/apply', methods=['POST'])
+def api_off_apply():
+    """公式アカウントを つくりたい（申請）"""
+    u = _me()
+    if not u:
+        return jsonify(ok=False), 401
+    d = request.get_json(silent=True) or {}
+    name = (d.get('name') or '').strip()
+    if not name:
+        return jsonify(ok=False, error='名前を 入れて ください'), 400
+    c = _db()
+    dup = c.execute("SELECT 1 FROM oma_official WHERE name=?", (name,)).fetchone()
+    dup2 = c.execute("SELECT 1 FROM oma_official_apply WHERE name=? "
+                     "AND status='wait'", (name,)).fetchone()
+    if dup or dup2:
+        c.close()
+        return jsonify(ok=False, error='その 名前は つかわれて います'), 409
+    c.execute("INSERT INTO oma_official_apply(member_id,name,note,created_at) "
+              "VALUES(?,?,?,?)",
+              (u['member_id'], name[:40], (d.get('note') or '')[:300], jst_str()))
+    c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+@bp_mail.route('/api/mail/official/mine')
+def api_off_mine():
+    """じぶんが 運営している 公式"""
+    u = _me()
+    if not u:
+        return jsonify(ok=False), 401
+    c = _db()
+    rows = [dict(r) for r in c.execute("""
+        SELECT o.id, o.name, o.icon, s.role FROM oma_official_staff s
+        JOIN oma_official o ON o.id=s.official_id
+        WHERE s.member_id=? AND o.active=1""", (u['member_id'],)).fetchall()]
+    c.close()
+    return jsonify(ok=True, items=rows)
+
+
+@bp_mail.route('/api/mail/official/<int:oid>/inbox')
+def api_off_inbox(oid):
+    """公式の 受信箱（運営者が 見る）。利用者ごとの 部屋と 新着"""
+    u = _me()
+    if not u:
+        return jsonify(ok=False), 401
+    if not _off_role(oid, u['member_id']):
+        return jsonify(ok=False, error='運営者では ありません'), 403
+    tag = 'off:%s' % oid
+    c = _db()
+    rooms = []
+    for r in c.execute("SELECT id FROM oma_room WHERE kind='official' AND owner=? "
+                       "ORDER BY id DESC", (tag,)).fetchall():
+        who = c.execute("""SELECT m.member_id, m.nickname FROM oma_room_member rm
+                           JOIN mp_member m ON m.member_id=rm.member_id
+                           WHERE rm.room_id=?""", (r['id'],)).fetchone()
+        last = c.execute("SELECT id, body, member_id, created_at FROM oma_msg "
+                         "WHERE room_id=? AND hidden=0 ORDER BY id DESC LIMIT 1",
+                         (r['id'],)).fetchone()
+        rooms.append({
+            'room_id': r['id'],
+            'user': (who['nickname'] if who else '?'),
+            'last': (dec(last['body'])[:30] if last else ''),
+            'last_at': (last['created_at'] if last else None),
+            'from_user': bool(last and not str(last['member_id']).startswith('off:')),
+        })
+    c.close()
+    return jsonify(ok=True, rooms=rooms)
+
+
+@bp_mail.route('/api/mail/official/<int:oid>/room/<int:rid>')
+def api_off_room(oid, rid):
+    """運営者が その 部屋の やりとりを 見る"""
+    u = _me()
+    if not u:
+        return jsonify(ok=False), 401
+    if not _off_role(oid, u['member_id']):
+        return jsonify(ok=False, error='運営者では ありません'), 403
+    c = _db()
+    rm = c.execute("SELECT 1 FROM oma_room WHERE id=? AND kind='official' "
+                   "AND owner=?", (rid, 'off:%s' % oid)).fetchone()
+    if not rm:
+        c.close(); return jsonify(ok=False, error='ありません'), 404
+    msgs = []
+    for m in c.execute("""SELECT o.id, o.member_id, o.body, o.created_at, o.kind,
+                          o.extra, mm.nickname FROM oma_msg o
+                          LEFT JOIN mp_member mm ON mm.member_id=o.member_id
+                          WHERE o.room_id=? AND o.hidden=0 ORDER BY o.id LIMIT 300""",
+                       (rid,)).fetchall():
+        d = dict(m)
+        d['body'] = dec(m['body'])
+        d['by_official'] = str(m['member_id']).startswith('off:')
+        if m['kind'] == 'image' and m['extra']:
+            d['extra'] = dec(m['extra'])
+        msgs.append(d)
+    c.close()
+    return jsonify(ok=True, msgs=msgs)
+
+
+@bp_mail.route('/api/mail/official/<int:oid>/reply', methods=['POST'])
+def api_off_reply(oid):
+    """公式の 名前で 返信する（運営者だけ）"""
+    u = _me()
+    if not u:
+        return jsonify(ok=False), 401
+    if not _off_role(oid, u['member_id']):
+        return jsonify(ok=False, error='運営者では ありません'), 403
+    d = request.get_json(silent=True) or {}
+    rid = d.get('room_id')
+    body = (d.get('body') or '').strip()
+    if not body:
+        return jsonify(ok=False, error='なにか 書いて'), 400
+    if len(body) > 2000:
+        return jsonify(ok=False, error='ながすぎます'), 400
+    c = _db()
+    rm = c.execute("SELECT 1 FROM oma_room WHERE id=? AND kind='official' "
+                   "AND owner=?", (rid, 'off:%s' % oid)).fetchone()
+    if not rm:
+        c.close(); return jsonify(ok=False, error='ありません'), 404
+    # 送り主は 'off:<公式ID>'。だれが 書いたかは extra に のこす（管理用）
+    cur = c.execute("""INSERT INTO oma_msg(room_id,member_id,body,created_at,
+                       kind,extra) VALUES(?,?,?,?,'text',?)""",
+                    (rid, 'off:%s' % oid, enc(body), jst_str(),
+                     'by:' + u['member_id']))
+    c.commit(); c.close()
+    return jsonify(ok=True, id=cur.lastrowid)
+
+
+@bp_mail.route('/api/mail/official/<int:oid>/broadcast', methods=['POST'])
+def api_off_broadcast(oid):
+    """友達追加した 全員の トークに 一斉送信（運営者だけ）"""
+    u = _me()
+    if not u:
+        return jsonify(ok=False), 401
+    if not _off_role(oid, u['member_id']):
+        return jsonify(ok=False, error='運営者では ありません'), 403
+    d = request.get_json(silent=True) or {}
+    body = (d.get('body') or '').strip()
+    if not body:
+        return jsonify(ok=False, error='なにか 書いて'), 400
+    if len(body) > 2000:
+        return jsonify(ok=False, error='ながすぎます'), 400
+    tag = 'off:%s' % oid
+    now = jst_str()
+    c = _db()
+    rooms = c.execute("SELECT id FROM oma_room WHERE kind='official' AND owner=?",
+                      (tag,)).fetchall()
+    for r in rooms:
+        c.execute("""INSERT INTO oma_msg(room_id,member_id,body,created_at,
+                     kind,extra) VALUES(?,?,?,?,'text',?)""",
+                  (r['id'], tag, enc(body), now, 'by:' + u['member_id']))
+    c.execute("INSERT INTO oma_official_post(official_id,sent_by,body,created_at) "
+              "VALUES(?,?,?,?)", (oid, u['member_id'], body[:2000], now))
+    c.commit(); c.close()
+    return jsonify(ok=True, sent=len(rooms))
+
+
+@bp_mail.route('/api/mail/official/<int:oid>/staff', methods=['POST'])
+def api_off_staff(oid):
+    """オーナーが 「公式で 送って いいよ」を 配る／取り消す"""
+    u = _me()
+    if not u:
+        return jsonify(ok=False), 401
+    if _off_role(oid, u['member_id']) != 'owner':
+        return jsonify(ok=False, error='オーナーだけが できます'), 403
+    d = request.get_json(silent=True) or {}
+    who = (d.get('member_id') or '').strip()
+    c = _db()
+    ex = c.execute('SELECT 1 FROM mp_member WHERE member_id=?', (who,)).fetchone()
+    if not ex:
+        c.close(); return jsonify(ok=False, error='その ID は いません'), 404
+    if d.get('remove'):
+        c.execute("DELETE FROM oma_official_staff WHERE official_id=? "
+                  "AND member_id=? AND role<>'owner'", (oid, who))
+    else:
+        c.execute("INSERT OR IGNORE INTO oma_official_staff"
+                  "(official_id,member_id,role) VALUES(?,?,'staff')", (oid, who))
+    c.commit(); c.close()
+    return jsonify(ok=True)

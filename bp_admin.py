@@ -1961,3 +1961,65 @@ def api_admin_mail_report(rid):
               (d.get('status') or 'closed', session.get('staff_id'), rid))
     c.commit(); c.close()
     return jsonify(ok=True)
+
+
+# ---------- 公式アカウント（申請の承認） ----------
+@bp.route('/api/admin/official/applies')
+def api_admin_off_applies():
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    c = _db()
+    rows = [dict(r) for r in c.execute("""
+        SELECT a.*, m.nickname FROM oma_official_apply a
+        LEFT JOIN mp_member m ON m.member_id=a.member_id
+        ORDER BY (a.status='wait') DESC, a.id DESC LIMIT 60""").fetchall()]
+    offs = [dict(r) for r in c.execute("""
+        SELECT o.id, o.name, o.owner, o.active,
+               (SELECT COUNT(*) FROM oma_official_staff s WHERE s.official_id=o.id) AS staff,
+               (SELECT COUNT(*) FROM oma_room r WHERE r.kind='official'
+                AND r.owner='off:'||o.id) AS users
+        FROM oma_official o ORDER BY o.id DESC""").fetchall()]
+    c.close()
+    return jsonify(ok=True, applies=rows, officials=offs)
+
+
+@bp.route('/api/admin/official/apply/<int:aid>', methods=['POST'])
+def api_admin_off_decide(aid):
+    """認める／ことわる。認めると 公式が できて 申請者が オーナーに なる"""
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    d = request.get_json(silent=True) or {}
+    c = _db()
+    a = c.execute("SELECT * FROM oma_official_apply WHERE id=? AND status='wait'",
+                  (aid,)).fetchone()
+    if not a:
+        c.close(); return jsonify(ok=False, error='ありません'), 404
+    who = session.get('staff_id')
+    if d.get('ok'):
+        cur = c.execute("INSERT INTO oma_official(name,note,owner) VALUES(?,?,?)",
+                        (a['name'], a['note'], a['member_id']))
+        oid = cur.lastrowid
+        c.execute("INSERT INTO oma_official_staff(official_id,member_id,role) "
+                  "VALUES(?,?,'owner')", (oid, a['member_id']))
+        c.execute("UPDATE oma_official_apply SET status='ok', handled_by=? "
+                  "WHERE id=?", (who, aid))
+    else:
+        c.execute("UPDATE oma_official_apply SET status='no', handled_by=? "
+                  "WHERE id=?", (who, aid))
+    c.commit(); c.close()
+    audit('official_apply', str(aid), 'ok' if d.get('ok') else 'no')
+    return jsonify(ok=True)
+
+
+@bp.route('/api/admin/official/<int:oid>/active', methods=['POST'])
+def api_admin_off_active(oid):
+    """公式を 止める／もどす（消さない）"""
+    if _role() != 'admin':
+        return jsonify(ok=False, error='管理者のみ'), 403
+    d = request.get_json(silent=True) or {}
+    c = _db()
+    c.execute('UPDATE oma_official SET active=? WHERE id=?',
+              (1 if d.get('active') else 0, oid))
+    c.commit(); c.close()
+    audit('official_active', str(oid), str(d.get('active')))
+    return jsonify(ok=True)
