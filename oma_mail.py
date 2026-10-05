@@ -420,6 +420,7 @@ def api_mail_send():
     c.execute('UPDATE oma_room_member SET last_read=? WHERE room_id=? '
               'AND member_id=?', (mid, rid, u['member_id']))
     c.commit(); c.close()
+    _auto_reply(rid, u['member_id'], _kind)
     return jsonify(ok=True, id=mid)
 
 
@@ -903,7 +904,10 @@ def api_off_add():
     c.close()
     if not o:
         return jsonify(ok=False, error='ありません'), 404
+    existed = _off_room_exists(oid, u['member_id'])
     rid = _off_room(oid, u['member_id'])
+    if not existed:
+        _send_welcome(oid, rid)
     return jsonify(ok=True, room_id=rid)
 
 
@@ -970,7 +974,7 @@ def api_off_inbox(oid):
             'user': (who['nickname'] if who else '?'),
             'last': (dec(last['body'])[:30] if last else ''),
             'last_at': (last['created_at'] if last else None),
-            'from_user': bool(last and not str(last['member_id']).startswith('off:')),
+            'from_user': _waiting(c, r['id']),
         })
     c.close()
     return jsonify(ok=True, rooms=rooms)
@@ -1083,5 +1087,126 @@ def api_off_staff(oid):
     else:
         c.execute("INSERT OR IGNORE INTO oma_official_staff"
                   "(official_id,member_id,role) VALUES(?,?,'staff')", (oid, who))
+    c.commit(); c.close()
+    return jsonify(ok=True)
+
+
+# ====================================================================
+# 公式アカウント: はじめの メッセージ・自動返信
+#   ・はじめの メッセージ … 友だち追加した その場で 1回だけ とどく
+#   ・自動返信 … 利用者が 書くたびに きまった 返事が 返る
+#   ・送り主は 'off:<公式ID>'。extra の しるし（by:welcome / by:auto）で 見わける
+# ====================================================================
+def _off_settings(oid):
+    c = _db()
+    r = c.execute('SELECT welcome, welcome_on, auto_reply, auto_on '
+                  'FROM oma_official WHERE id=?', (oid,)).fetchone()
+    c.close()
+    if not r:
+        return None
+    return {'welcome': r['welcome'] or '',
+            'welcome_on': int(r['welcome_on'] or 0),
+            'auto_reply': r['auto_reply'] or '',
+            'auto_on': int(r['auto_on'] or 0)}
+
+
+def _off_say(room_id, oid, text, tag):
+    """公式の 名前で 1通 入れる（tag は 'by:welcome' か 'by:auto'）"""
+    c = _db()
+    c.execute("INSERT INTO oma_msg(room_id,member_id,body,created_at,kind,extra) "
+              "VALUES(?,?,?,?,'text',?)",
+              (room_id, 'off:%s' % oid, enc(text), jst_str(), tag))
+    c.commit(); c.close()
+
+
+def _off_room_exists(oid, member_id):
+    """その人と その公式の 部屋が もう あるか"""
+    c = _db()
+    r = c.execute("SELECT 1 FROM oma_room r JOIN oma_room_member m "
+                  "ON m.room_id=r.id AND m.member_id=? "
+                  "WHERE r.kind='official' AND r.owner=?",
+                  (member_id, 'off:%s' % oid)).fetchone()
+    c.close()
+    return bool(r)
+
+
+def _send_welcome(oid, room_id):
+    """友だち追加した ときの「はじめの メッセージ」。
+       しっぱいしても 友だち追加 そのものは 成功させる"""
+    try:
+        st = _off_settings(oid)
+        if st and st['welcome_on'] and st['welcome'].strip():
+            _off_say(room_id, oid, st['welcome'].strip(), 'by:welcome')
+    except Exception as e:
+        print('[official welcome]', e)
+
+
+def _auto_reply(rid, member_id, kind):
+    """利用者が 書いたら きまった 返事を 返す。
+       しっぱいしても 利用者の 送信は こわさない"""
+    try:
+        if kind != 'text':
+            return
+        c = _db()
+        room = c.execute("SELECT kind, owner FROM oma_room WHERE id=?",
+                         (rid,)).fetchone()
+        c.close()
+        if not room or room['kind'] != 'official':
+            return
+        oid = str(room['owner'] or '')[4:]
+        if not oid.isdigit():
+            return
+        st = _off_settings(int(oid))
+        if not st or not st['auto_on'] or not st['auto_reply'].strip():
+            return
+        # つづけて 何通も 書かれても、10びょうに 1回だけ 返す
+        from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+        thr = (_dt.now(_tz(_td(hours=9))) - _td(seconds=10)).strftime('%Y-%m-%d %H:%M:%S')
+        c = _db()
+        n = c.execute("SELECT COUNT(*) AS n FROM oma_msg WHERE room_id=? "
+                      "AND member_id=? AND extra='by:auto' AND created_at>?",
+                      (rid, 'off:%s' % oid, thr)).fetchone()['n']
+        c.close()
+        if n:
+            return
+        _off_say(rid, int(oid), st['auto_reply'].strip(), 'by:auto')
+    except Exception as e:
+        print('[official auto]', e)
+
+
+def _waiting(c, room_id):
+    """運営者の 返事を まって いるか。自動の 返事・はじめの メッセージは 数えない"""
+    r = c.execute("SELECT member_id FROM oma_msg WHERE room_id=? AND hidden=0 "
+                  "AND COALESCE(extra,'') NOT IN ('by:auto','by:welcome') "
+                  "ORDER BY id DESC LIMIT 1", (room_id,)).fetchone()
+    return bool(r and not str(r['member_id']).startswith('off:'))
+
+
+@bp_mail.route('/api/mail/official/<int:oid>/settings', methods=['GET', 'POST'])
+def api_off_settings(oid):
+    """はじめの メッセージ・自動返信の 設定。見るのは 運営者、かえるのは オーナー"""
+    u = _me()
+    if not u:
+        return jsonify(ok=False), 401
+    role = _off_role(oid, u['member_id'])
+    if not role:
+        return jsonify(ok=False, error='運営者では ありません'), 403
+    if request.method == 'GET':
+        st = _off_settings(oid) or {}
+        return jsonify(ok=True, **st)
+    if role != 'owner':
+        return jsonify(ok=False, error='オーナーだけが かえられます'), 403
+    d = request.get_json(silent=True) or {}
+    welcome = (d.get('welcome') or '').strip()[:1000]
+    auto = (d.get('auto_reply') or '').strip()[:1000]
+    w_on = 1 if d.get('welcome_on') else 0
+    a_on = 1 if d.get('auto_on') else 0
+    if w_on and not welcome:
+        return jsonify(ok=False, error='はじめの メッセージを 書いて ください'), 400
+    if a_on and not auto:
+        return jsonify(ok=False, error='自動返信の ないようを 書いて ください'), 400
+    c = _db()
+    c.execute('UPDATE oma_official SET welcome=?, welcome_on=?, auto_reply=?, '
+              'auto_on=? WHERE id=?', (welcome, w_on, auto, a_on, oid))
     c.commit(); c.close()
     return jsonify(ok=True)

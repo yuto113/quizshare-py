@@ -562,9 +562,12 @@ async function ofApplySend(){
 }
 
 /* ---- 運営者の 画面 ---- */
-var OF_ID = null, OF_ROOM = null;
+var OF_ID = null, OF_ROOM = null, OF_NAME = '', OF_ROLE = 'staff';
 async function ofManage(id, name, role){
   OF_ID = id;
+  // 名前が 空なら「もどる」から。さいごに ひらいた 公式の 名前と 立場を つかう
+  if (name){ OF_NAME = name; OF_ROLE = role; }
+  name = OF_NAME; role = OF_ROLE;
   var d = await J('/api/mail/official/' + id + '/inbox');
   if (d.ok !== true){ toast(d.error,'error'); return; }
   openModal(
@@ -581,7 +584,7 @@ async function ofManage(id, name, role){
           + '</div>';
       }).join('') : '<div class="empty">まだ だれも 追加して いません</div>')
     + '<div class="row" style="margin-top:12px">'
-    + '<button class="btn mn" onclick="ofBroadcast()">📢 一斉に おしらせ</button>'
+    + '<button class="btn mn" onclick="ofBroadcast()">📢 おしらせ・自動メッセージ</button>'
     + (role==='owner' ? '<button class="btn gh" onclick="ofStaff()">👥 スタッフ</button>' : '')
     + '<button class="btn gh" onclick="showOfficial()">もどる</button></div>');
 }
@@ -616,17 +619,62 @@ async function ofReplySend(){
   ofOpenRoom(OF_ROOM);
 }
 
-function ofBroadcast(){
+function ofBack(){ ofManage(OF_ID, '', ''); }
+
+async function ofBroadcast(){
+  var st = await J('/api/mail/official/' + OF_ID + '/settings');
+  if (st.ok !== true){ toast(st.error, 'error'); return; }
+  var owner = (OF_ROLE === 'owner');
+  var dis = owner ? '' : ' disabled';
+  var sec = 'font-weight:700;font-size:13px;margin:0 0 3px';
+  var note = 'font-size:12px;color:var(--muted);margin:0 0 6px;line-height:1.7';
+  var lab = 'display:flex;align-items:center;gap:6px;font-size:12.5px;margin:4px 0 6px';
+  var hr = '<hr style="border:none;border-top:1px solid var(--line2);margin:16px 0">';
   openModal(
-      '<h1 style="font-size:17px;margin-bottom:10px">📢 一斉に おしらせ</h1>'
-    + '<p style="font-size:12px;color:var(--muted);margin-bottom:8px">'
-    + '追加して くれた 全員の トークに とどきます。</p>'
-    + '<textarea class="inp" id="bcText" rows="4" placeholder="おしらせの ないよう"></textarea>'
-    + '<div class="row" style="margin-top:10px">'
-    + '<button class="btn mn" onclick="ofBroadcastSend()">おくる</button>'
-    + '<button class="btn gh" onclick="ofManage(' + OF_ID + ',\'\',\'staff\')">'
-    + 'やめる</button></div>');
+      '<h1 style="font-size:17px;margin-bottom:12px">📢 おしらせ・自動メッセージ</h1>'
+
+    + '<div style="' + sec + '">一斉に おしらせ</div>'
+    + '<p style="' + note + '">追加して くれた 全員の トークに とどきます。</p>'
+    + '<textarea class="inp" id="bcText" rows="3" placeholder="おしらせの ないよう"></textarea>'
+    + '<div class="row" style="margin-top:8px">'
+    + '<button class="btn mn" onclick="ofBroadcastSend()">おくる</button></div>'
+
+    + hr
+    + '<div style="' + sec + '">👋 はじめの メッセージ</div>'
+    + '<p style="' + note + '">公式を 追加した 人に、入った ときに すぐ とどきます'
+    + '（1人に 1回だけ）。</p>'
+    + '<label style="' + lab + '"><input type="checkbox" id="wlOn"'
+    + (st.welcome_on ? ' checked' : '') + dis + '> つかう</label>'
+    + '<textarea class="inp" id="wlText" rows="3" placeholder="はじめに 見せる メッセージ"'
+    + dis + '>' + K(st.welcome || '') + '</textarea>'
+
+    + hr
+    + '<div style="' + sec + '">🤖 自動返信</div>'
+    + '<p style="' + note + '">利用者が メッセージを 書くたびに、ここに 書いた 返事が '
+    + '自動で 返ります（つづけて 書かれた ときは 10びょうに 1回）。'
+    + '人が 返事を する ことも できます。</p>'
+    + '<label style="' + lab + '"><input type="checkbox" id="arOn"'
+    + (st.auto_on ? ' checked' : '') + dis + '> つかう</label>'
+    + '<textarea class="inp" id="arText" rows="3" placeholder="自動で 返す 返事"'
+    + dis + '>' + K(st.auto_reply || '') + '</textarea>'
+
+    + (owner
+        ? '<div class="row" style="margin-top:12px">'
+          + '<button class="btn mn" onclick="ofSaveSettings()">設定を ほぞん</button></div>'
+        : '<p style="font-size:11.5px;color:var(--muted);margin-top:8px">'
+          + 'この 設定は オーナーだけが かえられます。</p>')
+    + '<div class="row" style="margin-top:12px">'
+    + '<button class="btn gh" onclick="ofBack()">もどる</button></div>');
 }
+
+async function ofSaveSettings(){
+  var d = await P('/api/mail/official/' + OF_ID + '/settings', {
+    welcome: $('wlText').value, welcome_on: $('wlOn').checked ? 1 : 0,
+    auto_reply: $('arText').value, auto_on: $('arOn').checked ? 1 : 0});
+  if (d.ok !== true){ toast(d.error, 'error'); return; }
+  toast('ほぞんしました');
+}
+
 async function ofBroadcastSend(){
   var t = $('bcText').value.trim();
   if (!t){ toast('ないようを 書いて','error'); return; }
