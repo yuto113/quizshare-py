@@ -1588,6 +1588,10 @@ app.register_blueprint(_bp_games)
 from oma_mail import bp_mail as _bp_mail
 app.register_blueprint(_bp_mail)
 
+# 管理センターの 新しい 入口 /MFSG2（旧 /admin は 予定の 日づけで 転送→404）
+from mfsg2 import install as _install_mfsg2
+_install_mfsg2(app)
+
 from bp_admin import bp as _bp_admin
 app.register_blueprint(_bp_admin)
 
